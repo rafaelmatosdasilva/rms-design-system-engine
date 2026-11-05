@@ -960,7 +960,7 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#write-the-intent-layer) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided, each row tagged Code, Figma, Intent layer or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (with the time), Type, What, Done by and Affects. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A chip for each type shows only that type, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 
 - **An intent layer change** is a card of its own: the pages it changed, the commit that made it, and the components those pages document. The engine keeps the last 50 changes it read, in the layer's snapshot.
 - **Every row names who did it.** A decision already says who answered it. A row that is work instead (a commit to the code, a read of Figma, a change to the intent layer) says who did it, in the same place:
@@ -1139,7 +1139,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| History | Each Figma change and each code commit, by release, with links, and what the team decided about it |
+| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 

@@ -57,13 +57,11 @@ test('a decision asked for in words goes to --decision with what was ruled out a
   assert.match(route('keep the chip height on purpose because the product needs a larger tap target', { hasConfig: true, components: ['chip'] }).run[0], / --keep /);
 });
 
-test('History: one table of the code\'s changes, Figma\'s, the intent layer\'s and the decisions, each tagged, a chip each; a release with nothing chosen hides', async () => {
-  const { readFileSync } = await import('node:fs');
+test('History: one table of the code\'s changes, Figma\'s, the intent layer\'s and the decisions, each row tagged, a chip each type', async () => {
   const tpl = templateText();
-  assert.match(tpl, /<tr data-chip="figma"><td>/);
-  assert.match(tpl, /<tr data-chip="code"><td>/);
+  for (const [chip, type] of [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer']]) assert.ok(tpl.includes(`'${chip}', '${type}'`), chip);
+  assert.match(tpl, /add\(d\.at, 'decisions', type,/, 'a decision, tagged as one');
+  assert.match(tpl, /'<tr data-chip="' \+ x\.chip \+ '"'/, 'every row says its type for the chips');
   assert.match(tpl, /\[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);
-  assert.match(tpl, /<tr data-chip="intent"><td>/, 'a change to the intent layer, tagged as one');
-  assert.match(tpl, /wn\.addEventListener\('sg-chip', function \(e\) \{ Array\.prototype\.forEach\.call\(e\.currentTarget\.querySelectorAll\('\.pg-inspect'\)/, 'never a var another page reuses');
-  assert.match(tpl, /\.pg-inspect\[hidden\] \{ display: none; \}/);
+  assert.doesNotMatch(tpl, /box\.innerHTML = order\.map/, 'one table, never a card per release');
 });

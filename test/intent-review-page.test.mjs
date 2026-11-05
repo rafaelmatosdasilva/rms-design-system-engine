@@ -46,7 +46,7 @@ test('a decision to review again: its page says so, a withdrawal says its questi
   assert.match(html, /Withdrawn by QA on 2026-03-06: its question is asked again\./);
   assert.doesNotMatch(html, /Declined/);
   assert.match(tpl, /p\.recheck && p\.action === 'review' \? 'Decision to review again'/);
-  assert.match(tpl, /\(d\.review \? '<p class="sg-il-line"><span class="pg-par-val">' \+ esc\(d\.review\)/, 'the History page shows the note');
+  assert.match(tpl, /\(d\.review \? line\('<span class="pg-par-val">' \+ esc\(d\.review\)/, 'the History page shows the note');
   assert.match(tpl, /\(d\.review \? '<br>' \+ esc\(d\.review\) : ''\)/, 'and so does the component\'s own History');
 });
 

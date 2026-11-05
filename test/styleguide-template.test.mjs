@@ -1259,14 +1259,12 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /One row per issue \(the team's unit of work/);
-  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">What<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'what was done or decided first, then what it affects, each column named');
-  assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);
+  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Done by<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, who did it, then what it affects, each column named');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
-  assert.match(tpl, /'<span class="pg-log-date">No component<\/span>'/);
+  assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
-  assert.match(tpl, /order\.sort\(releaseOrder\)/);
-  assert.match(tpl, /'released ' \+ esc\(g\.on\.slice\(0, 10\)\)/);
+  assert.match(tpl, /line\(quiet\('Released in '\) \+ tag/, 'each commit says the release it shipped in');
+  assert.match(tpl, /line\(quiet\('Not released yet'\)\)/);
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
   assert.match(tpl, /selectionMoves\(st\);/);
@@ -1714,48 +1712,52 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
   assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
 });
 
-test('History: each card dated as what it holds is: the code by its release, a read of Figma by its day, the decisions of a day by that day; rows newest first', () => {
+test('History: a row per change, newest first, whatever its type: a commit to the code with its issues and release, what a read of Figma changed in each component, a commit to the intent layer, a decision', () => {
   const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var cardHead = function (g) {'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
-  const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
-  const byTicket = (cs) => cs.map((c) => ({ items: [c] })), figmaHead = (g) => 'Figma read ' + g.read;
-  const head = new Function('releaseHead', 'esc', 'byTicket', 'figmaHead', src + 'return cardHead;')(releaseHead, (x) => String(x), byTicket, figmaHead);
-  const CODE = '<span class="sg-log-tag">Code</span>';
-  const v2 = { k: 'v2.0.0', on: '2026-10-21', commits: [{}] };
-  assert.equal(head({ k: '', commits: [], day: '2026-10-25', decisions: [{}] }), '2026-10-25', 'the decisions of a day: the day alone');
-  assert.equal(head({ k: '', commits: [{}], at: '2026-10-25' }), CODE + 'Merged, no release tag yet  ·  2026-10-25  ·  1 issue', 'code merged and not released yet keeps its name, tagged Code, with how many issues');
-  assert.equal(head(v2), CODE + 'v2.0.0  ·  released 2026-10-21  ·  1 issue');
-  assert.equal(head({ k: '', commits: [], read: 'x' }), 'Figma read x', 'a read of Figma is a card of its own, as a release is');
-  assert.doesNotMatch(tpl, /'After ' \+ esc/, 'nothing is said to come after a release: what is not code is dated');
-  assert.match(tpl, /if \(!home\) \{ home = byDay\[at\] = \{ k: '', on: '', at: at, commits: \[\], day: at, decisions: \[\] \}; order\.push\(home\); \}/, 'the decisions of each day, a card of their own');
-  assert.doesNotMatch(tpl, /names\.length \+ ' components'/, 'a read of Figma names every component it affects, as a code row does');
-  assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
-  assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
-});
-
-test('History: a read of Figma is a card of its own, dated: a row a changed component with what changed, then the ones read for the first time, named, the pills only under Affects', () => {
-  const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf('    var decisionRow = function (d) {'));
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const fns = new Function('esc', 'cid', 'sysButton', src + 'return { figmaRows, figmaHead, figmaChange, pillsHTML };')(esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`);
-  assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
-  assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
-  const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f' }, comps: [
+  const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
+    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1));
+  const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f', by: 'Done by QA' }, comps: [
     { name: 'navTab', changed: ['property tileSlot added'] }, { name: 'buttonFloat', changed: ['property showLabel added', 'property labelContent added'] },
     { name: 'cardRow', changed: ['read from Figma for the first time'] }, { name: 'chipRow', changed: ['read from Figma for the first time'] }] };
-  const rows = [...fns.figmaRows(read).matchAll(/<tr data-chip="figma"><td>([\s\S]*?)<\/td><td>([\s\S]*?)<\/td><\/tr>/g)].map((m) => [m[1].replace(/<[^>]+>/g, ''), [...m[2].matchAll(/href="#([^"]+)"/g)].map((x) => x[1])]);
-  assert.deepEqual(rows, [
-    ['showLabel added; labelContent added', ['c-buttonFloat/history']],
-    ['tileSlot added', ['c-navTab/history']],
-    ['Read for the first timeSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
-  ], 'what changed on the left, the component it changed as its pill; the new ones named once, as their pills under Affects; the commit that saved the read under the last');
-  assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
-  assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
+  const fns = run([
+    { k: 'v2.0.0', on: '2026-10-21T09:00:00Z', commits: [{ r: { date: '2026-10-20T08:00:00Z', short: 'aa11bb2', url: 'https://example.test/x/-/commit/aa11bb2', says: 'the tile', ticket: '#11', tickets: [{ ticket: '#11', ticketUrl: 'https://example.test/i/11' }, { ticket: 'REV-1' }], by: 'Done by Quokka' }, comps: ['cardTile'] }] },
+    { k: '', commits: [{ r: { date: '2026-10-28T08:00:00Z', short: 'cc33dd4', says: 'again', ticket: '#11', by: 'Done by quokka' }, comps: [] }] },
+    { k: '', commits: [], read },
+    { k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', says: 'Drafts reviewed', pages: ['Saving'], components: [], files: 1, by: 'Done by Wombat' } },
+    { k: '', commits: [], day: '2026-10-25', decisions: [{ at: '2026-10-25', what: 'No large tile', said: 'answered', by: 'Design', kind: 'decision' }] },
+  ]);
+  assert.deepEqual(fns.ROWS.map((x) => [x.chip, x.type, text(x.what)]), [
+    ['code', 'Code', '#11 · 2 commits again Not released yet'],
+    ['figma', 'Figma', 'showLabel added; labelContent added Saved in 9878c3f'],
+    ['figma', 'Figma', 'tileSlot added Saved in 9878c3f'],
+    ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
+    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Saving Committed in eea0cd0e'],
+    ['decisions', 'Decision', 'No large tile Answered'],
+    ['code', 'Code', '#11 · 2 commits REV-1 the tile Released in v2.0.0 on 2026-10-21'],
+  ], 'newest first, whatever the type: an issue a count of its commits, each commit its release; a read of Figma a row a component it changed, the new ones named once');
+  assert.match(fns.ROWS.at(-1).what, /href="https:\/\/example\.test\/x\/-\/tags\/v2\.0\.0"/, 'the release linked where the host keeps it');
+  assert.deepEqual(fns.ROWS.filter((x) => x.chip === 'figma').map((x) => [...x.affects.matchAll(/href="#([^"]+)"/g)].map((m) => m[1])), [['c-buttonFloat/history'], ['c-navTab/history'], ['c-cardRow/history', 'c-chipRow/history']], 'the components only under Affects, as pills');
+  assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
+  assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
+  assert.equal(text(fns.dateCell('2026-10-25')), '2026-10-25', 'a day alone has no time');
+  assert.match(text(fns.dateCell('2026-10-20T08:00:00Z')), /^2026-10-2[01] \d\d:\d\d$/, 'a moment: its day and its time, as the reader\'s clock says it');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
   assert.equal((many.match(/ hidden>/g) ?? []).length, 4, 'the first ten shown');
   assert.match(many, /<button data-pills-more>4 more<\/button>$/, 'the rest one click away, with the system\'s button');
   assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
-  assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
+});
+
+test('History: Done by names each person once, by the name they sign with, wherever on the page they used another', () => {
+  const tpl = templateText();
+  const src = tpl.slice(tpl.indexOf('    var nameKey = function (n)'), tpl.indexOf('    // Its day, and its time where it has one'));
+  const { learn, whoCell } = new Function('esc', 'line', src + 'return { learn, whoCell };')((x) => String(x), (h) => '<p>' + h + '</p>');
+  ['Done by quokka.da.wombat', 'Done by Quokka da Wombat · pushed by wombat', 'Done by QA'].forEach(learn);
+  assert.equal(whoCell(['Done by quokka.da.wombat']), '<td class="sg-log-who"><p>Quokka da Wombat</p></td>');
+  assert.equal(whoCell(['Done by QA, quokka.da.wombat', null]), '<td class="sg-log-who"><p>QA</p><p>Quokka da Wombat</p></td>');
+  assert.equal(whoCell([null]), '<td class="sg-log-who"></td>', 'nobody known: empty, never guessed');
 });
 
 test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
