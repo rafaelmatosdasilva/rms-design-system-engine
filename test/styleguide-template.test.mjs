@@ -1520,10 +1520,9 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     assert.match(tiles[1][1], /^\d+%Built\|$/);
     assert.match(tiles[2][1], /^(\d+%Met|–)\|$/);
     assert.match(tiles[3][1], /^\d+%Written\|$/);
-    // Every card counts over the same whole, the table's All, said once above them. Each card's foot counts what is
-    // done in full, the rows its filter shows for the done word, said as complete (the big number counts the work).
-    const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, total: document.querySelector('#status .sg-health-total').textContent, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
-    assert.equal(table.total, `${table.n} in the system`);
+    // Each card's foot counts what is done in full, the rows its filter shows for the done word, said as complete
+    // (the big number counts the work).
+    const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
     const of = (col, w) => col.filter((x) => x === w).length;
     assert.deepEqual(table.done, [`${of(table.par, 'Match')} of ${table.n} complete`, `${of(table.code, 'Built')} of ${table.n} complete`, `${of(table.acc, 'Met')} of ${table.n} complete`, `${of(table.doc, 'Written')} of ${table.n} complete`], 'each count at the foot is what its filter shows for the done word');
     assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(of(table.code, 'Built') / table.n * 100), 'Code\'s share is what is built over everything');
@@ -1796,7 +1795,7 @@ test('the Status matrix: only an area\'s pill opens that area; hovering a row li
   assert.match(tpl, /\.sg-link-pill:focus-visible \{ outline: 2px solid var\(--sg-accent\)/, 'the pill keeps its focus ring');
 });
 
-test('the Status cards\' tips stay short and fixed: 25 words at most, nothing made from data; the page criteria a line of their own', () => {
+test('the Status cards\' tips stay short and fixed: 25 words at most, nothing made from data', () => {
   const tpl = templateText();
   const tips = [...tpl.matchAll(/^\s*([pida])T\.how = '((?:[^'\\]|\\.)*)';$/gm)].map((m) => [m[1], m[2].replace(/\\'/g, "'")]);
   assert.deepEqual(tips.map((t) => t[0]), ['p', 'i', 'a', 'd'], 'each card\'s tip one fixed sentence or two');
@@ -1806,7 +1805,7 @@ test('the Status cards\' tips stay short and fixed: 25 words at most, nothing ma
     assert.doesNotMatch(tip, /[—;]/, 'no dash or semicolon');
   }
   assert.doesNotMatch(tpl, /\b[pida]T\.how \+=/, 'nothing added to a tip from data');
-  assert.match(tpl, /aT\.pagesLine = 'Page criteria: ' \+ pgSaid;/, 'the criteria that belong to a page, counted on a line of their own');
+  assert.doesNotMatch(tpl, /sg-health-total|sg-health-pages|Page criteria/, 'no count above the cards and no page-criteria line on one');
 });
 
 test('Figma beside the code is off unless the project asks for it (styleguide.figmaCompare)', async () => {
