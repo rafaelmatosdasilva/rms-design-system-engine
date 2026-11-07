@@ -159,7 +159,6 @@
       var items = o.rest.map(function (x) { return '<span class="pg-par-status pg-par--' + (x.cls === 'fix' ? 'differs' : 'figma') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(share(x.pct) + ' ' + x.word) + '</span>'; }).join('') +
         (o.untested ? '<span class="pg-par-status pg-par--none is-untested"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(o.untested + ' Untested') + '</span>' : '');
       var legend = items ? '<p class="sg-health-legend">' + items + '</p>' : '';
-      var pagesLine = o.pagesLine ? '<p class="sg-health-legend sg-health-pages">' + esc(o.pagesLine) + '</p>' : '';
       // At its foot, on one line: how many of everything in the system are done in full here (complete, never the big
       // number's word, which counts the work), and the link down to the table with that filter on (its arrow points down).
       var done = '<p class="sg-health-done"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"/><path d="M5.5 8.2l1.7 1.7 3.3-3.4"/></svg><b>' + o.doneN + '</b> of ' + o.total + ' complete</p>';
@@ -167,7 +166,7 @@
         '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></button>' : '';
       // The share done, big, after a green dot that ties it to the green of the bar, and its word beside it (51% Match).
       var count = '<div class="sg-health-count"><p class="sg-health-num">' + (o.pct == null ? '–' : '<span class="sg-health-dot" aria-hidden="true"></span><span class="sg-health-pct">' + o.pct + '%</span><span class="sg-health-out">' + esc(o.pctWord) + '</span>') + '</p></div>';
-      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + pagesLine + '<div class="sg-health-go">' + done + next + '</div></div>';
+      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + '<div class="sg-health-go">' + done + next + '</div></div>';
     };
     // Every card counts over the same whole: everything the table lists, as its All filter does. Parity compares only
     // what the code has built; Accessibility tries only that, in a browser.
@@ -202,17 +201,10 @@
     pT.how = 'How closely the code matches Figma, in every property, token and value. The line under it counts what matches in full.';
     iT.how = 'How much of the system exists in the code. The line under it counts what is built.';
     aT.how = 'How many WCAG 2.2 AA criteria the system meets, tried in a browser on every variant. Shown for the theme chosen at the top.';
-    // The criteria that belong to a page, tried on the products' own pages by the last audit: a line of their own on the
-    // card, how many pass and how many are left, never a list in the tip.
-    var onPages = WCAG && WCAG.pages && WCAG.pages.criteria;
-    if (onPages) {
-      var pg = { done: 0, todo: 0, check: 0 }; WCAG.criteria.forEach(function (k) { var p = onPages[k.sc]; if (p && pg[p.st] != null) pg[p.st]++; });
-      var pgSaid = [pg.done ? pg.done + ' pass' : '', pg.todo ? pg.todo + ' to fix' : '', pg.check ? pg.check + ' to check by hand' : ''].filter(Boolean).join(', ');
-      if (pgSaid) aT.pagesLine = 'Page criteria: ' + pgSaid;
-    }
+    // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
-    var html = '<div class="sg-health"><p class="sg-health-total"><b>' + mx.length + '</b> in the system</p><div class="sg-health-tiles">' + tiles + '</div></div>';
+    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
     if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }

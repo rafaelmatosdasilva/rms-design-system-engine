@@ -97,7 +97,20 @@
     return { id: id === 'whats-new' || id === 'changelog' ? 'history' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
   function copyText(text, btn, said, saidText) {
-    var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
+    // Its words only. A button of this page can carry a mark of its own (a tick before them, an arrow after), and
+    // writing over the whole of its label drops that mark for good: what changes here is the one text node the words
+    // are in, inside the label part when the system's button has one, else the button itself.
+    var holder = function (e) {
+      for (var i = 0; i < e.children.length; i++) { var h = holder(e.children[i]); if (h) return h; }
+      for (var j = 0; j < e.childNodes.length; j++) if (e.childNodes[j].nodeType === 3 && e.childNodes[j].nodeValue.trim()) return e;
+      return null;
+    };
+    var leaf = holder(btn) || btn;
+    var words = (function () {
+      for (var i = leaf.childNodes.length - 1; i >= 0; i--) { var k = leaf.childNodes[i]; if (k.nodeType === 3 && k.nodeValue.trim()) return k; }
+      return leaf.appendChild(document.createTextNode(''));
+    })();
+    var label = function (t) { words.nodeValue = t; }, was = words.nodeValue;
     var done = function () { label('Copied'); if (said) said.textContent = saidText || 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, saidText ? 3000 : 1500); };
     // Where the browser lets no page write to the clipboard, the text beside the button is selected instead, and the
     // button says which keys copy it: the person is never left with a Copy that did nothing.

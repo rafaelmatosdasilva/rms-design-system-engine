@@ -60,7 +60,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
 .pg-par-card + .pg-par-card { margin-top: var(--sg-card-gap); }
 .pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
-.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
+.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding-block: var(--sg-space-s); }   /* its height only: the sides are the table's, so a head sits over its column's words */
 .pg-par-card .pg-par-table tr:last-child td, .pg-par-card .pg-par-table tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
 .pg-par-card .pg-par-table tr:first-child > th:first-child { border-top-left-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }   /* stuck, the head keeps its card's top corners */
 .pg-par-card .pg-par-table tr:first-child > th:last-child { border-top-right-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }
@@ -899,7 +899,7 @@ table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where 
 /* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
 .sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
 .sg-tk-facts th[scope="row"] { width: 30%; position: static; background: none; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
-.sg-tk-facts tr:last-child > *, .sg-tk-facts tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) > * { border-bottom: 0; }   /* the card's own edge closes it */
+.sg-tk-facts tr:last-child > *, .sg-tk-facts tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) > * { border-bottom: 0; --sg-th-line: none; }   /* the card's own edge closes it: its head cell's drawn line goes with its border */
 .sg-tk-code-line { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-s); }   /* its name and Copy on one line */
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
@@ -998,7 +998,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-source { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); font-weight: var(--sg-text-weight); }   /* where a draft comes from */
 .sg-row-detail-body .sg-il-source--warn { color: var(--sg-text); padding-left: var(--sg-space-s); border-left: 2px solid var(--sg-danger); }   /* a name only Figma has, written as a prop */
 .sg-row-detail-body .sg-il-quiet { margin-top: var(--sg-space-m); }
-.sg-row-detail-body .sg-il-quiet > summary { cursor: pointer; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-row-detail-body .sg-il-quiet-head { margin: 0 0 var(--sg-space-s); color: var(--sg-muted); font-size: var(--sg-s); }   /* what the engine has no ground for says so over the items themselves: nothing is folded away */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }

@@ -453,7 +453,7 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 - **Flows.** Name each flow in `ds-config.json` → `a11y.flows`, its pages in order: `[{ "name": "Checkout", "pages": ["cart.html", "/checkout/address", "/checkout/pay"] }]`. A page is matched by its address or the end of it. With no flow named, 3.3.7 is a person's to check.
 - **What a person decides.** The pages are opened one by one and never filled in, so a field a flow fills once it runs looks empty here. Whether a step really commits money or data, and whether its review lets people correct it, is read from words only. These end as A person checks, never as Passes.
 - **One page alone.** 3.2.3, 3.2.4 and 3.2.6 need two pages of the product. With one, the check says so and asks for more pages.
-- **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the style guide's Status page, each one left to fix or to check is a row under Accessibility, with its pages. The Accessibility card's note says how each one stands.
+- **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the style guide's Status page, each one left to fix or to check is a row under Accessibility, with its pages.
 
 ### How sure each finding is
 
@@ -931,7 +931,7 @@ A page's panel on the Documentation page holds every change it asks for, in grou
 | Decisions about the page | Its other proposals: a page to write, a name to keep, a part's page, a page or a decision to review again |
 | Other changes | What is still to write, a part's page to move, notes no agent reads |
 
-- **Three actions per group, under its proposals.** Approve all, Change and Drop all, for everything the group shows (never what is folded away). Each copies its decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). No item has an action of its own. What you leave stays as it is.
+- **Three actions per group, under its proposals.** Approve all, Change and Drop all, for everything the group proposes (never a change it has no ground for). Each copies its decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). No item has an action of its own. What you leave stays as it is.
 - **One draft per section.** The engine drafts one line for each section a page lacks, never a second for the same section, and never a line the page already says.
 - **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
 - **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
@@ -999,7 +999,7 @@ When the engine proposes an answer to a decision (a page to write, a part to doc
 
 Each piece is strong, some or weak. The answer with the most behind it is proposed. When another answer has as much, the proposal says the evidence is split and a person decides.
 
-- **A change to a rule needs more than the engine.** A guard or a rewrite with nothing behind it but the engine's own reading is never proposed as a yes. It is folded away on the page, with No as its answer until you say otherwise. A rule your page marks as a must, or a yes the team gave to one like it before, is proposed as usual.
+- **A change to a rule needs more than the engine.** A guard or a rewrite with nothing behind it but the engine's own reading is never proposed as a yes. It is shown with the rest, under a line saying the engine has no ground for it, with No as its answer until you say otherwise. A rule your page marks as a must, or a yes the team gave to one like it before, is proposed as usual.
 
 ### Who decides
 
@@ -1295,7 +1295,7 @@ One row for each component, with one word per state. The cards above the table a
 | Accessibility | Met, Issues, Review, Untested |
 | Documentation | Written, Partial, Missing |
 
-- **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists, said once above them. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
+- **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
   - **Parity** counts every property, token and value compared, in what the code has built.
   - **Code** counts the rows themselves: built, unsure or missing.
   - **Accessibility** counts WCAG 2.2 AA criteria over the whole system. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it.

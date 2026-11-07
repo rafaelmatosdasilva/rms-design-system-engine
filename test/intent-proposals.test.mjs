@@ -241,7 +241,7 @@ test('a recheck of an Add answered with no page is kept for its component\'s own
   assert.equal(again.noPageRechecks.newThing, undefined);
 });
 
-test('a change to a rule with nothing but the engine\'s own reading behind it is never recommended: No is its answer, folded away', () => {
+test('a change to a rule with nothing but the engine\'s own reading behind it is never recommended: No is its answer, said over it', () => {
   const guard = { kind: 'guard', subject: 'Tile', page: 'Tile', rule: 'Only one Tile per screen.', proposal: 'Hold the rule as a check: At most 1 Tile on one screen.', evidence: ['The edit check can hold it on every edit.', 'A yes writes it into contract.authored.json → guards.'], no: 'It stays a rule agents read.' };
   const bare = withEvidence('guard:Tile:1', guard, {});
   assert.deepEqual([bare.recommends, bare.quiet], ['no', true]);
