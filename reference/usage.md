@@ -637,7 +637,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   marks something (a row that differs, one only in Figma or only in code, a prop not built), Accessibility while a
   problem stands (the last browser check's or the audit's), and Documentation while a kind is not written yet (`docOpen`),
   what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Details in Documentation) is one of the
-  Playground's tables, its title the head; the History is a table per release; Parity is one table of everything the
+  Playground's tables, its title the head; the History is one table, a row per change; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
   table as the Status page's Parity (`issueTableHTML`, `ISSUE_COLS`): Task nr (the Status page's number, open rows
   only), Type, Figma (its name and value), Code (its name and value, and where in the
@@ -708,7 +708,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
   drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
   moves a selection, as in the live preview), scaled down to fit the room.
-- **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
+- **Figma beside the code**, off unless `styleguide.figmaCompare` is `true` (no variant image is read without it), in the Playground (a Figma button, only for a component with a Figma image; none on the
   measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
   only while every variant prop is at its default) beside a still, inert copy of the component as drawn, or over it,
   clipped by a slider; a small one drawn up to 4 times larger, both alike. A variant with no image says so. Images
@@ -723,11 +723,18 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
-- **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every component's changes and every decision gathered by release, newest
-  first (not released yet on top), one row per issue with its commits and what they affect, one row per read of Figma that changed a component
-  (tagged Figma: what changed in each), one row per decision (tagged Decision: what was ruled out, why, who) with the page it is
-  about. Chips (All, Code, Figma, Decisions, each when it has rows) filter it, each with its own address (`#history?show=decisions`). **What:** the one the
-  message starts with (`#4521 - …`, or the team's own pattern, `changelog.ticket`: `"#\\d+|REL-\\d+"`); else the one the
+- **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every change in one
+  table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day, and the time as the
+  reader's clock says it), Type, What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
+  v2.1.0 on …" once a release holds it, nothing before), a row per component a read of Figma changed (what changed in it), a row per commit to the intent
+  layer (what it says, the pages it changed, its commit; a merge or a commit that changed no file is left out; a change the engine sent in parts, "…
+  (part 2 of 3)", is one row with each commit named), a row per decision (Decision, Lesson, Rule or Sign-off: what was ruled out, why) with the page it
+  is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Type and Done by in one cell that stays in view
+  under the head as they scroll. **Done by** names the person alone (who-did-it.mjs): one person under two names on the page (an account `qa.lead`
+  and the `QA Lead` it signs as) by the name they sign with, a Windows sign-in without its domain. **Affects** shows five components, then "N more". An issue more
+  than one commit names says how many ("· 3 commits"), and a click shows those alone. Chips (All, Code, Figma, Intent layer, Decisions, each when it
+  has rows) filter it, each with its own address (`#history?show=decisions`). **Issues:** every one the message starts with (`#4521 - …`,
+  `[#4521 #4522 - REL-12] …`, or the team's own pattern, `changelog.ticket`: `"#\\d+|REL-\\d+"`); else each one the
   merge or pull request it came by closes ("Closes #45" in its title or description), said `via !12`; else that request
   (`!12` on GitLab, `PR #70` elsewhere); "No issue" only for a commit made straight on the branch. A link pattern read
   from the project's own changelog (`[#n](…n)`) goes only to `#n` tickets; `changelog.ticketUrl` to every ticket.

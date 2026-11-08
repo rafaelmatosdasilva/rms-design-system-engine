@@ -2,6 +2,23 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The guide says History is one table of changes, names intentLayer.noDrafts, and Figma beside the code is off unless asked (continuous evaluation)
+
+What changed since the entry below (engine c4f386e): The features in four groups, named for what each does, and the README as their index (#346); The privacy check knows a project's people and company, and reads a pull request's names (#347); The guide says History is one table of changes, and Figma beside the code is off unless asked; The guide names intentLayer.noDrafts. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `a4a34bdb3dd0` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 4944f4bb` `cookbook/figma-edits.md 469513fc` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md aabbcc45` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 4cba582f` `reference/gates.md a8e75b2a` `reference/maintainers.md 082b6dd0` `reference/personality.md 7f1584bf` `reference/usage.md 74c3fa52` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 614cccd | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 78/79 | 78/79 |
+| Mean cost a run | $0.057 | $0.061 |
+| Input a run | 96k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed. Failed: new-ui-saved #2: adds the confirmation, or says the system has no green for it. no task changed state, and no run moved: the same result. Records: `records/the-guide-names-intentlayer-nodrafts`.
+
 ## 2026-11: The privacy check knows a project's people and company, reads a pull request's names, and never runs on an empty list (continuous evaluation)
 
 What changed since the entry below (engine 5eb0615): An evaluation run finds node wherever the machine keeps it (#343); Your local style guide is built again after each commit and each pull (#344); A person's name out of two comments, and refused from now on (#345); Four examples taken from a project become invented ones; The privacy check knows a project's people, and never runs on an empty list; A person is refused by name or account, and a pull request's names are read before it opens; The company a project is for is one of its names. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/gates.md`, `reference/maintainers.md`.

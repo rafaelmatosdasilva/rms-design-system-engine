@@ -201,5 +201,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-04-a-round-that-did-not` | The 24 guide tasks on Haiku (engine 4fa53d3) | "A round that did not publish says when the guide was last built" |
 | `local-style-guide-rebuilt-after-each-commit` | The 24 guide tasks on Haiku (engine 5eb0615) | "Your local style guide is built again after each commit and each pull" |
 | `privacy-nets` | The 24 guide tasks on Haiku (engine c4f386e) | "The privacy check knows a project's people and company, reads a pull request's names, and never runs on an empty list" |
+| `the-guide-names-intentlayer-nodrafts` | The 24 guide tasks on Haiku (engine 614cccd) | "The guide says History is one table of changes, names intentLayer.noDrafts, and Figma beside the code is off unless asked" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
