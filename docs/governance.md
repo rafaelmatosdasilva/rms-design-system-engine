@@ -2,7 +2,7 @@
 
 ## How the project is run
 
-The engine has one maintainer, who decides what is built, reviews every change and publishes the releases. Anyone can propose a change by opening an issue, and the maintainer answers each one and explains a refusal. Pull requests from others are not accepted; [CONTRIBUTING.md](CONTRIBUTING.md) says how to take part.
+The engine has one maintainer, who decides what is built, reviews every change and publishes the releases. Anyone can propose a change by opening an issue, and the maintainer answers each one and explains a refusal. Pull requests from others are not accepted; [CONTRIBUTING.md](../.github/CONTRIBUTING.md) says how to take part.
 
 What decides a change:
 
@@ -16,7 +16,7 @@ What decides a change:
 | Role | Who | Responsible for |
 |---|---|---|
 | Maintainer | Rafael Matos da Silva | Direction and roadmap, reviewing and merging changes, releases, security reports, the code of conduct, the repository and package settings |
-| Contributor | Anyone who opens an issue or takes part in a discussion | Following [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md) |
+| Contributor | Anyone who opens an issue or takes part in a discussion | Following [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md) |
 | Reviewer | None yet | Approving changes before they merge, once the project has a second maintainer |
 
 ## Continuity
@@ -28,6 +28,13 @@ The project is built so that it does not depend on any one secret:
 - **Installs keep working.** Every release stays on GitHub and npm, and each one can be verified with `gh attestation verify`.
 
 What is not covered yet: only the maintainer has admin access to the repository and the npm package. Adding a second person with that access, who could take over the project, is the next step for continuity, and the first condition for the OpenSSF Best Practices silver level.
+
+## What the project needs next
+
+- A second maintainer with admin access, for continuity and reviewed changes.
+- The OpenSSF Best Practices silver level.
+
+What comes next in the engine itself is on the [features page](features.md): its Coming soon parts.
 
 ## Changing this document
 

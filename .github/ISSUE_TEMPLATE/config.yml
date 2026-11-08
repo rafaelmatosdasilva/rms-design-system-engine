@@ -7,5 +7,5 @@ contact_links:
     url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/discussions
     about: How to set something up, which setting does what, whether it can do a thing. Not a bug.
   - name: Read the documentation first
-    url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md
+    url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/README.md
     about: Every option, setting and check, with what the engine reads, sends and may change.

@@ -10,7 +10,7 @@ Worth reporting:
 - A write the engine makes without the yes its setting asks for, or any write to code people wrote.
 - A run on CI that writes the design file or product code.
 - A command built from what a project, Figma file or page contains that runs something else.
-- Anything sent to a host the [Security and data](docs/details.md#security-and-data) page does not list.
+- Anything sent to a host the [Security and data](../docs/security.md#security-and-data) page does not list.
 
 ## How a report is handled
 
@@ -40,5 +40,5 @@ gh attestation verify rms-design-system-engine-v1.0.0.tar.gz --repo rafaelmatosd
 - **Every change goes through a pull request.** Main takes no direct push, and the privacy check, the full test suite and CodeQL's code scanning must pass before anything merges.
 - **Workflows hold read-only tokens.** Only the release job writes, and only tags and releases. Every action is pinned to a commit.
 - **[OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine)** scores how the repository is kept, on every change to main and every week.
-- **What it reads, sends and may change** is on the [Security and data](docs/details.md#security-and-data) page.
-- **The threat model,** its trust boundaries and the weaknesses it counters are in the [assurance case](docs/assurance-case.md).
+- **What it reads, sends and may change** is on the [Security and data](../docs/security.md#security-and-data) page.
+- **The threat model,** its trust boundaries and the weaknesses it counters are in the [assurance case](../docs/security.md#assurance-case).

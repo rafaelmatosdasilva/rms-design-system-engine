@@ -18,7 +18,7 @@ The engine is built by one maintainer, so pull requests are not accepted.
 A few things that help:
 
 - **One thing per issue.**
-- **Look first.** It may already be asked, or on the [roadmap](ROADMAP.md).
+- **Look first.** It may already be asked, or among the Coming soon parts of the [features page](../docs/features.md).
 - **Say what you were trying to do,** not only the feature you have in mind.
 - **Keep it anonymous.** Replace any client, product, person or host name with an invented one.
 
@@ -31,7 +31,7 @@ Not an issue:
 
 **You get a first answer within a week.** Every issue gets a reply, a no included.
 
-Each form asks **which part** of the [features page](docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`).
+Each form asks **which part** of the [features page](../docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`).
 
 Where an issue stands:
 
@@ -60,7 +60,7 @@ Pull requests are not accepted, a typo fix included: open an issue instead, and 
 
 ## Forking
 
-You are free to fork the engine under its [MIT license](LICENSE): change it, run your own version, build something else from it. Your fork is yours, and its changes stay there. [docs/development.md](docs/development.md) explains how the repository is laid out and tested.
+You are free to fork the engine under its [MIT license](../LICENSE): change it, run your own version, build something else from it. Your fork is yours, and its changes stay there. [docs/development.md](../docs/development.md) explains how the repository is laid out and tested.
 
 ## Code of conduct
 

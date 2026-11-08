@@ -60,7 +60,7 @@ test('the workflow runs the module on each event, never the issue\'s text in a s
 });
 
 test('CONTRIBUTING says what happens to an issue, with every state and priority label the workflow keeps', () => {
-  const c = readFileSync(new URL('../CONTRIBUTING.md', import.meta.url), 'utf8');
+  const c = readFileSync(new URL('../.github/CONTRIBUTING.md', import.meta.url), 'utf8');
   assert.match(c, /^## What happens to your issue$/m);
   for (const [n] of [...triageLabels().filter(([n]) => !n.startsWith('part: '))]) assert.ok(c.includes(`\`${n}\``), `CONTRIBUTING names ${n}`);
 });

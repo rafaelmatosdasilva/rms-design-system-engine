@@ -187,7 +187,7 @@ test('asked in Claude Code, judging the screens routes to --judge-pages; a proto
   const P = { hasConfig: true, components: ['button'] };
   for (const t of ['judge the Showroom screens with a model', 'have a model judge our pages against their briefs', 'julga os ecrãs do showroom com um modelo']) assert.deepEqual(route(t, P).run, ['rms-design-system-engine --judge-pages'], t);
   assert.notDeepEqual(route('judge the prototype pages', P).run, ['rms-design-system-engine --judge-pages']);
-  assert.match(readFileSync(join(ENGINE, 'docs', 'commands.md'), 'utf8'), /`\/rms-design-system-engine judge the Showroom screens with a model`/);
+  assert.match(readFileSync(join(ENGINE, 'docs', 'features.md'), 'utf8'), /`\/rms-design-system-engine judge the Showroom screens with a model`/);
 });
 
 test('in the style guide: the page review under each screen, then the model\'s judgment, said to be one', () => {
