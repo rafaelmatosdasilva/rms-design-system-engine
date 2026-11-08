@@ -1,6 +1,6 @@
 # Bring Figma in line with the code
 
-**Use when.** the person wants Figma updated to state what the code already has ("update Figma to match the code", "add the roles in Figma"), the accessibility findings pinned on the designed screens or each component's accessibility spec written in Figma ("pin the accessibility findings in Figma"), or the prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma"), a component made to follow how the system builds components ("fix the construction of the chip in Figma", a fix copied from the style guide's Construction page), or a run's `NEXT:` line lists Figma edits the engine can make.
+**Use when.** the person wants Figma updated to state what the code already has ("update Figma to match the code", "add the roles in Figma"), the accessibility findings pinned on the designed screens or each component's accessibility spec written in Figma ("pin the accessibility findings in Figma"), or the prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma"), a component made to follow how the system builds components ("fix the construction of the chip in Figma", a fix copied from the style guide's Rules page), or a run's `NEXT:` line lists Figma edits the engine can make.
 
 ## Steps
 

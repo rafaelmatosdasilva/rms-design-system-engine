@@ -44,6 +44,7 @@
 /* Every token table alike: its columns named, as every table with columns is, and its rows one height whatever the
    preview (a swatch, a radius, a bar), the preview's 32px and the cell's room. */
 .pg-inspect.sg-token-card th { text-align: left; background: var(--sg-tint); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; }
+.pg-inspect.sg-token-card :is(th, td):first-child { padding-left: var(--sg-cell-x); } .pg-inspect.sg-token-card :is(th, td):last-child { padding-right: var(--sg-cell-x); }   /* as the tables above: in line with the card's head */
 .pg-inspect.sg-token-card td { height: calc(var(--sg-space-xxl) + var(--sg-space-l)); }
 .pg-inspect.sg-token-card td.sg-token-value { overflow-wrap: normal; }
 /* Where the cards are narrow (a phone, or a tablet beside the menu), columns as wide as what they hold: the names wrap,

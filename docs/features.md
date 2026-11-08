@@ -60,7 +60,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: it only reads Figma. Renames are applied after you say yes. Every other fix is for your design team to make.*
 
 - Finds values with no token or style, detached instances, missing auto layout and missing descriptions.
-- Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the style guide's Construction page, beside the code's.
+- Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the style guide's Rules page, beside the code's.
 - Fixes a component's construction, such as renaming its layers, after you say yes.
 - Compares components of one kind, so every button sets its states and names its options the same way.
 - Says when the file is not reliable enough to compare, before any result.

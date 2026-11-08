@@ -93,6 +93,7 @@
     if (id === 'documentation' || id === 'coverage' || id === 'intent-layer' || id === 'for-agents') { if (!document.getElementById('documentation')) return { id: 'status', area: null, slug: 'documentation', q: null }; id = 'documentation'; }
     if (id === 'overview') return { id: 'index', area: null, slug: '', q: null };   // the index was once Overview
     if (id === 'brand-kit') id = 'identity';   // Identity was once the brand kit
+    if (id === 'construction') id = 'rules';   // Rules was once Construction
     if (id === 'todo' || id === 'tasks' || id === 'health') return { id: 'status', area: null, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // the page was once To do, then Tasks and Health
     return { id: id === 'whats-new' || id === 'changelog' ? 'history' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }

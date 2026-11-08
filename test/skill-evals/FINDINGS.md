@@ -8,6 +8,28 @@ Newest first.
 
 ---
 
+## A run measures the working tree, so a checkout during one measures something else
+
+**Found** 8 November 2026, measuring the Rules page. **Changed** nothing in the engine: the measurement is sound and the hazard is in how a run is started. Written down because the run looked like it had worked.
+
+**Evidence.** An evaluation was started on a committed branch, and it recorded an entry for a different change: `engine 5ae6f94`, titled after a pull request this branch had nothing to do with. `continuous.mjs` refuses to start on a dirty tree and names the commit it measures, so the commit looked pinned. It is not. Each run symlinks the engine's folder into its fresh home (`skills/rms-design-system-engine` → `ENGINE`, `lib.mjs`), so what an agent reads is the working tree as it stands at that moment, not the commit named in the header. Another session on the same clone ran `git checkout origin/main` while the run was going; the reflog has it:
+
+```
+HEAD@{0}: checkout: moving from <the branch> to origin/main
+HEAD@{1}: commit: <the change being measured>
+```
+
+From there every task read main's guide. The header kept saying the commit it started from until the next phase, which read the new one. Nothing failed: 79 of 79, an ordinary-looking entry for a tree nobody meant to measure.
+
+**Ruled out.**
+
+- *That the clean-tree check is enough.* It is taken once, before the first run, and says nothing about the forty minutes after it.
+- *That the header names what was measured.* It names `git rev-parse HEAD` at the moment the phase started. Two phases of one evaluation printed two different commits, which is the only reason this was caught at all.
+
+**What to do.** One clone per session, as `CLAUDE.md` already says for branches; where two sessions must share a machine, the second gets a worktree of its own. A run whose two phases print different engines measured two trees and is thrown away, not recorded.
+
+---
+
 ## The engine called in quotes, and a rescore that failed what it could not see
 
 **Found** 8 November 2026, measuring the git hooks that build the local style guide again, on the first run after the case below. **Changed** the pattern that tells an engine call (`ENGINE_SCRIPT` and `ENGINE_CALL` in `test/skill-evals/lib.mjs`), now used by `no-cli-on-path`'s check and by `handEdits` as well. `rescore.mjs` is unchanged and was not used for the entry.

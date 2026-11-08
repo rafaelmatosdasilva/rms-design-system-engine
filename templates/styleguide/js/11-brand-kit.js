@@ -1733,7 +1733,6 @@
       timing: tkIcon('<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.4"/>'),
       easing: tkIcon('<path d="M3 13c4.5 0 4-10 10-10"/>')
     };
-    var TK_FILTER_MARK = '<svg class="sg-dd-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';   // the Status filters' own mark
     var TK_PALETTE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5a5.5 5.5 0 0 0 0 11c.8 0 1.2-.6 1.2-1.2 0-.7-.5-1-.5-1.6 0-.6.5-1.1 1.1-1.1h1.3a2.9 2.9 0 0 0 2.9-2.9C14 4.7 11.3 2.5 8 2.5Z"/><circle cx="5.2" cy="7.6" r=".6"/><circle cx="6.8" cy="5.2" r=".6"/><circle cx="9.6" cy="5.2" r=".6"/></svg>';
     // The Status table's own arrow (it opens what it points at), and the menu's chevron for a group that opens.
     var TK_GO = '<svg class="sg-link-go" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11 11 5M6 5h5v5"/></svg>';

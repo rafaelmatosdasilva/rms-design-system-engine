@@ -1367,26 +1367,29 @@ inside it), and whether a yes/no variant changes how the component looks: one wh
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
 line with the same statuses.
 
-The style guide has a **Construction** page, in its menu: how the system is built, in Figma and in the code, in one table.
-A row is a rule, with its side (Figma or Code), how many follow it, what is to do, who fixes it (you in Figma, a developer
-in the code, or you decide) and its status (to fix, to decide, a rule, or a note: said, never a fault), filtered by side
-and by status. Its rows (`construction-page.mjs`):
+The style guide has a **Rules** page, in its menu: how the system is built, in Figma and in the code, in one table.
+A row is a rule, with its side (Figma or Code), how many follow it, who owns it (Design, Engineering, or both) and its
+status (to fix, to decide, or a rule). A rule nothing breaks says so ("Nothing breaks it"), never that nothing was found.
+Every column head sorts by it, and the same head again sorts the other way round; above the table a chip a status, with
+its own dot, and a list for the area and for the side, each saying how many rows the others would leave it. Its rows
+(`construction-page.mjs`):
 
 - **Figma**: these grammar lines; the file's own hygiene (values with no variable or style, detached instances, an
   instance's layer named unlike its component, a property bound outside its variable's scope, variables on all scopes);
   the components of one type compared with each other (a state set two ways, one thing two names, what most of the
   family has, to decide); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
-  inherits, a control's border at 3:1 and one job a token, and the tokens no component uses yet, as a note).
+  inherits, a control's border at 3:1 and one job a token).
 - **Code**: values written by hand (the census), aliases to a token declared nowhere, a font family written by hand,
   modes that fail together, the comparison's gates that lint the code (tokens a screen binds exist in CSS, every mode
   covered, no invented variables or text casing, no hand-built component, clean CSS: read from the last full audit's
   `findings.json`) and a product's near copy of a component, to decide.
 
-A row opens in the side panel: the decision to copy for a line to decide, and each component or place to fix with its
-fix to copy into Claude Code (Fix it, Another name, Name a layer; Fix all for a rule's renames). The code's change is
-asked for as a patch handed back, never written over the code people wrote. `styleguide.construction: "unlisted"` keeps
-the page out of the menu and the search, opened only by its link (`#construction`); `"off"` leaves it out.
+A row opens in the side panel: its status, who fixes it, and one card holding what the engine suggests, every component
+or place it changes with its fix, and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
+layer; Fix all for a rule's renames). The code's change is asked for as a patch handed back, never written over the code
+people wrote. `styleguide.construction: "unlisted"` keeps
+the page out of the menu and the search, opened only by its link (`#rules`; `#construction`, the address it had, opens it still); `"off"` leaves it out.
 
 A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and

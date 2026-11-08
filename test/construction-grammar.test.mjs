@@ -181,6 +181,12 @@ test('on the Construction page each row is a rule, a decision included: never a 
   const tpl = templateText();
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
   assert.doesNotMatch(page, /shared, or made for each component\?/);
-  assert.match(page, /'Confirm it, or take the other way: '/);
-  assert.match(page, /var AREA = \{ naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation',/);
+  // The two ways a family is built are said as what most of it does, with the other beside it: the panel suggests one.
+  assert.match(page, /Choose one; the others are then changed to match\./);
+  assert.match(page, /copyBtn\(k \? 'change' : 'approve', \(k \? '' : 'Suggested: '\) \+ WAY_HEAD\[w\.way\]/);
+  // Five areas, each holding more than a row or two, and none of them a side: Code and Products are gone, a Figma
+  // variable and a style are both Tokens, and the rest of how a component is built inside is Structure.
+  assert.match(page, /var AREA = \{\n\s*naming: 'Naming',\n\s*layout: 'Structure', layers: 'Structure', nesting: 'Structure', placement: 'Structure', wiring: 'Structure', interactions: 'Structure',\n\s*architecture: 'Properties', products: 'Properties',\n\s*variables: 'Tokens', tokens: 'Tokens', styles: 'Tokens',\n\s*documentation: 'Documentation', code: 'Documentation'\n\s*\};/);
+  assert.deepEqual([...new Set((page.match(/'(Naming|Structure|Properties|Tokens|Documentation)'/g) || []))].length, 5, 'five areas, no more');
+  assert.match(page, /var AREA_ORDER = \['Naming', 'Properties', 'Structure', 'Tokens', 'Documentation'\];/, 'read in the order a person meets them, never A to Z');
 });

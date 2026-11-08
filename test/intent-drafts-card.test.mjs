@@ -210,7 +210,7 @@ test('a drafted example shows its code under its line', () => {
 test('the pages to write are ordered most used first, with a chip and each one\'s reach', () => {
   // The Documentation page: the rows with no page sorted by their rank, a chip for them, their reach in the panel.
   assert.match(tpl, /\.concat\(\(IL\.noPage \|\| \[\]\)\.slice\(\)\.sort\(function \(a, b\) \{ var r = IL\.pagesToWrite \|\| \{\}/);
-  assert.match(tpl, /\{ key: 'pagesToWrite', label: 'Pages to write, most used first', n: toStart, dot: 'differs' \}/);
+  assert.match(tpl, /\{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' \}/);
   const src = /var ilReachOf = (function \(n\) \{[\s\S]*?'<\/span><\/p>'; \});/.exec(tpl)[1];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const reach = (IL) => new Function('IL', 'esc', `return (${src})`)(IL, esc);

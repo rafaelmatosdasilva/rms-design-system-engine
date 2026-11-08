@@ -1426,6 +1426,9 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.ok(tpl.indexOf("foundationLink('identity'") < tpl.indexOf("foundationLink('tokens'"), 'identity first, before the tokens');
   // Every page's address is its name in the menu: rename one, and its address follows.
   for (const [, id, label] of tpl.matchAll(/(?:navLink|foundationLink)\('([^']+)', '([^']+)'\)/g)) assert.equal(id, label.replace(/\s+/g, '-'), `the ${label} page's address`);
+  // A page that was renamed keeps its old address working, in the router and where a change names a page.
+  assert.ok(tpl.includes("if (id === 'construction') id = 'rules';"), 'Rules was once Construction');
+  assert.ok(tpl.includes("'#rules' + location.hash.replace(/^#construction/, '')"), '#construction opens Rules, as #brand-kit opens Identity');
   assert.match(tpl, /var bkCss = function \(t, unit\) \{[^\n]*var nm = t\.var \|\| [^\n]*'var\(' \+ nm/, 'a value drawn through its variable, Figma\'s value behind it');
   assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
   assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');

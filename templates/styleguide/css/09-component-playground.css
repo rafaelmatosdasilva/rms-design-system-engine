@@ -74,8 +74,10 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
+.pg-par-table :is(th, td):first-child { padding-left: var(--sg-cell-x); } .pg-par-table :is(th, td):last-child { padding-right: var(--sg-cell-x); }   /* its content starts and ends with the card's head and the chips above it */
 .pg-par-table td > code { display: block; }
 .pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
+.pg-par-table .sg-cx-share { display: inline; }   /* how many follow a construction rule and the share of them, on one line */
 .pg-par-table .pg-par-none { color: var(--sg-muted); }
 .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { white-space: nowrap; color: var(--sg-text-2); }
 /* Accessibility: under a criterion, each finding or duty on its own line, its source below it in small. */
@@ -227,9 +229,9 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
 /* The Construction table: the rule widest, the rest even, its status last. */
-.sg-cx-table { table-layout: fixed; width: 100%; min-width: 72rem; }   /* narrower, it scrolls: no word broken in two */
+.sg-cx-table { table-layout: fixed; width: 100%; min-width: 64rem; }   /* narrower, it scrolls: no word broken in two */
 .sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
-.sg-cx-table col.sg-cx-rule { width: 28%; } .sg-cx-table col.sg-cx-col { width: 11.5%; }
+.sg-cx-table col.sg-cx-rule { width: 32%; } .sg-cx-table col.sg-cx-col { width: 12.5%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
@@ -975,6 +977,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
+.sg-row-detail-body .sg-cx-draft { margin-top: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius-s); overflow: clip; }   /* what a construction rule's suggestion changes, in the card that suggests it */
+.sg-row-detail-body .sg-cx-draft-head { margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-tint); color: var(--sg-text); font-size: var(--sg-s); font-weight: var(--sg-heading-weight); }
+.sg-row-detail-body :is(.sg-cx-draft, .sg-il-line) + .sg-decide-grid { margin-top: var(--sg-space-xl); }   /* the decision under the draft it is for */
 .sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
 .sg-row-detail-body .sg-il-example code { font-size: var(--sg-s); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }

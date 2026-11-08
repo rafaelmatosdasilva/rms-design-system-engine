@@ -2,27 +2,41 @@
   (function () { var a = nav.querySelector('a[href="#status"]'), o = nav.querySelector('a[href="#index"]'); if (a && o) o.insertAdjacentElement('afterend', a); })();
   var td = section('status', 'Status', 'How the system is doing', '');   // no line under its title: the cards say it
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
-  // Construction: how the system is built, in Figma and in the code (DATA.construction, construction-page.mjs). One table,
+  // Rules: how the system is built, in Figma and in the code (DATA.construction, construction-page.mjs). One table,
   // a row a rule: in Figma the rules it builds a component by (construction-grammar.mjs), the Figma file's own hygiene,
   // the components of one type compared with each other and the tokens; in the code what the code linting finds. Each
   // row says its side and who fixes it, its status (a rule once every component follows it; to fix when most do, the
-  // team decided it, or it is the system's own rule; to decide otherwise; a note when it is said, never a fault), how many
-  // follow it and what is to do. A row opens in the side panel: the decision to copy for a rule to decide, and each
-  // component or place to fix with its fix to copy into Claude Code (renames are made by the engine's script,
+  // team decided it, or it is the system's own rule; to decide otherwise) and how many follow it. Every column head
+  // sorts by it, again for the other way round. A row opens in the side panel: what is suggested, every component or
+  // place it changes and the decision under them, in one card; each fix is copied into Claude Code (renames are made by the engine's script,
   // --figma-fix; a name to give, layout and bindings are a person's; the code's change is a patch handed back). No
   // exceptions: a component follows it or is to fix. In the menu, unless the team leaves it out (styleguide.construction).
+  // The page lives at #rules; #construction, the address it had, opens it still.
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
-    hr(); if (G.listed) navLink('construction', 'construction');
-    var sec = section('construction', 'System', 'Construction', '');
-    // The kind of rule each is (construction-grammar.mjs → judge, construction-page.mjs): every rule on names together,
-    // whatever is named; how each component is built inside (the skeleton) in its own kinds; the tokens; the products.
-    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture', tokens: 'Tokens', products: 'Products' };
-    var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'], note: ['none', 'Note'] };
-    var ORDER = { fix: 0, decide: 1, rule: 2, note: 3 };
+    hr(); if (G.listed) navLink('rules', 'rules');
+    var sec = section('rules', 'System', 'Rules', '');
+    // The kind of rule each is, in five: how things are named, whatever is named; how a component is built inside; its
+    // properties (its axes, its options and the shape its family shares); the values it binds, a Figma variable and a
+    // style alike, which are one thing to a design system; and what says what it is for. Each rule keeps the finer kind
+    // the engine judged it by (layers, nesting, wiring, placement) - this is how the page groups them, so no filter
+    // offers one row and no word stands in two columns. Side says whether a rule is Figma's or the code's; an area
+    // never does.
+    var AREA = {
+      naming: 'Naming',
+      layout: 'Structure', layers: 'Structure', nesting: 'Structure', placement: 'Structure', wiring: 'Structure', interactions: 'Structure',
+      architecture: 'Properties', products: 'Properties',
+      variables: 'Tokens', tokens: 'Tokens', styles: 'Tokens',
+      documentation: 'Documentation', code: 'Documentation'
+    };
+    // Read in the order a person meets them, never A to Z: what things are called, what a component takes, how it is
+    // built, what it binds, what says what it is for.
+    var AREA_ORDER = ['Naming', 'Properties', 'Structure', 'Tokens', 'Documentation'];
+    var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
+    var ORDER = { fix: 0, decide: 1, rule: 2 };
     // Where each rule is, and who fixes it, as the Status page's To do says it.
-    var SIDE = { figma: 'Figma', code: 'Code' };
-    var WHO_FIX = { figma: WHO.figma, code: WHO.code, both: WHO.both };
+    var SIDE = { figma: 'Figma', code: 'Code' };   // the side a rule is on, as the column head and the crumbs say it
+    var OWNER = { figma: 'Design', code: 'Engineering', both: 'Design and engineering' };
     var rows = RULES.slice().sort(function (a, b) { return (a.side === 'code') - (b.side === 'code') || ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
@@ -34,17 +48,8 @@
     var unit = function (r, n) { return byComponent(r) ? (n === 1 ? 'component' : 'components') : (n === 1 ? 'place' : 'places'); };
     var plural2 = function (n) { return n === 1 ? 'component' : 'components'; };
     var followHTML = function (r) {
-      if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">None found</span>'; }
-      return r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / (r.of || 1) * 100) + '%</span>';
-    };
-    var todoOf = function (r) {
-      var n = comps(r).length;
-      if (r.status === 'rule') return '<span class="pg-missing">Nothing</span>';
-      if (r.status === 'note') return 'Nothing to fix';
-      if (r.kind === 'break') return (r.status === 'decide' ? 'Decide on ' : 'Fix ') + n + ' ' + unit(r, n);
-      // Said as the rule the way most go, never as a question: the team confirms it, or takes the other way.
-      if (r.status === 'decide') return r.ways ? 'Confirm it, or take the other way: ' + r.ways.map(function (w) { return w.follows + ' ' + (w.way === 'own' ? 'use variables made for them' : 'use shared variables'); }).join(', ') : 'Decide whether it is the rule; then ' + n + ' ' + plural2(n) + ' to fix';
-      return 'Fix ' + n + ' ' + plural2(n);
+      if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">Nothing breaks it</span>'; }
+      return r.follows + ' of ' + r.of + ' <span class="pg-par-val sg-cx-share">(' + Math.round(r.follows / (r.of || 1) * 100) + '%)</span>';
     };
     var cmd = 'rms-design-system-engine';
     // The one change for every component a rule has to fix, as it is copied into Claude Code: renames the engine writes,
@@ -61,12 +66,24 @@
     };
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
-      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-chip-group="' + esc(r.side || 'figma') + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + todoOf(r) + '</td><td>' + esc(WHO_FIX[r.who] || WHO_FIX.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-f data-f-area="' + esc(AREA[r.area] || capital(r.area)) + '" data-f-side="' + esc(SIDE[r.side] || SIDE.figma) + '" data-f-status="' + esc(ST[r.status][1]) + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(OWNER[r.who] || OWNER.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
+    // A column head sorts by it; clicked again, the other way round. A name A to Z, a share and a status with what is
+    // most open first; rules of the same value keep the page's own order. A row keeps its number (data-cx-row), so it
+    // opens the rule it opened before however the table is sorted.
+    var SORT = [
+      ['Rule', function (r) { return r.says.toLowerCase(); }],
+      ['Area', function (r) { return (AREA[r.area] || capital(r.area)).toLowerCase(); }],
+      ['Side', function (r) { return (SIDE[r.side] || SIDE.figma).toLowerCase(); }],
+      ['Follow it', function (r) { return r.of ? r.follows / r.of : comps(r).length ? 0 : 1; }],
+      ['Owned by', function (r) { return (OWNER[r.who] || OWNER.figma).toLowerCase(); }],
+      ['Status', function (r) { return ORDER[r.status]; }]
+    ];
+    var sortOf = {}; SORT.forEach(function (c) { sortOf[c[0]] = c[1]; });
     var cxKey = function (r) { return 'cx:' + r.id; };
     var panel = function (i, from) {
       var r = rows[i]; if (!r) return;
-      var m = panelShell('sg-cx-panel', 'Construction'); m._key = cxKey(r);
+      var m = panelShell('sg-cx-panel', 'Rules'); m._key = cxKey(r);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var cs = comps(r), byC = {}, n = cs.length;
       r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
@@ -75,8 +92,7 @@
       var pct = r.of ? Math.round(r.follows / r.of * 100) : null;
       // What the engine suggests, from what most of the system already does; one decision for every component.
       var suggest, decide;
-      if (r.status === 'rule') { suggest = (r.of == null ? 'Nothing found that breaks it.' : 'Every one follows it.') + ' Nothing to change.'; decide = ''; }
-      else if (r.status === 'note') { suggest = '<p class="sg-il-line">' + esc(r.todo || '') + '</p>'; decide = ''; }
+      if (r.status === 'rule') { suggest = '<p class="sg-il-line">' + esc((r.of == null ? 'Nothing found that breaks it.' : 'Every one follows it.') + ' Nothing to change.') + '</p>'; decide = ''; }
       else if (r.kind === 'break') {
         suggest = (r.of != null ? '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' (' + pct + '%) already follow it.') + '</p>' : '') + '<p class="sg-il-line"><strong>' + esc(r.todo || '') + '</strong></p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', n === 1 ? (r.status === 'decide' ? 'Decide on it' : 'Apply it') : (r.status === 'decide' ? 'Decide on all ' : 'Apply to all ') + n, applyAll(r)) + '</div>';
@@ -95,25 +111,43 @@
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
       var head = byComponent(r) ? 'Component' : 'Where';
-      var list = n ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc((r.status === 'note' ? 'What it says (' : byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>' + head + '</th><th>What changes</th></tr></thead><tbody>'
+      // The draft: every component or place the suggestion changes, with the change it takes.
+      var list = n ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>' + head + '</th><th>What changes</th></tr></thead><tbody>'
         + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
-      var ways = fam ? '<table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table>' : '';
-      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Who fixes it', '<p>' + esc((WHO_FIX[r.who] || WHO_FIX.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + (ways ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('How the ' + fam.components + ' in the family are built') + '</div><div class="pg-par-scroll">' + ways + '</div></div>' : '') + list;
+      var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
+      // What is suggested, what it changes and the decision are one card: the draft is read, then approved under it.
+      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
+        + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr><th>Rule</th><th>Area</th><th>In</th><th>Follow it</th><th>To do</th><th>Who fixes it</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
-    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]')); });
+    // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still finds it.
+    var sortKey = null, sortDir = 1;
+    var sortBy = function (key) {
+      var val = sortOf[key]; if (!val) return;
+      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
+      var tb = sec.querySelector('.sg-cx-table tbody');
+      Array.prototype.slice.call(tb.children).sort(function (a, b) {
+        var x = rows[+a.getAttribute('data-cx-row')], y = rows[+b.getAttribute('data-cx-row')], u = val(x), v = val(y);
+        return (u < v ? -1 : u > v ? 1 : 0) * sortDir || ORDER[x.status] - ORDER[y.status];
+      }).forEach(function (tr) { tb.appendChild(tr); });
+      Array.prototype.forEach.call(sec.querySelectorAll('.sg-cx-table th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+    };
+    sec.addEventListener('click', function (e) {
+      var th = e.target.closest('th[data-sort]'); if (th) { sortBy(th.getAttribute('data-sort')); return; }
+      if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
+    });
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
-    var nOf = function (st) { return rows.filter(function (r) { return r.status === st; }).length; };
-    var nIn = function (side) { return rows.filter(function (r) { return (r.side || 'figma') === side; }).length; };
-    // The two sides first, then the statuses: a row counts under its side and its status, so the total is the rows'.
-    pageBar(sec, { total: rows.length, chips: [{ key: 'figma', label: 'In Figma', n: nIn('figma') }, { key: 'code', label: 'In the code', n: nIn('code') }, { key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }, { key: 'note', label: 'Notes', n: nOf('note'), dot: 'none' }].filter(function (c) { return c.n; }) });
+    // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
+    // and each says how many rows it would leave beside the others.
+    var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
+    filterBar(sec, { total: rows.length, chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: AREA_ORDER }, { key: 'side', label: 'Side' }] });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
@@ -390,6 +424,85 @@
   // the Status page's). chips: [{ key, label, n, dot }] (dot: the status kind its colour comes from: differs, figma,
   // match, none), All first; a click shows only the table rows with that key (data-chip on each row). One table per
   // page: the chips filter its rows, never split it.
+  // A table's filters, as the Status page's table filters: one chip a column, each showing All until a value is chosen,
+  // its list saying how many rows each value would leave beside the other chips' choices, and the chips combining. A
+  // value the others leave no row in is not offered. All, and Clear filters, drop them. A row carries its value for a
+  // column in data-f-<key>; a column a row can hold several of (a page read from Figma and the intent layer) is marked
+  // multi, and its values are separated by a bar, so a value with a space in it is still one value. Rows are hidden, never drawn again, so the sort and the panel still find
+  // them. A column every row answers the same way is no filter, so it is left out.
+  function filterBar(sec, o) {
+    var h = sec.querySelector(':scope > h2');
+    if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
+    var trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
+    var val = function (tr, k) { return tr.getAttribute('data-f-' + k) || ''; };
+    var has = function (tr, c, w) { return c.multi ? val(tr, c.key).split('|').indexOf(w) >= 0 : val(tr, c.key) === w; };
+    var cols = (o.cols || []).map(function (c) {
+      var seen = {}, words = [];
+      trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
+      var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
+      words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
+      return { key: c.key, label: c.label, multi: c.multi, words: words };
+    }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
+    if (!trs.length || !cols.length) return null;
+    var F = {}, C = '';
+    var colOf = function (k) { return (o.cols || []).filter(function (c) { return c.key === k; })[0] || { key: k }; };
+    var onChip = function (tr, c) { return c.word ? has(tr, colOf(c.col), c.word) : !!tr.getAttribute('data-f-' + c.key); };
+    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    var chipOf = function (k) { return chips.filter(function (c) { return c.key === k; })[0]; };
+    var inCols = function (tr, skip) { return cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
+    var passes = function (tr, skip) { return (!C || onChip(tr, chipOf(C))) && inCols(tr, skip); };
+    var bar = document.createElement('div'); bar.className = 'sg-todo-head';
+    bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
+      '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
+      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
+      cols.map(function (c) {
+        var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
+        return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+          '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+          '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
+          [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
+          '</span></span>';
+      }).join('') + '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
+    var draw = function () {
+      trs.forEach(function (tr) { tr.hidden = !passes(tr); });
+      var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
+      bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
+      bar.querySelector('[data-f-clear]').hidden = !on;
+      chips.forEach(function (c) {
+        var b = bar.querySelector('.sg-chip[data-chip="' + c.key + '"]');
+        b.setAttribute('aria-pressed', C === c.key ? 'true' : 'false');
+        b.querySelector('.sg-count').outerHTML = countHTML(trs.filter(function (tr) { return onChip(tr, c) && inCols(tr); }).length);
+      });
+      cols.forEach(function (c) {
+        var b = bar.querySelector('.sg-chip-menu[data-fg="' + c.key + '"]'), w = F[c.key] || '';
+        b.querySelector('.sg-chip-word').textContent = w || 'All';
+        b.setAttribute('aria-pressed', w ? 'true' : 'false');
+        b.querySelector('.sg-chip-n').innerHTML = '';
+        Array.prototype.forEach.call(document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('[role="option"]'), function (op) {
+          var ow = op.getAttribute('data-f').slice(c.key.length + 1);
+          var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;   // what the other chips leave it
+          op.querySelector('.sg-count').outerHTML = countHTML(n);
+          op.setAttribute('aria-selected', ow === w ? 'true' : 'false');
+          op.hidden = !!ow && !n && ow !== w;   // a value the other chips leave no row in is not offered
+          if (ow && ow === w) b.querySelector('.sg-chip-n').innerHTML = countHTML(n);   // chosen: its count on the chip too
+        });
+      });
+      sec.dispatchEvent(new CustomEvent('sg-filter', { detail: F }));
+    };
+    bar.addEventListener('click', function (e) {
+      var m = e.target.closest('.sg-chip-menu'); if (m) { mxMenu(m, m.getAttribute('aria-expanded') !== 'true'); return; }
+      if (e.target.closest('[data-f-all], [data-f-clear]')) { F = {}; C = ''; draw(); return; }
+      var ch = e.target.closest('.sg-chip[data-chip]'); if (ch) { C = C === ch.getAttribute('data-chip') ? '' : ch.getAttribute('data-chip'); draw(); return; }
+      var op = e.target.closest('.sg-dd-option[data-f]'); if (!op) return;
+      var dd = op.closest('.sg-chip-dd'); if (dd) mxMenu(dd.querySelector('.sg-chip-menu'), false, true);
+      var k = op.getAttribute('data-f').split(':')[0], w = op.getAttribute('data-f').slice(k.length + 1);
+      if (w) F[k] = w; else delete F[k];
+      draw();
+    });
+    draw();
+    return bar;
+  }
   function pageBar(sec, o) {
     var h = sec.querySelector(':scope > h2');
     if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
@@ -552,8 +665,19 @@
       return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(r.kind) + '</p>' + r.written + '</div>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
-    var ilSources = function (p) { if (p.tokens) return 'Figma, Intent layer'; if (p.absent) return 'Intent layer';
-      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0.length ? esc(w0.join(', ')) : '<span class="pg-missing">None</span>'; } var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
+    // Where a page's text comes from, as words: the Sources column joins them, and the Source filter offers them.
+    var ilSourceWords = function (p) {
+      if (p.tokens) return ['Figma', 'Intent layer'];
+      if (p.absent) return ['Intent layer'];
+      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0; }
+      var r = p.reads || {}, out = [];
+      if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer');
+      ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
+      return out;
+    };
+    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(', ')) : '<span class="pg-missing">None</span>'; };
+    // A page's status in one word, as the filter and the chips before it said it.
+    var IL_WORD = { review: 'Review', write: 'Missing', remove: 'Remove', keep: 'Done' };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
     // page (its drafts, each once, beside where it comes from), Changes to rules (the guards and rewrites its rules
     // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it says so on its own line, No its
@@ -784,7 +908,7 @@
     var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '"' + (p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ' data-f-pagesToWrite="1"' : '') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
@@ -821,15 +945,15 @@
     };
     // A link to a page's panel (panel=doc:<file>) opens it.
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
-    var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
-    // The rows to review, by who they wait on: one chip each ("Waiting on Cards team 3"), most first.
-    var waits = {}; rows.forEach(function (p) { var d = statusOf(p) === 'review' && deciderOf(p); if (d) waits[d] = (waits[d] || 0) + 1; });
-    var waitChips = Object.keys(waits).sort(function (a, b) { return waits[b] - waits[a] || a.localeCompare(b); }).map(function (d) { return { key: waitsKey(d), label: 'Waiting on ' + d, n: waits[d], dot: 'figma' }; });
-    pageBar(ilSec, { links: sourceLinks(ilSrc.url), chips: (function () { var toReview = rows.filter(needsReview).length;
-      var toStart = rows.filter(function (p) { return p.missingFor && (IL.pagesToWrite || {})[p.missingFor]; }).length;
-      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(waitChips).concat(toStart ? [{ key: 'pagesToWrite', label: 'Pages to write, most used first', n: toStart, dot: 'differs' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
+    // The rows to review, by who they wait on, as a filter of its own ("Waiting on Cards team"): a row that waits on
+    // nobody answers it with nothing, so the chip offers only the teams there are.
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
+    var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
+    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length,
+      chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
+      cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Contract'] }, { key: 'waits', label: 'Waiting on' }] });
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };

@@ -236,9 +236,6 @@
     ['Documentation', 'doc', function (o) { return o.doc.say; }]
   ];
   var MX_COL_OF = { figma: 'Figma', code: 'Code', par: 'Parity', acc: 'Accessibility', doc: 'Documentation' };
-  // A filter's mark: three lines, each shorter, centred.
-  var FILTER_MARK = '<svg class="sg-dd-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';
-  var MX_TRI = '<svg class="sg-mx-tri" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5h6L4 6.5z" fill="currentColor"/></svg>';
   var MX_AREAS = ['Parity', 'Accessibility', 'Documentation'];
   // The Status page's address says what it shows, so a link opens it as it is: the area it is sorted by
   // (#status/parity), each filter (?code=Missing&doc=Missing), a sort another than the area's (sort=Component&dir=up),
