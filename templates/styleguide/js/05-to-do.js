@@ -97,6 +97,9 @@
   function partOfAnother(c) { var f = parentOf(c.name); return !!f && COMPONENTS.some(function (x) { return x.name === f; }); }
   function menuCount() { var fam = {}; COMPONENTS.forEach(function (c) { var f = menuFamily(c); if (f) fam[f] = 1; }); return COMPONENTS.filter(inMenu).length + Object.keys(fam).length; }
   function parentOf(n) { var x = String(n).trim(), i = x.indexOf('/'); if (PART_ROOT[x]) return PART_ROOT[x]; if (i <= 0) return null; var f = bareName(x.slice(0, i)); return PARENT_NAME[f.toLowerCase()] || f; }
+  // The component a part belongs to, however deep it sits: a part of a part (a cell's own piece) belongs to the
+  // component at the top, and that is the one row counting it. A family name no component carries is the top itself.
+  function rootComponentOf(n) { var seen = {}, at = String(n).trim(), up; while ((up = parentOf(at)) && !seen[up]) { seen[up] = 1; at = up; } return at; }   // rootOf is the Playground's, for markup: every name here is the one page's
   function familyKey(n) { return parentOf(n) || (String(n).trim() || '(no name)'); }
   // A component a Showroom screen found missing from the code (checked when the screen was built): Missing, whatever
   // file the pairing only suggests.
