@@ -16,6 +16,19 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine take the hosted token stylesheets again` | The stylesheets your product loads its token values from, downloaded again into one local file, every mode of them, with the address kept so a later run does it by itself |
 | `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
 
+## Check your Figma library
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
+| `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
+
+## Lint your codebase
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
+
 ## Compare Figma and code
 
 | Ask in Claude Code | What you get |
@@ -36,14 +49,14 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
 | `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
 
-## Write component contracts
+## Write component specs
 
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
 | `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
 
-## Write the intent layer
+## Gather usage guidelines
 
 | Ask in Claude Code | What you get |
 |---|---|
@@ -61,20 +74,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine publish the style guide for the team` | The job that publishes it on every push |
 | `/rms-design-system-engine rebuild my style guide` | Your own copy built again, only the parts the change reached |
 
-## Catch drift in product code and AI edits
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
-
-## Review the Figma library
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
-| `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
-
-## Build with AI, on the system
+## Prototype with your real components
 
 | Ask in Claude Code | What you get |
 |---|---|
