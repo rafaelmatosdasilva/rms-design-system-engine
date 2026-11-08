@@ -16,9 +16,22 @@
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('rules', 'rules');
     var sec = section('rules', 'System', 'Rules', '');
-    // The kind of rule each is (construction-grammar.mjs → judge, construction-page.mjs): every rule on names together,
-    // whatever is named; how each component is built inside (the skeleton) in its own kinds; the tokens; the products.
-    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture', tokens: 'Tokens', products: 'Products' };
+    // The kind of rule each is, in five: how things are named, whatever is named; how a component is built inside; its
+    // properties (its axes, its options and the shape its family shares); the values it binds, a Figma variable and a
+    // style alike, which are one thing to a design system; and what says what it is for. Each rule keeps the finer kind
+    // the engine judged it by (layers, nesting, wiring, placement) - this is how the page groups them, so no filter
+    // offers one row and no word stands in two columns. Side says whether a rule is Figma's or the code's; an area
+    // never does.
+    var AREA = {
+      naming: 'Naming',
+      layout: 'Structure', layers: 'Structure', nesting: 'Structure', placement: 'Structure', wiring: 'Structure', interactions: 'Structure',
+      architecture: 'Properties', products: 'Properties',
+      variables: 'Tokens', tokens: 'Tokens', styles: 'Tokens',
+      documentation: 'Documentation', code: 'Documentation'
+    };
+    // Read in the order a person meets them, never A to Z: what things are called, what a component takes, how it is
+    // built, what it binds, what says what it is for.
+    var AREA_ORDER = ['Naming', 'Properties', 'Structure', 'Tokens', 'Documentation'];
     var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
     var ORDER = { fix: 0, decide: 1, rule: 2 };
     // Where each rule is, and who fixes it, as the Status page's To do says it.
@@ -134,7 +147,7 @@
     // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
     // and each says how many rows it would leave beside the others.
     var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
-    filterBar(sec, { total: rows.length, chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area' }, { key: 'side', label: 'Side' }] });
+    filterBar(sec, { total: rows.length, chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: AREA_ORDER }, { key: 'side', label: 'Side' }] });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
