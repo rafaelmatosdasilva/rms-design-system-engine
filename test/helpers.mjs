@@ -13,6 +13,16 @@ import assert from 'node:assert/strict';
 
 const SCRIPTS_DIR = fileURLToPath(new URL('../lib/', import.meta.url));
 
+// Where the tests that read a Props type find their TypeScript: TS_FOR_TESTS when set, else the test tools' own folder
+// (test/.ci-tools, installed from its lockfile, the TypeScript CI reaches through NODE_PATH) once it holds one, else the
+// folder they run in. The engine has no dependencies of its own, so without this a machine with that folder installed
+// still skipped them, and what ran on GitHub did not run on the computer whose run is the gate.
+export function typescriptRoot(env = process.env) {
+  if (env.TS_FOR_TESTS) return env.TS_FOR_TESTS;
+  const tools = fileURLToPath(new URL('./.ci-tools/', import.meta.url));
+  return existsSync(join(tools, 'node_modules', 'typescript', 'package.json')) ? tools : process.cwd();
+}
+
 // A time limit in a test is there to stop a hang, never to measure how fast this computer is. The full suite starts
 // many browser tests at once, so one that finishes in two minutes on its own can take far longer while the others
 // compete for the same cores: the limit is then reached by a busy machine and the run reads as a broken engine.
