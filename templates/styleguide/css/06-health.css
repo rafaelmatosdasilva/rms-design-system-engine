@@ -76,11 +76,10 @@
 .sg-mx-sys-head { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: var(--sg-card-gap) 0 var(--sg-space-l); }
 .sg-mx-sys { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
 .sg-todo > .pg-par-card { margin-bottom: 0; }
-.sg-health-total { margin: 0 0 var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text-2); }   /* the whole every card counts over, said once above them */
 .sg-health-go { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }   /* how many are complete at the left, the link at the right, one line */
 .sg-health-done { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; font-size: var(--sg-m); color: var(--sg-text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sg-health-done > svg { flex: none; width: var(--sg-mark); height: var(--sg-mark); }
-.sg-health-total > b, .sg-health-done > b { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-health-done > b { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .sg-health-go { margin-top: auto; padding-top: calc(var(--sg-space-l) + var(--sg-space-xs)); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
 .sg-health-anchor { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-m); cursor: pointer; }   /* a link down to the table: its words and an arrow pointing down */
 .sg-health-anchor > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
@@ -90,7 +89,6 @@
 .sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text-2); }   /* what is left, side by side on one line */
 .sg-health-legend .pg-par-status { gap: calc(var(--sg-space-xxs) * 2.5); white-space: nowrap; }   /* the dot, its words and the count of components 5px apart */
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
-.sg-health-legend + .sg-health-pages { margin-top: calc(-1 * var(--sg-space-s)); }   /* the page criteria's line right under the legend */
 .sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
 .sg-health-bar > span + span { background: var(--sg-a5); }
 .sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, var(--sg-a5) 0 2px, transparent 2px 4px); }

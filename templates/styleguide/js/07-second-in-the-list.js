@@ -530,8 +530,8 @@
       if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0.length ? esc(w0.join(', ')) : '<span class="pg-missing">None</span>'; } var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
     // page (its drafts, each once, beside where it comes from), Changes to rules (the guards and rewrites its rules
-    // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it folded away, No its answer until
-    // a person says otherwise), and Other changes (what is still to write, a part's page to move, the notes no agent
+    // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it says so on its own line, No its
+    // answer until a person says otherwise), and Other changes (what is still to write, a part's page to move, the notes no agent
     // reads). Three actions a group, under it, never on an item: Approve all, Change, Drop all, each copying its decision
     // on everything the group shows, in the person's words, for Claude Code. Never where each is written (Claude Code finds it).
     var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
@@ -557,8 +557,9 @@
       var said = function (k) { return steps[k] ? ' data-il-' + k + '="' + esc(steps[k]) + '"' : ''; };
       return '<div class="sg-il-line sg-il-change sg-il-item" data-il-item' + said('approve') + said('change') + said('drop') + '><strong>' + esc(head) + '</strong>' + body + '</div>';
     };
-    // A group: its heading and count, its items, those folded away (quiet, which its actions leave as they are), then its
-    // three actions below them all: Approve all, Change, Drop all. Each copies its decision on what the group shows.
+    // A group: its heading and count, its items, those the engine has no ground for (quiet: shown like the rest, under a
+    // line saying so, and left as they are by its actions), then its three actions below them all: Approve all, Change,
+    // Drop all. Each copies its decision on the items above that line, never on those.
     var IL_DO = [['approve', 'Approve all', 'Approve'], ['change', 'Change', 'Change'], ['drop', 'Drop all', 'Drop']];
     var ilGroup = function (key, head, items, all, quiet) {
       quiet = quiet || []; var n = items.length + quiet.length; if (!n) return '';
@@ -568,10 +569,10 @@
         return sysButton('button', items.length === 1 || d[0] === 'change' ? d[2] : d[1] + ' ' + items.length, ' data-il-all="' + key + '" data-il-do="' + d[0] + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark(d[0]));
       }).join('') + '<span class="sg-decide-said" role="status"></span></div>' : '';
       return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + said('change') + said('drop') + '><div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong></div>' + items.join('')
-        + (quiet.length ? '<details class="sg-il-quiet"><summary>' + esc(quiet.length + (quiet.length === 1 ? ' more the engine has no ground for: No, unless you say otherwise' : ' more the engine has no ground for: No to each, unless you say otherwise')) + '</summary>' + quiet.join('') + '</details>' : '') + acts + '</div>';
+        + (quiet.length ? '<div class="sg-il-quiet"><p class="sg-il-quiet-head">' + esc(quiet.length === 1 ? 'The engine has no ground for the change below: No, unless you say otherwise.' : 'The engine has no ground for the ' + quiet.length + ' changes below: No to each, unless you say otherwise.') + '</p>' + quiet.join('') + '</div>' : '') + acts + '</div>';
     };
     // A group's decision, in the person's words: the group's own words for it when it has them (all: "Approve all 3
-    // drafts"), else each item's in turn (steps: those the group shows, never what is folded away).
+    // drafts"), else each item's in turn (steps: those the group proposes, never one it has no ground for).
     // → the decision to copy, or '' when there is nothing to decide.
     var ilGroupDecision = function (on, all, steps) {
       var said = all ? [all] : steps.filter(Boolean);
@@ -776,7 +777,7 @@
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo, ilOpen(p)), task = own ? ilTodo(own) : c.todo;
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      // A group's Approve all, Change or Drop all copies its decision on what it shows (not what is folded away), said
+      // A group's Approve all, Change or Drop all copies its decision on what it proposes (not what it has no ground for), said
       // beside them once copied.
       var detail = m.querySelector('.sg-row-detail');
       detail.onclick = function (e) {

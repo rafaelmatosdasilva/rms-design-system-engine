@@ -25,13 +25,13 @@ const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';
 const unq = (s) => String(s).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 // Each group as the page draws it: its key, heading, its words for each action (all), the labels of its actions (under
-// its items), and items, each with its heading, its body, whether it is folded away, and the words each answer adds.
+// its items), and items, each with its heading, its body, whether the engine has no ground for it, and the words each answer adds.
 const groupsOf = (html) => [...html.matchAll(/<div class="sg-il-group-decide" data-il-group="(\w+)"((?: data-il-all-\w+="[^"]*")*)><div class="sg-il-group-head"><strong>([^<]+)<\/strong><\/div>([\s\S]*?)(?=<div class="sg-il-group-decide"|<\/div><\/div>$)/g)].map((m) => ({
   key: m[1], head: m[3], all: Object.fromEntries([...m[2].matchAll(/data-il-all-(\w+)="([^"]*)"/g)].map((a) => [a[1], unq(a[2])])),
   actions: [...m[4].matchAll(/<button data-il-all="\w+" data-il-do="(\w+)"[^>]*>([^<]+)<\/button>/g)].map((x) => `${x[1]}:${x[2]}`),
   actionsLast: /<div class="sg-il-group-actions"[^>]*>(?:<button[^>]*>[^<]+<\/button>)+<span class="sg-decide-said" role="status"><\/span><\/div><\/div>$/.test(m[4]) || /<div class="sg-il-group-actions"[^>]*>(?:<button[^>]*>[^<]+<\/button>)+<span class="sg-decide-said" role="status"><\/span><\/div>$/.test(m[4]),
-  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-(?:approve|change|drop)="[^"]*")*)><strong>([^<]+)<\/strong>([\s\S]*?)<\/div>(?=<div class="sg-il-line|<details|<\/details>|<div class="sg-il-group-actions"|<\/div>|$)/g)].map((i) => ({
-    head: unq(i[2]), body: i[3], quiet: m[4].slice(0, i.index).includes('<details'),
+  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-(?:approve|change|drop)="[^"]*")*)><strong>([^<]+)<\/strong>([\s\S]*?)<\/div>(?=<div class="sg-il-line|<div class="sg-il-quiet"|<div class="sg-il-group-actions"|<\/div>|$)/g)].map((i) => ({
+    head: unq(i[2]), body: i[3], quiet: m[4].slice(0, i.index).includes('<div class="sg-il-quiet"'),
     steps: Object.fromEntries([...i[1].matchAll(/data-il-(\w+)="([^"]*)"/g)].map((x) => [x[1], unq(x[2])])),
   })),
 }));
@@ -98,7 +98,7 @@ test('a draft that names a property only Figma has is offered a rewrite, beside 
   assert.doesNotMatch(none, /Proposed instead/, 'nothing to mend: no rewrite');
 });
 
-test('the changes to rules are a group of their own, apart from the drafts; one with only the engine behind it is folded away and left out of Approve all', () => {
+test('the changes to rules are a group of their own, apart from the drafts; one with only the engine behind it says so and is left out of Approve all', () => {
   const rule = (proposal, more = {}) => ({ kind: 'guard', key: `guard:Tile:${proposal.length}`, rule: 'Only one Tile per screen.', proposal, candidates: [{ answer: 'yes', evidence: [{ from: "The team's pages", says: 'The page marks the rule must.' }] }], decider: { name: 'Tiles team' }, ...more });
   const html = loadChanges()({ name: 'Tile', file: 't.json', drafts: [{ where: 'Purpose', text: 'Groups content.' }] }, [], [], '', [
     rule('Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.'),
@@ -110,17 +110,18 @@ test('the changes to rules are a group of their own, apart from the drafts; one 
   assert.equal(hold.head, 'Hold the rule as a check');
   assert.match(hold.body, /“Only one Tile per screen\.”<\/span><span class="sg-il-label">With the check<\/span><span class="sg-il-text">At most 1 Tile on one screen\.<\/span><span class="sg-il-source">The page marks the rule must\.<\/span><waits>Tiles team<\/waits>/);
   assert.deepEqual([hold.quiet, quiet.head, quiet.quiet], [false, 'Rewrite the rule', true]);
-  assert.match(html, /<details class="sg-il-quiet"><summary>1 more the engine has no ground for: No, unless you say otherwise<\/summary>/);
+  assert.match(html, /<div class="sg-il-quiet"><p class="sg-il-quiet-head">The engine has no ground for the change below: No, unless you say otherwise\.<\/p>/, 'nothing folded away: it says so over the items themselves');
+  assert.doesNotMatch(html, /<details|<summary/, 'no expander in the panel');
   assert.match(quiet.body, /Only the engine's own reading of the rule speaks for it/);
   assert.deepEqual(g[1].actions, ['approve:Approve', 'change:Change', 'drop:Drop'], 'for the one it shows');
   assert.equal(decision(html, 1, 'drop'), '/rms-design-system-engine-acme on Component Tile, No to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.".');
-  assert.equal(approved(html, 1), '/rms-design-system-engine-acme on Component Tile, Yes to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.".', 'what is folded away is left as it is');
+  assert.equal(approved(html, 1), '/rms-design-system-engine-acme on Component Tile, Yes to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.".', 'what the engine has no ground for is left as it is');
   // A rule change is decided here only: never again under Proposal.
   assert.match(tpl, /var list = ilOwn\(p\)\.filter\(function \(x\) \{ return !isRuleChange\(x\); \}\);/);
   assert.match(tpl, /ilChanges\(p, c\.write, c\.notes, own \? ilTodo\(own, true\) : c\.todo, ilOpen\(p\)\)/);
 });
 
-test('the panel\'s actions copy what their group shows, never what is folded away, and say where to paste it', () => {
+test('the panel\'s actions copy what their group shows, never what the engine has no ground for, and say where to paste it', () => {
   assert.match(tpl, /var k = all\.getAttribute\('data-il-do'\), g = all\.closest\('\[data-il-group\]'\), shown = Array\.prototype\.filter\.call\(g\.querySelectorAll\('\[data-il-item\]'\), function \(it\) \{ return !it\.closest\('\.sg-il-quiet'\); \}\);/);
   assert.match(tpl, /copyText\(ilGroupDecision\(box\.getAttribute\('data-il-on'\), g\.getAttribute\('data-il-all-' \+ k\), shown\.map\(function \(it\) \{ return it\.getAttribute\('data-il-' \+ k\); \}\)\), all, all\.parentNode\.querySelector\('\.sg-decide-said'\), 'Paste it in Claude Code'\);/);
   assert.doesNotMatch(tpl, /var ilGroupsOf = |var ilDecided = |data-il-copy-review|detail\.oninput = /, 'no per-item choice and no Copy decisions left');
