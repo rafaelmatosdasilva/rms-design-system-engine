@@ -141,7 +141,8 @@ What the engine does for design and product teams. Every part reads the same kno
 - Every colour and space on the page is one of your tokens, so it looks like your system.
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
 - Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
-- Your own copy builds itself again whenever the code, Figma, the intent layer, a store or the engine changes, in the background from login on. It is on by default: setup turns it on, and one setting turns it off. It runs only what the change feeds, and publishes to your team's store only a page that changed, so a team with no CI runner stays up to date.
+- The copy on your computer keeps up with your git. Once you have built it there, it is built again after each commit and each change you pull in. It is the quick build, for you to look at, and is never published.
+- A team with no CI runner asks for a round when it wants one. It runs only what the change feeds, and publishes to your team's store only a page that changed.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
 
 ## Try components in a playground

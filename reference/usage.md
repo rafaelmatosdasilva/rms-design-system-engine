@@ -105,7 +105,7 @@ rms-design-system-engine --publish-styleguide            # write the CI job that
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
-rms-design-system-engine --auto                         # one round now, then exit: what moved since the last build, only the steps those sources feed, the publish when the page changed; one line a round in .design-system-engine-out/watch.log; exit 1 when a step failed. Nothing rebuilds by itself - a round happens when someone asks
+rms-design-system-engine --auto                         # one round now, then exit: what moved since the last build, only the steps those sources feed, the publish when the page changed; one line a round in .design-system-engine-out/watch.log; exit 1 when a step failed. A round never starts by itself - it happens when someone asks (the git hooks build only the local quick page, never a round)
 rms-design-system-engine --outputs                      # the contracts and the design intent made again from the intent layer as it is now, without the gates (what a round runs when only the layer moved)
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --pages-to-write [N]           # the components with no intent-layer page, most used first (products, files, uses); each run that writes the layer starts the top intentLayer.startPages (10 by default) as drafts
@@ -162,8 +162,9 @@ rms-design-system-engine --figma-screens <answer.json>   # keep its answer as th
 rms-design-system-engine --figma-a11y                    # write the read-only script that reads the same screens for accessibility: each text and lone icon with what is drawn behind it, inside instances, and each control under 24 by 24, to run with use_figma
 rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
-rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's pre-commit and pre-push hooks (done by --init); --remove-hooks takes them out
+rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's hooks (done by --init): pre-commit and pre-push check the change; post-commit, post-merge and post-rewrite build the local style guide again, quickly, where one was built (--git-rebuild); --remove-hooks takes them out
 rms-design-system-engine --git-check commit|push         # what git's hooks run: only for what the change uses; commit warns and exits 0, push exits 1 while a finding is left
+rms-design-system-engine --git-rebuild commit|merge|rewrite  # what git's post-commit, post-merge and post-rewrite run: the local style guide built again quickly, in a process of its own, where a page was built; never on CI or with "hooks": false; always exits 0
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
 rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
 rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
@@ -938,8 +939,8 @@ most every six hours, and says in one line what moved since and when the page wa
 the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A style guide
 build always asks, and says how to publish when the page is behind; with `"styleguide": { "publish": "auto" }` it
 publishes itself, where GitLab lets the person write the store, so a pipeline that cannot run never leaves the team on
-an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now, and says whether
-the background watch is on for this folder and what its last round did. The Status page shows, by its title, when it was built and with which engine.
+an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now, and says what
+this folder's last round did. The page records what it was built from (the code's commit, Figma's version, the engine's commit) in its head, never on the page itself.
 
 Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the style guide store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20

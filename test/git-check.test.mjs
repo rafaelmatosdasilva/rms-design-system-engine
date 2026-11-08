@@ -12,6 +12,9 @@ import { installHooks, installGitHooks, gitHooksStatus, upgradeHooks } from '../
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+// Every git hook the engine writes: the checks before a commit and a push, the local style guide after a change.
+const ALL = ['pre-commit', 'pre-push', 'post-commit', 'post-merge', 'post-rewrite'];
+const each = (v) => Object.fromEntries(ALL.map((n) => [n, v]));
 // A git that reads no person's own settings, and writes as a role.
 const ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'QA', GIT_AUTHOR_EMAIL: 'qa@example.com', GIT_COMMITTER_NAME: 'QA', GIT_COMMITTER_EMAIL: 'qa@example.com' };
 const git = (dir, ...args) => execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -127,8 +130,8 @@ test('installed as the repository\'s own git hooks: git runs them, a commit warn
   git(dir, 'remote', 'add', 'origin', remote);
   git(dir, 'push', '-q', 'origin', 'main');
   const r = installGitHooks(dir, { engineDir: ENGINE });
-  assert.deepEqual(r.written, ['pre-commit', 'pre-push']);
-  assert.deepEqual(gitHooksStatus(dir).hooks, { 'pre-commit': 'ours', 'pre-push': 'ours' });
+  assert.deepEqual(r.written, ALL);
+  assert.deepEqual(gitHooksStatus(dir).hooks, each('ours'));
   assert.ok(statSync(join(r.dir, 'pre-push')).mode & 0o100);
   assert.match(readFileSync(join(r.dir, 'pre-push'), 'utf8'), /exec node '.*audit\.mjs' --git-check push/);
   assert.doesNotMatch(readFileSync(join(r.dir, 'pre-commit'), 'utf8'), new RegExp(dir));   // worktrees share hooks: no absolute project path
@@ -144,7 +147,7 @@ test('installed as the repository\'s own git hooks: git runs them, a commit warn
   assert.notEqual(git(dir, 'rev-parse', 'HEAD').trim(), git(remote, 'rev-parse', 'main').trim());
   // --remove-hooks takes out only its own.
   installGitHooks(dir, { engineDir: ENGINE, remove: true });
-  assert.deepEqual(gitHooksStatus(dir).hooks, { 'pre-commit': 'none', 'pre-push': 'none' });
+  assert.deepEqual(gitHooksStatus(dir).hooks, each('none'));
 });
 
 test('a hook of the project\'s own, or a hooks folder it commits, is never written: the line to add is said', () => {
@@ -153,7 +156,7 @@ test('a hook of the project\'s own, or a hooks folder it commits, is never writt
   mkdirSync(hooks, { recursive: true });
   writeFileSync(join(hooks, 'pre-push'), '#!/bin/sh\nnpm test\n');
   const r = installGitHooks(dir, { engineDir: ENGINE });
-  assert.deepEqual(r.written, ['pre-commit']);
+  assert.deepEqual(r.written, ALL.filter((n) => n !== 'pre-push'));
   assert.equal(readFileSync(join(hooks, 'pre-push'), 'utf8'), '#!/bin/sh\nnpm test\n');
   assert.deepEqual(r.kept.map((k) => k.name), ['pre-push']);
   assert.match(r.kept[0].line, /^node '.*audit\.mjs' --git-check push \|\| exit 1$/);
@@ -168,7 +171,7 @@ test('a hook of the project\'s own, or a hooks folder it commits, is never writt
   git(other, 'config', 'core.hooksPath', '.githooks');
   const o = installGitHooks(other, { engineDir: ENGINE });
   assert.deepEqual(o.written, []);
-  assert.deepEqual(o.kept.map((k) => k.name), ['pre-commit', 'pre-push']);
+  assert.deepEqual(o.kept.map((k) => k.name), ALL);
   assert.equal(existsSync(join(other, '.githooks')), false);
 });
 
@@ -185,14 +188,14 @@ test('a project reached through a symlinked folder is still the top of its repos
 test('--install-hooks writes the git hooks beside the Claude Code ones; a project set up before gets them on its next run', () => {
   const dir = project();
   const r = installHooks(dir, { engineDir: ENGINE });
-  assert.deepEqual(r.git.written, ['pre-commit', 'pre-push']);
+  assert.deepEqual(r.git.written, ALL);
   installGitHooks(dir, { engineDir: ENGINE, remove: true });
   assert.equal(upgradeHooks(dir, {}, { engineDir: ENGINE, env: {} }), true);
-  assert.deepEqual(gitHooksStatus(dir).hooks, { 'pre-commit': 'ours', 'pre-push': 'ours' });
+  assert.deepEqual(gitHooksStatus(dir).hooks, each('ours'));
   assert.equal(upgradeHooks(dir, {}, { engineDir: ENGINE, env: {} }), false);   // already current
   assert.equal(upgradeHooks(dir, { hooks: false }, { engineDir: ENGINE, env: {} }), false);
   installHooks(dir, { remove: true });
-  assert.deepEqual(gitHooksStatus(dir).hooks, { 'pre-commit': 'none', 'pre-push': 'none' });
+  assert.deepEqual(gitHooksStatus(dir).hooks, each('none'));
 });
 
 test('the command: a commit exits 0 with its warning, a push exits 1, no project here passes', () => {
