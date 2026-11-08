@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { writeFileSync, rmSync, statSync } from 'node:fs';
+import { writeFileSync, rmSync, statSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_EXAMPLE, ROOT } from '../.githooks/private-check.mjs';
 import { projectTerms } from '../.githooks/private-terms.mjs';
@@ -407,4 +407,30 @@ test('a pull request lists the names its changes add, and opens only once they w
     assert.match(unread.stderr, new RegExp(company));
     assert.notEqual(pr('--names-read').status, 3, 'read: it goes on to open the pull request');
   } finally { for (const d of [remote, dir, home]) rmSync(d, { recursive: true, force: true }); }
+});
+
+test('the company a project is for is one of its names: said once here or read from its profile, asked once, and only where the list is kept', async () => {
+  const home = tempDir('terms-company-'), proj = tempDir('terms-company-proj-');
+  const was = process.env.RMS_PRIVATE_TERMS_DIR;
+  process.env.RMS_PRIVATE_TERMS_DIR = home;
+  try {
+    const m = await import('../.githooks/private-terms.mjs');
+    writeFileSync(join(proj, 'ds-config.json'), '{}');
+    assert.equal(m.askCompany(proj), false, 'a computer that keeps no list is never asked');
+    writeFileSync(join(home, 'private-projects.json'), JSON.stringify({ projects: [realpathSync(proj)] }));
+    assert.equal(m.askCompany(proj), true, 'a project it remembers, with no company said');
+    assert.equal(m.askCompany(proj), false, 'asked once');
+    const company = `${j('North', 'wind')} ${j('Hold', 'ings')}`;   // invented, as the rules ask
+    assert.equal(m.rememberCompany(proj, company), true);
+    assert.deepEqual(m.companyNames(proj), [company]);
+    const t = m.projectTerms(proj);
+    assert.ok(t.terms.has(j('northwind', 'holdings')), 'the whole name');
+    assert.ok(t.phrases.includes(j('northwind', 'holdings')), 'and as words apart, in prose');
+    writeFileSync(join(proj, 'design-system-engine-profile.json'), JSON.stringify({ profile: 1, name: j('Quokka', ' Labs'), client: j('quokka', 'labs') }));
+    assert.deepEqual(m.companyNames(proj), [company, j('Quokka', ' Labs'), j('quokka', 'labs')], 'a profile says what the team calls it');
+    assert.ok(!JSON.stringify(m.projectTerms(proj)).includes('undefined'));
+  } finally {
+    if (was === undefined) delete process.env.RMS_PRIVATE_TERMS_DIR; else process.env.RMS_PRIVATE_TERMS_DIR = was;
+    for (const d of [home, proj]) rmSync(d, { recursive: true, force: true });
+  }
 });

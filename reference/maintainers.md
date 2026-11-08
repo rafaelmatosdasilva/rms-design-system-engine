@@ -36,6 +36,10 @@ Five layers refuse anything private, each catching what the one before may miss:
      every run of the engine remembers its project, the installed copy's runs included.
      `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there (a folder of projects, never
      one that holds the engine: its test fixtures are projects too), `--add <folder>` one at a time.
+   - **The company it is for.** Its legal name is often in no file: on such a computer the engine asks once for each
+     project it remembers (a NEXT line for the agent), and `--company "<its legal name>" [<the project's folder>]`
+     keeps the answer here, never in the project's files. A project's profile gives what the team calls the company
+     (its `name` and `client`) unasked.
    - **Never silently empty.** A commit, its message, a push and a pull request are refused while the list has never
      been said: knowing no project, the check would refuse no one's names and still pass. A computer that holds no one's
      project says so once with `--none`. CI has no list by design: the hashed names are its own.

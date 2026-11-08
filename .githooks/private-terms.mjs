@@ -58,6 +58,38 @@ export function listState() {
 // Whether this computer keeps a list at all: then every run of the engine remembers its project, whichever checkout runs.
 export const keepsList = () => existsSync(PROJECTS());
 
+// ── The company a project is for ──────────────────────────────────────────────────────────────────────────────────
+// Its legal name is in no file of a project, often: a profile says what the team calls it (name, client), never the
+// rest. On a computer that keeps the list the engine asks once for each project it remembers, and keeps the answer
+// here, beside the project: it is this computer's, never written into the client's files.
+export function rememberCompany(dir, name) {
+  const at = realpathSync(resolve(dir)), n = String(name ?? '').trim();
+  if (!n) return false;
+  const p = readJson(PROJECTS(), { projects: [] });
+  p.companies = { ...(p.companies ?? {}), [at]: n };
+  writeJson(PROJECTS(), p);
+  return true;
+}
+// The company's names a project gives: the one a person said here, and its profile's (name, client).
+export function companyNames(dir) {
+  const out = [];
+  try { const said = readJson(PROJECTS(), {}).companies?.[realpathSync(resolve(dir))]; if (said) out.push(said); } catch { /* no list */ }
+  const prof = readJson(join(dir, 'design-system-engine-profile.json'), {});
+  for (const k of ['name', 'client']) if (typeof prof[k] === 'string' && prof[k].trim()) out.push(prof[k].trim());
+  return [...new Set(out)];
+}
+// Whether to ask for a project's company now: only on a computer that keeps the list, for a project it remembers, with
+// no company said here, and once (an unanswered question is not asked again; --company answers it any time).
+export function askCompany(dir) {
+  try {
+    if (!keepsList()) return false;
+    const at = realpathSync(resolve(dir)), p = readJson(PROJECTS(), { projects: [] });
+    if (!p.projects.includes(at) || p.companies?.[at] || (p.asked ?? []).includes(at)) return false;
+    p.asked = [...(p.asked ?? []), at]; writeJson(PROJECTS(), p);
+    return true;
+  } catch { return false; }
+}
+
 // ── A project's people ────────────────────────────────────────────────────────────────────────────────────────────
 // Everyone who committed to a project, by the name they sign with and the account their address starts with: a name
 // from a project's history once reached the engine's public files as an example, and nothing here knew it. A bot is no
@@ -199,6 +231,8 @@ export function projectTerms(root) {
   if (pkg.name) for (const w of String(pkg.name).split(/[@/]/)) add(w, 'package name', own);
   let remotes = '';
   try { remotes = execFileSync('git', ['-C', root, 'remote', '-v'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* no git */ }
+  // The company it is for: its whole name, as words apart too, and each word of it that is a name.
+  for (const c of companyNames(root)) { add(c, 'company', own); for (const w of c.split(/\s+/)) add(w, 'company', own); }
   // Its people: each one's whole name, kept as words apart too, and the account their address starts with.
   for (const a of authorsOf(root)) { add(a.name, 'git author', own); for (const u of a.users) add(u, 'git author', own); }
   for (const text of [near('ds-config.json'), remotes, near('.design-system-engine-project'), near('.gitlab-source.json'), near('package.json')]) {
@@ -402,6 +436,12 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     const w = norm(at('--name') ?? '');
     if (!/^[a-z]{3,}$/.test(w)) { console.log('Give one word of 3 letters or more: --name <word>'); process.exit(2); }
     const t = buildTerms(); t.namedByHand = [...new Set([...(t.namedByHand ?? []), w])]; t.named = { ...(t.named ?? {}), [w]: 'named by hand' }; writeJson(TERMS(), t); console.log('named', w, '(refused where it is used as a name)');
+  } else if (a.includes('--company')) {
+    // --company "<its legal name>" [<the project's folder>]: the company a project is for, kept on this computer only.
+    const i = a.indexOf('--company'), name = a[i + 1], dir = a[i + 2] && !a[i + 2].startsWith('--') ? a[i + 2] : process.cwd();
+    if (!name || name.startsWith('--')) { console.log('Give the company\'s name: --company "<its legal name>" [<the project\'s folder>]'); process.exit(2); }
+    rememberProject(dir); rememberCompany(dir, name); buildTerms({ force: true });
+    console.log('kept on this computer: its names are refused from now on');
   } else if (a.includes('--none')) {
     // A computer that holds no one's project says so, once: its hooks then let a commit through with no list.
     const p = readJson(PROJECTS(), { projects: [] });
