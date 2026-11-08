@@ -123,16 +123,16 @@ test('[reimplementation] a DS input field, a checkbox and a part the theme style
 
 // The Figma side: the DS components each product screen uses, read from Figma.
 const screenSnap = (components) => JSON.stringify({ screens: { '1:2': { name: 'Main', plugin: 'app', components } } });
-const SCREEN_DS = { componentSelectors: { buttonStepper: '.buttonStepper', buttonPrimary: '.buttonPrimary' }, pluginDirs: { app: 'app' } };
+const SCREEN_DS = { componentSelectors: { counterStepper: '.counterStepper', buttonPrimary: '.buttonPrimary' }, pluginDirs: { app: 'app' } };
 
 test('[reimplementation] a component the Figma screen uses and the code never uses fails', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': SCREEN_DS,
-    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1, buttonPrimary: 2, 'Icon-plus': 1 }),
-    'app/ui.src.html': `<!-- a buttonStepper drawn by hand --><div class="stepper"><button class="buttonPrimary">-</button></div>\n<style>.buttonStepper{}</style>\n`,
+    'figma-screen-components.snapshot.json': screenSnap({ counterStepper: 1, buttonPrimary: 2, 'Icon-plus': 1 }),
+    'app/ui.src.html': `<!-- a counterStepper drawn by hand --><div class="stepper"><button class="buttonPrimary">-</button></div>\n<style>.counterStepper{}</style>\n`,
   });
   assert.equal(code, 1, out);
-  assert.match(out, /app: "Main" uses buttonStepper; the code never uses \.buttonStepper/);
+  assert.match(out, /app: "Main" uses counterStepper; the code never uses \.counterStepper/);
   assert.doesNotMatch(out, /uses buttonPrimary;/, 'a component the code uses is not listed');
   assert.doesNotMatch(out, /Icon-plus/, 'only DS components count');
 });
@@ -157,29 +157,29 @@ test('[reimplementation] a component a screen draws only as another one\'s own p
 test('[reimplementation] a class added from script counts as a use', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': SCREEN_DS,
-    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }),
-    'app/ui.src.html': `<div id="s"></div><script>document.getElementById('s').classList.add('buttonStepper');</script>\n`,
+    'figma-screen-components.snapshot.json': screenSnap({ counterStepper: 1 }),
+    'app/ui.src.html': `<div id="s"></div><script>document.getElementById('s').classList.add('counterStepper');</script>\n`,
   });
   assert.equal(code, 0, out);
   assert.match(out, /every DS component the product screens use in Figma is used by their code/);
 });
 
 test('[reimplementation] a screen component can be excused, and screenComponentsStrict false makes it advice', () => {
-  const files = { 'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }), 'app/ui.src.html': '<div class="stepper"></div>\n' };
-  assert.equal(runGate(GATE, { ...files, 'ds-config.json': { ...SCREEN_DS, knownReimplementations: ['app/buttonStepper'] } }).code, 0);
+  const files = { 'figma-screen-components.snapshot.json': screenSnap({ counterStepper: 1 }), 'app/ui.src.html': '<div class="stepper"></div>\n' };
+  assert.equal(runGate(GATE, { ...files, 'ds-config.json': { ...SCREEN_DS, knownReimplementations: ['app/counterStepper'] } }).code, 0);
   const soft = runGate(GATE, { ...files, 'ds-config.json': { ...SCREEN_DS, screenComponentsStrict: false } });
   assert.equal(soft.code, 0, soft.out);
-  assert.match(soft.out, /⚠️ .*uses buttonStepper/);
+  assert.match(soft.out, /⚠️ .*uses counterStepper/);
 });
 
 test('[reimplementation] a component the DS has not built yet is said as not checked, not a product gap', () => {
   const { code, out } = runGate(GATE, {
-    'ds-config.json': { ...SCREEN_DS, knownUnimplementedComponents: ['buttonStepper'] },
-    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }),
+    'ds-config.json': { ...SCREEN_DS, knownUnimplementedComponents: ['counterStepper'] },
+    'figma-screen-components.snapshot.json': screenSnap({ counterStepper: 1 }),
     'app/ui.src.html': '<div class="stepper"></div>\n',
   });
   assert.equal(code, 0, out);
-  assert.match(out, /⏭ \[reimplementation\] app: "Main" uses buttonStepper, which the DS has not built yet/);
+  assert.match(out, /⏭ \[reimplementation\] app: "Main" uses counterStepper, which the DS has not built yet/);
   assert.doesNotMatch(out, /the code never uses/);
 });
 

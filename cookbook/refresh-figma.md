@@ -1386,7 +1386,7 @@ Merge the returned `effects` into `figma-vars.snapshot.json` alongside `color`/`
 
 ## Phase 1 - Step 1e: Capture the components each product screen uses → `figma-screen-components.snapshot.json`
 
-Gate [10] (No hand-built DS components) compares each product screen in Figma with its product's code: a DS component a screen uses that the code never uses was built by hand or left out (a stepper drawn as `buttonStepper` in Figma, hand-built in code). Run this over every entry of `ds-config.json → frames[]` and `screens[]`, and save the result where `paths.snapshotScreenComponents` points (default `figma-screen-components.snapshot.json`), with `_updated` stamped. With FIGMA_TOKEN the audit captures it itself.
+Gate [10] (No hand-built DS components) compares each product screen in Figma with its product's code: a DS component a screen uses that the code never uses was built by hand or left out (a stepper drawn as `counterStepper` in Figma, hand-built in code). Run this over every entry of `ds-config.json → frames[]` and `screens[]`, and save the result where `paths.snapshotScreenComponents` points (default `figma-screen-components.snapshot.json`), with `_updated` stamped. With FIGMA_TOKEN the audit captures it itself.
 
 ```js
 const SCREENS = [ /* ds-config.json → frames[] and screens[]: { name, nodeId, plugin } */ ];

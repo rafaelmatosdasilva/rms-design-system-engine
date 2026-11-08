@@ -78,7 +78,7 @@ test('a Figma colour is drawn with the variable the naming rule gives it, else t
 const catalog = { components: { node: { props: { Title: { type: 'text', default: 'Title' }, iconContent: { type: 'slot' }, Selected: { type: 'enum', values: ['False', 'True'], default: 'False' } } }, panel: { props: {} } } };
 const screen = { name: 'Atlas', tree: { kind: 'frame', name: 'Atlas', w: 300, h: 200, layout: 'VERTICAL', children: [
   { kind: 'instance', name: 'panel', component: 'panel', w: 300, h: 200, fill: { var: 'panel/primary/color' }, layout: 'VERTICAL', gap: 8, gapVar: 'gap/m', children: [
-    { kind: 'instance', name: 'node', component: 'node', w: 200, h: 40, props: { Title: 'cardTile', iconContent: 'Icon-var-color', State: 'Disabled', Selected: 'False' }, texts: ['cardTile'] },
+    { kind: 'instance', name: 'node', component: 'node', w: 200, h: 40, props: { Title: 'cardTile', iconContent: 'Icon-fill-color', State: 'Disabled', Selected: 'False' }, texts: ['cardTile'] },
     { kind: 'instance', name: 'node', component: 'node', w: 200, h: 40, props: { Title: 'modalAlert', iconContent: 'Icon-component', State: 'Default', Selected: 'True' }, texts: ['modalAlert'] },
   ] },
 ] } };
@@ -89,7 +89,7 @@ test('a designed instance keeps its swapped-in icon and the state it is shown in
   const panel = p.children[0];
   assert.equal(panel.props.surface, 'panel/primary');
   const [one, two] = panel.children[0].children;
-  assert.equal(one.props.iconContent, 'Icon-var-color');
+  assert.equal(one.props.iconContent, 'Icon-fill-color');
   assert.equal(one.props.figmaState, 'Disabled');
   assert.equal(two.props.figmaState, undefined, 'the default state needs nothing');
   const r = checkPrototype(p, { catalog, view: { components: [{ name: 'node', cls: 'node', markup: '<button class="node"><span>x</span></button>', controls: [] }] }, scales, css: '.node.node-selected{} .node.node-disabled{}' });
@@ -101,7 +101,7 @@ test('page: each instance draws the markup with room for its words, its icon fro
   const full = '<button class="node var-item"><div class="var-type-icon"></div><span class="var-name">Label</span></button>';
   const parts = { view: { components: [{ name: 'node', cls: 'node', markup: full, markups: [full, '<button class="node icon-only"><svg><use href="#icon-x"/></svg></button>'], controls: [] }], modes: [] },
     themeCSS: ':root{--panel:#123456} .node{margin-bottom:8px;display:flex} .node.node-selected{outline:2px solid white} .node.node-disabled{border-style:dashed}', componentCSS: '',
-    iconSheet: '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute"><symbol id="icon-var-color" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/></symbol><symbol id="icon-component" viewBox="0 0 16 16"><rect width="12" height="12"/></symbol></svg>' };
+    iconSheet: '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute"><symbol id="icon-fill-color" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/></symbol><symbol id="icon-component" viewBox="0 0 16 16"><rect width="12" height="12"/></symbol></svg>' };
   const html = prototypePage({ name: 'atlas', tree, parts, scales, gaps: [], catalog, fonts: false });
   const dir = tempDir('from-code-');
   writeFileSync(join(dir, 'p.html'), html);
@@ -115,7 +115,7 @@ test('page: each instance draws the markup with room for its words, its icon fro
         disabled: nodes[0].classList.contains('node-disabled'), selected: nodes[1].classList.contains('node-selected'), margin: getComputedStyle(nodes[0]).marginBottom,
         surface: getComputedStyle(document.querySelector('[data-pt-unbuilt]')).backgroundColor }; })()`, returnByValue: true }, sessionId)).result.value;
     assert.deepEqual(v.names, ['cardTile', 'modalAlert']);
-    assert.deepEqual(v.icons, ['#icon-var-color', '#icon-component']);
+    assert.deepEqual(v.icons, ['#icon-fill-color', '#icon-component']);
     assert.equal(v.disabled, true, 'State=Disabled turns on the class the code has for it');
     assert.equal(v.selected, true, 'Selected=True turns on a class the theme declares');
     assert.equal(v.margin, '0px', 'the arrangement spaces the parts, as auto layout does');
