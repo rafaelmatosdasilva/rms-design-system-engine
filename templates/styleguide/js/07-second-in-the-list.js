@@ -217,7 +217,7 @@
     var quiet = function (text) { return '<span class="pg-log-date">' + text + '</span>'; };
     var shaLink = function (url, short) { return url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener"><code>' + esc(short) + '</code></a>' : '<code>' + esc(short) + '</code>'; };
     // Who did it (who-did-it.mjs): its own column, the names alone (the column says Done by), one a line. One person
-    // under two names on the page (an account's teresa.deus, the Teresa Deus they sign with) is said by the name they sign
+    // under two names on the page (an account's qa.lead, the QA Lead it signs with) is said by the name they sign
     // with. A row nobody is known for leaves it empty.
     var nameKey = function (n) { return String(n).toLowerCase().replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim(); };
     var namesOf = function (b) { return String(b || '').replace(/^Done by /, '').split(', ').map(function (n) { return n.trim(); }).filter(Boolean); };

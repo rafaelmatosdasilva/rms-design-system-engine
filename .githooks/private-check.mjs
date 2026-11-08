@@ -60,12 +60,14 @@ export const FORBIDDEN = new Set([
   // the private backlog and the owner's personal address
   '0cfbd5a35f88c2ef', '49f94064933b52f6', '7b682e980cda89ba', 'a2ecd660a27c8db8', 'ea6214d81b87a69a',
   'd79e4b5fcb6c289d', '6d381e28f97ddd5f',
+  // a person once named in an example: refused in any spelling of their whole name
+  'd19b82414c664816',
   // private modules kept outside the engine
   '2dc4eb7142840b03', '63e774e3e28ee459', 'bfc553418d7459f4', '6eca9600e85946ba', '6d1cf6612d05cdb1', 'ad32cdbbdad61224', '8be4e5489d3b14d3', '30d97e37a52b3aec',
 ]);
 // First names once used as people in examples: matched as a whole capitalised word only (short names would match
 // inside joined words otherwise).
-export const FORBIDDEN_FIRST_NAMES = new Set(['24d4b96f58da6d4a', '8a5b4ac36aba7445', '3d099d0f13df9d0b']);
+export const FORBIDDEN_FIRST_NAMES = new Set(['24d4b96f58da6d4a', '8a5b4ac36aba7445', '3d099d0f13df9d0b', '9e88b067408182d0']);
 // Short private names refused only as a word of their own: joined from shorter words they would match ordinary code
 // ("for (k in m)"). Hashed as the list above.
 export const FORBIDDEN_WORDS = new Set([
