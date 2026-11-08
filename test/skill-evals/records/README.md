@@ -202,5 +202,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `local-style-guide-rebuilt-after-each-commit` | The 24 guide tasks on Haiku (engine 5eb0615) | "Your local style guide is built again after each commit and each pull" |
 | `privacy-nets` | The 24 guide tasks on Haiku (engine c4f386e) | "The privacy check knows a project's people and company, reads a pull request's names, and never runs on an empty list" |
 | `the-guide-names-intentlayer-nodrafts` | The 24 guide tasks on Haiku (engine 614cccd) | "The guide says History is one table of changes, names intentLayer.noDrafts, and Figma beside the code is off unless asked" |
+| `one-construction-page` | The 24 guide tasks on Haiku (engine 7345c71) | "One Construction page for Figma and the code, in the menu" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

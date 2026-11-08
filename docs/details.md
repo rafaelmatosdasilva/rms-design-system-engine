@@ -253,7 +253,7 @@ Code can only match what Figma states, so the summary says first when the file i
 
 ### How your system builds a component in Figma
 
-Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own, auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. A Construction page in the style guide, opened by its link, lists them with what is to do; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](commands.md#check-your-figma-library)).
+Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own, auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Construction page lists them with what is to do; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](commands.md#check-your-figma-library)).
 
 ### Components of one type, built the same way
 
@@ -264,6 +264,18 @@ The components of one type in Figma (every button, every input) are compared wit
 - **What most of them have.** Most inputs have a label and a required mark: one without them is listed to check.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
+
+### One Construction page for Figma and the code
+
+How your system is built, on both sides, is one page in the style guide's menu. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
+
+- **One table, a row per rule.** Each row says where it is (Figma or Code), how many follow it, what is to do and who fixes it: you in Figma, a developer in the code, or you decide.
+- **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
+- **In the code.** What [Lint your codebase](#lint-your-codebase) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
+- **A note, never a task.** Tokens no component uses yet are listed, not flagged: a system often keeps them for a brand or a component to come.
+- **The code is never changed for you.** A code fix is handed back as a patch to apply.
+
+To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all options](../reference/config.md)).
 
 ## Lint your codebase
 
