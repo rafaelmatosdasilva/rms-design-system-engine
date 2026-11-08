@@ -52,6 +52,16 @@ Five layers refuse anything private, each catching what the one before may miss:
    a pull request brings, and on a pull request's title and description; the `main` ruleset requires it before
    anything merges. GitHub's secret scanning and push protection are on.
 
+- **People, by name.** A common first name (Portuguese or English) with a capitalised surname, a particle between
+  them or not, or an account made of the two (`name.surname`, `name_surname`), is refused wherever it is written: the
+  repository writes roles, never people, invented ones included. A first name that is a plain or a design word (Will,
+  Max, Grace) and a typeface (a name followed by Sans, Pro, Mono…) are not on the list. The owner, whom the licence
+  names, is the one exception.
+- **A pull request's names, read before it opens.** `node .githooks/private-check.mjs --pr --title "…" --body FILE
+  [-- gh arguments]` lists every pair of capitalised words the branch adds, its title and description included, unless
+  both are plain words (a word counts as plain only where the dictionary has it in lower case) or one is a product the
+  engine works with. Nothing opens until they were read: say a person or a company generically, or run it again with
+  `--names-read` once none is one. It is how a name no list knows is caught.
 - `test/no-testbed-names.test.mjs` runs the check on the whole repository with the suite and plants one case of each
   kind (`node .githooks/private-check.mjs --records` also reads the evaluation records).
 - A private name the hashed list should know (a client's own name, the backlog's) goes in as a hash (the first 16 hex

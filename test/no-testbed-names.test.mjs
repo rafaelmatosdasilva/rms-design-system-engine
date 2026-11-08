@@ -375,3 +375,36 @@ test('hashing the names keeps every one already there and drops only what was al
     assert.ok(block.includes(h('widget')) || block.split("'").length > 5, 'the project\'s own names came in');
   } finally { for (const d of [engine, home, proj]) rmSync(d, { recursive: true, force: true }); }
 });
+
+test('a person by name or account is refused, invented ones too; a role, a typeface, a product and the owner are not', async () => {
+  const { privateFindings } = await import('../.githooks/private-check.mjs');
+  const person = (t) => privateFindings(t, { names: false }).filter((f) => f.kind === 'a person\'s name').map((f) => f.what);
+  const first = j('Mari', 'ana'), last = j('Quo', 'kka');   // a common first name and an invented surname
+  assert.deepEqual(person(`Reviewed by ${first} ${last}.`), [`${first} ${last}`]);
+  assert.deepEqual(person(`Signed ${first} da ${last}.`), [`${first} da ${last}`], 'with a particle');
+  assert.deepEqual(person(`the account ${first.toLowerCase()}.${last.toLowerCase()} committed it`), [`${first.toLowerCase()}.${last.toLowerCase()}`]);
+  assert.deepEqual(person(`under ${first.toLowerCase()}_${last.toLowerCase()} too`), [`${first.toLowerCase()}.${last.toLowerCase()}`]);
+  for (const fine of ['the QA Lead signs it', 'qa.lead commits', `set in ${j('Sof', 'ia')} Pro`, 'Max Width and Will Change', 'Design Tokens', `${first.toLowerCase()}.${last.toLowerCase()}@example.com`, `files/${first.toLowerCase()}.json`]) assert.deepEqual(person(fine), [], fine);
+});
+
+test('a pull request lists the names its changes add, and opens only once they were read', () => {
+  const remote = tempDir('pr-names-remote-'), dir = tempDir('pr-names-'), home = noneHome();
+  try {
+    const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main'], { cwd: remote });
+    git('init', '-q', '-b', 'main'); git('config', 'user.email', 'qa@example.com'); git('config', 'user.name', 'QA');
+    execFileSync('mkdir', ['-p', join(dir, '.githooks')]);
+    for (const f of ['private-check.mjs', 'private-terms.mjs']) execFileSync('cp', [join(ROOT, '.githooks', f), join(dir, '.githooks', f)]);
+    writeFileSync(join(dir, 'a.md'), 'A clean line.\n'); git('add', '-A'); git('commit', '-qm', 'base', '--no-verify');
+    git('remote', 'add', 'origin', remote); git('push', '-q', 'origin', 'main');
+    git('switch', '-q', '-c', 'change');
+    const company = `${j('Nor', 'thwind')} ${j('Tra', 'ders')}`;   // invented, as the rules ask
+    writeFileSync(join(dir, 'b.md'), `Built for ${company}.\n`); git('add', '-A'); git('commit', '-qm', 'change', '--no-verify');
+    const body = join(dir, 'BODY'); writeFileSync(body, 'A change.\n');
+    const pr = (...more) => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--pr', '--title', 'A change', '--body', body, ...more, '--', '--base', 'main'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '', PATH: process.env.PATH.split(':').filter((p) => !/gh|homebrew|local/.test(p)).join(':'), RMS_PRIVATE_TERMS_DIR: home } });
+    const unread = pr();
+    assert.equal(unread.status, 3, unread.stderr);
+    assert.match(unread.stderr, new RegExp(company));
+    assert.notEqual(pr('--names-read').status, 3, 'read: it goes on to open the pull request');
+  } finally { for (const d of [remote, dir, home]) rmSync(d, { recursive: true, force: true }); }
+});

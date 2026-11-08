@@ -60,8 +60,8 @@ export const FORBIDDEN = new Set([
   // the private backlog and the owner's personal address
   '0cfbd5a35f88c2ef', '49f94064933b52f6', '7b682e980cda89ba', 'a2ecd660a27c8db8', 'ea6214d81b87a69a',
   'd79e4b5fcb6c289d', '6d381e28f97ddd5f',
-  // a person once named in an example: refused in any spelling of their whole name
-  'd19b82414c664816',
+  // people once named in examples: refused in any spelling of their whole names
+  'd19b82414c664816', 'fffe1bcdece8e7ef',
   // private modules kept outside the engine
   '2dc4eb7142840b03', '63e774e3e28ee459', 'bfc553418d7459f4', '6eca9600e85946ba', '6d1cf6612d05cdb1', 'ad32cdbbdad61224', '8be4e5489d3b14d3', '30d97e37a52b3aec',
 ]);
@@ -2502,13 +2502,81 @@ function backlogCodes(text) {
 }
 
 // A person credited as a source. Product and place names that read the same way are not people.
-const NOT_A_PERSON = /^(Google Fonts|Hard Rule|Naming Convention|Design Tokens|Code Connect|Dev Mode|Figma \w+|Claude \w+|Tailwind \w+|Style Dictionary|Material Design|Storybook \w+|Chrome \w+|Visual Studio|Git \w+)$/;
+// The repository's owner is the one person it names, where its licence must (LICENSE, GOVERNANCE, the README).
+const NOT_A_PERSON = /^(Rafael Matos|Google Fonts|Hard Rule|Naming Convention|Design Tokens|Code Connect|Dev Mode|Figma \w+|Claude \w+|Tailwind \w+|Style Dictionary|Material Design|Storybook \w+|Chrome \w+|Visual Studio|Git \w+)$/;
 function credits(text) {
   const out = [];
   for (const m of text.matchAll(/\b(?:by|per|after|according to|cf\.?)\s+([A-Z][a-z]+ (?:[A-Z][a-z]+ )?[A-Z][a-z]+)\b/g)) if (!NOT_A_PERSON.test(m[1])) out.push(m[0]);
   for (const m of text.matchAll(/\(([A-Z][a-z]+ [A-Z][a-z]+), ["“]/g)) if (!NOT_A_PERSON.test(m[1])) out.push(m[0]);
   for (const m of text.matchAll(/\b([A-Z][a-z]+(?: [A-Z][a-z]+)?)'s (?:article|post|essay|talk|benchmark|framework|book|newsletter|thread)\b/g)) out.push(m[0]);
   return out;
+}
+
+// A person by their name: a common first name (Portuguese or English) and a capitalised surname, with a particle or not
+// between them, or an account made of the two (with a dot or an underscore). The repository writes roles, never people, invented
+// ones included, so every one is refused; the names the engine knows by hash catch the rest. A first name that is a
+// plain word or a design word (Will, Max, Grace, Rosa, Violeta) is not on the list, and a typeface is no person.
+const PERSON_FIRST = new Set([
+  'aaron', 'abel', 'abigail', 'adam', 'adelaide', 'adolfo', 'adriana', 'adriano', 'adrian', 'afonso', 'agnes', 'alan', 'alberto', 'albert',
+  'alejandro', 'alessandra', 'alessandro', 'alexandra', 'alexandre', 'alexander', 'alfredo', 'alice', 'alicia', 'alison', 'alvaro', 'amanda', 'amelia', 'ana',
+  'anabela', 'andre', 'andrea', 'andreia', 'andrew', 'angela', 'angelica', 'anita', 'anna', 'anne', 'antonia', 'antonio', 'armando', 'arthur',
+  'artur', 'augusto', 'aurora', 'barbara', 'beatriz', 'benedita', 'benjamin', 'bernardo', 'bianca', 'brenda', 'brian', 'bruna', 'bruno', 'caio',
+  'camila', 'camilo', 'candida', 'carla', 'carlos', 'carlota', 'carmen', 'carolina', 'caroline', 'catarina', 'cecilia', 'charles', 'charlotte', 'christian',
+  'christina', 'christine', 'christopher', 'cintia', 'claudia', 'claudio', 'clemente', 'cristiano', 'cristina', 'daniel', 'daniela', 'danilo', 'david', 'debora',
+  'denise', 'diana', 'diego', 'diogo', 'dolores', 'domingos', 'dora', 'duarte', 'edgar', 'edson', 'eduarda', 'eduardo', 'elena', 'eliana',
+  'elisa', 'elisabete', 'elizabeth', 'emanuel', 'emilia', 'emily', 'emma', 'enzo', 'eric', 'erica', 'ernesto', 'estela', 'ester', 'eugenia',
+  'eva', 'fabiana', 'fabio', 'fabricio', 'fatima', 'felipe', 'felix', 'fernanda', 'fernando', 'filipa', 'filipe', 'flavia', 'flavio', 'francisca',
+  'francisco', 'gabriel', 'gabriela', 'gaspar', 'george', 'gilberto', 'giovanna', 'gloria', 'goncalo', 'graca', 'gregorio', 'guilherme', 'gustavo', 'heitor',
+  'helena', 'helder', 'henrique', 'henry', 'hugo', 'ines', 'ingrid', 'irene', 'isabel', 'isabela', 'isadora', 'jaime', 'james', 'janaina',
+  'jennifer', 'jessica', 'joana', 'joao', 'joaquim', 'jonas', 'jorge', 'jose', 'josefa', 'joseph', 'julia', 'juliana', 'julio', 'karen',
+  'karina', 'katia', 'kevin', 'larissa', 'laura', 'leandro', 'leonardo', 'leonor', 'leticia', 'lidia', 'liliana', 'lorena', 'lorenzo', 'luana',
+  'lucas', 'lucia', 'luciana', 'luciano', 'luisa', 'luiz', 'luis', 'manuel', 'manuela', 'marcela', 'marcelo', 'marcia', 'marcio', 'marco',
+  'marcos', 'margarida', 'maria', 'mariana', 'marina', 'mario', 'marta', 'martim', 'mateus', 'matheus', 'matilde', 'mauricio', 'mauro', 'melissa',
+  'michael', 'michele', 'miguel', 'milena', 'miriam', 'monica', 'murilo', 'natalia', 'natasha', 'nathalia', 'nelson', 'nicolas', 'nicole', 'nuno',
+  'olga', 'olivia', 'otavio', 'patricia', 'paula', 'paulo', 'pedro', 'priscila', 'rafael', 'rafaela', 'raimundo', 'raquel', 'raul', 'rebeca',
+  'regina', 'renata', 'renato', 'ricardo', 'rita', 'roberta', 'roberto', 'rodrigo', 'rogerio', 'rolando', 'romeu', 'ronaldo', 'rosana', 'rubens',
+  'rui', 'sabrina', 'salvador', 'samuel', 'sandra', 'sara', 'sergio', 'silvia', 'simao', 'simone', 'sofia', 'sonia', 'stefany', 'susana',
+  'tadeu', 'tamara', 'tania', 'tatiana', 'teresa', 'thiago', 'thomas', 'tiago', 'tomas', 'tomaz', 'valentina', 'valeria', 'valter', 'vanessa',
+  'vasco', 'vera', 'vicente', 'vinicius', 'vitor', 'viviane', 'wagner', 'wellington', 'william', 'yara', 'yasmin', 'zelia',
+]);
+const TYPEFACE_WORD = /^(Sans|Serif|Mono|Pro|Display|Text|Bold|Regular|Light|Medium|Semibold|Grotesk|Grotesque|Neue|Next|UI|Std|Condensed|Rounded|Slab|Code|Variable|Black|Thin|Italic|Book|Heavy|Extra|Script|Sc|Caps)$/;
+const PARTICLE = '(?:(?:da|de|do|dos|das|di|del|della|van|von|der|den|la|le|du|e) )?';   // follows the space after the first name
+const bare = (w) => w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Every capitalised word with the one after it (a particle between them or not), overlapping: after a capitalised word
+// such as "Signed", the name that follows is still read whole, its first word not taken by the pair before it.
+function capitalPairs(text) {
+  return [...String(text).matchAll(new RegExp(`\\b(\\p{Lu}\\p{Ll}+)(?=( ${PARTICLE})(\\p{Lu}\\p{Ll}+)\\b)`, 'gu'))].map((m) => ({ first: m[1], second: m[3], phrase: m[1] + m[2] + m[3] }));
+}
+function people(text) {
+  const out = [];
+  for (const p of capitalPairs(text)) if (PERSON_FIRST.has(bare(p.first)) && !TYPEFACE_WORD.test(p.second) && !NOT_A_PERSON.test(p.phrase)) out.push(p.phrase);
+  for (const m of text.matchAll(/(^|[^\w.@\/-])([a-z]{3,})[._]([a-z]{2,})(?![\w@-]|\.[a-z])/g)) if (PERSON_FIRST.has(m[2])) out.push(`${m[2]}.${m[3]}`);
+  return out;
+}
+
+// ── The names a pull request adds, read before it opens ──
+// A name no list knows (a client's company, a person nobody hashed) is caught only by someone reading. Every pair of
+// capitalised words a change adds is listed for that, unless both are plain words: a word counts as plain only where
+// the dictionary has it in lower case, since it keeps names (a first name, a town) capitalised.
+let PLAIN = null;
+function plain(w) {
+  if (!PLAIN) {
+    PLAIN = new Set();
+    for (const f of ['/usr/share/dict/words', '/usr/share/dict/web2', '/usr/share/dict/american-english']) {
+      try { for (const x of readFileSync(f, 'utf8').split('\n')) if (x && x === x.toLowerCase()) PLAIN.add(x); break; } catch { /* the next */ }
+    }
+  }
+  return PLAIN.has(w.toLowerCase()) || PLAIN.has(w.toLowerCase().replace(/s$/, ''));
+}
+// A product the engine works with is no one's name, first or second: What Figma, Ask Claude.
+const PRODUCT = /^(Figma|Claude|Anthropic|Chrome|Chromium|Google|Safari|Firefox|Vue|Nuxt|React|Svelte|Angular|Vite|Webpack|Node|Jest|Playwright|Puppeteer|Tailwind|Storybook|Github|Gitlab|Jira|Slack|Notion|Windows|Linux|Apple|Copilot|Cursor|Codex|Router|Pages)$/;
+export function namesIn(text) {
+  const out = new Set();
+  for (const p of capitalPairs(text)) {
+    if (NOT_A_PERSON.test(p.phrase) || TYPEFACE_WORD.test(p.second) || PRODUCT.test(p.first) || PRODUCT.test(p.second) || (plain(p.first) && plain(p.second))) continue;
+    out.add(p.phrase);
+  }
+  return [...out];
 }
 
 function firstNames(text) {
@@ -2569,6 +2637,7 @@ export function privateFindings(text, { names = true } = {}) {
   const out = [];
   if (names && forbiddenHits(text)) out.push({ kind: 'private name', what: '(a client, a person, a company or the backlog)' });
   for (const w of firstNames(text)) out.push({ kind: 'a person\'s first name', what: w });
+  for (const w of people(text)) out.push({ kind: 'a person\'s name', what: w });
   for (const w of personalEmails(text)) out.push({ kind: 'email address', what: w });
   for (const w of backlogCodes(text)) out.push({ kind: 'backlog item code', what: w });
   for (const w of credits(text)) out.push({ kind: 'a person credited', what: w });
@@ -2722,6 +2791,18 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     if (!bodyFile) { console.error('--pr needs --title "…" and --body FILE.'); process.exit(2); }
     let body = ''; try { body = readFileSync(bodyFile, 'utf8'); } catch { console.error(`--body: ${bodyFile} cannot be read.`); process.exit(2); }
     const bad = prFindings(title, body);
+    // Every name the branch adds, with its title and description, is read before anything is opened (--names-read).
+    const rest0 = args.includes('--') ? args.slice(args.indexOf('--') + 1) : [];
+    const base = rest0.includes('--base') ? rest0[rest0.indexOf('--base') + 1] : 'main';
+    let added = '';
+    try { added = execFileSync('git', ['diff', '-U0', `origin/${base}...HEAD`, '--', '.', ':!test/skill-evals/records', ':!**/package-lock.json'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n'); } catch { /* no base to read against: the title and description only */ }
+    const toRead = bad.length ? [] : namesIn(`${title}\n${body}\n${added}`);
+    if (toRead.length && !args.includes('--names-read')) {
+      console.error(`Read these before the pull request opens: ${toRead.length} name(s) its changes add that no list says are plain words.`);
+      for (const n of toRead) console.error(`  ${n}`);
+      console.error('A person or a company: say it generically, then run this again. Every one a plain name of the engine\'s own: run this again with --names-read.');
+      process.exit(3);
+    }
     if (bad.length) {
       console.error('Refused: this repository is public, and the pull request carries something private.');
       for (const x of bad) console.error(`  ${x.file}  ${x.kind}${x.what ? ': ' + x.what : ''}`);
