@@ -17,15 +17,15 @@ See what is ready at work in the [live style guide](https://rafaelmatosdasilva.g
 
 | Audit | | |
 |:---|---|:---:|
-| [Check your Figma library](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built differently from the rest. | 🟢 |
-| [Lint your codebase](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours and copied components across your code, and stops a push that adds them. | 🟢 |
+| [Check your Figma library](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built against your library's own rules. | 🟢 |
+| [Lint your codebase](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours, copied components and breaks in your own rules, and stops a push that adds them. | 🟢 |
 | [Compare Figma and code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#compare-figma-and-code) | A deep design-code parity check of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | 🟢 |
 | [Test accessibility](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#test-accessibility) | Tests contrast, keyboard focus, touch targets and zoom on every component, in a real browser. | 🟡 |
 
 | Documentation | | |
 |:---|---|:---:|
 | [Write component specs](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | 🟢 |
-| [Gather usage guidelines](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines) | The intent layer, which says why each component exists and when to use it, gathered from Figma's descriptions and notes and your docs. | 🟢 |
+| [Gather usage guidelines](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs, and drafted where missing. | 🟢 |
 | [Annotate Figma from the code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#annotate-figma-from-the-code) | Writes accessibility specs, pins problems on your screens and links each component to its code, after you approve. | ⚪ |
 
 | Collaboration | | |

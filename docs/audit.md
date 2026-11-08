@@ -55,6 +55,8 @@ To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all 
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
 
+What it finds is shown as rules too. Each check's findings become rows on the style guide's Construction page, beside Figma's, so both sides of how your system is built read as one list.
+
 ### In your tokens and themes
 
 Advice on keeping the system healthy as it grows, never a failure.
