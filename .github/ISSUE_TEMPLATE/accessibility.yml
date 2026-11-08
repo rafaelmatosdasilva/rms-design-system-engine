@@ -1,0 +1,73 @@
+name: An accessibility barrier
+description: Something the engine makes (the style guide, its pages, its messages, its documentation) that someone cannot use with a screen reader, a keyboard, zoom, high contrast or reduced motion.
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A barrier in what the engine makes is fixed before other work in its part. A finding the accessibility check got wrong about your own components is a bug: use **Something is broken** for that.
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      description: The part of the [features page](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md) it is in, or Not sure.
+      options:
+        - Check your Figma library
+        - Lint your codebase
+        - Compare Figma and code
+        - Test accessibility
+        - Write component specs
+        - Gather usage guidelines
+        - Annotate Figma from the code
+        - Publish a living style guide
+        - Try components in a playground
+        - Turn Figma into code
+        - Bring code components into Figma
+        - Generate components in Figma and code
+        - Prototype with your real components
+        - Setting up or updating it
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: The page, screen or command, and what on it.
+      placeholder: The style guide's Construction page, the Copy button in a row's side panel
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how
+    attributes:
+      label: How you use it
+      multiple: true
+      options:
+        - A screen reader
+        - Only the keyboard
+        - Zoom or a large text size
+        - High contrast or forced colours
+        - Reduced motion
+        - Voice control
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What stops you
+      description: What you tried, and what happened instead. The browser, the assistive technology and their versions help.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send it
+      options:
+        - label: There is no client, product, person, host or token name in what I wrote.
+          required: true

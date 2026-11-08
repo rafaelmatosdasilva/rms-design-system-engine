@@ -10,6 +10,33 @@ Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). How deci
 
 A security problem goes through the Security tab instead, never an issue. [SECURITY.md](SECURITY.md) says how, and what is worth reporting.
 
+## What happens to your issue
+
+**You get a first answer within a week.** Every issue is read, and every one gets a reply, a no included.
+
+Each form asks **which part** of the [features page](docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`), so issues are sorted by the same names you read there.
+
+Where an issue stands is said by one label at a time:
+
+| Label | What it means |
+|---|---|
+| `needs triage` | New: not read yet. Every new issue starts here. |
+| `needs info` | Waiting on you: the comment says what is missing. With no reply in 14 days it is closed, and your reply reopens it. |
+| `confirmed` | Reproduced, or agreed it should change. Not planned yet. |
+| `planned` | On the way. The change that fixes it closes it, so you are told when it lands. |
+| `wontfix` | Declined. The comment always says why. |
+| `duplicate` | Already asked. The comment links the issue that carries it on. |
+
+How soon it is worked on is its priority:
+
+| Label | When |
+|---|---|
+| `priority: high` | A problem found in use, or one that stops a part doing what the features page promises. An accessibility barrier in what the engine makes is always high. |
+| `priority: medium` | It moves a part forward, or delivers what the features page already promises. |
+| `priority: low` | Later. |
+
+A fix reaches you the day after it is merged: every install updates itself once a day.
+
 ## About pull requests
 
 **Unsolicited pull requests are not merged.** Not because the work isn't welcome, but because a change to the engine carries a test, its documentation and a release label, and deciding whether a change belongs at all is the maintainer's job. A pull request that arrives before that decision is work spent on an answer that may be no.

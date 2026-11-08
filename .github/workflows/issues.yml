@@ -1,0 +1,51 @@
+# What happens to an issue once it is sent (CONTRIBUTING.md, What happens to your issue; issue-triage.mjs). A new issue
+# takes needs triage and the label of the part its form names; a reporter's reply to an issue waiting on them sends it
+# back to triage, reopened if it was closed for waiting; once a day every label is kept in step with the features page
+# and each issue waiting 14 days on its reporter is closed with a note. The issue's text is read by the module, never
+# put in a shell, and only labels, a reopen and a closing note are written.
+name: issues
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issues-${{ github.event.issue.number || 'daily' }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: A new or edited issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node lib/issue-triage.mjs label "$GITHUB_EVENT_PATH"
+      - name: A reply from the reporter
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node lib/issue-triage.mjs reply "$GITHUB_EVENT_PATH"
+      - name: Every label in step, and issues waiting 14 days closed
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node lib/issue-triage.mjs sync
+          node lib/issue-triage.mjs stale

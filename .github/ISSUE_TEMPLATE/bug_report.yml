@@ -7,6 +7,30 @@ body:
       value: |
         A security problem does not go here. Use the [Security tab](https://github.com/rafaelmatosdasilva/rms-design-system-engine/security/advisories/new) instead, so it stays private until there is a fix.
 
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      description: The part of the [features page](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md) it happened in.
+      options:
+        - Check your Figma library
+        - Lint your codebase
+        - Compare Figma and code
+        - Test accessibility
+        - Write component specs
+        - Gather usage guidelines
+        - Annotate Figma from the code
+        - Publish a living style guide
+        - Try components in a playground
+        - Turn Figma into code
+        - Bring code components into Figma
+        - Generate components in Figma and code
+        - Prototype with your real components
+        - Setting up or updating it
+        - Not sure
+    validations:
+      required: true
+
   - type: textarea
     id: what-you-ran
     attributes:
