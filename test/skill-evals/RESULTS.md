@@ -2,6 +2,23 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Side, Owned by, and the statuses read without opening a list (continuous evaluation)
+
+What changed since the entry below (engine 9f4f851): Side, Owned by, and the statuses read without opening a list. The guide changed in `reference/usage.md`.
+
+Guide set measured: `5b0fb9882f8b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md aabbcc45` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md b820faeb` `reference/gates.md a8e75b2a` `reference/maintainers.md 082b6dd0` `reference/personality.md 7f1584bf` `reference/usage.md da9d45f0` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 91d7a3f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 94k | 92k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 94k. no task changed state, and no run moved: the same result. Records: `records/2026-11-08-side-owned-by-and-the`.
+
 ## 2026-11: Rules and Documentation filter by any of their columns (continuous evaluation)
 
 What changed since the entry below (engine d234ea9): The guide measured with the Rules page: 79 of 79; Rules and Documentation filter by any of their columns. The guide changed in `reference/usage.md`.
