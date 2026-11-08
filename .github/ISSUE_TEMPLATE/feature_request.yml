@@ -7,6 +7,30 @@ body:
       value: |
         Worth a look at [ROADMAP.md](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/ROADMAP.md) first: it may already be on the way, or already decided against.
 
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      description: The part of the [features page](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md) it belongs to, or Not sure.
+      options:
+        - Check your Figma library
+        - Lint your codebase
+        - Compare Figma and code
+        - Test accessibility
+        - Write component specs
+        - Gather usage guidelines
+        - Annotate Figma from the code
+        - Publish a living style guide
+        - Try components in a playground
+        - Turn Figma into code
+        - Bring code components into Figma
+        - Generate components in Figma and code
+        - Prototype with your real components
+        - Setting up or updating it
+        - Not sure
+    validations:
+      required: true
+
   - type: textarea
     id: problem
     attributes:
@@ -30,8 +54,3 @@ body:
       description: Existing options, other tools, a workaround, and why each falls short.
     validations:
       required: false
-
-  - type: markdown
-    attributes:
-      value: |
-        **On pull requests:** please don't open one for this yet. If this is a yes, that is said here first, and then a pull request is welcome. [CONTRIBUTING.md](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/CONTRIBUTING.md) says why.
