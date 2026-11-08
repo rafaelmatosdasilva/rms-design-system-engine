@@ -274,6 +274,8 @@
   // arrow to its page (one only in Figma has none to open).
   var STATUS_PILL = function (ok, yes) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? yes || 'Found' : 'Missing') + '</span>'; };
   var USERS_ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+  // The mark on the column a table is sorted by, on every table whose heads sort (the Status page's, the Construction page's).
+  var MX_TRI = '<svg class="sg-mx-tri" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5h6L4 6.5z" fill="currentColor"/></svg>';
   function usersTable(names) {
     if (!names.length) return '<p class="sg-tk-none">No component uses it.</p>';
     return '<div class="pg-par-scroll"><table class="pg-par-table sg-tk-users"><thead><tr><th scope="col">Component</th><th scope="col">Figma</th><th scope="col">Code</th><th scope="col" class="sg-mx-open-cell"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' +

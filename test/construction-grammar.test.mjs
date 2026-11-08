@@ -181,6 +181,8 @@ test('on the Construction page each row is a rule, a decision included: never a 
   const tpl = templateText();
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
   assert.doesNotMatch(page, /shared, or made for each component\?/);
-  assert.match(page, /'Confirm it, or take the other way: '/);
+  // The two ways a family is built are said as what most of it does, with the other beside it: the panel suggests one.
+  assert.match(page, /Choose one; the others are then changed to match\./);
+  assert.match(page, /copyBtn\(k \? 'change' : 'approve', \(k \? '' : 'Suggested: '\) \+ WAY_HEAD\[w\.way\]/);
   assert.match(page, /var AREA = \{ naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation',/);
 });

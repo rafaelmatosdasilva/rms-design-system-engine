@@ -49,7 +49,7 @@ test('the components of one type compared with each other: a state set two ways,
   assert.deepEqual(familyRules({ chip: v({}) }), [], 'no type of three or more: nothing compared');
 });
 
-test('the tokens: named by role, layered where their value changes, brands that pin what they inherit, unused said, never a fault', () => {
+test('the tokens: named by role, layered where their value changes, brands that pin what they inherit', () => {
   const vars = {
     color: { light: { 'surface/base/color': '#fff', 'text/blue/color': '#00f', 'border/subtle/color': '#ccc' }, dark: { 'surface/base/color': '#000', 'text/blue/color': '#00f', 'border/subtle/color': '#333' } },
     aliases: {},
@@ -57,7 +57,7 @@ test('the tokens: named by role, layered where their value changes, brands that 
   const todos = [{ kind: 'Same value', who: 'both', say: '2 groups of tokens hold the same value.', todo: 'Decide for each group.' }, { kind: 'Broken alias', who: 'code', say: 'in the code', todo: 'x' }];
   const brands = { brands: [] };
   const jobs = [{ var: '--border-subtle', controls: [], others: ['card'], low: [{ name: 'input' }] }];
-  const rules = tokenRules({ vars, todos, brands, jobs, used: new Set(['surface/base/color']) });
+  const rules = tokenRules({ vars, todos, brands, jobs });
   const look = byId(rules, 'tokens-named-by-role');
   assert.equal(look.toFix[0].where, 'text/blue/color');
   assert.equal(byId(rules, 'tokens-one-primitive').status, 'decide');
@@ -67,10 +67,7 @@ test('the tokens: named by role, layered where their value changes, brands that 
   assert.match(layer.toFix[0].value, /1 token is defined the same in every mode \(text\/blue\/color\)/);
   assert.equal(byId(rules, 'tokens-control-border').toFix[0].where, '--border-subtle');
   assert.equal(byId(rules, 'tokens-one-job').status, 'decide');
-  const unused = byId(rules, 'tokens-unused');
-  assert.equal(unused.status, 'note', 'a token nothing uses yet is said, never a task: a white-label system keeps them on purpose');
-  assert.deepEqual(unused.toFix.map((t) => t.where).sort(), ['border/subtle/color', 'text/blue/color']);
-  assert.ok(!byId(tokenRules({ vars, todos }), 'tokens-unused'), 'what the components use not known: nothing said about it');
+  assert.ok(!byId(rules, 'tokens-unused'), 'a token no component uses yet is not said here: it is no fault, and the page is for what is to fix or to decide');
 });
 
 test('in the code: values written by hand, broken aliases, the gates that lint the code and near copies, each a developer\'s or a decision', () => {
@@ -103,13 +100,16 @@ test('both sides in one view, the grammar\'s first; nothing on either side, no p
   assert.equal(constructionView({}), null);
 });
 
-test('the page: in the menu by default, one table with its side and who fixes each, chips for each side', () => {
+test('the page: in the menu by default, one table whose heads sort, chips for what is left to do', () => {
   const tpl = templateText();
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// Changes in Figma: each change made'));
-  assert.match(page, /<th>In<\/th><th>Follow it<\/th><th>To do<\/th><th>Who fixes it<\/th><th>Status<\/th>/);
-  assert.match(page, /data-chip-group="' \+ esc\(r\.side \|\| 'figma'\) \+ '"/);
-  assert.match(page, /\{ key: 'figma', label: 'In Figma'/);
-  assert.match(page, /\{ key: 'code', label: 'In the code'/);
+  assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'In', 'Follow it', 'Who fixes it', 'Status'], 'one head a column, each sorting by it; no To do column');
+  assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
+  assert.match(page, /sortDir = sortKey === key \? -sortDir : 1;/, 'the same head again sorts the other way round');
+  assert.ok(!/data-chip-group=/.test(page), 'which side a rule is on is a column, never a chip');
+  assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'the chips are what is left to do');
+  assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)', n: nOf/g)].map((m) => m[2]), ['To fix', 'To decide', 'Rules']);
+  assert.match(page, /card\(r\.status === 'rule' \? 'Nothing to change' : 'Suggested change', suggest \+ ways \+ list \+ decide\)/, 'what is suggested, what it changes and the decision are one card, the decision under the draft');
   assert.match(page, /Hand each change back as a patch for a person to apply; change no code yourself\./, 'the code\'s change is handed back, never written over the code people wrote');
   const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
   assert.match(gen, /const constructionShow = cfg\.styleguide\?\.construction \?\? 'listed';/, 'in the menu unless the team leaves it out');

@@ -55,13 +55,13 @@
 /* Untested is for now only (the browser is still trying it): diagonal stripes, in the bar, its legend, the table and a tab alike. */
 .sg-health-bar > .is-untested, .is-untested > .pg-par-sign { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--sg-muted) 55%, transparent) 0 1px, transparent 1px 2.5px), color-mix(in srgb, var(--sg-muted) 22%, transparent); }   /* dim fill, tight lines */
 .sg-health-bar > .is-done { background: var(--sg-positive); } .sg-health-bar > .is-check { background: var(--sg-warning-ink); } .sg-health-bar > .is-fix { background: var(--sg-negative); }   /* done, to check, to fix: the status dots' colours */
-.sg-matrix th[data-sort] .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }   /* a column head sorts by its area */
-.sg-matrix th[data-sort] .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
+th[data-sort] .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }   /* a column head sorts by it, on any table that sorts */
+th[data-sort] .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
 .sg-mx-tri { flex: none; width: calc(0.6em + var(--sg-space-xs)); height: calc(0.6em + var(--sg-space-xs)); opacity: 0; transition: opacity var(--sg-fast), transform var(--sg-fast); }   /* the sorted column: a triangle, down or up */
-.sg-matrix th[data-sort] .sg-mx-sort:hover .sg-mx-tri { opacity: 0.5; }
-.sg-matrix th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-sort { color: var(--sg-text); }
-.sg-matrix th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-tri { opacity: 1; }
-.sg-matrix th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
+th[data-sort] .sg-mx-sort:hover .sg-mx-tri { opacity: 0.5; }
+th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-sort { color: var(--sg-text); }
+th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-tri { opacity: 1; }
+th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
 .sg-mx-cell, .sg-todo td > a.sg-mx-cell[href] { color: inherit; text-decoration: none; display: inline-flex; border-radius: var(--sg-radius-s); }   /* a status that opens its area, not underlined until pointed at */
 .sg-mx-cell:hover .pg-par-status { text-decoration: underline; text-underline-offset: 3px; }
 .sg-matrix tr[hidden] { display: none; }
