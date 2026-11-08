@@ -146,7 +146,7 @@
     health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     status: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     history: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
-    documentation: '<path d="M4 2h5.5L12 4.5V14H4Z"/><path d="M6 7h4M6 9.5h4M6 12h2.5"/>',
+    documentation: '<path d="M2 2h9.5L14 4.5V14H2Z"/><path d="M4 7h8M4 9.5h8M4 12h5"/>',
     colors: '<circle cx="8" cy="8" r="6"/><path d="M8 2v12M2.8 5h10.4M2.8 11h10.4"/>',
     typography: '<path d="M3 4V3h10v1M8 3v10M6 13h4"/>',
     spacing: '<path d="M2 3v10M14 3v10M5 8h6M5 8l1.5-1.5M5 8l1.5 1.5M11 8l-1.5-1.5M11 8l-1.5 1.5"/>',
@@ -156,6 +156,7 @@
     showroom: '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/>',
     templates: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 6v8"/>',   // a page frame: its header, a side column and the content
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
+    construction: '<path d="M2.5 13.5V2.5l11 11z"/><path d="M5.2 10.8V6.3l4.5 4.5z"/>',   // a set square: the system measured against its own rules
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }

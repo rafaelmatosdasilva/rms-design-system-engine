@@ -1367,7 +1367,7 @@ inside it), and whether a yes/no variant changes how the component looks: one wh
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
 line with the same statuses.
 
-The style guide has a **Construction** page, in its menu: how the system is built, in Figma and in the code, in one table.
+The style guide has a **Rules** page, in its menu: how the system is built, in Figma and in the code, in one table.
 A row is a rule, with its side (Figma or Code), how many follow it, who fixes it (you in Figma, a developer in the code,
 or you decide) and its status (to fix, to decide, or a rule), filtered by status. Every column head sorts by it, and the
 same head again sorts the other way round. Its rows (`construction-page.mjs`):

@@ -2,7 +2,7 @@
   (function () { var a = nav.querySelector('a[href="#status"]'), o = nav.querySelector('a[href="#index"]'); if (a && o) o.insertAdjacentElement('afterend', a); })();
   var td = section('status', 'Status', 'How the system is doing', '');   // no line under its title: the cards say it
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
-  // Construction: how the system is built, in Figma and in the code (DATA.construction, construction-page.mjs). One table,
+  // Rules: how the system is built, in Figma and in the code (DATA.construction, construction-page.mjs). One table,
   // a row a rule: in Figma the rules it builds a component by (construction-grammar.mjs), the Figma file's own hygiene,
   // the components of one type compared with each other and the tokens; in the code what the code linting finds. Each
   // row says its side and who fixes it, its status (a rule once every component follows it; to fix when most do, the
@@ -13,8 +13,8 @@
   // exceptions: a component follows it or is to fix. In the menu, unless the team leaves it out (styleguide.construction).
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
-    hr(); if (G.listed) navLink('construction', 'construction');
-    var sec = section('construction', 'System', 'Construction', '');
+    hr(); if (G.listed) navLink('construction', 'rules');
+    var sec = section('construction', 'System', 'Rules', '');
     // The kind of rule each is (construction-grammar.mjs → judge, construction-page.mjs): every rule on names together,
     // whatever is named; how each component is built inside (the skeleton) in its own kinds; the tokens; the products.
     var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture', tokens: 'Tokens', products: 'Products' };
@@ -69,7 +69,7 @@
     var cxKey = function (r) { return 'cx:' + r.id; };
     var panel = function (i, from) {
       var r = rows[i]; if (!r) return;
-      var m = panelShell('sg-cx-panel', 'Construction'); m._key = cxKey(r);
+      var m = panelShell('sg-cx-panel', 'Rules'); m._key = cxKey(r);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var cs = comps(r), byC = {}, n = cs.length;
       r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
@@ -107,7 +107,7 @@
       var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Who fixes it', '<p>' + esc((WHO_FIX[r.who] || WHO_FIX.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
     sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
