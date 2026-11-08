@@ -204,5 +204,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `the-guide-names-intentlayer-nodrafts` | The 24 guide tasks on Haiku (engine 614cccd) | "The guide says History is one table of changes, names intentLayer.noDrafts, and Figma beside the code is off unless asked" |
 | `one-construction-page` | The 24 guide tasks on Haiku (engine 7345c71) | "One Construction page for Figma and the code, in the menu" |
 | `2026-11-08-the-triage-test-reads-contributing` | The 24 guide tasks on Haiku (engine bcee1c1) | "The triage test reads CONTRIBUTING where it moved, in .github" |
+| `2026-11-08-the-rules-page-lives-at` | The 24 guide tasks on Haiku (engine d234ea9) | "The Rules page lives at #rules, and #construction still opens it" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
