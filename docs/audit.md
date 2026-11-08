@@ -43,9 +43,9 @@ Each is a decision for your team in Figma, and keeping it as it is, as a known e
 
 How your system is built, on both sides, is one page in the style guide's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
 
-- **One table, a row per rule.** Each row says where it is (Figma or Code), how many follow it and who fixes it: you in Figma, a developer in the code, or you decide.
+- **One table, a row per rule.** Each row says its side (Figma or Code), how many follow it, and who owns it: Design, Engineering, or both. A rule nothing breaks says so.
 - **Sort it your way.** Every column head sorts by it, and again for the other way round.
-- **Filter by any column.** A chip each for Area, In and Status, above the table. Each shows All until you choose, and says how many rules your other choices would leave. They combine, and Clear filters drops them.
+- **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Area and one for Side. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
 - **One card for the decision.** A row opens in the side panel: what the engine suggests, every component or place it would change, and the approval under it, in one card to read top to bottom.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
 - **In the code.** What [Lint your codebase](#lint-your-codebase) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.

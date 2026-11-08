@@ -74,6 +74,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
+.pg-par-table :is(th, td):first-child { padding-left: var(--sg-cell-x); } .pg-par-table :is(th, td):last-child { padding-right: var(--sg-cell-x); }   /* its content starts and ends with the card's head and the chips above it */
 .pg-par-table td > code { display: block; }
 .pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
 .pg-par-table .sg-cx-share { display: inline; }   /* how many follow a construction rule and the share of them, on one line */

@@ -22,8 +22,8 @@
     var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
     var ORDER = { fix: 0, decide: 1, rule: 2 };
     // Where each rule is, and who fixes it, as the Status page's To do says it.
-    var SIDE = { figma: 'Figma', code: 'Code' };
-    var WHO_FIX = { figma: WHO.figma, code: WHO.code, both: WHO.both };
+    var SIDE = { figma: 'Figma', code: 'Code' };   // the side a rule is on, as the column head and the crumbs say it
+    var OWNER = { figma: 'Design', code: 'Engineering', both: 'Design and engineering' };
     var rows = RULES.slice().sort(function (a, b) { return (a.side === 'code') - (b.side === 'code') || ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
@@ -35,7 +35,7 @@
     var unit = function (r, n) { return byComponent(r) ? (n === 1 ? 'component' : 'components') : (n === 1 ? 'place' : 'places'); };
     var plural2 = function (n) { return n === 1 ? 'component' : 'components'; };
     var followHTML = function (r) {
-      if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">None found</span>'; }
+      if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">Nothing breaks it</span>'; }
       return r.follows + ' of ' + r.of + ' <span class="pg-par-val sg-cx-share">(' + Math.round(r.follows / (r.of || 1) * 100) + '%)</span>';
     };
     var cmd = 'rms-design-system-engine';
@@ -53,7 +53,7 @@
     };
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
-      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-f data-f-area="' + esc(AREA[r.area] || capital(r.area)) + '" data-f-in="' + esc(SIDE[r.side] || SIDE.figma) + '" data-f-status="' + esc(ST[r.status][1]) + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(WHO_FIX[r.who] || WHO_FIX.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-f data-f-area="' + esc(AREA[r.area] || capital(r.area)) + '" data-f-side="' + esc(SIDE[r.side] || SIDE.figma) + '" data-f-status="' + esc(ST[r.status][1]) + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(OWNER[r.who] || OWNER.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A column head sorts by it; clicked again, the other way round. A name A to Z, a share and a status with what is
     // most open first; rules of the same value keep the page's own order. A row keeps its number (data-cx-row), so it
@@ -61,9 +61,9 @@
     var SORT = [
       ['Rule', function (r) { return r.says.toLowerCase(); }],
       ['Area', function (r) { return (AREA[r.area] || capital(r.area)).toLowerCase(); }],
-      ['In', function (r) { return (SIDE[r.side] || SIDE.figma).toLowerCase(); }],
+      ['Side', function (r) { return (SIDE[r.side] || SIDE.figma).toLowerCase(); }],
       ['Follow it', function (r) { return r.of ? r.follows / r.of : comps(r).length ? 0 : 1; }],
-      ['Who fixes it', function (r) { return (WHO_FIX[r.who] || WHO_FIX.figma).toLowerCase(); }],
+      ['Owned by', function (r) { return (OWNER[r.who] || OWNER.figma).toLowerCase(); }],
       ['Status', function (r) { return ORDER[r.status]; }]
     ];
     var sortOf = {}; SORT.forEach(function (c) { sortOf[c[0]] = c[1]; });
@@ -105,7 +105,7 @@
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
       var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
       // What is suggested, what it changes and the decision are one card: the draft is read, then approved under it.
-      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Who fixes it', '<p>' + esc((WHO_FIX[r.who] || WHO_FIX.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
+      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
@@ -131,9 +131,10 @@
     });
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
-    // All, then one chip a column: its area, which side it is on, and its status. They combine, and each says how many
-    // rows it would leave beside the others.
-    filterBar(sec, { total: rows.length, cols: [{ key: 'area', label: 'Area' }, { key: 'in', label: 'In' }, { key: 'status', label: 'Status', order: [ST.fix[1], ST.decide[1], ST.rule[1]] }] });
+    // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
+    // and each says how many rows it would leave beside the others.
+    var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
+    filterBar(sec, { total: rows.length, chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area' }, { key: 'side', label: 'Side' }] });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
@@ -428,15 +429,19 @@
       var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
       words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
       return { key: c.key, label: c.label, multi: c.multi, words: words };
-    }).filter(function (c) { return c.words.length > 1; });
+    }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
     if (!trs.length || !cols.length) return null;
     var F = {}, C = '';
-    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return tr.getAttribute('data-f-' + c.key); }); });
-    var passes = function (tr, skip) { return (!C || !!tr.getAttribute('data-f-' + C)) && cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
+    var colOf = function (k) { return (o.cols || []).filter(function (c) { return c.key === k; })[0] || { key: k }; };
+    var onChip = function (tr, c) { return c.word ? has(tr, colOf(c.col), c.word) : !!tr.getAttribute('data-f-' + c.key); };
+    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    var chipOf = function (k) { return chips.filter(function (c) { return c.key === k; })[0]; };
+    var inCols = function (tr, skip) { return cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
+    var passes = function (tr, skip) { return (!C || onChip(tr, chipOf(C))) && inCols(tr, skip); };
     var bar = document.createElement('div'); bar.className = 'sg-todo-head';
     bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
       '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
-      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + countHTML(trs.filter(function (tr) { return tr.getAttribute('data-f-' + c.key); }).length) + '</button>'; }).join('') +
+      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
       cols.map(function (c) {
         var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
         return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
@@ -451,7 +456,11 @@
       var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
       bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
       bar.querySelector('[data-f-clear]').hidden = !on;
-      chips.forEach(function (c) { bar.querySelector('.sg-chip[data-chip="' + c.key + '"]').setAttribute('aria-pressed', C === c.key ? 'true' : 'false'); });
+      chips.forEach(function (c) {
+        var b = bar.querySelector('.sg-chip[data-chip="' + c.key + '"]');
+        b.setAttribute('aria-pressed', C === c.key ? 'true' : 'false');
+        b.querySelector('.sg-count').outerHTML = countHTML(trs.filter(function (tr) { return onChip(tr, c) && inCols(tr); }).length);
+      });
       cols.forEach(function (c) {
         var b = bar.querySelector('.sg-chip-menu[data-fg="' + c.key + '"]'), w = F[c.key] || '';
         b.querySelector('.sg-chip-word').textContent = w || 'All';
@@ -459,7 +468,7 @@
         b.querySelector('.sg-chip-n').innerHTML = '';
         Array.prototype.forEach.call(document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('[role="option"]'), function (op) {
           var ow = op.getAttribute('data-f').slice(c.key.length + 1);
-          var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;
+          var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;   // what the other chips leave it
           op.querySelector('.sg-count').outerHTML = countHTML(n);
           op.setAttribute('aria-selected', ow === w ? 'true' : 'false');
           op.hidden = !!ow && !n && ow !== w;   // a value the other chips leave no row in is not offered
@@ -927,11 +936,11 @@
     // nobody answers it with nothing, so the chip offers only the teams there are.
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
-    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length, cols: [
-      { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Contract'] },
-      { key: 'status', label: 'Status', order: [IL_WORD.write, IL_WORD.review, IL_WORD.remove, IL_WORD.keep] },
-      { key: 'waits', label: 'Waiting on' }
-    ], chips: [{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }] });
+    var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
+    var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
+    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length,
+      chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
+      cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Contract'] }, { key: 'waits', label: 'Waiting on' }] });
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
