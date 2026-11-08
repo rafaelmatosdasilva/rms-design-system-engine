@@ -140,6 +140,12 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   else if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
   const bin = join(home, 'bin');
   mkdirSync(bin, { recursive: true });
+  // The node this evaluation runs on, first on the path. The run's shell starts from the new HOME with no profile, and
+  // the filter below takes every .local/bin away (where install.sh puts an engine): on a machine whose node lives
+  // there, every run lost node, each call to the engine failed with "node: not found", and a run measured a broken
+  // machine as a broken guide (15 of 79). The engine's command and the guide's "node <install-dir>/audit.mjs" both
+  // find it here.
+  symlinkSync(process.execPath, join(bin, 'node'));
   if (cliOnPath) {
     for (const name of ['rms-design-system-engine']) {
       writeFileSync(join(bin, name), `#!/usr/bin/env bash\nexec node "${join(ENGINE, 'audit.mjs')}" "$@"\n`);
