@@ -1369,8 +1369,9 @@ line with the same statuses.
 
 The style guide has a **Rules** page, in its menu: how the system is built, in Figma and in the code, in one table.
 A row is a rule, with its side (Figma or Code), how many follow it, who fixes it (you in Figma, a developer in the code,
-or you decide) and its status (to fix, to decide, or a rule), filtered by status. Every column head sorts by it, and the
-same head again sorts the other way round. Its rows (`construction-page.mjs`):
+or you decide) and its status (to fix, to decide, or a rule). Every column head sorts by it, and the same head again
+sorts the other way round; a chip above the table filters by area, by side and by status, each saying how many rows the
+other chips would leave it, and the chips combine. Its rows (`construction-page.mjs`):
 
 - **Figma**: these grammar lines; the file's own hygiene (values with no variable or style, detached instances, an
   instance's layer named unlike its component, a property bound outside its variable's scope, variables on all scopes);

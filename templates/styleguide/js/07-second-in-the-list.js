@@ -53,7 +53,7 @@
     };
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
-      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(WHO_FIX[r.who] || WHO_FIX.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-f data-f-area="' + esc(AREA[r.area] || capital(r.area)) + '" data-f-in="' + esc(SIDE[r.side] || SIDE.figma) + '" data-f-status="' + esc(ST[r.status][1]) + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(WHO_FIX[r.who] || WHO_FIX.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A column head sorts by it; clicked again, the other way round. A name A to Z, a share and a status with what is
     // most open first; rules of the same value keep the page's own order. A row keeps its number (data-cx-row), so it
@@ -131,9 +131,9 @@
     });
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
-    var nOf = function (st) { return rows.filter(function (r) { return r.status === st; }).length; };
-    // One chip a status, and All: what is left to do. Which side a rule is on is a column of its own, which sorts.
-    pageBar(sec, { total: rows.length, chips: [{ key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }].filter(function (c) { return c.n; }) });
+    // All, then one chip a column: its area, which side it is on, and its status. They combine, and each says how many
+    // rows it would leave beside the others.
+    filterBar(sec, { total: rows.length, cols: [{ key: 'area', label: 'Area' }, { key: 'in', label: 'In' }, { key: 'status', label: 'Status', order: [ST.fix[1], ST.decide[1], ST.rule[1]] }] });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
@@ -410,6 +410,77 @@
   // the Status page's). chips: [{ key, label, n, dot }] (dot: the status kind its colour comes from: differs, figma,
   // match, none), All first; a click shows only the table rows with that key (data-chip on each row). One table per
   // page: the chips filter its rows, never split it.
+  // A table's filters, as the Status page's table filters: one chip a column, each showing All until a value is chosen,
+  // its list saying how many rows each value would leave beside the other chips' choices, and the chips combining. A
+  // value the others leave no row in is not offered. All, and Clear filters, drop them. A row carries its value for a
+  // column in data-f-<key>; a column a row can hold several of (a page read from Figma and the intent layer) is marked
+  // multi, and its values are separated by a bar, so a value with a space in it is still one value. Rows are hidden, never drawn again, so the sort and the panel still find
+  // them. A column every row answers the same way is no filter, so it is left out.
+  function filterBar(sec, o) {
+    var h = sec.querySelector(':scope > h2');
+    if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
+    var trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
+    var val = function (tr, k) { return tr.getAttribute('data-f-' + k) || ''; };
+    var has = function (tr, c, w) { return c.multi ? val(tr, c.key).split('|').indexOf(w) >= 0 : val(tr, c.key) === w; };
+    var cols = (o.cols || []).map(function (c) {
+      var seen = {}, words = [];
+      trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
+      var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
+      words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
+      return { key: c.key, label: c.label, multi: c.multi, words: words };
+    }).filter(function (c) { return c.words.length > 1; });
+    if (!trs.length || !cols.length) return null;
+    var F = {}, C = '';
+    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return tr.getAttribute('data-f-' + c.key); }); });
+    var passes = function (tr, skip) { return (!C || !!tr.getAttribute('data-f-' + C)) && cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
+    var bar = document.createElement('div'); bar.className = 'sg-todo-head';
+    bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
+      '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
+      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + countHTML(trs.filter(function (tr) { return tr.getAttribute('data-f-' + c.key); }).length) + '</button>'; }).join('') +
+      cols.map(function (c) {
+        var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
+        return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+          '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+          '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
+          [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
+          '</span></span>';
+      }).join('') + '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
+    var draw = function () {
+      trs.forEach(function (tr) { tr.hidden = !passes(tr); });
+      var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
+      bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
+      bar.querySelector('[data-f-clear]').hidden = !on;
+      chips.forEach(function (c) { bar.querySelector('.sg-chip[data-chip="' + c.key + '"]').setAttribute('aria-pressed', C === c.key ? 'true' : 'false'); });
+      cols.forEach(function (c) {
+        var b = bar.querySelector('.sg-chip-menu[data-fg="' + c.key + '"]'), w = F[c.key] || '';
+        b.querySelector('.sg-chip-word').textContent = w || 'All';
+        b.setAttribute('aria-pressed', w ? 'true' : 'false');
+        b.querySelector('.sg-chip-n').innerHTML = '';
+        Array.prototype.forEach.call(document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('[role="option"]'), function (op) {
+          var ow = op.getAttribute('data-f').slice(c.key.length + 1);
+          var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;
+          op.querySelector('.sg-count').outerHTML = countHTML(n);
+          op.setAttribute('aria-selected', ow === w ? 'true' : 'false');
+          op.hidden = !!ow && !n && ow !== w;   // a value the other chips leave no row in is not offered
+          if (ow && ow === w) b.querySelector('.sg-chip-n').innerHTML = countHTML(n);   // chosen: its count on the chip too
+        });
+      });
+      sec.dispatchEvent(new CustomEvent('sg-filter', { detail: F }));
+    };
+    bar.addEventListener('click', function (e) {
+      var m = e.target.closest('.sg-chip-menu'); if (m) { mxMenu(m, m.getAttribute('aria-expanded') !== 'true'); return; }
+      if (e.target.closest('[data-f-all], [data-f-clear]')) { F = {}; C = ''; draw(); return; }
+      var ch = e.target.closest('.sg-chip[data-chip]'); if (ch) { C = C === ch.getAttribute('data-chip') ? '' : ch.getAttribute('data-chip'); draw(); return; }
+      var op = e.target.closest('.sg-dd-option[data-f]'); if (!op) return;
+      var dd = op.closest('.sg-chip-dd'); if (dd) mxMenu(dd.querySelector('.sg-chip-menu'), false, true);
+      var k = op.getAttribute('data-f').split(':')[0], w = op.getAttribute('data-f').slice(k.length + 1);
+      if (w) F[k] = w; else delete F[k];
+      draw();
+    });
+    draw();
+    return bar;
+  }
   function pageBar(sec, o) {
     var h = sec.querySelector(':scope > h2');
     if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
@@ -572,8 +643,19 @@
       return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(r.kind) + '</p>' + r.written + '</div>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
-    var ilSources = function (p) { if (p.tokens) return 'Figma, Intent layer'; if (p.absent) return 'Intent layer';
-      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0.length ? esc(w0.join(', ')) : '<span class="pg-missing">None</span>'; } var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
+    // Where a page's text comes from, as words: the Sources column joins them, and the Source filter offers them.
+    var ilSourceWords = function (p) {
+      if (p.tokens) return ['Figma', 'Intent layer'];
+      if (p.absent) return ['Intent layer'];
+      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0; }
+      var r = p.reads || {}, out = [];
+      if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer');
+      ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
+      return out;
+    };
+    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(', ')) : '<span class="pg-missing">None</span>'; };
+    // A page's status in one word, as the filter and the chips before it said it.
+    var IL_WORD = { review: 'Review', write: 'Missing', remove: 'Remove', keep: 'Done' };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
     // page (its drafts, each once, beside where it comes from), Changes to rules (the guards and rewrites its rules
     // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it says so on its own line, No its
@@ -804,7 +886,7 @@
     var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '"' + (p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ' data-f-pagesToWrite="1"' : '') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
@@ -841,15 +923,15 @@
     };
     // A link to a page's panel (panel=doc:<file>) opens it.
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
-    var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
-    // The rows to review, by who they wait on: one chip each ("Waiting on Cards team 3"), most first.
-    var waits = {}; rows.forEach(function (p) { var d = statusOf(p) === 'review' && deciderOf(p); if (d) waits[d] = (waits[d] || 0) + 1; });
-    var waitChips = Object.keys(waits).sort(function (a, b) { return waits[b] - waits[a] || a.localeCompare(b); }).map(function (d) { return { key: waitsKey(d), label: 'Waiting on ' + d, n: waits[d], dot: 'figma' }; });
-    pageBar(ilSec, { links: sourceLinks(ilSrc.url), chips: (function () { var toReview = rows.filter(needsReview).length;
-      var toStart = rows.filter(function (p) { return p.missingFor && (IL.pagesToWrite || {})[p.missingFor]; }).length;
-      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(waitChips).concat(toStart ? [{ key: 'pagesToWrite', label: 'Pages to write, most used first', n: toStart, dot: 'differs' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
+    // The rows to review, by who they wait on, as a filter of its own ("Waiting on Cards team"): a row that waits on
+    // nobody answers it with nothing, so the chip offers only the teams there are.
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length, cols: [
+      { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Contract'] },
+      { key: 'status', label: 'Status', order: [IL_WORD.write, IL_WORD.review, IL_WORD.remove, IL_WORD.keep] },
+      { key: 'waits', label: 'Waiting on' }
+    ], chips: [{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }] });
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };

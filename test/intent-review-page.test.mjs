@@ -36,7 +36,8 @@ test('an answer says who gave it, and when that was not its owner, says who deci
 test('a page whose component changed is reviewed as that, and every row to review says who it waits on, with a chip each', () => {
   assert.match(tpl, /isStale\(p\) && p\.action === 'review' \? 'Changed since written'/);
   assert.match(tpl, /deciderOf\(p\) \? \['Waits on ' \+ deciderOf\(p\)\] : \[\]/);
-  assert.match(tpl, /label: 'Waiting on ' \+ d, n: waits\[d\]/);
+  assert.match(tpl, /\{ key: 'waits', label: 'Waiting on' \}/, 'who a row waits on is a filter of its own');
+  assert.match(tpl, /data-f-waits="' \+ esc\(\(statusOf\(p\) === 'review' && deciderOf\(p\)\) \|\| ''\)/, 'only a row to review waits on anyone');
   assert.match(tpl, /\['review', 'Note beside it'\]/, 'what the agents read shows the note beside the page');
   assert.match(tpl, /x\.decider \? lines\(\['Waits on ' \+ x\.decider\.name \+ '\.'\]\)/, 'a change in Figma held for sign-off says who it waits on');
 });

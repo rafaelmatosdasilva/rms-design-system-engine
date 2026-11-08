@@ -275,7 +275,10 @@
   // arrow to its page (one only in Figma has none to open).
   var STATUS_PILL = function (ok, yes) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? yes || 'Found' : 'Missing') + '</span>'; };
   var USERS_ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
-  // The mark on the column a table is sorted by, on every table whose heads sort (the Status page's, the Construction page's).
+  // A filter's mark: three lines, each shorter, centred. Shared, as the sort mark is: the pages that filter are built
+  // before the Status page's part runs.
+  var FILTER_MARK = '<svg class="sg-dd-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';
+  // The mark on the column a table is sorted by, on every table whose heads sort (the Status page's, the Rules page's).
   var MX_TRI = '<svg class="sg-mx-tri" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5h6L4 6.5z" fill="currentColor"/></svg>';
   function usersTable(names) {
     if (!names.length) return '<p class="sg-tk-none">No component uses it.</p>';

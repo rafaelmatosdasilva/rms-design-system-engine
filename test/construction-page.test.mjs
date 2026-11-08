@@ -107,8 +107,9 @@ test('the page: in the menu by default, one table whose heads sort, chips for wh
   assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
   assert.match(page, /sortDir = sortKey === key \? -sortDir : 1;/, 'the same head again sorts the other way round');
   assert.ok(!/data-chip-group=/.test(page), 'which side a rule is on is a column, never a chip');
-  assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'the chips are what is left to do');
-  assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)', n: nOf/g)].map((m) => m[2]), ['To fix', 'To decide', 'Rules']);
+  assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'which side a rule is on is a filter of its own, never a chip beside the statuses');
+  assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['area', 'Area'], ['in', 'In'], ['status', 'Status']], 'one filter a column: its area, its side and its status');
+  assert.match(page, /data-f data-f-area="' \+ esc\(AREA\[r\.area\] \|\| capital\(r\.area\)\)/, 'every row says its values to the filter');
   assert.match(page, /card\(r\.status === 'rule' \? 'Nothing to change' : 'Suggested change', suggest \+ ways \+ list \+ decide\)/, 'what is suggested, what it changes and the decision are one card, the decision under the draft');
   assert.match(page, /Hand each change back as a patch for a person to apply; change no code yourself\./, 'the code\'s change is handed back, never written over the code people wrote');
   const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
