@@ -11,10 +11,11 @@
   // place it changes and the decision under them, in one card; each fix is copied into Claude Code (renames are made by the engine's script,
   // --figma-fix; a name to give, layout and bindings are a person's; the code's change is a patch handed back). No
   // exceptions: a component follows it or is to fix. In the menu, unless the team leaves it out (styleguide.construction).
+  // The page lives at #rules; #construction, the address it had, opens it still.
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
-    hr(); if (G.listed) navLink('construction', 'rules');
-    var sec = section('construction', 'System', 'Rules', '');
+    hr(); if (G.listed) navLink('rules', 'rules');
+    var sec = section('rules', 'System', 'Rules', '');
     // The kind of rule each is (construction-grammar.mjs → judge, construction-page.mjs): every rule on names together,
     // whatever is named; how each component is built inside (the skeleton) in its own kinds; the tokens; the products.
     var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture', tokens: 'Tokens', products: 'Products' };

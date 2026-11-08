@@ -1387,7 +1387,7 @@ A row opens in the side panel: its status, who fixes it, and one card holding wh
 or place it changes with its fix, and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
 layer; Fix all for a rule's renames). The code's change is asked for as a patch handed back, never written over the code
 people wrote. `styleguide.construction: "unlisted"` keeps
-the page out of the menu and the search, opened only by its link (`#construction`); `"off"` leaves it out.
+the page out of the menu and the search, opened only by its link (`#rules`; `#construction`, the address it had, opens it still); `"off"` leaves it out.
 
 A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
