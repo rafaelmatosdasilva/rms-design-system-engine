@@ -2,48 +2,66 @@
   (function () { var a = nav.querySelector('a[href="#status"]'), o = nav.querySelector('a[href="#index"]'); if (a && o) o.insertAdjacentElement('afterend', a); })();
   var td = section('status', 'Status', 'How the system is doing', '');   // no line under its title: the cards say it
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
-  // Construction: how the system builds a component in Figma (DATA.construction, construction-grammar.mjs). One table, a
-  // row a rule: its status (a rule only once every component follows it; to fix when most do or the team decided it; to
-  // decide otherwise), how many follow it and what is to do. A row opens in the side panel: the decision to copy for a
-  // rule to decide, and each component to fix with its fix to copy into Claude Code (renames are made by the engine's
-  // script, --figma-fix; a name to give, layout and bindings are a person's). No exceptions: a component follows it or is
-  // to fix. In no menu and no search unless the team lists it (styleguide.construction): opened by its link.
+  // Construction: how the system is built, in Figma and in the code (DATA.construction, construction-page.mjs). One table,
+  // a row a rule: in Figma the rules it builds a component by (construction-grammar.mjs), the Figma file's own hygiene,
+  // the components of one type compared with each other and the tokens; in the code what the code linting finds. Each
+  // row says its side and who fixes it, its status (a rule once every component follows it; to fix when most do, the
+  // team decided it, or it is the system's own rule; to decide otherwise; a note when it is said, never a fault), how many
+  // follow it and what is to do. A row opens in the side panel: the decision to copy for a rule to decide, and each
+  // component or place to fix with its fix to copy into Claude Code (renames are made by the engine's script,
+  // --figma-fix; a name to give, layout and bindings are a person's; the code's change is a patch handed back). No
+  // exceptions: a component follows it or is to fix. In the menu, unless the team leaves it out (styleguide.construction).
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('construction', 'construction');
     var sec = section('construction', 'System', 'Construction', '');
-    // The kind of rule each is (construction-grammar.mjs → judge): every rule on names together, whatever is named; how
-    // each component is built inside (the skeleton) in its own kinds.
-    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture' };
-    var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
-    var ORDER = { fix: 0, decide: 1, rule: 2 };
-    var rows = RULES.slice().sort(function (a, b) { return ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
+    // The kind of rule each is (construction-grammar.mjs → judge, construction-page.mjs): every rule on names together,
+    // whatever is named; how each component is built inside (the skeleton) in its own kinds; the tokens; the products.
+    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture', tokens: 'Tokens', products: 'Products' };
+    var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'], note: ['none', 'Note'] };
+    var ORDER = { fix: 0, decide: 1, rule: 2, note: 3 };
+    // Where each rule is, and who fixes it, as the Status page's To do says it.
+    var SIDE = { figma: 'Figma', code: 'Code' };
+    var WHO_FIX = { figma: WHO.figma, code: WHO.code, both: WHO.both };
+    var rows = RULES.slice().sort(function (a, b) { return (a.side === 'code') - (b.side === 'code') || ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
     var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>' : esc(n); };
-    var comps = function (r) { var seen = {}, out = []; r.toFix.forEach(function (t) { if (!seen[t.component]) { seen[t.component] = 1; out.push(t.component); } }); return out; };
+    // What a rule breaks at: a component, or a place (a file and line, a token, a brand) when it is not one.
+    var atOf = function (t) { return t.component || t.where || ''; };
+    var comps = function (r) { var seen = {}, out = []; r.toFix.forEach(function (t) { var a = atOf(t); if (!seen[a]) { seen[a] = 1; out.push(a); } }); return out; };
+    var byComponent = function (r) { return r.toFix.every(function (t) { return !!t.component; }); };
+    var unit = function (r, n) { return byComponent(r) ? (n === 1 ? 'component' : 'components') : (n === 1 ? 'place' : 'places'); };
     var plural2 = function (n) { return n === 1 ? 'component' : 'components'; };
+    var followHTML = function (r) {
+      if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">None found</span>'; }
+      return r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / (r.of || 1) * 100) + '%</span>';
+    };
     var todoOf = function (r) {
       var n = comps(r).length;
       if (r.status === 'rule') return '<span class="pg-missing">Nothing</span>';
+      if (r.status === 'note') return 'Nothing to fix';
+      if (r.kind === 'break') return (r.status === 'decide' ? 'Decide on ' : 'Fix ') + n + ' ' + unit(r, n);
       // Said as the rule the way most go, never as a question: the team confirms it, or takes the other way.
       if (r.status === 'decide') return r.ways ? 'Confirm it, or take the other way: ' + r.ways.map(function (w) { return w.follows + ' ' + (w.way === 'own' ? 'use variables made for them' : 'use shared variables'); }).join(', ') : 'Decide whether it is the rule; then ' + n + ' ' + plural2(n) + ' to fix';
       return 'Fix ' + n + ' ' + plural2(n);
     };
     var cmd = 'rms-design-system-engine';
     // The one change for every component a rule has to fix, as it is copied into Claude Code: renames the engine writes,
-    // names for unnamed layers Claude proposes as one list, layout and bindings Claude walks through.
+    // names for unnamed layers Claude proposes as one list, layout and bindings Claude walks through; the code's change
+    // handed back as a patch, never written over the code people wrote.
     var applyAll = function (r) {
       var cs = comps(r), n = cs.length, f = (r.toFix[0] || {}).fix || {};
-      var lead = 'Make every component follow the system\'s construction rule "' + r.says + '" (' + n + ' ' + plural2(n) + ' to change: ' + cs.join(', ') + '). ';
+      var lead = 'Make every ' + (byComponent(r) ? 'component' : 'place') + ' follow the system\'s construction rule "' + r.says + '" (' + n + ' ' + unit(r, n) + ' to change: ' + cs.join(', ') + '). ';
+      if (r.side === 'code') return lead + (r.status === 'decide' ? 'Give me one list with each one and the choice it takes, for me to decide; change no code.' : 'Hand each change back as a patch for a person to apply; change no code yourself.');
       if (f.what) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ', then apply the script it writes.';
       if (f.layers) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ': read in Figma what each unnamed layer holds, propose one list of names, and once I approve it run it again with --names and apply the script it writes.';
+      if (r.status === 'decide') return lead + 'Give me one list with each one and the choice it takes, for me to decide; change nothing in Figma yet.';
       return lead + 'The engine does not change layout or variable bindings: give me one list of what to change in Figma, component by component, in the order to do it.';
     };
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
-      var n = comps(r).length;
-      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / r.of * 100) + '%</span></td><td>' + todoOf(r) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-chip-group="' + esc(r.side || 'figma') + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + todoOf(r) + '</td><td>' + esc(WHO_FIX[r.who] || WHO_FIX.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var cxKey = function (r) { return 'cx:' + r.id; };
     var panel = function (i, from) {
@@ -51,13 +69,18 @@
       var m = panelShell('sg-cx-panel', 'Construction'); m._key = cxKey(r);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var cs = comps(r), byC = {}, n = cs.length;
-      r.toFix.forEach(function (t) { (byC[t.component] = byC[t.component] || []).push(t); });
+      r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
       var WAY_HEAD = { own: 'Variables made for each component', shared: 'Shared variables' };
       var lower = function (x) { return String(x).replace(/^\w/, function (c) { return c.toLowerCase(); }); };
-      var pct = Math.round(r.follows / r.of * 100);
+      var pct = r.of ? Math.round(r.follows / r.of * 100) : null;
       // What the engine suggests, from what most of the system already does; one decision for every component.
       var suggest, decide;
-      if (r.status === 'rule') { suggest = 'Every component follows it. Nothing to change.'; decide = ''; }
+      if (r.status === 'rule') { suggest = (r.of == null ? 'Nothing found that breaks it.' : 'Every one follows it.') + ' Nothing to change.'; decide = ''; }
+      else if (r.status === 'note') { suggest = '<p class="sg-il-line">' + esc(r.todo || '') + '</p>'; decide = ''; }
+      else if (r.kind === 'break') {
+        suggest = (r.of != null ? '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' (' + pct + '%) already follow it.') + '</p>' : '') + '<p class="sg-il-line"><strong>' + esc(r.todo || '') + '</strong></p>';
+        decide = '<div class="sg-decide-grid">' + copyBtn('approve', n === 1 ? (r.status === 'decide' ? 'Decide on it' : 'Apply it') : (r.status === 'decide' ? 'Decide on all ' : 'Apply to all ') + n, applyAll(r)) + '</div>';
+      }
       else if (r.ways) {
         var best = r.ways[0], other = r.ways[1];
         suggest = '<p class="sg-il-line"><strong>' + esc(WAY_HEAD[best.way]) + '</strong>: ' + esc(best.follows + ' of ' + r.of + ' components already do this (' + lower(best.says) + ').') + '</p><p class="sg-il-line"><span class="pg-par-val">' + esc(other.follows + ' go the other way (' + lower(other.says) + '). Choose one; the others are then changed to match.') + '</span></p>';
@@ -71,23 +94,26 @@
         suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' components (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + plural2(n) + ' that don\'t, so every one does.') + '</strong></p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
-      var list = n ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('Components it changes (' + n + ')') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>What changes</th></tr></thead><tbody>'
+      var head = byComponent(r) ? 'Component' : 'Where';
+      var list = n ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc((r.status === 'note' ? 'What it says (' : byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>' + head + '</th><th>What changes</th></tr></thead><tbody>'
         + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
       var ways = fam ? '<table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table>' : '';
-      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + (ways ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('How the ' + fam.components + ' in the family are built') + '</div><div class="pg-par-scroll">' + ways + '</div></div>' : '') + list;
+      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Who fixes it', '<p>' + esc((WHO_FIX[r.who] || WHO_FIX.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + (ways ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('How the ' + fam.components + ' in the family are built') + '</div><div class="pg-par-scroll">' + ways + '</div></div>' : '') + list;
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', ST[r.status][1]], title: r.says, body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr><th>Rule</th><th>Area</th><th>Follow it</th><th>To do</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr><th>Rule</th><th>Area</th><th>In</th><th>Follow it</th><th>To do</th><th>Who fixes it</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
     sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]')); });
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
     var nOf = function (st) { return rows.filter(function (r) { return r.status === st; }).length; };
-    pageBar(sec, { chips: [{ key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }].filter(function (c) { return c.n; }) });
+    var nIn = function (side) { return rows.filter(function (r) { return (r.side || 'figma') === side; }).length; };
+    // The two sides first, then the statuses: a row counts under its side and its status, so the total is the rows'.
+    pageBar(sec, { total: rows.length, chips: [{ key: 'figma', label: 'In Figma', n: nIn('figma') }, { key: 'code', label: 'In the code', n: nIn('code') }, { key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }, { key: 'note', label: 'Notes', n: nOf('note'), dot: 'none' }].filter(function (c) { return c.n; }) });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,

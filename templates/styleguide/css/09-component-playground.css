@@ -227,9 +227,9 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
 /* The Construction table: the rule widest, the rest even, its status last. */
-.sg-cx-table { table-layout: fixed; width: 100%; min-width: 56rem; }   /* narrower, it scrolls: no word broken in two */
+.sg-cx-table { table-layout: fixed; width: 100%; min-width: 72rem; }   /* narrower, it scrolls: no word broken in two */
 .sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
-.sg-cx-table col.sg-cx-rule { width: 34%; } .sg-cx-table col.sg-cx-col { width: 15%; }
+.sg-cx-table col.sg-cx-rule { width: 28%; } .sg-cx-table col.sg-cx-col { width: 11.5%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
