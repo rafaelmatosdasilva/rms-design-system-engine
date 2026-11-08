@@ -91,6 +91,10 @@
     var f = parentOf(c.name); if (!f || (c.codeOnly && c.codeOnly.figma)) return null;
     return COMPONENTS.some(function (x) { return x.name === f; }) ? null : f;
   }
+  // A component inside a bigger one: its parent is a component of its own name, so it is listed and counted with
+  // that parent, never on its own. A family is only a name (no component carries it), so its members are
+  // components in their own right.
+  function partOfAnother(c) { var f = parentOf(c.name); return !!f && COMPONENTS.some(function (x) { return x.name === f; }); }
   function menuCount() { var fam = {}; COMPONENTS.forEach(function (c) { var f = menuFamily(c); if (f) fam[f] = 1; }); return COMPONENTS.filter(inMenu).length + Object.keys(fam).length; }
   function parentOf(n) { var x = String(n).trim(), i = x.indexOf('/'); if (PART_ROOT[x]) return PART_ROOT[x]; if (i <= 0) return null; var f = bareName(x.slice(0, i)); return PARENT_NAME[f.toLowerCase()] || f; }
   function familyKey(n) { return parentOf(n) || (String(n).trim() || '(no name)'); }
