@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { context, decisionPoints, afterPass } from './skill-evals/lib.mjs';
+import { context, decisionPoints, afterPass, makeHome, cleanup } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
@@ -388,4 +388,20 @@ test('a run that failed in the harness is tried once more at once, never waited 
   assert.equal(afterPass(4), 'retry');           // runs failed in the harness (the Agent SDK not installed, say)
   assert.equal(afterPass(4, true), 'stop');      // and still failed: waiting would not fix them
   assert.equal(afterPass(2), 'stop');
+});
+
+test('a run\'s shell finds the node the evaluation runs on, and still no engine installed elsewhere on the machine', () => {
+  // A run's shell starts from the new HOME with no profile: only its PATH says where node is. A node kept in
+  // ~/.local/bin went with the filter that hides an installed engine there, and every call to the engine failed.
+  const { home, path } = makeHome({ install: () => {} });
+  try {
+    const sh = (cmd) => execFileSync('/bin/sh', ['-c', cmd], { env: { PATH: path, HOME: home }, encoding: 'utf8' }).trim();
+    assert.equal(sh('node -p process.execPath'), process.execPath, 'the evaluation\'s own node, whatever folder it lives in');
+    assert.match(sh('rms-design-system-engine --version 2>&1; echo "exit $?"'), /exit [01]$/, 'the engine\'s command runs: node is found');
+    assert.ok(!path.split(':').some((p) => /\.local\/bin/.test(p)), 'an engine installed in ~/.local/bin stays hidden');
+    // A task that takes the command away keeps node: the guide's "node <install-dir>/audit.mjs" still runs.
+    const bare = makeHome({ install: () => {} }, { cliOnPath: false });
+    try { assert.equal(execFileSync('/bin/sh', ['-c', 'command -v node'], { env: { PATH: bare.path, HOME: bare.home }, encoding: 'utf8' }).trim(), join(bare.home, 'bin', 'node')); }
+    finally { cleanup(bare.home); }
+  } finally { cleanup(home); }
 });

@@ -8,6 +8,32 @@ Newest first.
 
 ---
 
+## Fifteen of seventy-nine, and no run had node
+
+**Found** 8 November 2026, measuring a change of fifteen lines to `reference/usage.md` and one to `reference/config.md`. **Changed** `makeHome` in `test/skill-evals/lib.mjs`: the node the evaluation runs on goes into the new HOME's `bin`, first on the path. Nothing in `lib/` or in the guide.
+
+**Evidence.** 15 of 79 runs passed, against every check of every task: `audit-chip` did not scope to the chip, `first-setup` never ran `--init`, `props-question` never asked the engine. Two guide lines cannot do that. The transcript of `first-setup #0` says what did:
+
+```
+node ~/.claude/skills/rms-design-system-engine/audit.mjs --route "set up the parity…"
+(eval):1: command not found: node
+…/skill-eval-home-…/bin/rms-design-system-engine: line 2: exec: node: not found
+```
+
+The agent looked for node in four places, found none, told the person Node.js was missing and stopped: three tool calls, twelve seconds. Every task that needs the engine ended the same way. The PATH it printed held the new HOME's `bin` and the system's own folders, and no node.
+
+**Why.** A run's shell starts from the new HOME, which has no profile, so only the PATH `makeHome` hands it says where anything is. `makeHome` takes every `.local/bin` out of that PATH on purpose: it is where `install.sh` puts an engine, and a run must reach this engine and no other. On this machine node lives there too (`~/.local/bin/node`, a link to `~/.local/node22/bin/node`), so the filter took node with it. The runs that scored 70 of 70 before ran where node was in a system folder. Nothing said the machine had changed: a run that cannot start the engine is scored like one that chose not to.
+
+**Ruled out.**
+
+- *That the guide change made the agent stop reaching for the engine.* The failures cover tasks whose recipe the change never touched, and the transcripts show the agent reaching for the engine first and the shell refusing it.
+- *That the plan's login (`CLAUDE_CODE_OAUTH_TOKEN`, through the command line) behaves differently from the API key (through the Agent SDK).* The login worked: every run spent tokens and called tools. Only the shell's PATH was wrong, and it would have been on either route.
+- *Widening the filter so it keeps a `.local/bin` that holds node.* That folder can hold an installed engine as well, and then a run could reach it: the filter is right. Node goes in on its own instead, as the engine's command already does.
+
+**What changed.** `makeHome` links `process.execPath` into `bin`, for every task, the ones that take the engine's command away included (the guide's `node <install-dir>/audit.mjs` needs node all the same). A test runs a shell with only that PATH and HOME and finds this node, runs the engine's command, and finds no `.local/bin`; without the link it fails with the runs' own `node: command not found`. The 15-of-79 record was never committed.
+
+---
+
 ## A test called flaky, and it was the machine again
 
 **Found** 4 November 2026, on a full run before a push. **Changed** nothing in `lib/`, on purpose.
