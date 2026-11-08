@@ -2,6 +2,23 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Fix, Decide, Done; Source on both pages; an area for a page (continuous evaluation)
+
+What changed since the entry below (engine 91d7a3f): The index page counts the components the code has (#356); Three lines say the rules they mine and the comments they already read (#357); The Rules page: one decision, a table that sorts and filters, and names that say what they mean (#358); Fix, Decide, Done; Source on both pages; an area for a page. The guide changed in `reference/usage.md`.
+
+Guide set measured: `278df10df0e0` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md aabbcc45` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md b820faeb` `reference/gates.md a8e75b2a` `reference/maintainers.md 082b6dd0` `reference/personality.md 7f1584bf` `reference/usage.md d75da02a` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 06654ad | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.055 | $0.059 |
+| Input a run | 92k | 105k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 92k. no task changed state, and no run moved: the same result. Records: `records/2026-11-08-fix-decide-done-source-on`.
+
 ## 2026-11: Side, Owned by, and the statuses read without opening a list (continuous evaluation)
 
 What changed since the entry below (engine 9f4f851): Side, Owned by, and the statuses read without opening a list. The guide changed in `reference/usage.md`.
