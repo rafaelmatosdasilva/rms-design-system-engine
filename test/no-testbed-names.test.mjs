@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { writeFileSync, rmSync, statSync } from 'node:fs';
+import { writeFileSync, rmSync, statSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_EXAMPLE, ROOT } from '../.githooks/private-check.mjs';
 import { projectTerms } from '../.githooks/private-terms.mjs';
@@ -150,16 +150,23 @@ test('a pull request is opened only when its title and description carry nothing
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// A computer that holds no one's project, said once (--none): the hooks check with no list there, and refuse until said.
+function noneHome() {
+  const home = tempDir('terms-said-none-');
+  spawnSync(process.execPath, [join(ROOT, '.githooks', 'private-terms.mjs'), '--none'], { env: { ...process.env, RMS_PRIVATE_TERMS_DIR: home }, encoding: 'utf8' });
+  return home;
+}
+
 test('the commit hooks refuse a private change and let a clean one through', () => {
-  const dir = tempDir('private-check-');
+  const dir = tempDir('private-check-'), home = noneHome();
   try {
     const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
     git('init', '-q'); git('config', 'user.email', 'demo@example.com'); git('config', 'user.name', 'Demo');
-    const check = (...a) => spawnSync(process.execPath, [join(ROOT, '.githooks', 'private-check.mjs'), ...a], { cwd: dir, encoding: 'utf8' });
+    const check = (...a) => spawnSync(process.execPath, [join(ROOT, '.githooks', 'private-check.mjs'), ...a], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '', RMS_PRIVATE_TERMS_DIR: home } });
     // The check reads the staged diff of the repository it runs in: run it from a copy of itself there.
     execFileSync('mkdir', ['-p', join(dir, '.githooks')]);
     for (const f of ['private-check.mjs', 'private-terms.mjs']) execFileSync('cp', [join(ROOT, '.githooks', f), join(dir, '.githooks', f)]);
-    const staged = () => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--staged'], { cwd: dir, encoding: 'utf8', env: { ...process.env, RMS_PRIVATE_TERMS_DIR: dir } });
+    const staged = () => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--staged'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '', RMS_PRIVATE_TERMS_DIR: home } });
     writeFileSync(join(dir, 'a.md'), 'A clean line about tokens.\n'); git('add', 'a.md');
     assert.equal(staged().status, 0, staged().stderr);
     writeFileSync(join(dir, 'b.md'), `Mail ${'some.one'}@${'mail'}.com about it (${code('I', 42)}).\n`); git('add', 'b.md');
@@ -171,7 +178,7 @@ test('the commit hooks refuse a private change and let a clean one through', () 
     assert.equal(check('--message', msg).status, 1);
     writeFileSync(msg, 'Fix the chip radius\n');
     assert.equal(check('--message', msg).status, 0);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { rmSync(dir, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
 });
 
 // ── What leaks without naming anyone ───────────────────────────────────────────────────────────────────────────
@@ -268,13 +275,13 @@ test('a project is never remembered from a temporary folder or while tests run',
 });
 
 test('a push is refused for any commit it sends: its lines, its files, its author', () => {
-  const dir = tempDir('private-push-');
+  const dir = tempDir('private-push-'), home = noneHome();
   try {
     const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
     git('init', '-q', '-b', 'main'); git('config', 'user.email', 'demo@example.com'); git('config', 'user.name', 'Demo');
     execFileSync('mkdir', ['-p', join(dir, '.githooks')]);
     for (const f of ['private-check.mjs', 'private-terms.mjs']) execFileSync('cp', [join(ROOT, '.githooks', f), join(dir, '.githooks', f)]);
-    const push = (stdin) => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--push'], { cwd: dir, encoding: 'utf8', input: stdin, env: { ...process.env, RMS_PRIVATE_TERMS_DIR: dir } });
+    const push = (stdin) => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--push'], { cwd: dir, encoding: 'utf8', input: stdin, env: { ...process.env, CI: '', RMS_PRIVATE_TERMS_DIR: home } });
     writeFileSync(join(dir, 'a.md'), 'A clean line.\n'); git('add', '-A'); git('commit', '-qm', 'Clean', '--no-verify');
     const clean = git('rev-parse', 'HEAD').trim();
     assert.equal(push(`refs/heads/main ${clean} refs/heads/main ${'0'.repeat(40)}\n`).status, 0);
@@ -288,7 +295,7 @@ test('a push is refused for any commit it sends: its lines, its files, its autho
     assert.match(r.stderr, /Brand\.woff2 {2}a font file/);
     assert.match(r.stderr, /its author {2}a personal address/);
     assert.doesNotMatch(r.stderr, /a\.md/, 'a commit the remote already has is not checked again');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { rmSync(dir, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
 });
 
 test('a project name hashed here is refused as an identifier, with no list on the computer (the cloud, GitHub), and never in prose', async () => {
@@ -300,4 +307,130 @@ test('a project name hashed here is refused as an identifier, with no list on th
     assert.equal(termHits('a quokka and a tile'), 0, 'words apart in a sentence are not a name');
     assert.ok(privateFindings('import QuokkaTile from "./x"').some((f) => /own name/.test(f.kind) && !/quokka/i.test(f.what)), 'refused, without saying the name');
   } finally { FORBIDDEN_TERMS.delete(hash(name)); }
+});
+
+test('the hooks refuse while this computer\'s list was never said; one that holds none says so once; CI checks without it', () => {
+  const home = tempDir('terms-unsaid-'), dir = tempDir('terms-msg-');
+  try {
+    const msg = join(dir, 'MSG'); writeFileSync(msg, 'Fix the chip radius\n');
+    const run = (file, args, env) => spawnSync(process.execPath, [join(ROOT, '.githooks', file), ...args], { encoding: 'utf8', env: { ...process.env, RMS_PRIVATE_TERMS_DIR: home, ...env } });
+    const unsaid = run('private-check.mjs', ['--message', msg], { CI: '' });
+    assert.equal(unsaid.status, 1, 'knowing no project, it would refuse no one\'s and look green');
+    assert.match(unsaid.stderr, /no project names are known on this computer/);
+    assert.match(unsaid.stderr, /--none/);
+    assert.equal(run('private-check.mjs', ['--message', msg], { CI: 'true' }).status, 0, 'CI has no list by design: the hashed names are its own');
+    assert.equal(run('private-check.mjs', ['--text', msg], { CI: '' }).status, 0, 'reading a text is no gate');
+    assert.equal(run('private-terms.mjs', ['--none'], {}).status, 0);
+    assert.equal(run('private-check.mjs', ['--message', msg], { CI: '' }).status, 0, 'said once, the hooks check with no list');
+    // A computer that holds a project cannot say it holds none.
+    writeFileSync(join(home, 'private-projects.json'), JSON.stringify({ projects: [dir] }));
+    assert.equal(run('private-terms.mjs', ['--none'], {}).status, 2);
+  } finally { rmSync(home, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a project\'s people are its names too: each one\'s whole name and account, never a bot, a shared mailbox or this computer\'s own person', async () => {
+  const { authorsOf } = await import('../.githooks/private-terms.mjs');
+  const log = [
+    ['Acme Tester', 'acme.tester@acme.example'],
+    ['Acme Tester', 'atester@acme.example'],   // the same person again: once
+    ['dependabot[bot]', '49699333+dependabot[bot]@users.noreply.github.com'],
+    ['Build', 'build@acme.example'],
+    ['Owner Role', 'owner.role@example.com'],   // this computer's own person
+    ['Acme Designer', 'info@acme.example'],     // a shared mailbox gives no account
+  ].map((x) => x.join('\t')).join('\n');
+  const git = (args) => (args.includes('log') ? log : args.includes('user.name') ? 'Owner Role\n' : 'owner.role@example.com\n');
+  assert.deepEqual(authorsOf('/x', { git }), [{ name: 'Acme Tester', users: ['atester'] }, { name: 'Acme Designer', users: [] }], 'an account that is the name already adds nothing');
+  // In a project, the whole name is a term and words apart too, as a project's own name is.
+  const dir = tempDir('terms-people-');
+  try {
+    const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+    writeFileSync(join(dir, 'ds-config.json'), '{}');
+    g('init', '-q'); g('add', '-A'); g('-c', 'user.name=Acme Tester', '-c', 'user.email=acme.tester@acme.example', 'commit', '-qm', 'first');
+    const t = projectTerms(dir);
+    assert.ok(t.terms.has('acmetester'), [...t.terms.keys()].join(' '));
+    assert.ok(t.phrases.includes('acmetester'), 'matched in prose too, as words apart');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('hashing the names keeps every one already there and drops only what was allowed', () => {
+  const engine = tempDir('terms-engine-'), home = tempDir('terms-list-'), proj = tempDir('terms-proj-');
+  try {
+    execFileSync('mkdir', ['-p', join(engine, '.githooks')]);
+    for (const f of ['private-check.mjs', 'private-terms.mjs']) execFileSync('cp', [join(ROOT, '.githooks', f), join(engine, '.githooks', f)]);
+    const h = (x) => execFileSync(process.execPath, ['-e', `process.stdout.write(require('node:crypto').createHash('sha256').update(${JSON.stringify(x)}).digest('hex').slice(0, 16))`], { encoding: 'utf8' });
+    const file = join(engine, '.githooks', 'private-check.mjs');
+    const older = h('olderprojectword'), allowed = 'acmewidgetkit';
+    // A block that already holds a name from a project no longer on this computer, and one a person will allow.
+    const src = execFileSync('cat', [file], { encoding: 'utf8' }).replace(/(\/\/ BEGIN hashed project names\n)[\s\S]*?(\/\/ END hashed project names)/, `$1export const FORBIDDEN_TERMS = new Set([\n  '${older}',\n  '${h(allowed)}',\n]);\nexport const FORBIDDEN_PHRASES = new Set([]);\n$2`);
+    writeFileSync(file, src);
+    writeFileSync(join(proj, 'ds-config.json'), JSON.stringify({ name: 'Acme Widget Kit' }));
+    writeFileSync(join(home, 'private-projects.json'), JSON.stringify({ projects: [proj] }));
+    const env = { ...process.env, RMS_PRIVATE_TERMS_DIR: home };
+    spawnSync(process.execPath, [join(engine, '.githooks', 'private-terms.mjs'), '--allow', allowed], { env, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [join(engine, '.githooks', 'private-terms.mjs'), '--hashes'], { env, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const block = /BEGIN hashed project names\n([\s\S]*?)\/\/ END hashed project names/.exec(execFileSync('cat', [file], { encoding: 'utf8' }))[1];
+    assert.ok(block.includes(older), 'a name once refused is never forgotten');
+    assert.ok(!block.includes(h(allowed)), 'what a person allowed leaves the list');
+    assert.ok(block.includes(h('widget')) || block.split("'").length > 5, 'the project\'s own names came in');
+  } finally { for (const d of [engine, home, proj]) rmSync(d, { recursive: true, force: true }); }
+});
+
+test('a person by name or account is refused, invented ones too; a role, a typeface, a product and the owner are not', async () => {
+  const { privateFindings } = await import('../.githooks/private-check.mjs');
+  const person = (t) => privateFindings(t, { names: false }).filter((f) => f.kind === 'a person\'s name').map((f) => f.what);
+  const first = j('Mari', 'ana'), last = j('Quo', 'kka');   // a common first name and an invented surname
+  assert.deepEqual(person(`Reviewed by ${first} ${last}.`), [`${first} ${last}`]);
+  assert.deepEqual(person(`Signed ${first} da ${last}.`), [`${first} da ${last}`], 'with a particle');
+  assert.deepEqual(person(`the account ${first.toLowerCase()}.${last.toLowerCase()} committed it`), [`${first.toLowerCase()}.${last.toLowerCase()}`]);
+  assert.deepEqual(person(`under ${first.toLowerCase()}_${last.toLowerCase()} too`), [`${first.toLowerCase()}.${last.toLowerCase()}`]);
+  for (const fine of ['the QA Lead signs it', 'qa.lead commits', `set in ${j('Sof', 'ia')} Pro`, 'Max Width and Will Change', 'Design Tokens', `${first.toLowerCase()}.${last.toLowerCase()}@example.com`, `files/${first.toLowerCase()}.json`]) assert.deepEqual(person(fine), [], fine);
+});
+
+test('a pull request lists the names its changes add, and opens only once they were read', () => {
+  const remote = tempDir('pr-names-remote-'), dir = tempDir('pr-names-'), home = noneHome();
+  try {
+    const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main'], { cwd: remote });
+    git('init', '-q', '-b', 'main'); git('config', 'user.email', 'qa@example.com'); git('config', 'user.name', 'QA');
+    execFileSync('mkdir', ['-p', join(dir, '.githooks')]);
+    for (const f of ['private-check.mjs', 'private-terms.mjs']) execFileSync('cp', [join(ROOT, '.githooks', f), join(dir, '.githooks', f)]);
+    writeFileSync(join(dir, 'a.md'), 'A clean line.\n'); git('add', '-A'); git('commit', '-qm', 'base', '--no-verify');
+    git('remote', 'add', 'origin', remote); git('push', '-q', 'origin', 'main');
+    git('switch', '-q', '-c', 'change');
+    const company = `${j('Nor', 'thwind')} ${j('Tra', 'ders')}`;   // invented, as the rules ask
+    writeFileSync(join(dir, 'b.md'), `Built for ${company}.\n`); git('add', '-A'); git('commit', '-qm', 'change', '--no-verify');
+    const body = join(dir, 'BODY'); writeFileSync(body, 'A change.\n');
+    const pr = (...more) => spawnSync(process.execPath, [join(dir, '.githooks', 'private-check.mjs'), '--pr', '--title', 'A change', '--body', body, ...more, '--', '--base', 'main'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '', PATH: process.env.PATH.split(':').filter((p) => !/gh|homebrew|local/.test(p)).join(':'), RMS_PRIVATE_TERMS_DIR: home } });
+    const unread = pr();
+    assert.equal(unread.status, 3, unread.stderr);
+    assert.match(unread.stderr, new RegExp(company));
+    assert.notEqual(pr('--names-read').status, 3, 'read: it goes on to open the pull request');
+  } finally { for (const d of [remote, dir, home]) rmSync(d, { recursive: true, force: true }); }
+});
+
+test('the company a project is for is one of its names: said once here or read from its profile, asked once, and only where the list is kept', async () => {
+  const home = tempDir('terms-company-'), proj = tempDir('terms-company-proj-');
+  const was = process.env.RMS_PRIVATE_TERMS_DIR;
+  process.env.RMS_PRIVATE_TERMS_DIR = home;
+  try {
+    const m = await import('../.githooks/private-terms.mjs');
+    writeFileSync(join(proj, 'ds-config.json'), '{}');
+    assert.equal(m.askCompany(proj), false, 'a computer that keeps no list is never asked');
+    writeFileSync(join(home, 'private-projects.json'), JSON.stringify({ projects: [realpathSync(proj)] }));
+    assert.equal(m.askCompany(proj), true, 'a project it remembers, with no company said');
+    assert.equal(m.askCompany(proj), false, 'asked once');
+    const company = `${j('North', 'wind')} ${j('Hold', 'ings')}`;   // invented, as the rules ask
+    assert.equal(m.rememberCompany(proj, company), true);
+    assert.deepEqual(m.companyNames(proj), [company]);
+    const t = m.projectTerms(proj);
+    assert.ok(t.terms.has(j('northwind', 'holdings')), 'the whole name');
+    assert.ok(t.phrases.includes(j('northwind', 'holdings')), 'and as words apart, in prose');
+    writeFileSync(join(proj, 'design-system-engine-profile.json'), JSON.stringify({ profile: 1, name: j('Quokka', ' Labs'), client: j('quokka', 'labs') }));
+    assert.deepEqual(m.companyNames(proj), [company, j('Quokka', ' Labs'), j('quokka', 'labs')], 'a profile says what the team calls it');
+    assert.ok(!JSON.stringify(m.projectTerms(proj)).includes('undefined'));
+  } finally {
+    if (was === undefined) delete process.env.RMS_PRIVATE_TERMS_DIR; else process.env.RMS_PRIVATE_TERMS_DIR = was;
+    for (const d of [home, proj]) rmSync(d, { recursive: true, force: true });
+  }
 });

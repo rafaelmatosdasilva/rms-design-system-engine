@@ -45,10 +45,10 @@ test('every snapshot is beside the token CSS; the system\'s own scripts and the 
 test('the products checked out beside the system are the folders whose package depends on it; one it lists and lacks is said', () => {
   const parent = tempDir('setup-products-');
   const ds = join(parent, 'tidal-ds');
-  put(ds, 'package.json', { name: '@tidal/ds-core' });
+  put(ds, 'package.json', { name: '@tidal/ds-kit' });
   put(ds, '.git/config', '[remote "origin"]\n\turl = https://github.com/tidal-co/tidal-ds.git\n');
   put(ds, 'products.json', { products: [{ repo: 'tidal-co/tidal-app-harbor' }, { repo: 'tidal-co/tidal-app-kelp' }, { repo: 'tidal-co/tidal-app-reef' }] });
-  put(join(parent, 'tidal-app-harbor'), 'package.json', { dependencies: { '@tidal/ds-core': 'github:tidal-co/tidal-ds#v1.2.0' } });
+  put(join(parent, 'tidal-app-harbor'), 'package.json', { dependencies: { '@tidal/ds-kit': 'github:tidal-co/tidal-ds#v1.2.0' } });
   put(join(parent, 'tidal-app-harbor'), 'ui.src.html', '<style>.a{}</style>');
   put(join(parent, 'tidal-app-kelp'), 'package.json', { devDependencies: { 'tidal-ui': 'github:tidal-co/tidal-ds' } });
   put(join(parent, 'tidal-app-kelp'), 'src/ui.src.html', '<style>.a{}</style>');
@@ -73,12 +73,12 @@ test('the frames and screens a captured screen snapshot names: each product\'s w
 test('setup writes what the project says into ds-config.json', () => {
   const parent = tempDir('setup-writes-');
   const ds = join(parent, 'tidal-ds');
-  put(ds, 'package.json', { name: '@tidal/ds-core' });
+  put(ds, 'package.json', { name: '@tidal/ds-kit' });
   put(ds, 'src/theme.css', ':root { --button-iconText: #000; --button-background: #fff; --gap-m: 8px }\n@media (prefers-color-scheme: dark) { :root { --button-iconText: #fff } }');
   put(ds, 'src/figma-vars.snapshot.json', vars(['button/iconText/color', 'button/background/color']));
   put(ds, 'src/figma-screen-components.snapshot.json', { screens: { '1:2': { name: 'Harbor', plugin: 'harbor' }, '3:4': { name: 'Harbor — Export', plugin: 'harbor' } } });
   put(ds, 'src/shared.js', 'document.addEventListener("click", () => {});');
-  put(join(parent, 'tidal-harbor'), 'package.json', { dependencies: { '@tidal/ds-core': '^1' } });
+  put(join(parent, 'tidal-harbor'), 'package.json', { dependencies: { '@tidal/ds-kit': '^1' } });
   put(join(parent, 'tidal-harbor'), 'ui.src.html', '<style>.a{}</style>');
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--project=.', '--no-hooks'], { cwd: ds, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);

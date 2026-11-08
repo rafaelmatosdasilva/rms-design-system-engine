@@ -320,11 +320,11 @@ an explicit set, but derivation is the default and the point.
 
 ### Exact-name mode (`iconCheck.exactName`)
 
-By default the gate accepts any faithful suffix of a namespaced DS name - `Icon/var/color`
-passes as `#icon-color` or `#icon-var-color`. When a project sets
+By default the gate accepts any faithful suffix of a namespaced DS name - `Icon/fill/color`
+passes as `#icon-color` or `#icon-fill-color`. When a project sets
 `iconCheck.exactName: true`, the sprite id must be the **exact** full Figma component
-name (kebab-cased, `Icon-` → `icon-`), with no short forms. `Icon-object-text` must be
-`#icon-object-text`, never `#icon-text`. Use this when the DS carries one canonical name
+name (kebab-cased, `Icon-` → `icon-`), with no short forms. `Icon-note-text` must be
+`#icon-note-text`, never `#icon-text`. Use this when the DS carries one canonical name
 per icon and you never want a component silently aliased behind a shorter id. Deliberate
 exceptions - one component reused at two sizes for two roles - still declare
 `idDiffersFromDsName`.

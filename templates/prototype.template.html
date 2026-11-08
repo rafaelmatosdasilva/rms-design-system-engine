@@ -268,7 +268,7 @@ html, body { margin: 0; }
       if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') { if (!x.value) x.placeholder = v; } else x.textContent = v;
     });
   }
-  // A swapped-in icon (iconContent: Icon-var-color) drawn from the system's icon sheet: into the component's empty icon
+  // A swapped-in icon (iconContent: Icon-fill-color) drawn from the system's icon sheet: into the component's empty icon
   // part, else in place of its first icon. One the sheet does not have leaves the part as the code draws it.
   function swapIcons(e, c, p) {
     Object.keys(c.slotProps || {}).forEach(function (k) {

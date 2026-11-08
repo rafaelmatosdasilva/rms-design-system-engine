@@ -27,13 +27,26 @@ Five layers refuse anything private, each catching what the one before may miss:
    `--no-verify`.
 3. **The names of the projects on this computer.** `.githooks/private-terms.mjs` reads, from each project the engine
    ran on, the names its people chose (components, properties and options, token paths, modes, brands, fonts,
-   pages, icons) and its own (project, package, repository, hosts, Figma keys), and keeps them on this computer only
-   (`~/.config/rms-engine/`, or `RMS_PRIVATE_TERMS_DIR`), never in the repository. Every check refuses them, so a new
-   client is covered from its first run, unasked. Plain words, CSS words and names every system writes
-   (buttonPrimary) are never a project's. A project is remembered when the engine runs on it from a checkout with
-   the hooks on; `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there,
-   `--review` lists the names the engine's files already carry, and `--allow <name>` marks one as the engine's own
-   (only a generic one: rename anything specific).
+   pages, icons), its own (project, package, repository, hosts, Figma keys) and its people (everyone in its git
+   history, by the name they sign with and each account their address starts with; never a bot, a shared mailbox or
+   whoever commits from the engine's checkout here). It keeps them on this computer only (`~/.config/rms-engine/`, or
+   `RMS_PRIVATE_TERMS_DIR`), never in the repository. Every check refuses them, so a new client is covered from its
+   first run, unasked. Plain words, CSS words and names every system writes (buttonPrimary) are never a project's.
+   - **Remembered on every run.** On a computer that keeps the list, or whose engine checkout runs the privacy hooks,
+     every run of the engine remembers its project, the installed copy's runs included.
+     `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there (a folder of projects, never
+     one that holds the engine: its test fixtures are projects too), `--add <folder>` one at a time.
+   - **The company it is for.** Its legal name is often in no file: on such a computer the engine asks once for each
+     project it remembers (a NEXT line for the agent), and `--company "<its legal name>" [<the project's folder>]`
+     keeps the answer here, never in the project's files. A project's profile gives what the team calls the company
+     (its `name` and `client`) unasked.
+   - **Never silently empty.** A commit, its message, a push and a pull request are refused while the list has never
+     been said: knowing no project, the check would refuse no one's names and still pass. A computer that holds no one's
+     project says so once with `--none`. CI has no list by design: the hashed names are its own.
+   - `--review` lists the names the engine's files already carry, and `--allow <name>` marks one as the engine's own
+     (only a generic one: rename anything specific, as the rules above ask of every example).
+   - `--hashes` writes the list into the hashed names GitHub's check reads. It adds to them and forgets none: a name
+     from a project no longer on this computer stays refused. Only what was allowed here leaves.
 4. **The patterns.** Whatever the project: a Figma file key (other than the placeholder, the owner's public board
    and the fictional fixture's), a company host (gitlab.…, jira.…, \*.internal, a private IP), a path on someone's
    computer (/Users/name, /home/name, C:\\Users\\name; placeholders such as /Users/me are fine), a secret (figd\_,
@@ -43,6 +56,16 @@ Five layers refuse anything private, each catching what the one before may miss:
    a pull request brings, and on a pull request's title and description; the `main` ruleset requires it before
    anything merges. GitHub's secret scanning and push protection are on.
 
+- **People, by name.** A common first name (Portuguese or English) with a capitalised surname, a particle between
+  them or not, or an account made of the two (`name.surname`, `name_surname`), is refused wherever it is written: the
+  repository writes roles, never people, invented ones included. A first name that is a plain or a design word (Will,
+  Max, Grace) and a typeface (a name followed by Sans, Pro, Mono…) are not on the list. The owner, whom the licence
+  names, is the one exception.
+- **A pull request's names, read before it opens.** `node .githooks/private-check.mjs --pr --title "…" --body FILE
+  [-- gh arguments]` lists every pair of capitalised words the branch adds, its title and description included, unless
+  both are plain words (a word counts as plain only where the dictionary has it in lower case) or one is a product the
+  engine works with. Nothing opens until they were read: say a person or a company generically, or run it again with
+  `--names-read` once none is one. It is how a name no list knows is caught.
 - `test/no-testbed-names.test.mjs` runs the check on the whole repository with the suite and plants one case of each
   kind (`node .githooks/private-check.mjs --records` also reads the evaluation records).
 - A private name the hashed list should know (a client's own name, the backlog's) goes in as a hash (the first 16 hex
