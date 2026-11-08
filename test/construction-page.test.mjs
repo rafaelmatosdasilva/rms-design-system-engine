@@ -103,12 +103,12 @@ test('both sides in one view, the grammar\'s first; nothing on either side, no p
 test('the page: in the menu by default, one table whose heads sort, chips for what is left to do', () => {
   const tpl = templateText();
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// Changes in Figma: each change made'));
-  assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'Side', 'Follow it', 'Owned by', 'Status'], 'one head a column, each sorting by it; no To do column');
+  assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'Source', 'Follow it', 'Owned by', 'Status'], 'one head a column, each sorting by it; no To do column');
   assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
   assert.match(page, /sortDir = sortKey === key \? -sortDir : 1;/, 'the same head again sorts the other way round');
   assert.ok(!/data-chip-group=/.test(page), 'which side a rule is on is a column, never a chip');
   assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'which side a rule is on is a filter of its own, never a chip beside the statuses');
-  assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['area', 'Area'], ['side', 'Side']], 'the area and the side are lists');
+  assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['area', 'Area'], ['source', 'Source']], 'the area and where it was read from are lists');
   assert.match(page, /var cxStatusChips = \['fix', 'decide', 'rule'\]\.map\(function \(k\) \{ return \{ key: k, label: ST\[k\]\[1\], dot: ST\[k\]\[0\]/, 'each status a chip of its own, with its dot, read without opening a list');
   assert.match(page, /data-f data-f-area="' \+ esc\(AREA\[r\.area\] \|\| capital\(r\.area\)\)/, 'every row says its values to the filter');
   assert.match(page, /card\(r\.status === 'rule' \? 'Nothing to change' : 'Suggested change', suggest \+ ways \+ list \+ decide\)/, 'what is suggested, what it changes and the decision are one card, the decision under the draft');
