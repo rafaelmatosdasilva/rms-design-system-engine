@@ -1,10 +1,10 @@
 // Step 6 of the code capture: component APIs, icons, markup and nesting. Known-answer fixtures
 // made up for these tests. The TypeScript case runs when a TypeScript compiler can be resolved
-// (TS_FOR_TESTS=<dir with node_modules/typescript>, or one installed next to the engine).
+// (TS_FOR_TESTS=<dir with node_modules/typescript>, else the test tools' own in test/.ci-tools: typescriptRoot).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, typescriptRoot } from './helpers.mjs';
 import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../lib/component-source.mjs';
 import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../lib/component-api.mjs';
 import { symbolsIn, iconRefs, iconUsage } from '../lib/icon-source.mjs';
@@ -15,7 +15,7 @@ import { findChrome } from '../lib/cdp.mjs';
 import { usableTypeScript } from '../lib/project-typescript.mjs';
 
 const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'undefined';
-const TS = loadTypeScript(process.env.TS_FOR_TESTS ?? process.cwd());
+const TS = loadTypeScript(typescriptRoot());
 
 // ── Component source ──────────────────────────────────────────────────────────
 test('source: the file finder prefers componentFiles, then a declared file, then the shared pairing (name, class, selector…)', () => {
