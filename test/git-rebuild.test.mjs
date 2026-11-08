@@ -4,10 +4,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { pageOf, shouldRebuild, childEnv, startRebuild, rebuildLoop, quickBuild, startedText, LOCK, AGAIN, LOG } from '../lib/git-rebuild.mjs';
+import { pageOf, shouldRebuild, childEnv, startRebuild, rebuildLoop, quickBuild, startedText, LOCK, AGAIN, LOG, pageBehind, rebuildIfBehind } from '../lib/git-rebuild.mjs';
+import { codeOf, stampMeta } from '../lib/stamp.mjs';
 import { installGitHooks, gitHooksStatus } from '../lib/hooks-install.mjs';
 import { makeFixture, budget } from './helpers.mjs';
 
@@ -153,4 +154,61 @@ test('the command: an event outside a project passes, a wrong one says how it is
   const bad = run(['--git-rebuild', 'push'], makeFixture({ 'ds-config.json': {} }));
   assert.equal(bad.status, 2);
   assert.match(bad.stdout, /--git-rebuild commit\|merge\|rewrite/);
+});
+
+// A project that is no git repository: its code taken from GitLab (the commit it was taken at kept beside it), its
+// engine updated from GitHub. Its page is held to what it was built from instead.
+function gitlabProject(sha) {
+  const dir = makeFixture({ 'ds-config.json': {}, '.gitlab-source.json': { ref: 'master', sha } });
+  return dir;
+}
+function engineRepo() {
+  const dir = makeFixture({ 'a.txt': 'one\n' });
+  git(dir, 'init', '-q', '-b', 'main'); git(dir, 'add', '-A'); git(dir, 'commit', '-q', '-m', 'one');
+  const first = git(dir, 'rev-parse', 'HEAD').trim();
+  writeFileSync(join(dir, 'a.txt'), 'two\n'); git(dir, 'commit', '-qam', 'two');
+  return { dir, first, now: git(dir, 'rev-parse', 'HEAD').trim() };
+}
+
+test('the code a page is built from, where the project is no git repository: the commit it was taken from GitLab at', () => {
+  assert.equal(codeOf(gitlabProject('5daebd9')).commit, '5daebd9');
+  assert.equal(codeOf(makeFixture({})).commit, null, 'neither git nor taken from GitLab: unknown, as before');
+});
+
+test('a page is behind when the engine moved on or the code is another commit; never for an older or an unrelated engine', () => {
+  const e = engineRepo(), dir = gitlabProject('code-new');
+  const at = (stamp) => pageBehind(dir, {}, { engineDir: e.dir, stamp });
+  assert.deepEqual(at({ engine: e.now, code: 'code-new' }), { behind: false, why: [] });
+  assert.deepEqual(at({ engine: e.first, code: 'code-new' }), { behind: true, why: ['the engine'] }, 'the engine moved on since');
+  assert.deepEqual(at({ engine: e.now, code: 'code-old' }), { behind: true, why: ['the code'] }, 'the code moved since');
+  assert.deepEqual(at({ engine: e.now, code: null }), { behind: true, why: ['the code'] }, 'built before it could say its code: once more');
+  assert.equal(at({ engine: '1'.repeat(40), code: 'code-new' }).behind, false, 'an engine this one cannot place: another checkout, never rebuilt over');
+  assert.equal(at(null).behind, false, 'no page, or one with no stamp: nothing to hold it to');
+});
+
+test('a behind page is built again only where one was built, never on CI, with hooks off, or while one builds', () => {
+  const e = engineRepo(), dir = gitlabProject('code-new');
+  let spawned = 0;
+  const spawn = () => { spawned++; return { pid: 1, unref() {} }; };
+  const run = (o = {}) => rebuildIfBehind(dir, { cfg: {}, env: {}, script: '/engine/lib/audit.mjs', engineDir: e.dir, spawn, ...o });
+  assert.equal(run().started, false, 'no page built here yet');
+  page(dir); writeFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), `<html><head>${stampMeta({ engine: e.first, code: 'code-old' })}</head></html>`);
+  assert.equal(run({ env: { CI: 'true' } }).started, false);
+  assert.equal(run({ cfg: { hooks: false } }).started, false);
+  writeFileSync(join(dir, LOCK), '{}');
+  assert.equal(run().started, false, 'one builds already');
+  rmSync(join(dir, LOCK));
+  const r = run();
+  assert.deepEqual(r, { started: true, why: ['the engine', 'the code'] });
+  assert.equal(spawned, 1);
+});
+
+test('at the end of a turn in a project that is no git repository, a page built from other code is built again', { timeout: budget(120000) }, async () => {
+  const dir = gitlabProject('code-new');
+  page(dir); writeFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), `<html><head>${stampMeta({ engine: null, code: 'code-old' })}</head></html>`);
+  const r = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ hook_event_name: 'Stop', cwd: dir, session_id: 's' }), encoding: 'utf8', env: ENV });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(await settled(dir), 'the build ends on its own');
+  const now = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
+  assert.match(now, /code&quot;:&quot;code-new&quot;/, 'the page now says the code it was built from');
 });
