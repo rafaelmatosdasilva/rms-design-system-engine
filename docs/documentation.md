@@ -238,7 +238,7 @@ Name your base branch where it says `main`. To post the report on the pull reque
 
 ## Gather usage guidelines
 
-The intent layer says why each component exists, when to use it and when not, and what was decided. The engine writes what it is sure of; what needs judgement is a draft, and a person reviews and approves it.
+The intent layer says why each component exists, when to use it and when not, and what was decided. It gathers from three places: your own pages wherever they live, Figma's descriptions and notes, and the comments your engineers wrote in the code. The engine writes what it is sure of; what needs judgement is a draft, and a person reviews and approves it.
 
 ### What the engine is sure of, it writes
 
@@ -296,7 +296,7 @@ A component with no page gives agents nothing to read. The engine ranks those co
 - **The list.** `rms-design-system-engine --pages-to-write` prints it, most used first. On the Documentation page, the chip "Pages to write, most used first" shows the same rows in the same order, and each row says its rank and where it is used.
 - **Documented elsewhere is left out.** A component documented in another page, a part of another component, and an icon or sub-part that only sits inside a documented component are listed apart, with why.
 - **The first ones are started.** Each run that writes the layer starts pages for the first 10 the products use (`intentLayer.startPages`, `0` for none), beside their siblings, as a yes to writing a page would.
-- **Drafted from the contract.** What it is for comes from its description. When to use it comes from the products that use it, the values its props take, its states and what it holds. Each line is a draft, never your team's words, and each passes the content check first.
+- **Drafted from the contract.** What it is for comes from its description, wherever that was read: your own words, the component's own comment in its code, or Figma ([what a contract says it is for](#what-a-contract-says-it-is-for)). When to use it comes from the products that use it, the values its props take, its states and what it holds. Each line is a draft, never your team's words, and each passes the content check first.
 
 ### Parts are not components
 

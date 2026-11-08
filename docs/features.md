@@ -8,8 +8,8 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Check your Figma library](#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built differently from the rest. | Ready to use |
-| [Lint your codebase](#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours and copied components across your code, and stops a push that adds them. | Ready to use |
+| [Check your Figma library](#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built against your library's own rules. | Ready to use |
+| [Lint your codebase](#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours, copied components and breaks in your own rules, and stops a push that adds them. | Ready to use |
 | [Compare Figma and code](#compare-figma-and-code) | A deep design-code parity check of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
 | [Test accessibility](#test-accessibility) | Tests contrast, keyboard focus, touch targets and zoom on every component, in a real browser. | Early development |
 
@@ -18,7 +18,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | Feature | What it does | Status |
 |---|---|---|
 | [Write component specs](#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | Ready to use |
-| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, which says why each component exists and when to use it, gathered from Figma's descriptions and notes and your docs. | Ready to use |
+| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs, and drafted where missing. | Ready to use |
 | [Annotate Figma from the code](#annotate-figma-from-the-code) | Writes accessibility specs, pins problems on your screens and links each component to its code, after you approve. | Coming soon |
 
 ### Collaboration
@@ -90,6 +90,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 **In your apps' code**
 
+- Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Flags CSS variables and text casing the design never asked for.
@@ -203,6 +204,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: it reads DSDS or Markdown and MDX pages from GitLab, GitHub (Enterprise too) or a folder in your project, and pages kept in Notion or Confluence. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. Notion and Confluence are only read: each fix is listed for a person to make there. The engine writes only what it is sure of. Everything else is a draft for a person to approve.*
 
 - Reads your documentation where it already lives: a docs folder, a documentation site's pages, the `.mdx` beside each component, or a Notion or Confluence page and the pages under it. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
+- Reads what your engineers wrote in the code too: a component's own comment and the doc comments above its props, used where your pages and Figma say nothing.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
 - Writes what it is sure of, such as the element a component renders, and drafts the rest, such as an example, for a person to approve.
 - Drafts an example on each page that shows none: the call the products write most, in the code's own syntax, with only what the contract has and where it came from.
