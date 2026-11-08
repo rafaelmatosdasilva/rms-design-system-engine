@@ -2,6 +2,23 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: One Construction page for Figma and the code, in the menu (continuous evaluation)
+
+What changed since the entry below (engine 614cccd): A local style guide with no git under it keeps up with the engine and the code (#348); The guide says History is one table of changes, and names intentLayer.noDrafts (#351); Update README.md (#350); One Construction page for Figma and the code, in the menu. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `e1bd76ffc0d7` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 4944f4bb` `cookbook/figma-edits.md 469513fc` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md aabbcc45` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2b6caff4` `reference/gates.md a8e75b2a` `reference/maintainers.md 082b6dd0` `reference/personality.md 7f1584bf` `reference/usage.md 3f79643b` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 7345c71 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 78/79 | 79/79 |
+| Mean cost a run | $0.061 | $0.056 |
+| Input a run | 107k | 97k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 107k. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/one-construction-page`.
+
 ## 2026-11: The guide says History is one table of changes, names intentLayer.noDrafts, and Figma beside the code is off unless asked (continuous evaluation)
 
 What changed since the entry below (engine c4f386e): The features in four groups, named for what each does, and the README as their index (#346); The privacy check knows a project's people and company, and reads a pull request's names (#347); The guide says History is one table of changes, and Figma beside the code is off unless asked; The guide names intentLayer.noDrafts. The guide changed in `reference/config.md`, `reference/usage.md`.
