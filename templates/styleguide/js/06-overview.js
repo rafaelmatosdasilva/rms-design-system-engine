@@ -19,6 +19,10 @@
   // Each group says what it holds (styleguide.groups in ds-config.json words it your way).
   function group(title, desc, n) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + (n != null ? countHTML(n) : '') + '</h3>';   /* the group's name only: the cards say the rest */ var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
   var GROUPS = DATA.groups || {};
+  // The components the index page shows, one card each, and the number its group says: decided once, here. The
+  // code's own components, each one that is not a part of a bigger one; one the code has only as a CSS class is not
+  // a component of the code yet, and is on Status alone, where its Code cell says what to do about it.
+  var SHOWN = COMPONENTS.filter(function (c) { return !cssOnly(c) && !partOfAnother(c); }).sort(function (a, b) { return a.name.localeCompare(b.name); });
   // How ready it is, as a small label: only what the team said, never a guess.
   function statusPill(st) { return st ? '<span class="sg-status sg-status--' + esc(st.kind) + '">' + esc(st.status) + '</span>' : ''; }
   // What a component's header and its card say at a glance, from what the page already holds: the release its last
@@ -70,7 +74,7 @@
   // A text style's sample: a line in small letters and capitals with figures and signs, told with the system's own
   // counts (never a project's name), then its capitals and figures.
   var SPECIMEN = (function () {
-    var n = function (v) { return Number(v || 0).toLocaleString('en'); }, comps = COMPONENTS.length, styles = (TOKENS.typography || []).length, icons = (DATA.icons || []).length;
+    var n = function (v) { return Number(v || 0).toLocaleString('en'); }, comps = SHOWN.length, styles = (TOKENS.typography || []).length, icons = (DATA.icons || []).length;
     return comps && styles ? 'Quick fox: ' + n(comps) + ' components, ' + n(styles) + ' text styles' + (icons ? ' & ' + n(icons) + ' icons' : '') + '. Zero lazy dogs, 100% system!' : 'Jackdaws love my big sphinx of quartz: 1,234,567,890 times!';
   })();
   // An easing as its curve's four numbers: the browser's named ones, or the cubic-bezier the code writes.
@@ -95,14 +99,14 @@
   }
   if (MOT && (MOT.overview || []).length) card(fGrid, 'motion', 'Foundations', 'motion', motTimings ? motTimings + (motTimings === 1 ? ' timing' : ' timings') + ' the components move with.' : motN + ' duration and easing tokens.', motionThumb());
   if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
-  var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.', COMPONENTS.length) : null;
+  var cGrid = SHOWN.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.', SHOWN.length) : null;
   // Its Figma description, else its note, else the props it offers.
   var about = function (c) {
     var d = (c.description || '').replace(/@\w+/g, '').trim() || (c.note || '').trim(); if (d) return d;
     var ps = (c.controls || []).map(function (p) { return p.label; });
     return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
   };
-  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { if (!parentOf(c.name)) card(cGrid, cid(c.name), 'Components', c.name, about(c), '', c.status); });   // its card: the thumbnail and the name only
+  SHOWN.forEach(function (c) { card(cGrid, cid(c.name), 'Components', c.name, about(c), '', c.status); });   // its card: the thumbnail and the name only
   // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it. Never with ?all:
   // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
