@@ -54,8 +54,3 @@ body:
       description: Existing options, other tools, a workaround, and why each falls short.
     validations:
       required: false
-
-  - type: markdown
-    attributes:
-      value: |
-        **On pull requests:** please don't open one for this yet. If this is a yes, that is said here first, and then a pull request is welcome. [CONTRIBUTING.md](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/CONTRIBUTING.md) says why.

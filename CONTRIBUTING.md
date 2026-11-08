@@ -1,22 +1,39 @@
 # Contributing
 
-The engine has one maintainer. The way to take part is to **open an issue**: a problem you ran into, something you want it to do, a place the documentation is wrong. Every issue is read and answered.
+The way to take part is to **open an issue**. Tell us what broke, what you need, or where the documentation is wrong. Every issue is read and answered.
 
-Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). How decisions are made is in [GOVERNANCE.md](GOVERNANCE.md), and where the engine is going in [ROADMAP.md](ROADMAP.md).
+The engine is built by one maintainer, so pull requests are not accepted.
 
-## Report a problem or ask for something
+## Open an issue
 
-[Open an issue.](https://github.com/rafaelmatosdasilva/rms-design-system-engine/issues/new/choose) The templates ask for what the answer depends on: what you ran, what you expected, what happened instead, and the run's output.
+[Open an issue](https://github.com/rafaelmatosdasilva/rms-design-system-engine/issues/new/choose) and pick the form that fits:
 
-A security problem goes through the Security tab instead, never an issue. [SECURITY.md](SECURITY.md) says how, and what is worth reporting.
+| Form | Use it when |
+|---|---|
+| **Something is broken** | The engine did something other than what it says it does. |
+| **Ask for something** | You need a new feature, a check, a setting, or a change to how something works. |
+| **The documentation is wrong** | A page says something the engine doesn't do, or has a typo or a broken link. |
+| **An accessibility barrier** | Something the engine makes can't be used with a screen reader, the keyboard, zoom, high contrast or reduced motion. |
+
+A few things that help:
+
+- **One thing per issue.**
+- **Look first.** It may already be asked, or on the [roadmap](ROADMAP.md).
+- **Say what you were trying to do,** not only the feature you have in mind.
+- **Keep it anonymous.** Replace any client, product, person or host name with an invented one.
+
+Not an issue:
+
+- **A question** about using it goes to [Discussions](https://github.com/rafaelmatosdasilva/rms-design-system-engine/discussions).
+- **A security problem** goes through the Security tab, privately. [SECURITY.md](SECURITY.md) says how.
 
 ## What happens to your issue
 
-**You get a first answer within a week.** Every issue is read, and every one gets a reply, a no included.
+**You get a first answer within a week.** Every issue gets a reply, a no included.
 
-Each form asks **which part** of the [features page](docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`), so issues are sorted by the same names you read there.
+Each form asks **which part** of the [features page](docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`).
 
-Where an issue stands is said by one label at a time:
+Where an issue stands:
 
 | Label | What it means |
 |---|---|
@@ -27,7 +44,7 @@ Where an issue stands is said by one label at a time:
 | `wontfix` | Declined. The comment always says why. |
 | `duplicate` | Already asked. The comment links the issue that carries it on. |
 
-How soon it is worked on is its priority:
+How soon it is worked on:
 
 | Label | When |
 |---|---|
@@ -37,19 +54,14 @@ How soon it is worked on is its priority:
 
 A fix reaches you the day after it is merged: every install updates itself once a day.
 
-## About pull requests
+## Pull requests
 
-**Unsolicited pull requests are not merged.** Not because the work isn't welcome, but because a change to the engine carries a test, its documentation and a release label, and deciding whether a change belongs at all is the maintainer's job. A pull request that arrives before that decision is work spent on an answer that may be no.
-
-So:
-
-- **A typo, a broken link, a wrong command in the docs.** Just send it. These need no discussion.
-- **Anything else.** Open an issue first. If the answer is yes, that is said in the issue, and a pull request is then welcome.
-
-A pull request opened without that is closed with a pointer to this file. Nothing about it is personal.
+Pull requests are not accepted, a typo fix included: open an issue instead, and it is fixed here. A pull request is closed with a link to this page. Nothing about it is personal.
 
 ## Forking
 
-Forking is encouraged and the [MIT license](LICENSE) covers it. Take the engine, change it, run your own version, build something else from it. That is a different thing from sending the change back here, and only the second one is by invitation.
+You are free to fork the engine under its [MIT license](LICENSE): change it, run your own version, build something else from it. Your fork is yours, and its changes stay there. [docs/development.md](docs/development.md) explains how the repository is laid out and tested.
 
-If you fork to work on the engine itself, [docs/development.md](docs/development.md) has the repository's layout, how to run the tests, and what a change has to satisfy.
+## Code of conduct
+
+Everyone in issues and discussions follows the [code of conduct](CODE_OF_CONDUCT.md): be respectful, and criticise ideas, not people.
