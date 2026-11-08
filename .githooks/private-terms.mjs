@@ -48,6 +48,41 @@ export function rememberProject(dir) {
   } catch { return false; }
 }
 
+// What this computer's list says: 'known' (projects remembered), 'none' (said to hold none, with --none) or 'empty'
+// (said neither: a check here would refuse no one's names and not know it, so the hooks refuse until it is said).
+export function listState() {
+  const p = readJson(PROJECTS(), null);
+  if ((p?.projects ?? []).length) return 'known';
+  return p?.none ? 'none' : 'empty';
+}
+// Whether this computer keeps a list at all: then every run of the engine remembers its project, whichever checkout runs.
+export const keepsList = () => existsSync(PROJECTS());
+
+// ── A project's people ────────────────────────────────────────────────────────────────────────────────────────────
+// Everyone who committed to a project, by the name they sign with and the account their address starts with: a name
+// from a project's history once reached the engine's public files as an example, and nothing here knew it. A bot is no
+// person, a shared mailbox (info@, dev@) is no one's name, and this computer's own person is the one writing.
+const BOT = /\[bot\]|^(dependabot|renovate|github-actions|gitlab-bot|semantic-release|greenkeeper|snyk)\b|@(users\.)?noreply\.github(usercontent)?\.com$/i;
+const MAILBOX = /^(info|dev|devs|admin|noreply|no-reply|root|git|ci|cd|build|builds|team|hello|contact|support|design|deploy|release|bot)$/i;
+export function authorsOf(root, { git = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }) } = {}) {
+  let log = '';
+  try { log = git(['-C', root, 'log', '--all', '--format=%an%x09%ae']); } catch { return []; }
+  // This computer's own person: who commits from the engine's checkout here, set there or for the whole computer.
+  const self = new Set(), engine = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  for (const k of ['user.name', 'user.email']) { try { const v = git(['-C', engine, 'config', k]).trim(); if (v) self.add(norm(v)); } catch { /* none set */ } }
+  const out = new Map();
+  for (const line of log.split('\n')) {
+    const [name = '', email = ''] = line.split('\t');
+    if (!name.trim() || BOT.test(name) || BOT.test(email) || MAILBOX.test(name.trim()) || self.has(norm(name)) || self.has(norm(email))) continue;
+    // One person, every account they committed from (the name they sign with is a term already).
+    const a = out.get(norm(name)) ?? { name: name.trim(), users: [] };
+    const local = email.split('@')[0] ?? '';
+    if (!MAILBOX.test(local) && norm(local).length >= 4 && norm(local) !== norm(name) && !a.users.includes(local)) a.users.push(local);
+    out.set(norm(name), a);
+  }
+  return [...out.values()];
+}
+
 // ── Reading a project's names ───────────────────────────────────────────────────────────────────────────────────
 // Only the names a project's people chose are read: its components and their properties and options, its tokens'
 // paths, its collections and modes, its brands, its fonts, its pages and screens, its icons. The keys the engine's own
@@ -164,6 +199,8 @@ export function projectTerms(root) {
   if (pkg.name) for (const w of String(pkg.name).split(/[@/]/)) add(w, 'package name', own);
   let remotes = '';
   try { remotes = execFileSync('git', ['-C', root, 'remote', '-v'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* no git */ }
+  // Its people: each one's whole name, kept as words apart too, and the account their address starts with.
+  for (const a of authorsOf(root)) { add(a.name, 'git author', own); for (const u of a.users) add(u, 'git author', own); }
   for (const text of [near('ds-config.json'), remotes, near('.design-system-engine-project'), near('.gitlab-source.json'), near('package.json')]) {
     for (const m of text.matchAll(FIGMA_KEY)) keys.add(m[1]);
     for (const m of text.matchAll(/"[\w]*[Ff]ile[Kk]ey"\s*:\s*"([A-Za-z0-9]{15,})"/g)) keys.add(m[1]);
@@ -365,6 +402,12 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     const w = norm(at('--name') ?? '');
     if (!/^[a-z]{3,}$/.test(w)) { console.log('Give one word of 3 letters or more: --name <word>'); process.exit(2); }
     const t = buildTerms(); t.namedByHand = [...new Set([...(t.namedByHand ?? []), w])]; t.named = { ...(t.named ?? {}), [w]: 'named by hand' }; writeJson(TERMS(), t); console.log('named', w, '(refused where it is used as a name)');
+  } else if (a.includes('--none')) {
+    // A computer that holds no one's project says so, once: its hooks then let a commit through with no list.
+    const p = readJson(PROJECTS(), { projects: [] });
+    if ((p.projects ?? []).length) { console.log(`${p.projects.length} project(s) are remembered here already: --none is for a computer that holds none.`); process.exit(2); }
+    writeJson(PROJECTS(), { projects: [], none: true });
+    console.log('This computer holds no project of anyone\'s: its hooks check without a list.');
   } else if (a.includes('--hashes')) {
     // Every project name hashed into private-check.mjs, so a run with no list here (the cloud, GitHub) refuses it too.
     // The plain words that are a name only in context stay here: hashed, they would refuse ordinary prose.
@@ -372,11 +415,17 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     const allow = new Set((t.allow ?? []).map(norm));
     const h = (x) => createHash('sha256').update(x).digest('hex').slice(0, 16);
     const keep = (x) => x && !allow.has(x) && x.length >= 4;
-    const terms = [...new Set([...Object.keys(t.terms), ...(t.keys ?? []).map(norm)].filter(keep).map(h))].sort();
-    const phrases = [...new Set((t.phrases ?? []).map(norm).filter(keep).map(h))].sort();
     const file = join(dirname(fileURLToPath(import.meta.url)), 'private-check.mjs');
-    const set = (name, list) => `export const ${name} = new Set([${list.length ? '\n' + list.map((x) => `  '${x}',`).join('\n') + '\n' : ''}]);`;
     const src = readFileSync(file, 'utf8');
+    // What is there already stays: a name once refused is never forgotten because the project it came from is no
+    // longer on this computer. Only what a person allowed here leaves the list.
+    const block = /\/\/ BEGIN hashed project names\n([\s\S]*?)\/\/ END hashed project names/.exec(src)?.[1] ?? '';
+    const had = (name) => [...(new RegExp(`${name} = new Set\\(\\[([^\\]]*)\\]`).exec(block)?.[1] ?? '').matchAll(/'([0-9a-f]{16})'/g)].map((m) => m[1]);
+    const gone = new Set([...allow].map(h));
+    const merged = (before, now) => [...new Set([...before, ...now])].filter((x) => !gone.has(x)).sort();
+    const terms = merged(had('FORBIDDEN_TERMS'), [...Object.keys(t.terms), ...(t.keys ?? []).map(norm)].filter(keep).map(h));
+    const phrases = merged(had('FORBIDDEN_PHRASES'), (t.phrases ?? []).map(norm).filter(keep).map(h));
+    const set = (name, list) => `export const ${name} = new Set([${list.length ? '\n' + list.map((x) => `  '${x}',`).join('\n') + '\n' : ''}]);`;
     const next = src.replace(/(\/\/ BEGIN hashed project names\n)[\s\S]*?(\/\/ END hashed project names)/, `$1${set('FORBIDDEN_TERMS', terms)}\n${set('FORBIDDEN_PHRASES', phrases)}\n$2`);
     if (next === src && !src.includes('BEGIN hashed project names')) { console.log('private-check.mjs has no hashed project names block'); process.exit(2); }
     writeFileSync(file, next);

@@ -27,13 +27,22 @@ Five layers refuse anything private, each catching what the one before may miss:
    `--no-verify`.
 3. **The names of the projects on this computer.** `.githooks/private-terms.mjs` reads, from each project the engine
    ran on, the names its people chose (components, properties and options, token paths, modes, brands, fonts,
-   pages, icons) and its own (project, package, repository, hosts, Figma keys), and keeps them on this computer only
-   (`~/.config/rms-engine/`, or `RMS_PRIVATE_TERMS_DIR`), never in the repository. Every check refuses them, so a new
-   client is covered from its first run, unasked. Plain words, CSS words and names every system writes
-   (buttonPrimary) are never a project's. A project is remembered when the engine runs on it from a checkout with
-   the hooks on; `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there,
-   `--review` lists the names the engine's files already carry, and `--allow <name>` marks one as the engine's own
-   (only a generic one: rename anything specific).
+   pages, icons), its own (project, package, repository, hosts, Figma keys) and its people (everyone in its git
+   history, by the name they sign with and each account their address starts with; never a bot, a shared mailbox or
+   whoever commits from the engine's checkout here). It keeps them on this computer only (`~/.config/rms-engine/`, or
+   `RMS_PRIVATE_TERMS_DIR`), never in the repository. Every check refuses them, so a new client is covered from its
+   first run, unasked. Plain words, CSS words and names every system writes (buttonPrimary) are never a project's.
+   - **Remembered on every run.** On a computer that keeps the list, or whose engine checkout runs the privacy hooks,
+     every run of the engine remembers its project, the installed copy's runs included.
+     `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there (a folder of projects, never
+     one that holds the engine: its test fixtures are projects too), `--add <folder>` one at a time.
+   - **Never silently empty.** A commit, its message, a push and a pull request are refused while the list has never
+     been said: knowing no project, the check would refuse no one's names and still pass. A computer that holds no one's
+     project says so once with `--none`. CI has no list by design: the hashed names are its own.
+   - `--review` lists the names the engine's files already carry, and `--allow <name>` marks one as the engine's own
+     (only a generic one: rename anything specific, as the rules above ask of every example).
+   - `--hashes` writes the list into the hashed names GitHub's check reads. It adds to them and forgets none: a name
+     from a project no longer on this computer stays refused. Only what was allowed here leaves.
 4. **The patterns.** Whatever the project: a Figma file key (other than the placeholder, the owner's public board
    and the fictional fixture's), a company host (gitlab.…, jira.…, \*.internal, a private IP), a path on someone's
    computer (/Users/name, /home/name, C:\\Users\\name; placeholders such as /Users/me are fine), a secret (figd\_,

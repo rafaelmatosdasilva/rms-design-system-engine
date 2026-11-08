@@ -35,7 +35,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { localTerms, PUBLIC_HOST } from './private-terms.mjs';
+import { localTerms, PUBLIC_HOST, listState } from './private-terms.mjs';
 
 // The repository checked: the engine's own, or another kept private beside it (RMS_CHECK_ROOT), as strict.
 export const ROOT = process.env.RMS_CHECK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -210,6 +210,7 @@ export const FORBIDDEN_TERMS = new Set([
   '0e2c55555f25c3c2',
   '0e888f75a43935ad',
   '0e9fcf764cd8c82b',
+  '0ea9841e811f8d47',
   '0ece31ec7200746c',
   '0f1106c2cedac719',
   '0f36532d474ddc27',
@@ -221,6 +222,7 @@ export const FORBIDDEN_TERMS = new Set([
   '0f9b5014c660eeee',
   '0f9c779ea8ad1905',
   '0fa0a5ac90db2933',
+  '0fafbd28a68047ea',
   '0fd29ec914f9e79b',
   '0fd7dd4a0882e42c',
   '0fd935c653694c82',
@@ -342,6 +344,7 @@ export const FORBIDDEN_TERMS = new Set([
   '1e4889da0ce5da0b',
   '1e5bb3c1bc4e2703',
   '1e78e7b77c2f891c',
+  '1ea0ec297133159a',
   '1ea68e70ce74e845',
   '1ec35dd9a56cbe95',
   '1ecf563aefdc6cb6',
@@ -400,6 +403,7 @@ export const FORBIDDEN_TERMS = new Set([
   '24ceeace972bfa7b',
   '24d045e2c8c4052e',
   '24e5d9d7e6763074',
+  '2507bf07ae6aa8e0',
   '254745f86fa990ca',
   '255baff37b92aa7a',
   '25abcbc1e061765d',
@@ -414,6 +418,7 @@ export const FORBIDDEN_TERMS = new Set([
   '26acc318b9dd2ee7',
   '26c2638f0b8e62e5',
   '26d196e95e0d8f30',
+  '26fcd8fa25ef02d2',
   '2705fc3fc8e13a80',
   '27120958f22de43d',
   '273a9afe6e2614a9',
@@ -1188,6 +1193,7 @@ export const FORBIDDEN_TERMS = new Set([
   '7acd647f64b85419',
   '7acdf19b9eb5e9a8',
   '7adae736d761675f',
+  '7aeaaa1fb6a5e50f',
   '7af90b8dec43f142',
   '7b1cdcdcb662f7ba',
   '7b385942cb3e2fb2',
@@ -1621,6 +1627,7 @@ export const FORBIDDEN_TERMS = new Set([
   'ab5661034ee0df8f',
   'ab6e32ae753c7535',
   'ab853e5a2abb84db',
+  'abd6b405f5380935',
   'ac319148191b775d',
   'ac370a4853224cdd',
   'ac6bf00ea55df14c',
@@ -1827,6 +1834,7 @@ export const FORBIDDEN_TERMS = new Set([
   'c0099e19ea778a5c',
   'c034e06752938729',
   'c03fa1783a25e2b9',
+  'c055195f812fb665',
   'c08ea1f934bb033e',
   'c0973133f7e347dd',
   'c0bb4aed10f76cce',
@@ -2353,6 +2361,7 @@ export const FORBIDDEN_TERMS = new Set([
   'f9877f6cd5d72120',
   'f99754c2eae3825d',
   'f9af22bda8def04f',
+  'f9eea290d34ca7c7',
   'f9fc4b3ed10b6bf6',
   'fa1119edb0f401b1',
   'fa242da9bb57cc92',
@@ -2385,6 +2394,7 @@ export const FORBIDDEN_TERMS = new Set([
   'fd1b3b33c4afc5e5',
   'fd24ae36e08c05ed',
   'fd374b075628eede',
+  'fd4967b61e357d8b',
   'fd573ff5d9e4cf9e',
   'fd848fce4e4d664f',
   'fdd1781597aa3722',
@@ -2693,6 +2703,15 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
   const args = process.argv.slice(2);
   const at = args.indexOf('--message');
   const arg = (f) => args[args.indexOf(f) + 1];
+  // The checks that stand between a change and GitHub (a commit, its message, a push, a pull request) refuse while this
+  // computer's list has never been said: knowing no project's names, they would let every client's through and look
+  // green. CI has no list by design (the hashed names are its own); a computer holding no one's project says so once.
+  if (['--staged', '--push', '--message', '--pr'].some((f) => args.includes(f)) && !process.env.CI && listState() === 'empty') {
+    console.error('Refused: no project names are known on this computer, so this check would refuse no one\'s and say nothing.');
+    console.error('  Remember the projects the engine works on here: node .githooks/private-terms.mjs --add <a project\'s folder> (or --scan <a folder of projects>).');
+    console.error('  On a computer that holds no one\'s project: node .githooks/private-terms.mjs --none');
+    process.exit(1);
+  }
   // --pr --title "…" --body FILE [-- more arguments for gh]: the title and the description are read first, and the
   // pull request is opened only when they carry nothing private. Opening it first and fixing it after leaves the text
   // in GitHub's edit history, where it stays.
