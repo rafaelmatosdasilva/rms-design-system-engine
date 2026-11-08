@@ -4,25 +4,127 @@ What the engine does for design and product teams. Every part reads the same kno
 
 **On this page**
 
-| Feature | What it does for you | Stage |
-|---|---|---|
-| [Write component contracts](#write-component-contracts) | One up-to-date spec per component, written from your Figma file and your code: its options, states and what goes inside it. People and AI tools read the same spec, and nobody maintains it by hand. | Ready to use |
-| [Write the intent layer](#write-the-intent-layer) | Why each component exists and when to use it, gathered in one place from your docs and past decisions. What it can't be sure of goes to a person, and guidelines that contradict each other are flagged. | Ready to use |
-| [Review the Figma library](#review-the-figma-library) | Checks your Figma file is fit to be the source everything else compares against. Your design team gets a list of what to fix, so no result rests on a broken file. | Ready to use |
-| [Track system health](#track-system-health) | Flags the tokens that will cause trouble as the system grows, such as names tied to a colour or aliases to deleted tokens. They are cheapest to fix early, and nothing here fails a run. | Ready to use |
-| [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Ready to use |
-| [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Ready to use |
-| [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's spec, Figma match, accessibility and history, plus who needs to do what next. | Ready to use |
-| [Try components in a playground](#try-components-in-a-playground) | Change a component's props live and see it as the code draws it, in every theme. Its controls are still being tuned to each component. | Early development |
-| [Fit your team's setup](#fit-your-teams-setup) | Works straight from your repositories, with no clone and nothing duplicated. Figma and the code are read from one place the whole team shares, so nobody keeps a copy in sync. | Early development |
-| [Test accessibility](#test-accessibility) | Tests each component the way people use it, from contrast to screen readers, and splits each criterion into tasks for the people who own it, in order. Fix it once and every screen benefits. | Early development |
-| [Build with AI, on the system](#build-with-ai-on-the-system) | AI builds prototypes and product code with your real components, and nothing invented gets past the checks. What passes a user test can ship without being redrawn. | Coming soon |
-| [Update Figma from the code](#update-figma-from-the-code) | Sends what developers learn back to designers in Figma: accessibility notes, screen issues and links to the code, only after you approve. | Coming soon |
-| [Keep products on the system](#keep-products-on-the-system) | Helps every product move to the next system version: which version each one runs, a ready-made fix per product, one ticket per difference. | Coming soon |
-| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built with your own styles, names and structure, where you choose: in Figma, in code, or both. Ready for sign-off. | Coming soon |
-| [Build code from Figma](#build-code-from-figma) | For a system that exists only in Figma: the order to build it in, exact names and values, and a check after each piece. | Coming soon |
+### Audit
 
-## Write component contracts
+| Feature | What it does | Status |
+|---|---|---|
+| [Check your Figma library](#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built differently from the rest. | Ready to use |
+| [Lint your codebase](#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours and copied components across your code, and stops a push that adds them. | Ready to use |
+| [Compare Figma and code](#compare-figma-and-code) | A deep design-code parity check of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
+| [Test accessibility](#test-accessibility) | Tests contrast, keyboard focus, touch targets and zoom on every component, in a real browser. | Early development |
+
+### Documentation
+
+| Feature | What it does | Status |
+|---|---|---|
+| [Write component specs](#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | Ready to use |
+| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, which says why each component exists and when to use it, gathered from Figma's descriptions and notes and your docs. | Ready to use |
+| [Annotate Figma from the code](#annotate-figma-from-the-code) | Writes accessibility specs, pins problems on your screens and links each component to its code, after you approve. | Coming soon |
+
+### Collaboration
+
+| Feature | What it does | Status |
+|---|---|---|
+| [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | Ready to use |
+| [Try components in a playground](#try-components-in-a-playground) | Change a component's props live, in every state and theme, as the code draws it. | Early development |
+
+### Creation
+
+| Feature | What it does | Status |
+|---|---|---|
+| [Turn Figma into code](#turn-figma-into-code) | Turns a Figma-only system into code, piece by piece, checking each one. | Coming soon |
+| [Bring code components into Figma](#bring-code-components-into-figma) | Turns a component that exists only in your code into a Figma component, with its props and tokens, for designers to fine-tune. | Coming soon |
+| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built in Figma, code or both. | Coming soon |
+| [Prototype with your real components](#prototype-with-your-real-components) | AI builds prototypes with your real components, and nothing invented gets past the checks. | Coming soon |
+
+## Check your Figma library
+
+**Ready to use** · **Why it matters:** Every other result is only as good as the file it compares against.
+
+*Today: it only reads Figma. Renames are applied after you say yes. Every other fix is for your design team to make.*
+
+- Finds values with no token or style, detached instances, missing auto layout and missing descriptions.
+- Writes down how your system builds components (names, properties, layers, variables) and lists the ones that break it, on a Construction page.
+- Fixes a component's construction, such as renaming its layers, after you say yes.
+- Compares components of one kind, so every button sets its states and names its options the same way.
+- Says when the file is not reliable enough to compare, before any result.
+
+## Lint your codebase
+
+**Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
+
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+
+**In your tokens and themes**
+
+- Tokens named by look (blue-500) or after a product, instead of by role.
+- Aliases that point at a removed token, with the change that removed it.
+- Tokens in a layer where they never change, that could live a layer up.
+- What breaks only in a combination of modes, such as dark on a phone.
+- Brands that pin a value they should inherit from the brand they extend.
+- Two components whose own rules are nearly the same.
+- A health number per area on the style guide's Status page.
+
+**In your apps' code**
+
+- Spots a product screen or an AI edit that builds its own copy of a system component.
+- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
+- Flags CSS variables and text casing the design never asked for.
+- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
+- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
+- Checks Tailwind classes against Figma.
+- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
+- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
+- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
+- Renames a token everywhere in one change, with a patch for each product. *(Coming soon)*
+- Lists every place still using a retired component or token, with what to use instead. *(Coming soon)*
+- Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs. *(Coming soon)*
+- Names a product late to move on the Status page, for its own team. *(Coming soon)*
+- Opens one issue per difference in your tracker, and closes it once it is fixed. *(Coming soon)*
+- Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
+- Reads products kept in their own repositories. *(Coming soon)*
+
+## Compare Figma and code
+
+**Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
+
+*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
+
+- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
+- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
+- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
+- Finds the code file of each Figma component on its own, so nobody writes a map.
+- Checks icons, slots and the parts inside each component.
+- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
+- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
+- Warns when a Figma frame changed since the version you approved.
+- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
+- Runs 25 checks, called gates, each listed in the [technical documentation](details.md#the-gates).
+- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
+- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
+
+## Test accessibility
+
+**Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
+
+*Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, not from VoiceOver or NVDA themselves.*
+
+- Tries every component in a real browser, in every state and colour mode.
+- Measures contrast against what is really painted behind the text.
+- Follows the Tab key through each page to find traps, lost focus and controls a keyboard never reaches.
+- Measures touch targets, on the page and again on a small 320 pixel screen.
+- Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
+- Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
+- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
+- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
+- Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
+- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
+- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
+- Tries again only what changed, so a second run takes seconds.
+- Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
+- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
+
+## Write component specs
 
 **Ready to use** · **Why it matters:** Developers and AI tools build from the same spec, and nobody keeps it up to date by hand.
 
@@ -38,7 +140,7 @@ What the engine does for design and product teams. Every part reads the same kno
 - Checks your Figma Code Connect mappings against the contracts.
 - Drafts a Figma Code Connect file for each component that has none, from what its contract pairs. A person checks it and publishes it.
 
-## Write the intent layer
+## Gather usage guidelines
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
@@ -64,66 +166,14 @@ What the engine does for design and product teams. Every part reads the same kno
 - Never overwrites a sentence a person wrote.
 - A change to the layer reaches the published style guide on its own, checked on the pages it was about.
 
-## Review the Figma library
+## Annotate Figma from the code
 
-**Ready to use** · **Why it matters:** Every other result is only as good as the file it compares against.
+**Coming soon** · **Why it matters:** Designers see in Figma what developers already know.
 
-*Today: it only reads Figma. Renames are applied after you say yes. Every other fix is for your design team to make.*
-
-- Finds values with no token or style, detached instances, missing auto layout and missing descriptions.
-- Writes down how your system builds components (names, properties, layers, variables) and lists the ones that break it, on a Construction page.
-- Fixes a component's construction, such as renaming its layers, after you say yes.
-- Compares components of one kind, so every button sets its states and names its options the same way.
-- Says when the file is not reliable enough to compare, before any result.
-
-## Track system health
-
-**Ready to use** · **Why it matters:** The token layer is where a system ages badly, and it is cheapest to put right early.
-
-*Today: advice only. None of it fails a run.*
-
-- Tokens named by look (blue-500) or after a product, instead of by role.
-- Aliases that point at a removed token, with the change that removed it.
-- Tokens in a layer where they never change, that could live a layer up.
-- What breaks only in a combination of modes, such as dark on a phone.
-- Brands that pin a value they should inherit from the brand they extend.
-- Two components whose own rules are nearly the same.
-- A health number per area on the style guide's Status page.
-
-## Catch drift in product code and AI edits
-
-**Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
-
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
-
-- Spots a product screen or an AI edit that builds its own copy of a system component.
-- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
-- Flags CSS variables and text casing the design never asked for.
-- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
-- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
-- Checks Tailwind classes against Figma.
-- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
-- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
-- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
-
-## Compare Figma and code
-
-**Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
-
-*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
-
-- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
-- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
-- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
-- Finds the code file of each Figma component on its own, so nobody writes a map.
-- Checks icons, slots and the parts inside each component.
-- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
-- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
-- Warns when a Figma frame changed since the version you approved.
-- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
-- Runs 25 checks, called gates, each listed in the [technical documentation](details.md#the-gates).
-- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
-- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
+- Writes each component's accessibility spec into Figma.
+- Pins accessibility problems on the layers of your designed screens.
+- Links each component to its code file in Dev Mode.
+- Shows you every change first. Nothing changes until you say yes.
 
 ## Publish a living style guide
 
@@ -158,40 +208,42 @@ What the engine does for design and product teams. Every part reads the same kno
 - A link keeps what you set, so it opens that exact variant.
 - Marked Early on each component's page while it is tuned.
 
-## Fit your team's setup
+## Turn Figma into code
 
-**Early development** · **Why it matters:** Your tools stay as they are, and the engine fits around them.
+**Coming soon** · **Why it matters:** Engineering starts from the designed system, not an interpretation of it.
 
-*Today: every browser check runs in Chrome.*
+- With no code yet, lists what to build, in order, instead of failing.
+- Gives Claude Figma's exact names and values before it writes the code.
+- Checks every piece once it is built.
 
-- Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
-- Follows a Figma branch, so edits on the main file do not restart a long scan.
-- Reads very large Figma files in checked pieces, and only what changed on the next refresh.
-- Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
-- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
+## Bring code components into Figma
 
-## Test accessibility
+**Coming soon** · **Why it matters:** A component that exists only in code gets a Figma home, so designers can fine-tune it and Figma and the code can be compared.
 
-**Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
+- Draws a component that exists only in code as a Figma component: its props as properties and variants, its tokens as variables, its parts as layers.
+- Starts from the components the style guide marks Only in the code.
+- Uses only the system's own variables, text styles and components. It never makes up a value.
+- Shows you every change first. Nothing is written to Figma until you say yes.
 
-*Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, not from VoiceOver or NVDA themselves.*
+## Generate components in Figma and code
 
-- Tries every component in a real browser, in every state and colour mode.
-- Measures contrast against what is really painted behind the text.
-- Follows the Tab key through each page to find traps, lost focus and controls a keyboard never reaches.
-- Measures touch targets, on the page and again on a small 320 pixel screen.
-- Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
-- Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
-- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
-- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
-- Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
-- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
-- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
-- Tries again only what changed, so a second run takes seconds.
-- Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
-- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
+**Coming soon** · **Why it matters:** New components follow the system's rules from the start, in the design and in the code.
 
-## Build with AI, on the system
+- You choose where it is built: in Figma and in code, only in Figma, or only in code, from the same description.
+- In code, it is written the way your components already are: your framework, file layout, props, tokens and names, with nothing the system does not have.
+- Built in both, the two are checked against each other before anyone signs off, so they start out matching.
+- The AI builds a new component from your description ("a tag like the chip"), starting from the one it is most like.
+- Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
+- Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
+- Uses only the system's own variables, components, text styles and names. It never makes up a value.
+- Works in a product file too: the system's variables come from its published library, imported by the key the Figma MCP finds for each.
+- Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
+- Grows the component set to hold new variants, so none is clipped.
+- Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
+- Follows how your system builds components: names, properties, layers and auto layout.
+- Writes nothing until someone signs it off and you say yes, then checks the result.
+
+## Prototype with your real components
 
 **Coming soon** · **Why it matters:** AI builds fast but invents components. This keeps it on your real system, in your product's code and in prototypes.
 
@@ -280,52 +332,17 @@ It records what was found, never a verdict of its own. And where a check never w
 
 Two things it will not do. It never shows a zero where it means *not yet*: a step with nothing yet says what to run instead, because a zero and *not yet* look the same and mean opposite things. And under twelve checks it refuses to draw a trend and says so: two runs are not a trend, and a tool that draws one from two runs is a tool that says the opposite next week.
 
-## Update Figma from the code
+## Works with your tools
 
-**Coming soon** · **Why it matters:** Designers see in Figma what developers already know.
+Your tools stay as they are, and the engine fits around them.
 
-- Writes each component's accessibility spec into Figma.
-- Pins accessibility problems on the layers of your designed screens.
-- Links each component to its code file in Dev Mode.
-- Shows you every change first. Nothing changes until you say yes.
+*Today: every browser check runs in Chrome.*
 
-## Keep products on the system
-
-**Coming soon** · **Why it matters:** Products take up system changes without a migration project.
-
-- Renames a token everywhere in one change, with a patch for each product.
-- Lists every place still using a retired component or token, with what to use instead.
-- Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs.
-- Names a product late to move on the Status page, for its own team.
-- Opens one issue per difference in your tracker, and closes it once it is fixed.
-- Reviews the screens a product builds with the system as pages, and scores each out of 10.
-- Reads products kept in their own repositories.
-
-## Generate components in Figma and code
-
-**Coming soon** · **Why it matters:** New components follow the system's rules from the start, in the design and in the code.
-
-- You choose where it is built: in Figma and in code, only in Figma, or only in code, from the same description.
-- In code, it is written the way your components already are: your framework, file layout, props, tokens and names, with nothing the system does not have.
-- Built in both, the two are checked against each other before anyone signs off, so they start out matching.
-- The AI builds a new component from your description ("a tag like the chip"), starting from the one it is most like.
-- Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
-- Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
-- Uses only the system's own variables, components, text styles and names. It never makes up a value.
-- Works in a product file too: the system's variables come from its published library, imported by the key the Figma MCP finds for each.
-- Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
-- Grows the component set to hold new variants, so none is clipped.
-- Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
-- Follows how your system builds components: names, properties, layers and auto layout.
-- Writes nothing until someone signs it off and you say yes, then checks the result.
-
-## Build code from Figma
-
-**Coming soon** · **Why it matters:** Engineering starts from the designed system, not an interpretation of it.
-
-- With no code yet, lists what to build, in order, instead of failing.
-- Gives Claude Figma's exact names and values before it writes the code.
-- Checks every piece once it is built.
+- Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
+- Follows a Figma branch, so edits on the main file do not restart a long scan.
+- Reads very large Figma files in checked pieces, and only what changed on the next refresh.
+- Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
+- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
 
 ## What you can count on
 

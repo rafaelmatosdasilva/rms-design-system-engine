@@ -9,15 +9,15 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [How it works](#how-it-works)
 - [Install and update](#install-and-update)
 - [Run it](#run-it)
+- [Check your Figma library](#check-your-figma-library)
+- [Lint your codebase](#lint-your-codebase)
 - [Compare Figma and code](#compare-figma-and-code)
 - [Test accessibility](#test-accessibility)
-- [Write component contracts](#write-component-contracts)
-- [Write the intent layer](#write-the-intent-layer)
+- [Write component specs](#write-component-specs)
+- [Gather usage guidelines](#gather-usage-guidelines)
 - [Publish a living style guide](#publish-a-living-style-guide)
-- [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits)
-- [Review the Figma library](#review-the-figma-library)
-- [Track system health](#track-system-health)
-- [Build with AI, on the system](#build-with-ai-on-the-system)
+- [Try components in a playground](#try-components-in-a-playground)
+- [Prototype with your real components](#prototype-with-your-real-components)
 - [Inside Claude Code](#inside-claude-code)
 - [The files it creates](#the-files-it-creates)
 - [Security and data](#security-and-data)
@@ -25,6 +25,23 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [Environment variables](#environment-variables)
 
 ## How it works
+
+```mermaid
+flowchart LR
+  F[Figma file] --> R
+  C[Code] --> R
+  R["Facts<br/>what exists, with its source<br/>and how sure the reading is"] --> K["Contracts<br/>what each component<br/>must satisfy"]
+  R --> I["Intent<br/>why it exists,<br/>when to use it"]
+  K --> V["Checks<br/>measured in a real browser"]
+  I --> V
+  V --> S[Style guide]
+  V --> A[AI agents]
+  V --> P["Patches and tasks<br/>for people"]
+```
+
+Facts, contracts and checks are measured, never guessed by a model. AI drafts the intent layer and builds with the system, and the checks judge what it builds. When something cannot be read or run, the result says so instead of passing.
+
+**One request, start to finish.** You ask Claude Code to check the button. The engine reads the button from Figma and the code, takes the components inside it along, and measures it in every state and colour mode. Each difference names its rule, the file and line, the value to write there and who fixes it. Code people wrote comes back as a patch to apply, never changed, and a change to Figma waits for a yes. The button's page in the style guide shows the same result.
 
 - **It reads Figma precisely.** What your design system really defines, the tokens and each component's parts, states and options. It is not a "does this look like Figma?" screenshot comparison.
 - **It reads your code the same way.** Once per run it opens your pages in a browser and records what the code really produces, every token in every mode, each component's sizes, states, props, icons and markup, and which components sit inside which.
@@ -216,6 +233,197 @@ A Figma seat has a limited number of API calls a day or a month.
 - It is skipped when the Figma file has not changed since the last complete refresh (one call to check). `FIGMA_REFRESH=force` refreshes anyway.
 - When Figma answers with a limit, the refresh stops at once, says how long to wait, and keeps the snapshots as they were.
 
+
+## Check your Figma library
+
+These read the Figma file for whoever keeps it, and never fail a run.
+
+| Check | What it finds | How to turn it off |
+|---|---|---|
+| The Figma file itself | Values with no token, detached instances, missing auto layout or descriptions | `"figmaHygiene": false` |
+
+### The Figma file itself
+
+For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, a variant with no auto layout, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes.
+
+Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
+
+- Under 90% of its values bound to a token or style, or of its variants in auto layout, it is only partly reliable.
+- Under 60%, a match or a difference can be chance, and the least reliable components are named.
+
+### How your system builds a component in Figma
+
+Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own, auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. A Construction page in the style guide, opened by its link, lists them with what is to do; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](commands.md#check-your-figma-library)).
+
+### Components of one type, built the same way
+
+The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
+
+- **States set the same way.** Disabled is a property of its own on most buttons and an option of State on a few: those few are named, with the way most of them do it.
+- **One thing, one name.** `labelContent` on most buttons and `Label` on one: that one is named.
+- **What most of them have.** Most inputs have a label and a required mark: one without them is listed to check.
+
+Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
+
+## Lint your codebase
+
+Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
+
+### In your tokens and themes
+
+Advice on keeping the system healthy as it grows, never a failure.
+
+| Check | What it finds | How to turn it off |
+|---|---|---|
+| System health | Risks as the system grows, such as tokens named after a product | `"systemHealth": false` |
+| Mode combinations | What breaks only in a combination of modes, such as Dark on a phone | `modeCombinations: false` |
+
+#### System health
+
+Advice on keeping the system healthy as it grows (`🧭 System health`), never a failure.
+
+- A colour mode set below a product's root, so part of the page draws in another mode.
+- A product that brings in two of the system's themes, one overriding the other by load order.
+- Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
+- A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
+- Two components whose own rules are nearly the same.
+- Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
+- Aliases to a removed token, with the commit that removed it.
+- The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+- A class a product styles almost as one of the system's components, as a decision, never a drift.
+
+A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
+
+#### A token in the right layer
+
+A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
+
+#### Mode combinations
+
+The gates check each mode on its own. When you have two collections that switch (Light and Dark, Desktop and Phone), every combination is also opened in the browser, such as Dark on a phone or Light on a desktop.
+
+- Each token is compared with Figma's value in that combination.
+- Each text and background pair the system uses is measured for contrast.
+
+Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Status page, under The system.
+
+The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Status page under The system.
+
+#### Who owns what
+
+`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Status page then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
+
+- A key can be a pattern: `"tile*"` covers every tile, `"patterns/"` every pattern page.
+- The owner is also who decides what waits on a person about it: a proposal, a page's drafts, a page to review again, a change held for sign-off.
+- When the person who decides is not the team's name, give both: `"tileCard": { "team": "Cards team", "decides": "QA lead" }`.
+
+See [Who decides](#who-decides) for what the Documentation page does with it.
+
+#### Brands that pin what they inherit
+
+For a system with brands (Figma's extended collections), System health lists each value a brand sets exactly as it inherits it from the brand it extends. It changes nothing today, and pins the value: the brand no longer follows when its parent changes it. Keep each the brand must hold and remove the rest. A brand may set any variable, a component's own and ones nothing reads yet included; that is never listed. Advice, never a failure.
+
+### In your apps' code
+
+These run beside the gates. Most give advice and never fail a run, and each can be turned off in `ds-config.json`.
+
+| Check | What it finds | How to turn it off |
+|---|---|---|
+| Instructions for AI agents | Wrong names in `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules | `"steering": false` |
+| Primitives written by hand | A `<span>` styled as your Text component, a flex `<div>` with the system's gap | Runs only when `primitives` is set |
+| Workarounds | A control laid over a component, a sign of a missing slot or prop | `"workarounds": false` |
+| Tailwind | Classes that differ from Figma, and values in brackets outside the theme | `"tailwind": false` |
+| Values written by hand | Every value a token should carry, with the token to use | `"census": false` (a run fails when a file's count grows) |
+| A commit warns, a push refuses | What a commit or a push uses that has a finding | `--remove-hooks`, or `"hooks": false` |
+
+#### Near copies of a component
+
+A product that builds a component by hand, or styles a class almost like one of yours, comes back to you as a decision. Use the component, with a new option if it needs one, or add the new one to the system on purpose.
+
+#### Local or shared
+
+Every gap the engine finds and every change an agent proposes is sorted into one of two kinds, with the reason in one line.
+
+- **Local.** It stays in one product: its own screen, its own CSS, its version, its pages. Its team acts, and it waits on no one.
+- **Shared.** It changes what other products get: a shared component's options or props, a token, a contract, a component in Figma. It waits on the person who decides for it, from `owners` in `ds-config.json` ([Who owns what](#who-owns-what)).
+
+How it is judged:
+
+| What | How |
+|---|---|
+| Where it lives | The system (its theme, its components and their contracts, its Figma file) or one product. One the engine cannot place counts as shared until someone says. |
+| Effect on other products | How many products' code uses the component, from the usage map. |
+| How hard it is to undo | A removal, a rename or a breaking change is hard. A changed value is less so. An addition is easy. |
+| Ambiguity | A decision between Figma and the code, or a place the engine could not tell. |
+
+The last three set its risk (high, medium or low), which the reason says. For example: "Shared: cardTile's size=xs is the system's: 3 products use it (Northwind, Acme shop, Acme admin); hard to undo, high risk."
+
+Where you see it:
+
+- **The style guide's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
+  - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
+- **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
+- **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
+- **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
+- **A change held for sign-off.** The guard says why it is shared and who decides it.
+- **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.
+
+#### Instructions for AI agents
+
+`AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own. Every component, prop value and token they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing.
+
+A file that only says what not to use is noted too. Saying that the design system is installed and its components are the ones to use is what moves agents onto it.
+
+#### Primitives written by hand
+
+Once the library owner declares which styling means which component (`primitives` in `ds-config.json`), the engine spots it written by hand. A `<span>` given the body text style and the secondary colour is `<Text size="medium" color="secondary">`, and a flex `<div>` with the system's gap is its `Stack`. No token check sees these, since their values are the system's own. The audit lists each one, the edit check hands it back when an AI adds one, and `llms.txt` gives generators the table.
+
+#### The names your agents actually invent
+
+The catalog rejects names by meaning: a system whose values are `error` and `warn` tells an agent that `danger` means `error`. That catches what a reasonable agent would guess.
+
+It does not catch what *your* agents guessed. `--check-ui` already knows them — every time it says `"Pill" is not in the catalog (did you mean Chip?)`, an agent invented a name and the check knew the right one. Those are now kept (`.design-system-engine-out/invented.json`, local and cumulative) and fed back into the catalog, so the next agent reads them beside the real values instead of finding out after writing the page. A name invented once will be invented again, by the same model reading the same documentation.
+
+Only inventions the check could correct go into the catalog: an entry that cannot say what to write instead would send an agent nowhere. The rest are still counted, because knowing a name gets invented is worth something on its own.
+
+The same names are written into each component's contract (`invented`, with the right name and how often) and beside the component in `llms.txt` ("agents here wrote: prop showFooters → showFooter"), so an agent reads them whichever file it opens. They come from both checks, `--check-ui` and the check of pages written as code, props, values and events alike.
+
+#### Workarounds around a component
+
+A screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot. It is reported to the design system as a missing slot or prop, not as the screen's mistake.
+
+**Once is an oddity; three times is a gap.** When the same thing is built by hand around the same component in more than one file, the run says so separately: that is a piece the design system does not have, and documentation does not fix it — the component does. Prototypes count alongside product screens, because an agent drawing a page meets what a component lacks before any product does. The list is also written to `.design-system-engine-out/missing-apis.json`, for whoever owns the component.
+
+#### Tailwind
+
+- Each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens), and a difference names the class to write. What is compared:
+  - height, padding, corner, gap, and the fill, text and border colours;
+  - text size, weight and line height, and border width;
+  - shadow, from Figma's effects, and motion: a hover that Figma animates needs `transition` with its duration and easing.
+- **Each variant on its own.** The classes each option writes are read (`cva` and `tailwind-variants`, a map of option to classes, a conditional on the prop), so Figma's Large is compared with the Large classes, not with every class in the file.
+- **Each state.** `hover:`, `active:`, `focus-visible:`, `disabled:` and `aria-`/`data-` classes are compared with the colour Figma binds in that state. A state Figma draws differently with no class for it is named, with the class to add.
+- **Each mode.** In dark mode (or a brand), each colour is checked as the theme's override block or a `dark:` class draws it, against the value Figma gives that variable in the mode.
+- **Tailwind v3 too.** A `tailwind.config` theme (and its `extend`) is read as text, never run, so its colours, spacing, corners, type, shadows and durations name the utility to write, as a v4 `@theme` does.
+- A class with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`) steps outside the theme. When your `@theme` has the same value, it names the utility to write. Otherwise it says the value is not in the design system.
+- `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }`. Figma's token names are then matched to the theme's own (`surface/base/color` to `--color-surface-base`), and a theme variable used through its utility counts as used.
+
+#### Values written by hand
+
+The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
+
+#### A commit warns, a push refuses
+
+`--install-hooks` (and `--init`) also adds git hooks to the project. Two check what your change uses: `pre-commit` and `pre-push`. Three build your local style guide again after a change: `post-commit`, `post-merge` and `post-rewrite` ([Built again after each commit](#see-a-change-in-seconds)).
+
+- **A commit warns.** It lists what the commit adds that has a finding, and always goes ahead.
+- **A push refuses.** While one of those findings is left, the push stops with the list. Fix them and push again.
+- **Only what the change uses.** The lines the commit or push adds, read against what they replace. The rest of the system's differences never stop either one.
+- **What counts.** What the edit check finds on those lines: a value written by hand, a token declared nowhere, a prop a component does not take. And a difference the last full audit found in a component or token those lines use.
+- **What never counts.** A difference you accepted as debt, one you keep on purpose, or one that is Figma's work alone.
+- **A finding marked wrong** (`--wrong`) is shown, but never stops a push.
+- **Nothing slow.** The two checks never open a browser or reach the network. They read the audit's findings as the last full run left them, so run the audit again once a change fixes one.
+- **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
+- `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
 ## Compare Figma and code
 
@@ -655,7 +863,7 @@ An automated check finds many failures, but it cannot show that a product meets 
 - **Whole tasks.** Whether someone using a screen reader or only a keyboard can finish a flow from start to end is tried by a person.
 - **Where it shows.** These are listed as You check by hand on the Status page, and a row stays open until someone says it was checked.
 
-## Write component contracts
+## Write component specs
 
 Each component gets a contract, rewritten from Figma and the code on every run: its props, variants, states, tokens and the components it nests. `contracts/llms.txt` is the one file AI tools read.
 
@@ -770,7 +978,7 @@ A test holds every spec the demo builds to a schema written from the format's pu
 
 ### Code Connect drafts
 
-The engine reads the Figma Code Connect files your project commits: each code prop and the Figma property it reads, a property that only decides whether another is written (in either form), and, in the template form, what fills a slot between the component's tags. A text or a swapped instance written into a slot the code has pairs with that slot. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
+The engine reads the Figma Code Connect files your project commits: each code prop and the Figma property it reads, a property that only decides whether another is written (in either form), and, in the template form, what fills a slot between the component's tags. A text or a swapped instance written into a slot the code has pairs with that slot. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-specs)).
 
 - **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
 - **Slots filled.** In the template form, what fills a slot is written between the component's tags: the default slot's content as it is, a named slot's in the element its framework uses (`slot="icon"` for a web component, `<template #icon>` for Vue), guarded by the property that decides whether it is filled.
@@ -884,7 +1092,7 @@ jobs:
 
 Name your base branch where it says `main`. To post the report on the pull request, add a step that reads `.design-system-engine-out/contract-changes.md`.
 
-## Write the intent layer
+## Gather usage guidelines
 
 The intent layer says why each component exists, when to use it and when not, and what was decided. The engine writes what it is sure of; what needs judgement is a draft, and a person reviews and approves it.
 
@@ -952,7 +1160,7 @@ Some components exist only as pieces of another: a dropdown's row, a table's cel
 
 The engine finds them when two things agree. Either the name sits under the other's in Figma (`grid/Row`), or the name carries the other's and the other holds it. A part is shown inside its root, in a Parts area, and leaves the menu and the counts. Its documentation goes in the root's page, under Parts, one section per part, so it can say how that piece is used. Agents are told to place the root.
 
-When only one thing agrees, the engine asks instead of guessing: a card on the component with an answer to copy. [Tell Claude](commands.md#write-the-intent-layer) and it records the answer in your intent layer, so it is never asked again.
+When only one thing agrees, the engine asks instead of guessing: a card on the component with an answer to copy. [Tell Claude](commands.md#gather-usage-guidelines) and it records the answer in your intent layer, so it is never asked again.
 
 ### What the team already decided
 
@@ -960,7 +1168,7 @@ Every decision somebody makes is recorded where it is made: a difference kept on
 
 Now they come together in one log, written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
 
-A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#write-the-intent-layer) and it writes the line for you to read first, and sends it to the layer only when you ask.
+A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#gather-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
 The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (with the time), Type, What, Done by and Affects. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A chip for each type shows only that type, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 
@@ -1228,7 +1436,7 @@ With no intent layer, every row can still be finished.
 
 ### Guidance for agents
 
-Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](commands.md#write-the-intent-layer) to rate them, and each component gets a class.
+Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](commands.md#gather-usage-guidelines) to rate them, and each component gets a class.
 
 | Class | What it means |
 |---|---|
@@ -1323,194 +1531,7 @@ Early development. Each component's page opens on its Playground: the component 
 - **Width.** Shows the component at each breakpoint your Figma file gives (Phone 350, Desktop 1680), else at 375, 768 and 1280 pixels, with your media queries applied.
 - **It works as in your products.** Your system's own scripts run (`systemScripts` in `ds-config.json`), a selection moves when you click it, and an overlay opens with its own animation.
 
-## Catch drift in product code and AI edits
-
-These run beside the gates. Most give advice and never fail a run, and each can be turned off in `ds-config.json`.
-
-| Check | What it finds | How to turn it off |
-|---|---|---|
-| Instructions for AI agents | Wrong names in `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules | `"steering": false` |
-| Primitives written by hand | A `<span>` styled as your Text component, a flex `<div>` with the system's gap | Runs only when `primitives` is set |
-| Workarounds | A control laid over a component, a sign of a missing slot or prop | `"workarounds": false` |
-| Tailwind | Classes that differ from Figma, and values in brackets outside the theme | `"tailwind": false` |
-| Values written by hand | Every value a token should carry, with the token to use | `"census": false` (a run fails when a file's count grows) |
-| A commit warns, a push refuses | What a commit or a push uses that has a finding | `--remove-hooks`, or `"hooks": false` |
-
-### Near copies of a component
-
-A product that builds a component by hand, or styles a class almost like one of yours, comes back to you as a decision. Use the component, with a new option if it needs one, or add the new one to the system on purpose.
-
-### Local or shared
-
-Every gap the engine finds and every change an agent proposes is sorted into one of two kinds, with the reason in one line.
-
-- **Local.** It stays in one product: its own screen, its own CSS, its version, its pages. Its team acts, and it waits on no one.
-- **Shared.** It changes what other products get: a shared component's options or props, a token, a contract, a component in Figma. It waits on the person who decides for it, from `owners` in `ds-config.json` ([Who owns what](#who-owns-what)).
-
-How it is judged:
-
-| What | How |
-|---|---|
-| Where it lives | The system (its theme, its components and their contracts, its Figma file) or one product. One the engine cannot place counts as shared until someone says. |
-| Effect on other products | How many products' code uses the component, from the usage map. |
-| How hard it is to undo | A removal, a rename or a breaking change is hard. A changed value is less so. An addition is easy. |
-| Ambiguity | A decision between Figma and the code, or a place the engine could not tell. |
-
-The last three set its risk (high, medium or low), which the reason says. For example: "Shared: cardTile's size=xs is the system's: 3 products use it (Northwind, Acme shop, Acme admin); hard to undo, high risk."
-
-Where you see it:
-
-- **The style guide's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
-  - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
-- **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
-- **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
-- **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
-- **A change held for sign-off.** The guard says why it is shared and who decides it.
-- **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.
-
-### Instructions for AI agents
-
-`AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own. Every component, prop value and token they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing.
-
-A file that only says what not to use is noted too. Saying that the design system is installed and its components are the ones to use is what moves agents onto it.
-
-### Primitives written by hand
-
-Once the library owner declares which styling means which component (`primitives` in `ds-config.json`), the engine spots it written by hand. A `<span>` given the body text style and the secondary colour is `<Text size="medium" color="secondary">`, and a flex `<div>` with the system's gap is its `Stack`. No token check sees these, since their values are the system's own. The audit lists each one, the edit check hands it back when an AI adds one, and `llms.txt` gives generators the table.
-
-### The names your agents actually invent
-
-The catalog rejects names by meaning: a system whose values are `error` and `warn` tells an agent that `danger` means `error`. That catches what a reasonable agent would guess.
-
-It does not catch what *your* agents guessed. `--check-ui` already knows them — every time it says `"Pill" is not in the catalog (did you mean Chip?)`, an agent invented a name and the check knew the right one. Those are now kept (`.design-system-engine-out/invented.json`, local and cumulative) and fed back into the catalog, so the next agent reads them beside the real values instead of finding out after writing the page. A name invented once will be invented again, by the same model reading the same documentation.
-
-Only inventions the check could correct go into the catalog: an entry that cannot say what to write instead would send an agent nowhere. The rest are still counted, because knowing a name gets invented is worth something on its own.
-
-The same names are written into each component's contract (`invented`, with the right name and how often) and beside the component in `llms.txt` ("agents here wrote: prop showFooters → showFooter"), so an agent reads them whichever file it opens. They come from both checks, `--check-ui` and the check of pages written as code, props, values and events alike.
-
-### Workarounds around a component
-
-A screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot. It is reported to the design system as a missing slot or prop, not as the screen's mistake.
-
-**Once is an oddity; three times is a gap.** When the same thing is built by hand around the same component in more than one file, the run says so separately: that is a piece the design system does not have, and documentation does not fix it — the component does. Prototypes count alongside product screens, because an agent drawing a page meets what a component lacks before any product does. The list is also written to `.design-system-engine-out/missing-apis.json`, for whoever owns the component.
-
-### Tailwind
-
-- Each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens), and a difference names the class to write. What is compared:
-  - height, padding, corner, gap, and the fill, text and border colours;
-  - text size, weight and line height, and border width;
-  - shadow, from Figma's effects, and motion: a hover that Figma animates needs `transition` with its duration and easing.
-- **Each variant on its own.** The classes each option writes are read (`cva` and `tailwind-variants`, a map of option to classes, a conditional on the prop), so Figma's Large is compared with the Large classes, not with every class in the file.
-- **Each state.** `hover:`, `active:`, `focus-visible:`, `disabled:` and `aria-`/`data-` classes are compared with the colour Figma binds in that state. A state Figma draws differently with no class for it is named, with the class to add.
-- **Each mode.** In dark mode (or a brand), each colour is checked as the theme's override block or a `dark:` class draws it, against the value Figma gives that variable in the mode.
-- **Tailwind v3 too.** A `tailwind.config` theme (and its `extend`) is read as text, never run, so its colours, spacing, corners, type, shadows and durations name the utility to write, as a v4 `@theme` does.
-- A class with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`) steps outside the theme. When your `@theme` has the same value, it names the utility to write. Otherwise it says the value is not in the design system.
-- `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }`. Figma's token names are then matched to the theme's own (`surface/base/color` to `--color-surface-base`), and a theme variable used through its utility counts as used.
-
-### Values written by hand
-
-The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
-
-### A commit warns, a push refuses
-
-`--install-hooks` (and `--init`) also adds git hooks to the project. Two check what your change uses: `pre-commit` and `pre-push`. Three build your local style guide again after a change: `post-commit`, `post-merge` and `post-rewrite` ([Built again after each commit](#see-a-change-in-seconds)).
-
-- **A commit warns.** It lists what the commit adds that has a finding, and always goes ahead.
-- **A push refuses.** While one of those findings is left, the push stops with the list. Fix them and push again.
-- **Only what the change uses.** The lines the commit or push adds, read against what they replace. The rest of the system's differences never stop either one.
-- **What counts.** What the edit check finds on those lines: a value written by hand, a token declared nowhere, a prop a component does not take. And a difference the last full audit found in a component or token those lines use.
-- **What never counts.** A difference you accepted as debt, one you keep on purpose, or one that is Figma's work alone.
-- **A finding marked wrong** (`--wrong`) is shown, but never stops a push.
-- **Nothing slow.** The two checks never open a browser or reach the network. They read the audit's findings as the last full run left them, so run the audit again once a change fixes one.
-- **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
-- `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
-
-## Review the Figma library
-
-These read the Figma file for whoever keeps it, and never fail a run.
-
-| Check | What it finds | How to turn it off |
-|---|---|---|
-| The Figma file itself | Values with no token, detached instances, missing auto layout or descriptions | `"figmaHygiene": false` |
-
-### The Figma file itself
-
-For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, a variant with no auto layout, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes.
-
-Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
-
-- Under 90% of its values bound to a token or style, or of its variants in auto layout, it is only partly reliable.
-- Under 60%, a match or a difference can be chance, and the least reliable components are named.
-
-### How your system builds a component in Figma
-
-Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own, auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. A Construction page in the style guide, opened by its link, lists them with what is to do; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](commands.md#review-the-figma-library)).
-
-### Components of one type, built the same way
-
-The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
-
-- **States set the same way.** Disabled is a property of its own on most buttons and an option of State on a few: those few are named, with the way most of them do it.
-- **One thing, one name.** `labelContent` on most buttons and `Label` on one: that one is named.
-- **What most of them have.** Most inputs have a label and a required mark: one without them is listed to check.
-
-Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
-
-## Track system health
-
-Advice on keeping the system healthy as it grows, never a failure.
-
-| Check | What it finds | How to turn it off |
-|---|---|---|
-| System health | Risks as the system grows, such as tokens named after a product | `"systemHealth": false` |
-| Mode combinations | What breaks only in a combination of modes, such as Dark on a phone | `modeCombinations: false` |
-
-### System health
-
-Advice on keeping the system healthy as it grows (`🧭 System health`), never a failure.
-
-- A colour mode set below a product's root, so part of the page draws in another mode.
-- A product that brings in two of the system's themes, one overriding the other by load order.
-- Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
-- A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
-- Two components whose own rules are nearly the same.
-- Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
-- Aliases to a removed token, with the commit that removed it.
-- The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
-- A class a product styles almost as one of the system's components, as a decision, never a drift.
-
-A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
-
-### A token in the right layer
-
-A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
-
-### Mode combinations
-
-The gates check each mode on its own. When you have two collections that switch (Light and Dark, Desktop and Phone), every combination is also opened in the browser, such as Dark on a phone or Light on a desktop.
-
-- Each token is compared with Figma's value in that combination.
-- Each text and background pair the system uses is measured for contrast.
-
-Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Status page, under The system.
-
-The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Status page under The system.
-
-### Who owns what
-
-`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Status page then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
-
-- A key can be a pattern: `"tile*"` covers every tile, `"patterns/"` every pattern page.
-- The owner is also who decides what waits on a person about it: a proposal, a page's drafts, a page to review again, a change held for sign-off.
-- When the person who decides is not the team's name, give both: `"tileCard": { "team": "Cards team", "decides": "QA lead" }`.
-
-See [Who decides](#who-decides) for what the Documentation page does with it.
-
-### Brands that pin what they inherit
-
-For a system with brands (Figma's extended collections), System health lists each value a brand sets exactly as it inherits it from the brand it extends. It changes nothing today, and pins the value: the brand no longer follows when its parent changes it. Keep each the brand must hold and remove the rest. A brand may set any variable, a component's own and ones nothing reads yet included; that is never listed. Advice, never a failure.
-
-## Build with AI, on the system
+## Prototype with your real components
 
 ### What it writes for agents
 
@@ -1530,7 +1551,7 @@ Then it says which source decides when two disagree. The goal of the people who 
 
 When you correct what an AI made, the correction is usually said once, in a chat, and lost. The next agent makes the same mistake. A lesson keeps it.
 
-**Keep one.** [Tell Claude](commands.md#build-with-ai-on-the-system) what was wrong and why, or run `rms-design-system-engine --lesson "<what was wrong>" --why "<your reason>"` (add `--component <name>` when it is about one component).
+**Keep one.** [Tell Claude](commands.md#prototype-with-your-real-components) what was wrong and why, or run `rms-design-system-engine --lesson "<what was wrong>" --why "<your reason>"` (add `--component <name>` when it is about one component).
 
 - It is kept in `design-system-engine-lessons.json`, beside your other decisions, with who said it and when. Commit it.
 - Why is required. The AI asks you for it and never writes one for you.

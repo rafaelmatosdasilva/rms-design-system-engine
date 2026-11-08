@@ -1,5 +1,5 @@
 // docs/features.md gives each part one stage: Ready to use, Actively improving, Early development or Coming soon. The
-// "On this page" table and the line under each section's heading say the same, and headings carry no stage, so a
+// "On this page" tables and the line under each section's heading say the same, and headings carry no stage, so a
 // link to a section survives its stage changing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,13 +22,17 @@ test('every part has one stage, the same in the table and in its section', () =>
   }
 });
 
-// Ready to use, then Actively improving, Early development and Coming soon, in the table and in the sections alike,
-// so the page reads as the status it is.
+// The parts are listed in groups, one table each (Audit, Documentation, Collaboration, Creation). Inside a group, Ready
+// to use, then Actively improving, Early development and Coming soon, so each group reads as the status it is. The
+// order of the groups, and of the parts inside one stage, is the owner's: the order in which they build on each other.
 const ORDER = ['Ready to use', 'Actively improving', 'Early development', 'Coming soon'];
 const inOrder = (stages) => stages.every((s, i) => i === 0 || ORDER.indexOf(stages[i - 1]) <= ORDER.indexOf(s));
+const OVERVIEW = PAGE.slice(PAGE.indexOf('**On this page**'), PAGE.search(/^## /m));
+const groups = OVERVIEW.split(/^### /m).slice(1).map((g) => ({ name: g.split('\n')[0], stages: [...g.matchAll(/^\| \[.+?\]\(#.+?\) \|.*\| ([^|]+?) \|$/gm)].map((m) => m[1]) }));
 
-test('parts are listed by stage, most ready first, and headings carry no stage', () => {
-  assert.ok(inOrder([...rows.values()]), `table: ${[...rows.values()].join(', ')}`);
+test('parts are listed in groups, by stage inside each, and headings carry no stage', () => {
+  assert.ok(groups.length > 1 && groups.every((g) => g.stages.length), 'the parts are grouped, and no group is empty');
+  for (const g of groups) assert.ok(inOrder(g.stages), `${g.name}: ${g.stages.join(', ')}`);
   assert.deepEqual([...sections.keys()], [...rows.keys()], 'sections follow the table');
   assert.deepEqual([...PAGE.matchAll(/^## .+ · \w+$/gm)].map((m) => m[0]), []);
 });
@@ -54,5 +58,15 @@ test('every group on the commands page names a part of the features page, or Set
 // the other direction can be held: nothing a reader can use is left without its technical section.
 test('the technical documentation covers every usable part', () => {
   const sections = [...read('docs/details.md').matchAll(/^## (.+)$/gm)].map((m) => m[1]);
-  for (const name of usable.filter((n) => n !== "Fit your team's setup")) assert.ok(sections.includes(name), name);
+  for (const name of usable) assert.ok(sections.includes(name), name);
+});
+
+// The README's feature list is this page's overview, word for word: the same groups, names, descriptions and stages,
+// only its links pointing here. It is the short index of this page, never a second description that drifts from it.
+test('the README lists the features exactly as this page does', () => {
+  const tables = (text) => [...text.matchAll(/^### .+\n\n(?:\|.*\|\n?)+/gm)].map((m) => m[0].replace(/\]\([^)]*\)/g, ']').trim()).join('\n\n');
+  const readme = read('README.md');
+  const at = readme.indexOf('\n## Features\n'), own = readme.slice(at, readme.indexOf('\n## ', at + 1));
+  assert.ok(tables(OVERVIEW).length > 0, 'the page has its overview');
+  assert.equal(tables(own), tables(OVERVIEW));
 });
