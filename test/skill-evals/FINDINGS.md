@@ -8,6 +8,30 @@ Newest first.
 
 ---
 
+## The engine called in quotes, and a rescore that failed what it could not see
+
+**Found** 8 November 2026, measuring the git hooks that build the local style guide again, on the first run after the case below. **Changed** the pattern that tells an engine call (`ENGINE_SCRIPT` and `ENGINE_CALL` in `test/skill-evals/lib.mjs`), now used by `no-cli-on-path`'s check and by `handEdits` as well. `rescore.mjs` is unchanged and was not used for the entry.
+
+**Evidence.** 76 of 79, the three failures all `no-cli-on-path`, *ran the engine by its path* — the one task that passed when no run had node. Its transcript:
+
+```
+node "<the engine's folder, a space in its name>/audit.mjs" --component button
+  PARITY AUDIT · SCOPED TO: button …
+```
+
+The agent ran this engine by its path, with the button scoped, and the engine answered. The check is `/node\s+\S*audit\.mjs/`: `\S*` stops at the first space, and this engine's folder has one, so the path in quotes was never seen. When no run had node the agent had tried `~/.claude/skills/…/audit.mjs` first, with no space, and the check matched a call that had failed.
+
+The same `\S*` was in two more places: `ENGINE_CALL`, which counts the engine's runs, and `handEdits`, which counts a shell command that writes a file as an edit by hand unless it is the engine's. An engine call in quotes that wrote a file would have read as the agent writing it.
+
+**Ruled out.**
+
+- *That the guide stopped teaching the path.* Every run used the path; only the folder it lived in changed.
+- *Rescoring the saved runs with the fixed check, as `rescore.mjs` is for.* It turned the three `no-cli-on-path` runs to passes and nine `figma-*` runs to failures, every one of them a pass when it ran. Their checks read what the engine wrote (`.design-system-engine-out/specs/pill.spec.json`, `.design-system-engine-out/changes/chip.change.json`), and a saved row keeps none of it, so each read `null`. It rewrote the results in place, so the live verdicts of those nine were gone; the evaluation was run again whole instead, on the fixed checks.
+
+**What changed.** One pattern for an engine run by its path: bare, in double quotes or in single quotes. A test holds it to the quoted path with a space, to a command that is not the engine, and to `handEdits` leaving an engine call that writes a file alone. A rescore that cannot see what a run's engine wrote is an item of its own: until it can, a rescore of a task that reads the engine's output is not a score.
+
+---
+
 ## Fifteen of seventy-nine, and no run had node
 
 **Found** 8 November 2026, measuring a change of fifteen lines to `reference/usage.md` and one to `reference/config.md`. **Changed** `makeHome` in `test/skill-evals/lib.mjs`: the node the evaluation runs on goes into the new HOME's `bin`, first on the path. Nothing in `lib/` or in the guide.

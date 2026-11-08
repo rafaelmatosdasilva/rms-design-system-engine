@@ -1,5 +1,6 @@
 // test/skill-evals/rules.mjs - the rules every run must keep, whatever the task.
 // Each check is { name, ok, detail }. A run passes only if its task checks and all of these pass.
+import { ENGINE_CALL } from './lib.mjs';
 
 const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
 
@@ -26,7 +27,7 @@ export function handEdits(ctx, fileRe) {
     const path = String(c.input?.file_path ?? c.input?.notebook_path ?? '');
     if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(c.name) && fileRe.test(path) && !c.isError) out.push(`${c.name} ${path}`);
     const cmd = String(c.input?.command ?? '');
-    if (c.name === 'Bash' && !c.isError && !/(^|[\s;&|(])(rms-design-system-engine|node\s+\S*audit\.mjs)\b/.test(cmd)) {
+    if (c.name === 'Bash' && !c.isError && !ENGINE_CALL.test(cmd)) {
       const target = fileRe.source.replace(/^\(\^\|\\\/\)/, '').replace(/\$$/, '');
       if (new RegExp(`((>|>>)\\s*\\S*${target}|\\b(sed\\s+-i|perl\\s+-i|tee)\\b[^\\n]*${target}|\\bcp\\s+\\S+\\s+\\S*${target})`).test(cmd)) out.push(`Bash ${cmd.slice(0, 80)}`);
     }

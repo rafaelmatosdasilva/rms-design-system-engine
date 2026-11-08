@@ -328,7 +328,11 @@ export function context(events, dir, saved = null) {
 }
 
 // A call to the engine: its command, or node …/audit.mjs.
-export const ENGINE_CALL = /(^|[\s;&|(])(rms-design-system-engine|node\s+\S*audit\.mjs)\b/;
+// The engine's own script run by its path, as an agent writes it: bare, or in quotes where the path has a space in it.
+// `\S*` alone never saw a quoted path with a space, so an engine whose folder had a space in its name was called and
+// not seen: a run that did what its task asked failed it, and an engine call writing a file read as an edit by hand.
+export const ENGINE_SCRIPT = /node\s+(?:"[^"\n]*audit\.mjs"|'[^'\n]*audit\.mjs'|\S*audit\.mjs\b)/;
+export const ENGINE_CALL = new RegExp(`(^|[\\s;&|(])(rms-design-system-engine\\b|${ENGINE_SCRIPT.source})`);
 
 export const ENGINE_WRITES = /^\.design-system-engine-out\/|^contracts\/|^design-system-engine-(agreed|history)\.json$|^(component-prop-result|design-system-engine-check-result)\.json$|html-structure\.snapshot\.json$|^design-intent\.json$|^llms\.txt$/;
 

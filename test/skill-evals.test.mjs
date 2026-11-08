@@ -6,8 +6,8 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { context, decisionPoints, afterPass, makeHome, cleanup } from './skill-evals/lib.mjs';
-import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
+import { context, decisionPoints, afterPass, makeHome, cleanup, ENGINE_SCRIPT, ENGINE_CALL } from './skill-evals/lib.mjs';
+import { globalChecks, asksForToken, handEdits } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
 import { makeFixture, tempDir } from './helpers.mjs';
@@ -404,4 +404,23 @@ test('a run\'s shell finds the node the evaluation runs on, and still no engine 
     try { assert.equal(execFileSync('/bin/sh', ['-c', 'command -v node'], { env: { PATH: bare.path, HOME: bare.home }, encoding: 'utf8' }).trim(), join(bare.home, 'bin', 'node')); }
     finally { cleanup(bare.home); }
   } finally { cleanup(home); }
+});
+
+test('the engine run by its path is seen however the path is written, a quoted one with a space in it too', () => {
+  // An engine in a folder with a space in its name is called in quotes; `\\S*` alone never saw it, so a run that
+  // did what no-cli-on-path asks failed it, three runs of three.
+  const called = [
+    'node "/srv/Design Work/engine/audit.mjs" --component button',
+    "node '/srv/Design Work/engine/audit.mjs' --component button",
+    'node ~/.claude/skills/rms-design-system-engine/audit.mjs --component button',
+    'cd x && node /opt/engine/audit.mjs --route "check it"',
+    'rms-design-system-engine --component button',
+  ];
+  for (const cmd of called) assert.ok(ENGINE_CALL.test(cmd), cmd);
+  for (const cmd of called.slice(0, 4)) assert.ok(ENGINE_SCRIPT.test(cmd), cmd);
+  for (const cmd of ['cat /opt/engine/audit.mjs', 'node -e "1"', 'node "/opt/other/run.mjs"', 'grep audit.mjs README.md']) assert.equal(ENGINE_CALL.test(cmd), false, cmd);
+  // An engine call that writes a file is the engine's work, never an edit by hand.
+  const ctx = { calls: [{ name: 'Bash', isError: false, input: { command: 'node "/srv/Design Work/engine/audit.mjs" --json > ds-config.json' } }] };
+  assert.deepEqual(handEdits(ctx, /(^|\/)ds-config\.json$/), []);
+  assert.equal(handEdits({ calls: [{ name: 'Bash', isError: false, input: { command: 'echo {} > ds-config.json' } }] }, /(^|\/)ds-config\.json$/).length, 1, 'a write of its own still counts');
 });
