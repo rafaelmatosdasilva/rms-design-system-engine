@@ -31,7 +31,8 @@ test('a product that brings in two of the system\'s themes', () => {
 test('semantic tokens with no description; primitives are left out', () => {
   const vars = { color: { light: { 'text/primary': '#111', 'text/muted/color': '#666', 'primitives/gray/900': '#111' } }, sizing: { 'space/s': '4px' },
     tokenMeta: { 'text/primary': { description: 'Body text' }, 'text/muted': { description: 'Secondary text' } } };
-  assert.deepEqual(undescribedTokens(vars), { total: 3, missing: ['space/s'] });
+  // It says what it read, not only what it found: a rule nothing breaks needs the denominator to show a share.
+  assert.deepEqual(undescribedTokens(vars), { total: 3, semantic: ['space/s', 'text/muted/color', 'text/primary'], missing: ['space/s'] });
 });
 
 test('a Storybook preview rule that styles a component', () => {
