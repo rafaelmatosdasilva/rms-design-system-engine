@@ -55,7 +55,7 @@ file in the pipeline's cache). A source that cannot be read counts as moved: a b
 --a11y-no-worse` fails (exit 1) on an accessibility blocker the base branch's last build did not have, naming each; exit 0
 is no new blocker (or no base kept yet), exit 2 that this run measured nothing. On the base branch, after the audit,
 `--a11y-no-worse --record` keeps the base. The GitLab and GitHub jobs that carry it from one to the other are in the
-engine's `docs/details.md`, under *Accessibility never gets worse*; the options are in `--reference usage`.
+engine's `docs/accessibility.md`, under *Accessibility never gets worse*; the options are in `--reference usage`.
 
 
 To run the engine on every PR/push via GitHub Actions, add `.github/workflows/design-system-engine.yml` to your project:

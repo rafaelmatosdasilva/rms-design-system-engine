@@ -2,7 +2,7 @@
 
 How the repository is laid out, how to run the tests, and what a change has to satisfy before it merges.
 
-This page is for whoever is changing the engine itself: the maintainer, or anyone who has forked it. It is not an invitation to send the change back here. [CONTRIBUTING.md](../CONTRIBUTING.md) says how to take part, and [GOVERNANCE.md](../GOVERNANCE.md) how decisions are made.
+This page is for whoever is changing the engine itself: the maintainer, or anyone who has forked it. It is not an invitation to send the change back here. [CONTRIBUTING.md](../.github/CONTRIBUTING.md) says how to take part, and [GOVERNANCE.md](governance.md) how decisions are made.
 
 **On this page**
 
@@ -36,7 +36,7 @@ node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
 ```
 
-`sync-docs.mjs --check` exits non-zero if the gate counts or gate labels in `README.md`, `docs/features.md`, `docs/details.md` or the guide no longer match `lib/audit.mjs`. Run it without `--check` to patch them.
+`sync-docs.mjs --check` exits non-zero if the gate counts or gate labels in `README.md`, the pages in `docs/` or the guide no longer match `lib/audit.mjs`. Run it without `--check` to patch them.
 
 ## What a change needs
 

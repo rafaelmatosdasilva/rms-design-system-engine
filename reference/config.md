@@ -2,6 +2,8 @@
 
 Part of the rms-design-system-engine reference (`rms-design-system-engine --reference config`). The rules that always apply are in the main guide.
 
+A full example of a project's settings is in the engine's `docs/ds-config.example.json`.
+
 ---
 
 

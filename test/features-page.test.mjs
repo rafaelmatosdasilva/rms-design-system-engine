@@ -49,16 +49,31 @@ const usable = [...rows].filter(([, s]) => s !== 'Coming soon').map(([n]) => n);
 // written yet: a part may be held at Coming soon while its requests and its technical section already exist, and a
 // part may be Ready to use before either is written. So the pages are held to the parts, never to the stages: every
 // group and every section names a part of the page, and nothing a reader can use goes undocumented.
-test('every group on the commands page names a part of the features page, or Set up', () => {
-  const groups = [...read('docs/commands.md').matchAll(/^## (.+)$/gm)].map((m) => m[1]);
-  assert.deepEqual(groups.filter((g) => g !== 'Set up' && !parts.includes(g)), []);
+test('every What to ask table sits under a part of the page, or under Set up', () => {
+  const under = [];
+  let part = null;
+  for (const line of PAGE.split('\n')) {
+    const h = line.match(/^## (.+)$/)?.[1];
+    if (h) part = h;
+    if (/^### What to ask$/.test(line)) under.push(part);
+  }
+  assert.ok(under.length > 5, 'the parts carry their requests');
+  assert.deepEqual(under.filter((g) => !parts.includes(g)), []);
+  assert.ok(/^## Set up$/m.test(PAGE), 'the requests that set the engine up have their section');
 });
 
-// The page also carries sections that are not parts at all (Install and update, Run it, Security and data), so only
-// the other direction can be held: nothing a reader can use is left without its technical section.
-test('the technical documentation covers every usable part', () => {
-  const sections = [...read('docs/details.md').matchAll(/^## (.+)$/gm)].map((m) => m[1]);
-  for (const name of usable) assert.ok(sections.includes(name), name);
+// The technical documentation is one page per group (Test accessibility, the largest part, on a page of its own), and
+// every part a reader can use has its section, under its own name, on its group's page. A page also carries sections
+// that are not parts (Install and update, Security and data), so only that direction can be held.
+const PAGE_OF_GROUP = { Audit: 'audit', Documentation: 'documentation', Collaboration: 'collaboration', Creation: 'creation' };
+const groupOf = new Map(groups.flatMap((g) => [...OVERVIEW.split(/^### /m).find((x) => x.startsWith(g.name)).matchAll(/^\| \[(.+?)\]\(#/gm)].map((m) => [m[1], g.name])));
+test('the technical documentation covers every usable part, on its group\'s page', () => {
+  for (const name of usable) {
+    const page = name === 'Test accessibility' ? 'accessibility' : PAGE_OF_GROUP[groupOf.get(name)];
+    assert.ok(page, `${name}: its group has a page`);
+    const sections = [...read(`docs/${page}.md`).matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+    assert.ok(sections.includes(name), `${name} on docs/${page}.md`);
+  }
 });
 
 // The README's feature list is this page's overview, word for word: the same groups, names, descriptions and stages,

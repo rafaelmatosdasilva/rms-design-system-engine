@@ -36,7 +36,7 @@ body:
     attributes:
       label: Where
       description: The page, and the heading or line.
-      placeholder: docs/details.md, "Compare Figma and code"
+      placeholder: docs/audit.md, "Compare Figma and code"
     validations:
       required: true
 

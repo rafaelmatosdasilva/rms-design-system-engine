@@ -1,6 +1,6 @@
 # Features and capabilities
 
-What the engine does for design and product teams. Every part reads the same knowledge about your system, so what one learns, the others use. How each part works is in the [technical documentation](details.md), and what to ask Claude Code is on the [Commands](commands.md) page.
+What the engine does for design and product teams. Every part reads the same knowledge about your system, so what one learns, the others use. Each part says what to ask Claude Code for it, in its **What to ask** table, and [Set up](#set-up) has the requests that set the engine up. How each part works is in the [technical documentation](README.md). The page is also the roadmap: the parts marked Coming soon are what comes next.
 
 **On this page**
 
@@ -37,6 +37,22 @@ What the engine does for design and product teams. Every part reads the same kno
 | [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built in Figma, code or both. | Coming soon |
 | [Prototype with your real components](#prototype-with-your-real-components) | AI builds prototypes with your real components, and nothing invented gets past the checks. | Coming soon |
 
+## Set up
+
+Copy a request into Claude Code, or say it in your own words. Each part below has its own **What to ask** table; these set the engine up.
+
+Name a component the way your system does (button primary, Button Primary and primary button all work). When a word fits several components, such as *button* in a system with buttonPrimary and iconButton, Claude asks which one first.
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine set up this project` | Asks where your code and Figma are, then sets the project up |
+| `/rms-design-system-engine check the install` | Each problem with the install, and its fix |
+| `/rms-design-system-engine use these guidelines <link>` | Your written guidelines from Notion or GitLab, read on every run |
+| `/rms-design-system-engine use this intent layer <link or folder>` | Your intent layer (DSDS or Markdown pages on GitLab, GitHub or in a folder of your project, or pages in Notion or Confluence) read into each component's documentation, its contract and `llms.txt`, and a page that says what agents use from it |
+| `/rms-design-system-engine refresh the Figma data` | Figma read again, the best way available |
+| `/rms-design-system-engine take the hosted token stylesheets again` | The stylesheets your product loads its token values from, downloaded again into one local file, every mode of them, with the address kept so a later run does it by itself |
+| `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
+
 ## Check your Figma library
 
 **Ready to use** · **Why it matters:** Every other result is only as good as the file it compares against.
@@ -48,6 +64,13 @@ What the engine does for design and product teams. Every part reads the same kno
 - Fixes a component's construction, such as renaming its layers, after you say yes.
 - Compares components of one kind, so every button sets its states and names its options the same way.
 - Says when the file is not reliable enough to compare, before any result.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
+| `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
 
 ## Lint your codebase
 
@@ -84,6 +107,12 @@ What the engine does for design and product teams. Every part reads the same kno
 - Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
 - Reads products kept in their own repositories. *(Coming soon)*
 
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
+
 ## Compare Figma and code
 
 **Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
@@ -99,9 +128,22 @@ What the engine does for design and product teams. Every part reads the same kno
 - Checks that a brand changes only values, never which parts a component draws or how they are laid out.
 - Warns when a Figma frame changed since the version you approved.
 - Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
-- Runs 25 checks, called gates, each listed in the [technical documentation](details.md#the-gates).
+- Runs 25 checks, called gates, each listed in the [technical documentation](audit.md#the-gates).
 - Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
 - Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine check everything` | Every check, a summary and every difference in `differences.md` |
+| `/rms-design-system-engine check the button` | The same, for one component |
+| `/rms-design-system-engine check the button against Figma, without accessibility` | Every check against Figma, without accessibility |
+| `/rms-design-system-engine run only the token values check` | One check, by number or name |
+| `/rms-design-system-engine which component should I fix first?` | The component with the most left to fix |
+| `/rms-design-system-engine what did the last audit find?` | The last run's summary again, with nothing run anew |
+| `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
+| `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
 
 ## Test accessibility
 
@@ -124,6 +166,13 @@ What the engine does for design and product teams. Every part reads the same kno
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
 - Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
 
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
+| `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
+
 ## Write component specs
 
 **Ready to use** · **Why it matters:** Developers and AI tools build from the same spec, and nobody keeps it up to date by hand.
@@ -139,6 +188,13 @@ What the engine does for design and product teams. Every part reads the same kno
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
 - Drafts a Figma Code Connect file for each component that has none, from what its contract pairs. A person checks it and publishes it.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
+| `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
 
 ## Gather usage guidelines
 
@@ -165,6 +221,15 @@ What the engine does for design and product teams. Every part reads the same kno
 - Rates how ready your guidance is for AI agents, component by component.
 - Never overwrites a sentence a person wrote.
 - A change to the layer reaches the published style guide on its own, checked on the pages it was about.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine record that the tile has no large size, we ruled out a size per page because no screen needs it` | One decision on the tile's page in the intent layer, with what was ruled out and why, shown in History and given to agents |
+| `/rms-design-system-engine the row is a part of the tile list, it is never used on its own` | Recorded on the tile list's page in the intent layer: the row shown and documented inside it, and agents told to place the list |
+| `/rms-design-system-engine rate our guidelines for agents` | How much an agent can take from your guidance: ready, partial or thin, for each component, with what to add |
+| `/rms-design-system-engine rate our guidelines and test extraction with a model` | The same, plus a test where a model answers questions from your guidance alone (uses your model tokens) |
 
 ## Annotate Figma from the code
 
@@ -194,6 +259,15 @@ What the engine does for design and product teams. Every part reads the same kno
 - The copy on your computer keeps up with your git, the engine and the code. Once you have built it there, it is built again after each commit and each change you pull in, and after a Claude Code turn once the engine updated or the code it reads moved. It is the quick build, for you to look at, and is never published.
 - A team with no CI runner asks for a round when it wants one. It runs only what the change feeds, and publishes to your team's store only a page that changed.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine build the style guide` | The living style guide |
+| `/rms-design-system-engine check the modal and show it in the style guide` | One component's page |
+| `/rms-design-system-engine publish the style guide for the team` | The job that publishes it on every push |
+| `/rms-design-system-engine rebuild my style guide` | Your own copy built again, only the parts the change reached |
 
 ## Try components in a playground
 
@@ -331,6 +405,15 @@ It records what was found, never a verdict of its own. And where a check never w
 6. Whether agents are **reading** a component's card before using it.
 
 Two things it will not do. It never shows a zero where it means *not yet*: a step with nothing yet says what to run instead, because a zero and *not yet* look the same and mean opposite things. And under twelve checks it refuses to draw a trend and says so: two runs are not a trend, and a tool that draws one from two runs is a tool that says the opposite next week.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine remember this lesson: the clock button was put inside the tile, because a tile holds one action` | Your correction kept with your reason, and the strongest guard that can hold it (a check, a step agents read, or a rule for your guidelines), written once you say yes |
+| `/rms-design-system-engine show the lessons` | Every lesson and what it became, the rules proposed from findings that repeat, and the lines an AI wrote that a person changed since |
+| `/rms-design-system-engine are our prototypes getting better?` | The whole loop on one screen: the patterns a new page is held to, what agents got wrong and whose fault each was, what was written, what is left for a person, and whether the number is falling |
+| `/rms-design-system-engine judge the Showroom screens with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |
 
 ## Works with your tools
 
