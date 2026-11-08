@@ -1045,7 +1045,8 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
   - **A token that may write but not read is refused, not guessed at.** Sending the page reads the project's files first: that is how the engine tells what is already there from what is new. A token your host lets commit but not read the repository (a fine-grained token without **Repository: Read**) stops the publish and says so, rather than sending every file as new and leaving the store between two builds.
-- **Your own copy is rebuilt when you ask.** Nothing rebuilds it by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](commands.md#publish-a-living-style-guide)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
+- **Your own copy is rebuilt when you ask.** A round, the build that publishes, never starts by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](commands.md#publish-a-living-style-guide)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
+- **The page on your computer keeps up with your git.** After each commit and each pull, it is built again quickly and never published ([See a change in seconds](#see-a-change-in-seconds)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
@@ -1104,6 +1105,12 @@ A full build tries every component's accessibility in a browser, so it takes min
 - **What it leaves out.** No accessibility tried while building, no pictures of the guide's own pages, and nothing read from or sent to your team's stores.
 - **One component, faster still.** Add `--component` with its name for a page of that component and the ones it nests. Its audit is not run first, as it is for a full build.
 - **`--styleguide --watch` builds again on each save.** It follows your project, the style guide's template and the engine, and builds a moment after you save. Several files saved together make one build. Ctrl+C stops it.
+- **Built again after each commit and each pull.** Once you have built the page here, your git builds it again quickly after a commit, a merge or a pull, and a rebase. Your copy stays as your git is, with no command of yours.
+  - **Git never waits.** The build runs on its own and ends with the page. A commit goes ahead at once.
+  - **Never unasked.** Nothing is built where no page was built yet, nothing on CI, and nothing with `"hooks": false`.
+  - **One build at a time.** Several commits close together make one build, then one more for what came in meanwhile.
+  - **What it printed** is in `.design-system-engine-out/styleguide-rebuild.log`.
+  - **It comes by itself.** A project set up with the engine's hooks gets these on its next run ([A commit warns, a push refuses](#a-commit-warns-a-push-refuses)).
 - **Never published.** A quick page carries a mark, and no store takes it. Build the full guide (`--styleguide`) before you publish.
 - **Its times are kept apart.** `--timing` says where the time went, and `timing.json` keeps them under `styleguide --quick`, so they never replace the full build's.
 
@@ -1406,7 +1413,7 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 
 ### A commit warns, a push refuses
 
-`--install-hooks` (and `--init`) also adds two git hooks to the project. They look only at what your change uses.
+`--install-hooks` (and `--init`) also adds git hooks to the project. Two check what your change uses: `pre-commit` and `pre-push`. Three build your local style guide again after a change: `post-commit`, `post-merge` and `post-rewrite` ([Built again after each commit](#see-a-change-in-seconds)).
 
 - **A commit warns.** It lists what the commit adds that has a finding, and always goes ahead.
 - **A push refuses.** While one of those findings is left, the push stops with the list. Fix them and push again.
@@ -1414,8 +1421,8 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 - **What counts.** What the edit check finds on those lines: a value written by hand, a token declared nowhere, a prop a component does not take. And a difference the last full audit found in a component or token those lines use.
 - **What never counts.** A difference you accepted as debt, one you keep on purpose, or one that is Figma's work alone.
 - **A finding marked wrong** (`--wrong`) is shown, but never stops a push.
-- **Nothing slow.** The hooks never open a browser or reach the network. They read the audit's findings as the last full run left them, so run the audit again once a change fixes one.
-- **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has its own `pre-commit` or `pre-push`, or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
+- **Nothing slow.** The two checks never open a browser or reach the network. They read the audit's findings as the last full run left them, so run the audit again once a change fixes one.
+- **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
 - `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
 ## Review the Figma library
