@@ -74,6 +74,17 @@ test('a person, a personal address, the backlog and its codes are refused', () =
   assert.ok(kinds(['the', 'design', 'system', 'engine', [...'golkcab'].reverse().join('')].join('-')).includes('private name'));
 });
 
+test('a bot signs its own commits, and that sign-off is nobody\'s address', () => {
+  // Dependabot ends every commit message this way, and the rule refused the update for it, not for the diff.
+  const bot = `${'supp' + 'ort'}@${'git' + 'hub'}.com`;
+  assert.deepEqual(kinds(`actions: bump the actions group\n\nSigned-off-by: dependabot[bot] <${bot}>`), []);
+  assert.deepEqual(kinds(`Co-authored-by: some-app[bot] <${bot}>`), []);
+  // Only inside that trailer, and only for a bot: a person's sign-off and a loose address are still found.
+  assert.ok(kinds(`Signed-off-by: ${'A' + 'na'} <${bot}>`).includes('email address'));
+  assert.ok(kinds(`write to ${bot} about it`).includes('email address'));
+  assert.ok(kinds(`Signed-off-by: dependabot[bot] <${bot}>\nand write to ${bot}`).includes('email address'));
+});
+
 test('placeholders, no-reply addresses, colour spaces and products are not private', () => {
   assert.deepEqual(kinds('demo@example.com, git@gitlab.example.com, noreply@anthropic.com, user:secret@gitlab.com'), []);
   assert.deepEqual(kinds('icon@1x.png; Display P3 (D65); a heading H2; fonts from Google Fonts; by the design team'), []);
