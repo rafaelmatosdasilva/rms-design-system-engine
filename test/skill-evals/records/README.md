@@ -222,5 +222,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-09-new-ui-saved-alone` | `new-ui-saved` alone, 20 runs on Haiku (engine 5e50605), to read the one miss of the run above | "A question in place of the confirmation, once in thirty" (FINDINGS.md) |
 | `2026-11-09-how-a-shadow-changes-a` | The 24 guide tasks on Haiku (engine 93c09f2) | "Shadows, slots and the gap between parts" |
 | `2026-11-09-a-family-aligned-filled-and` | The 24 guide tasks on Haiku (engine ecf6b4b) | "A family aligned, filled and padded alike" |
+| `2026-11-09-a-system-with-no-layers` | The 24 guide tasks on Haiku (engine 72fa6b3) | "Category words, a family's limits, how a hover shows" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
