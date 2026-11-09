@@ -109,8 +109,22 @@ test('the code on History: a row each commit, the issues it names, how many comm
     const all = await rows();
     assert.equal(all.length, 3, 'a row each commit');
     assert.match(all[0][1], /^#11 · 3 commits #12 REV-1 Code review [0-9a-f]{7}$/, 'every issue it names, each with how many commits it has when more than one, then what it says');
-    assert.match(all[2][1], /Released in v1\.0\.0/);
     assert.deepEqual(all.map((x) => x[3]), ['Quokka da Wombat', 'wombat', 'Quokka da Wombat'], 'one person by the name they sign with; a Windows sign-in by its name alone');
+    // The release it shipped in sits under the day it was made, in the page's own version tag, and nowhere else: a
+    // commit no release holds yet carries none, and so does everything that ships in no release.
+    const when = async () => run(`[...document.querySelectorAll('#history tr[data-chip="code"]:not([hidden])')].map((tr) => tr.cells[0].innerText.replace(/\\s+/g, ' ').trim())`);
+    assert.match((await when())[2], /^2026-10-15 \d\d:\d\d v1\.0\.0$/, 'its day, its time, then the release it shipped in');
+    assert.equal(await run(`document.querySelectorAll('#history .sg-log-release').length`), 1, 'only the commit a release holds is tagged');
+    assert.equal(await run(`!!document.querySelector('#history .sg-log-release .sg-status')`), true, 'the page\'s own version tag, as beside the system\'s name');
+    assert.equal(await run(`document.querySelector('#history tr[data-chip="code"] .sg-log-what').innerText.indexOf('Released in')`), -1, 'no longer a line of its own in What');
+    // Sorted by Date, newest first, as the page opens; only the columns rows of one moment share can sort.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log th[data-sort]')].map((th) => th.getAttribute('data-sort'))`), ['Date', 'Type', 'Done by'], 'never What or Affects, which are one row\'s own');
+    assert.equal(await run(`document.querySelector('#history th[data-sort="Date"]').getAttribute('aria-sort')`), 'descending', 'newest first as it opens, and the head says so');
+    await run(`document.querySelector('#history th[data-sort="Date"] .sg-mx-sort').click()`);
+    assert.equal(await run(`document.querySelector('#history th[data-sort="Date"]').getAttribute('aria-sort')`), 'ascending');
+    assert.deepEqual((await when()).map((d) => d.slice(0, 10)), ['2026-10-15', '2026-10-16', '2026-10-17'], 'oldest first, clicked once');
+    await run(`document.querySelector('#history th[data-sort="Date"] .sg-mx-sort').click()`);
+    assert.deepEqual((await when()).map((d) => d.slice(0, 10)), ['2026-10-17', '2026-10-16', '2026-10-15'], 'newest first again, clicked twice');
     // An issue's count shows its commits alone, and a way back to every change.
     await run(`document.querySelector('#history [data-ticket="#12"], #history [data-ticket="#11"]').click()`);
     assert.equal((await rows()).length, 3);

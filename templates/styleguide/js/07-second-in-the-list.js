@@ -290,15 +290,25 @@
     };
     // Its day, and its time where it has one, as the reader's clock says it.
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    var dateCell = function (at) {
-      var s = String(at || ''), t = Date.parse(s);
-      if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + '</td>';
+    // The release the change shipped in, under the day it was made: the column that already answers when, and the
+    // page's own version tag, so a release reads the same here as it does beside the system's name. A change no
+    // release holds yet, and everything that ships in none (a read of Figma, a decision), simply has no tag.
+    var releaseTag = function (rel) {
+      if (!rel || !rel.k) return '';
+      var on = rel.on ? 'Released on ' + String(rel.on).slice(0, 10) : 'Released';
+      var tag = '<span class="sg-status">' + esc(rel.k) + '</span>';
+      return line(rel.url ? '<a class="sg-log-release" href="' + esc(rel.url) + '" target="_blank" rel="noopener" title="' + esc(on) + '">' + tag + '</a>'
+        : '<span class="sg-log-release" title="' + esc(on) + '">' + tag + '</span>');
+    };
+    var dateCell = function (at, rel) {
+      var s = String(at || ''), t = Date.parse(s), tag = releaseTag(rel);
+      if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + tag + '</td>';
       var d = new Date(t);
-      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())) + line(quiet(pad(d.getHours()) + ':' + pad(d.getMinutes()))) + '</td>';
+      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())) + line(quiet(pad(d.getHours()) + ':' + pad(d.getMinutes()))) + tag + '</td>';
     };
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
-    var add = function (at, chip, type, what, bys, affects, tickets, group) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null }); };
+    var add = function (at, chip, type, what, bys, affects, tickets, group, release) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null }); };
     // The code: each commit, the issues it names (each linked, with how many commits it has when more than one), what it
     // says, and the release it shipped in, once it has shipped.
     var ticketsOf = function (r) { return r.tickets || (r.ticket ? [{ ticket: r.ticket, ticketUrl: r.ticketUrl }] : []); };
@@ -313,18 +323,17 @@
         return name + (n > 1 ? ' ' + quiet('· <button type="button" class="sg-log-only" data-ticket="' + esc(t.ticket) + '">' + n + ' commits</button>') : '');
       }).join('  '));
     };
-    var releaseLine = function (g, r) {
-      // A commit no release holds yet: nothing to say (only a release is worth a line).
-      if (!g.k) return '';
+    var releaseOf = function (g, r) {
+      // A commit no release holds yet: nothing to show (only a release is worth a tag).
+      if (!g.k) return null;
       var url = r.url ? r.url.replace(/\/-\/commit\/[0-9a-f]+$/, '/-/tags/' + encodeURIComponent(g.k)).replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(g.k)) : null;
-      var tag = url && url !== r.url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(g.k) + '</a>' : esc(g.k);
-      return line(quiet('Released in ') + tag + (g.on ? ' ' + quiet('on ' + esc(String(g.on).slice(0, 10))) : ''));
+      return { k: g.k, on: g.on || '', url: url && url !== r.url ? url : null };
     };
     var noWho = function (r) { var o = {}; for (var k in r) o[k] = r[k]; o.by = null; return o; };
     order.forEach(function (g) { g.commits.forEach(function (x) {
       var r = x.r, comps = (x.comps || []).slice().sort();
       var affects = (comps.length ? pillsHTML(comps) : '') + ((r.where || []).length ? (comps.length ? ' ' : '') + whereHTML(r.where) : '');
-      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))) + releaseLine(g, r), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }));
+      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r));
     }); });
     // Figma: what each read changed in each component, a row each; the components read for the first time, one row.
     order.forEach(function (g) {
@@ -385,20 +394,43 @@
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
-    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Affects</th><th scope="col">Done by</th></tr></thead><tbody>' +
+    // Sorted by Date, newest first, as the page opens. Only the columns rows of one moment share can sort: What and
+    // Affects are one row's own, so ordering by them would tear a moment apart.
+    var LOG_SORT = { 'Date': function (x) { return stamp(x.at); }, 'Type': function (x) { return x.type; }, 'Done by': function (x) { return (x.bys || []).join(' '); } };
+    var logHead = ['Date', 'Type', 'What', 'Affects', 'Done by'].map(function (name) {
+      return LOG_SORT[name] ? '<th scope="col" data-sort="' + esc(name) + '" aria-sort="' + (name === 'Date' ? 'descending' : 'none') + '"><button type="button" class="sg-mx-sort">' + esc(name) + MX_TRI + '</button></th>'
+        : '<th scope="col">' + esc(name) + '</th>';
+    }).join('');
+    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-log"><thead><tr>' + logHead + '</tr></thead><tbody>' +
       ROWS.map(function (x, i) {
         // Rows of one moment, side by side: their Date, Type and Done by once, across them all (staying in view as they scroll).
         var n = 1; if (x.group && (i === 0 || ROWS[i - 1].group !== x.group)) while (ROWS[i + n] && ROWS[i + n].group === x.group) n++;
         var lead = !x.group || i === 0 || ROWS[i - 1].group !== x.group, span = n > 1 ? ' rowspan="' + n + '"' : '';
         var shared = function (cell) { return cell.replace(/^<td class="([^"]+)">([\s\S]*)<\/td>$/, '<td class="$1"' + span + '><div class="sg-log-stick">$2</div></td>'); };
-        return '<tr data-chip="' + x.chip + '"' + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
-          (lead ? shared(dateCell(x.at)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
+        return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
+          (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
+    // The table itself, held now: box is a var another page reuses, so by the time a head is measured or a column is
+    // clicked it may name another page's. Everything below works from this table, never from box.
+    var logHeadEl = box.querySelector('table.sg-log > thead'), logTable = logHeadEl.parentNode;
+    // Sorted in place, a moment at a time: a lead row and the rows under it move together, so the cells they share
+    // keep the rows they span. The rows are moved, never built again, so a row a chip or a ticket hid stays hidden.
+    var logKey = 'Date', logDir = -1;
+    var logSort = function (key) {
+      var val = LOG_SORT[key]; if (!val) return;
+      logDir = logKey === key ? -logDir : 1; logKey = key;
+      var tb = logTable.tBodies[0], blocks = [], cur = null;
+      Array.prototype.forEach.call(tb.children, function (tr) {
+        if (cur && tr.classList.contains('sg-log-more')) { cur.trs.push(tr); return; }
+        cur = { x: ROWS[+tr.getAttribute('data-log-row')], trs: [tr] }; blocks.push(cur);
+      });
+      blocks.sort(function (a, b) { var u = val(a.x), v = val(b.x); return (u < v ? -1 : u > v ? 1 : 0) * logDir || stamp(b.x.at) - stamp(a.x.at); });
+      blocks.forEach(function (b) { b.trs.forEach(function (tr) { tb.appendChild(tr); }); });
+      Array.prototype.forEach.call(logTable.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (logDir > 0 ? 'ascending' : 'descending') : 'none'); });
+    };
     // The shared cells stick under the table's head: how tall the head is, again whenever it changes (shown, resized).
-    // Held here: box is a var another page reuses, so it may name another page's by the time the head is measured.
-    var logHead = box.querySelector('table.sg-log > thead'), logTable = logHead.parentNode;
-    var headH = function () { if (logHead.offsetHeight) logTable.style.setProperty('--sg-log-head-h', logHead.offsetHeight + 'px'); };
-    headH(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(headH).observe(logHead);
+    var headH = function () { if (logHeadEl.offsetHeight) logTable.style.setProperty('--sg-log-head-h', logHeadEl.offsetHeight + 'px'); };
+    headH(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(headH).observe(logHeadEl);
     // The code, Figma, the intent layer or the decisions: a chip for each type the page has, when it has two.
     var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
     if (kinds.length > 1) pageBar(wn, { chips: kinds });
@@ -411,6 +443,7 @@
       if (t) Array.prototype.forEach.call(wn.querySelectorAll('.sg-chip[data-chip]'), function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-chip') === 'all' ? 'true' : 'false'); });
     };
     box.addEventListener('click', function (e) {
+      var th = e.target.closest('th[data-sort]'); if (th) { logSort(th.getAttribute('data-sort')); return; }
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
       var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove();
