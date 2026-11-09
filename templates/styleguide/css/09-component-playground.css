@@ -1036,6 +1036,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .pg-inspect tr:last-child td, .pg-inspect tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
 /* History's table: when, the type, what was done, what it affects, who did it. A card's table as every other (pg-par-card,
    pg-par-table): its head sticks with the card's corners, its top line and the gap above it, as the Status page's. */
+.sg-log-release { display: inline-block; text-decoration: none; }   /* the release a change shipped in, under the day it was made: the page's own version tag, a link to the tag where the code's host gives one */
+.sg-log-release:hover .sg-status { background: color-mix(in srgb, var(--sg-muted) 24%, transparent); }
 .pg-par-table.sg-log td { vertical-align: top; }   /* every cell from its top: a row's date, its type, what it did and who line up */
 .pg-par-table.sg-log tr.sg-log-more > td:first-child { padding-left: var(--sg-space-m); }   /* a row under a shared date starts with What and ends with Affects: their own columns' padding, not the table's first and last */
 .pg-par-table.sg-log tr.sg-log-more > td:last-child { padding-right: var(--sg-space-m); }

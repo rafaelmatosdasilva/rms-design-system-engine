@@ -1259,11 +1259,14 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /<table class="pg-par-table sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Affects<\/th><th scope="col">Done by<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, what it affects, then who did it, each column named');
+  assert.match(tpl, /var logHead = \['Date', 'Type', 'What', 'Affects', 'Done by'\]\.map/, 'when, its type, what was done or decided, what it affects, then who did it, each column named');
+  assert.match(tpl, /var LOG_SORT = \{ 'Date': [^}]+\}, 'Type': [^}]+\}, 'Done by': [^}]+\} \};/, 'the three columns rows of one moment share are the ones that sort, never What or Affects');
+  assert.match(tpl, /aria-sort="' \+ \(name === 'Date' \? 'descending' : 'none'\)/, 'newest first as the page opens, and the head says which column it is sorted by');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
-  assert.match(tpl, /line\(quiet\('Released in '\) \+ tag/, 'each commit says the release it shipped in');
+  assert.match(tpl, /var releaseTag = function \(rel\) \{/, 'each commit says the release it shipped in, as a tag under the day it was made');
+  assert.match(tpl, /return '<td class="sg-log-when">' \+ line\(esc\(s\.slice\(0, 10\)\)\) \+ tag \+ '<\/td>';/, 'the tag sits in the Date cell, the column that already answers when');
   assert.doesNotMatch(tpl, /Not released yet/, 'a commit not released yet says nothing of it');
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
@@ -1738,9 +1741,16 @@ test('History: a row per change, newest first, whatever its type: a commit to th
     ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
     ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Not in the guide yet: Saving Committed in eea0cd0e'],
     ['decisions', 'Decision', 'No large tile Answered'],
-    ['code', 'Code', '#11 · 2 commits REV-1 the tile Released in v2.0.0 on 2026-10-21'],
-  ], 'newest first, whatever the type: an issue a count of its commits, each commit its release; a read of Figma a row a component it changed, the new ones named once');
-  assert.match(fns.ROWS.at(-1).what, /href="https:\/\/example\.test\/x\/-\/tags\/v2\.0\.0"/, 'the release linked where the host keeps it');
+    ['code', 'Code', '#11 · 2 commits REV-1 the tile'],
+  ], 'newest first, whatever the type: an issue a count of its commits; a read of Figma a row a component it changed, the new ones named once');
+  // The release a commit shipped in is the row's own, shown under its date: never a line of its own in What, and never
+  // on a row that ships in no release (a read of Figma, the intent layer, a decision, a commit no release holds yet).
+  assert.deepEqual(fns.ROWS.map((x) => (x.release ? x.release.k : null)), [null, null, null, null, null, null, 'v2.0.0'], 'only the commit a release holds carries one');
+  const released = fns.ROWS.at(-1).release;
+  assert.match(text(fns.dateCell('2026-10-20T08:00:00Z', released)), /^2026-10-2[01] \d\d:\d\d v2\.0\.0$/, 'its day, its time, then the release');
+  assert.match(fns.dateCell('2026-10-20T08:00:00Z', released), /href="https:\/\/example\.test\/x\/-\/tags\/v2\.0\.0"/, 'the release linked where the host keeps it');
+  assert.match(fns.dateCell('2026-10-20T08:00:00Z', released), /title="Released on 2026-10-21"/, 'the day it was released, which the tag alone does not say');
+  assert.equal(text(fns.dateCell('2026-10-25', null)), '2026-10-25', 'no release, no tag');
   // A page named unlike the component it documents (Table Body Cell Tooltip, table/Cell/tooltip) is under Affects only.
   const named = run([{ k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', pages: ['Table Body Cell Tooltip', 'Saving'], components: ['table/Cell/tooltip'], alone: ['Saving'], files: 2 } }]);
   assert.equal(text(named.ROWS[0].what), '2 pages changed Not in the guide yet: Saving Committed in eea0cd0e', 'only the page that documents no component is named in What');
