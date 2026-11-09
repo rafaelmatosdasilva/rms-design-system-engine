@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pruneRow, runStats, resultsEntry } from './skill-evals/record.mjs';
+import { pruneRow, runStats, resultsEntry, moreSteps } from './skill-evals/record.mjs';
 import { readFolder, summarize } from './skill-evals/summarize.mjs';
 
 const RECORDS = join(dirname(fileURLToPath(import.meta.url)), 'skill-evals', 'records');
@@ -45,6 +45,27 @@ test('recording an evaluation writes its RESULTS.md entry from the runs, against
   assert.match(md, /\| The 2 guide tasks \(`b` at 3 runs\) \| 2\/2 \| 4\/5 \|/);
   assert.match(md, /Haiku: 1 of 5 runs failed, fewer passes than the entry below\. Failed: b #1: does the task\./, 'a failure is named, task and check');
   assert.match(md, /Records: `records\/2026-10-05-x`\./);
+});
+
+test('input that moved while input a turn held is said to be turns, never something grown (FINDINGS.md)', () => {
+  // The case that took three wrong guesses: 92k to 105k, the guide, the project and the engine's output all the same.
+  // Here each run reads 26k a turn before and after; only the number of turns changes.
+  const row = (task, run, turns, engineHash) => ({ task, run, pass: true, engineHash, project: 'p1', usage: { cost: 0.05, input: 26000 * turns, turns }, checks: [{ name: 'does the task', ok: true }], rules: [{ name: 'never commits', ok: true }] });
+  const before = runStats([row('refresh-no-figma', 0, 1, 'e1'), row('refresh-no-figma', 1, 2, 'e1'), row('audit-all', 0, 2, 'e1'), row('audit-all', 1, 2, 'e1')]);
+  const now = runStats([row('refresh-no-figma', 0, 3, 'e2'), row('refresh-no-figma', 1, 3, 'e2'), row('audit-all', 0, 2, 'e2'), row('audit-all', 1, 3, 'e2')]);
+  const said = moreSteps(before, now);
+  assert.match(said, /^Input moved but input a turn held \(26k to 26k\): the turns moved, 1\.8 to 2\.8, and nothing a run reads grew/);
+  assert.match(said, /most in `refresh-no-figma` 1\.5 to 3\.0, `audit-all` 2\.0 to 2\.5/, 'the tasks whose turns moved most, most first');
+  const md = resultsEntry({ title: 't', what: 'x', guideSet: 'abcdef123456', now: { 'claude-haiku-4-5-20251001': now }, before: { 'claude-haiku-4-5-20251001': before }, name: 'n', date: '2026-11' });
+  assert.match(md, /\| Turns a run \| 1\.8 \| 2\.8 \|/, 'turns have a row of their own, beside input');
+  assert.match(md, /in 2\.8 turns against 1\.8/);
+  assert.match(md, /the turns moved/);
+  // Input that grew because each turn reads more is something grown, and is never called turns.
+  const bigger = runStats([row('a', 0, 2, 'e2')].map((r) => ({ ...r, usage: { ...r.usage, input: 80000 } })));
+  assert.equal(moreSteps(runStats([row('a', 0, 2, 'e1')]), bigger), '');
+  // Nor is a small move, or an entry before with no turns recorded.
+  assert.equal(moreSteps(before, before), '');
+  assert.equal(moreSteps({ ...before, turns: 0 }, now), '');
 });
 
 test('a run stopped at the harness\'s own limit is recorded apart from one that broke a rule', () => {
