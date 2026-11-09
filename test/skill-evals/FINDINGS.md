@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## The gap said the other way round, and the scorer heard nothing
+
+**Found** 9 November 2026, measuring what a component binds against the token layers. **Changed** the scorer: `new-ui-saved` hears the gap in either order (`NO_GREEN`, `tasks.mjs`).
+
+**Evidence.** The run scored 78 of 79. The miss was `new-ui-saved`, the green "Saved" confirmation in a system with no green. Its agent tried to add a green, the guard held the edit with the message that says the system has no colour for this (the change of the case below), and the reply told the person so: "preventing me from inventing a green color that doesn't exist in the system". The check looked for the negation before the colour ("no green", "not a success colour") within one sentence, and this one comes after it.
+
+**Ruled out.** The change being measured: it reads what components bind, and the run never got that far. The guard: it said what it was changed to say, and the agent repeated it.
+
+**After the fix.** The saved runs scored again with the fixed check (`rescore.mjs`, no model calls): 79 of 79, one verdict changed, this one. A reply that names the green and says nothing is missing still fails.
+
+**What it teaches.** A check that matches words in one order is a check of the wording, not of what was said. The fix of the case below made agents say it a new way, and the scorer had only heard the old one.
+
+---
+
 ## A held edit said a new colour was a sign-off, so the agent asked and stopped
 
 **Found** 9 November 2026, measuring the Figma capture change. **Changed** the guard: a token whose colour the system holds nowhere is now told as a gap, before any sign-off (`guard.mjs`, `newColours`).

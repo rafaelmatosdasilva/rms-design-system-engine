@@ -56,6 +56,13 @@ How your tokens are layered is read from the tokens themselves, so you never hav
 - **And a token named like another collection's.** For example, `primitives/…` sitting in Semantic.
 - **Nothing is imposed.** A group of tokens that points in every direction has no clear layer, so it gets no rule.
 
+With the layers known, four more checks on what components bind:
+
+- **No base token on a component.** A primitive bound directly, where the rest of your system binds a semantic or component token.
+- **A family rounds its corners alike.** One button on a different radius token from the others of its size.
+- **A shared token is shared.** A token in a shared layer that only one component uses belongs to that component.
+- **A component's own token is used.** One that nothing binds and no token points at is left over.
+
 ### Components of one type, built the same way
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.

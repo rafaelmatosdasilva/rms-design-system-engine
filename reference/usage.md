@@ -1381,6 +1381,10 @@ Three rules come of it, each a place (a token) rather than a component: a token 
 through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
 the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
 names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
+With both, four more on what a component binds: never a base token (one in the layer others go through), where the
+rest bind above it (`no-base-tokens`); a family's components bind one radius token on their frame, size by size
+(`family-radius`); a token in a shared layer is bound by more than one component (`shared-tokens-shared`); and a
+component's own token is bound or pointed at by another (`own-tokens-used`).
 From the structure capture: where a component's padding sits (its own frame, or a layer
 inside it), and whether a yes/no variant changes how the component looks: one whose two variants differ only in layers
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a

@@ -229,3 +229,32 @@ test('bindings, from every variant\'s layers: a state\'s own token, a component\
   const old = Object.fromEntries(Object.entries(skeleton).map(([n, s]) => [n, { trees: s.trees, variants: s.variants }]));
   assert.equal(grammarOf({ props: {}, skeleton: old, varNames }).figma.rules.some((r) => /tokens$/.test(r.id) && r.id !== 'variables'), false);
 });
+
+test('bindings against the token layers: no base token, one radius a family, a shared token shared, an own token used', () => {
+  const t = (collection, name, to) => ({ name, collection, kind: 'COLOR', values: { Light: '#000' }, ...(to ? { aliases: { Light: to } } : {}) });
+  const tokens = { collections: [], tokens: [
+    t('Primitives', 'prim/blue'), t('Primitives', 'prim/gray'), t('Primitives', 'prim/r4'), t('Primitives', 'prim/r8'),
+    t('Semantic', 'sem/action', 'prim/blue'), t('Semantic', 'sem/text', 'prim/gray'), t('Semantic', 'sem/radius/m', 'prim/r8'),
+    t('Semantic', 'sem/radius/s', 'prim/r4'), t('Semantic', 'sem/surface', 'prim/gray'), t('Semantic', 'sem/lonely', 'prim/blue'),
+    t('Component', 'button/bg', 'sem/action'), t('Component', 'button/unused', 'sem/action'), t('Component', 'chip/bg', 'sem/action'),
+  ] };
+  const tree = { layout: { dir: 'HORIZONTAL' }, c: [{ t: 'TEXT', n: 'Label', id: '1' }] };
+  const comp = (root) => ({ trees: [tree], variants: [['State=Default', 0]], binds: { 'State=Default': { '': root, '0': { fills: 'sem/text' } } } });
+  const skeleton = {
+    buttonPrimary: comp({ fills: 'button/bg', topLeftRadius: 'sem/radius/m' }),
+    buttonSecondary: comp({ fills: 'button/bg', topLeftRadius: 'sem/radius/m' }),
+    // A primitive on its frame, and the small radius where the buttons round with the medium one.
+    buttonGhost: comp({ fills: 'prim/blue', topLeftRadius: 'sem/radius/s' }),
+    chip: comp({ fills: 'chip/bg', strokes: 'sem/surface' }),
+    card: comp({ fills: 'sem/surface', strokes: 'sem/lonely' }),
+  };
+  const g = grammarOf({ props: {}, skeleton, tokens });
+  const rule = (id) => g.figma.rules.find((r) => r.id === id);
+  assert.match(rule('no-base-tokens').says, /above the Primitives layer/);
+  assert.deepEqual(rule('no-base-tokens').toFix.map((x) => [x.component, x.value]), [['buttonGhost', 'the component fills binds prim/blue']]);
+  assert.deepEqual(rule('family-radius').toFix, [{ component: 'buttonGhost', value: 'binds sem/radius/s, where its family binds sem/radius/m' }]);
+  assert.deepEqual(rule('shared-tokens-shared').toFix.map((x) => x.where).sort(), ['sem/lonely', 'sem/radius/s'], 'shared tokens only one component binds');
+  assert.deepEqual(rule('own-tokens-used').toFix, [{ where: 'button/unused', value: 'nothing binds it or points at it' }]);
+  // Without the tokens, none of these four: the first three binding rules stand alone.
+  assert.equal(grammarOf({ props: {}, skeleton }).figma.rules.some((r) => ['no-base-tokens', 'family-radius', 'shared-tokens-shared', 'own-tokens-used'].includes(r.id)), false);
+});
