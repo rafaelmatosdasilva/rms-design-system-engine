@@ -15,7 +15,7 @@
 // Transcripts are never copied (they stay in results/, gitignored). Rescore and summarize read the copies as they read
 // results/.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { readingLine } from './reading.mjs';
+import { readingLine, leftOut } from './reading.mjs';
 import { homedir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,9 +31,12 @@ export function pruneRow(row) {
   for (const [p, t] of Object.entries(row.files ?? {})) {
     if (SKIP.test(p)) continue;
     const text = String(t ?? '');
-    files[p] = text.length > MAX ? `${text.slice(0, MAX)}\n… (${text.length - MAX} more characters left out of the record)` : t;
+    files[p] = text.length > MAX ? `${text.slice(0, MAX)}${leftOut(text.length - MAX)}` : t;
   }
-  return { ...row, changed: (row.changed ?? []).filter((p) => !SKIP.test(p)), files };
+  // A path dropped here is one the record no longer holds, so the row stops vouching for it too: `readPaths` says
+  // "what is not in `files` was not there", and a file taken out to keep the repository clean was there.
+  const readPaths = row.readPaths ? { readPaths: row.readPaths.filter((p) => !SKIP.test(p)) } : {};
+  return { ...row, changed: (row.changed ?? []).filter((p) => !SKIP.test(p)), files, ...readPaths };
 }
 
 function sources(p) {
@@ -106,7 +109,9 @@ export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', gu
   // Each file's own hash too: a later set whose every file one entry or another measured is measured (two branches
   // that changed different guide files, merged, need no evaluation of their crossing).
   if (fileHashes) out.push(`Guide files measured: ${Object.entries(fileHashes).map(([f, h]) => `\`${f} ${h}\``).join(' ')}`, '');
-  if (cli) out.push(`**The agent's command line changed.** ${cli.charAt(0).toUpperCase()}${cli.slice(1)}`, '');
+  // "The agent", not "its command line": with an API key the runs go through the Agent SDK and there is no command
+  // line to have changed, which is the same mistake as recording the CLI's version for a run that never spawned it.
+  if (cli) out.push(`**The agent changed.** ${cli.charAt(0).toUpperCase()}${cli.slice(1)}`, '');
   const reading = [];
   for (const [model, s] of Object.entries(now)) {
     const b = before[model];
@@ -137,7 +142,12 @@ export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', gu
   return out.join('\n');
 }
 
-const sh = (args, cwd) => { try { return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(); } catch { return ''; } };
+// git's own stderr stays out of the console: a range this clone cannot resolve printed `fatal: bad revision` in
+// the middle of a recording that then carried on, which reads as the recording having failed when it had not.
+const sh = (args, cwd) => { try { return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); } catch { return ''; } };
+// A commit this clone actually has. Without this a range silently resolved to nothing and the entry lost the
+// commits and the guide files it should have named, saying less and saying it quietly.
+const known = (cwd, h) => !!h && sh(['rev-parse', '--verify', '-q', `${h}^{commit}`], cwd) !== '';
 const GUIDE_PATHS = ['rms-design-system-engine.md', 'cookbook', 'reference'];
 
 if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
@@ -171,7 +181,11 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const prevName = /Records: `records\/([^`]+)`/.exec(results)?.[1];
     const before = prevName && existsSync(join(HERE, 'records', prevName)) ? sidesOf(join(HERE, 'records', prevName)) : {};
     const prevEngine = [...new Set(Object.values(before).map((x) => x.engine))][0] ?? '';
-    const range = prevEngine ? `${prevEngine}..${engines[0]}` : `${engines[0]}~1..${engines[0]}`;
+    // The entry before may name a commit that is not here (a squashed or rebased branch, a fresh clone). Say so and
+    // read from the measured commit's own parent, rather than letting an invalid range answer nothing.
+    const reach = known(ENGINE, prevEngine) ? prevEngine : '';
+    if (prevEngine && !reach) console.log(`⚠ the entry before was measured on engine ${prevEngine}, which this clone does not have: what changed is read from ${engines[0]}'s own parent instead, so it may name less than it should. Pass --what to say it.`);
+    const range = reach ? `${reach}..${engines[0]}` : `${engines[0]}~1..${engines[0]}`;
     // What changed: the commits in between, without the ones that only recorded an evaluation (RESULTS.md, records/).
     const recordOnly = (h) => sh(['show', '--name-only', '--format=', h], ENGINE).split('\n').filter(Boolean).every((f) => /^test\/skill-evals\/(RESULTS\.md|records\/)/.test(f));
     const subjects = sh(['log', '--no-merges', '--format=%h %s', range], ENGINE).split('\n').filter(Boolean).reverse()

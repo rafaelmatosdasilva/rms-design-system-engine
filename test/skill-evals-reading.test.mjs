@@ -1,8 +1,8 @@
-// test/skill-evals/reading.mjs - how a result is read, so a number means what it says. Three ways an evaluation
+// test/skill-evals/reading.mjs - how a result is read, so a number means what it says. Four ways an evaluation
 // lied to whoever read it, each learned the hard way and each a test here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { KINDS, kindOf, engineFell, byTask, movedTasks, readingLine } from './skill-evals/reading.mjs';
+import { KINDS, kindOf, engineFell, engineNeverStarted, unanswerable, leftOut, byTask, movedTasks, readingLine } from './skill-evals/reading.mjs';
 import { DEV } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
 
@@ -28,6 +28,44 @@ test('a run that reached an engine that fell over is the engine\'s failure, not 
   assert.equal(engineFell({ engine: [{ command: 'rms', result: '❌ [13] Structure — chip is 36px, Figma says 32px' }] }), null);
   assert.equal(engineFell({ engine: [{ command: 'rms --refresh-figma', result: '❌ no Figma token: put it in .env' }] }), null);
   assert.equal(engineFell({}), null);
+});
+
+test('a run whose shell could not start the engine measured the machine, not the guide', () => {
+  // 8 November: every run had lost node from its path, every call to the engine died in the shell, and a change of
+  // fifteen guide lines scored 15 of 79 with nothing saying why. Both shells' wording, and the one from `exec`.
+  const call = (result) => ({ command: 'node ~/.claude/skills/rms-design-system-engine/audit.mjs --component chip', result });
+  for (const said of ['(eval):1: command not found: node', 'bash: node: command not found', 'exec: node: not found', 'env: node: No such file or directory']) {
+    const never = engineNeverStarted({ engine: [call(said)] });
+    assert.ok(never, `not seen: ${said}`);
+    assert.match(never.command, /audit\.mjs/);
+    assert.equal(never.calls, 1);
+  }
+  // One call that started says the runtime was there: whatever else went wrong is the run's own, and is scored.
+  assert.equal(engineNeverStarted({ engine: [call('bash: node: command not found'), call('PARITY AUDIT · SCOPED TO: chip')] }), null);
+  // A run that asked the engine nothing chose that, and is measured for it.
+  assert.equal(engineNeverStarted({ engine: [] }), null);
+  assert.equal(engineNeverStarted({}), null);
+  // The engine's command missing is exactly what the no-engine side is there to measure: never this.
+  assert.equal(engineNeverStarted({ engine: [{ command: 'rms-design-system-engine --audit', result: 'bash: rms-design-system-engine: command not found' }] }), null);
+  // Nor is the engine saying something of its own that happens to carry the word.
+  assert.equal(engineNeverStarted({ engine: [call('❌ no node_modules: run npm ci first')] }), null);
+});
+
+test('a verdict a rescore cannot see is left exactly as it was scored', () => {
+  const spec = '.design-system-engine-out/specs/pill.spec.json';
+  // The nine runs of 8 November: their checks read what the engine wrote, and no row of that day kept it. With no
+  // `readPaths` the row cannot say whether the file was absent or never kept, so it is not scored again.
+  assert.deepEqual(unanswerable({ files: { 'ds-config.json': '{}' } }, [spec, 'ds-config.json']), [spec]);
+  // A row that kept it answers for it.
+  assert.deepEqual(unanswerable({ files: { [spec]: '{"name":"pill"}' } }, [spec]), []);
+  // A row that says its checks read it and kept nothing is vouching the file was not there: that scores as absent.
+  assert.deepEqual(unanswerable({ files: {}, readPaths: [spec] }, [spec]), []);
+  // But a path no check read when the run was scored is evidence this row never held, vouching or not.
+  assert.deepEqual(unanswerable({ files: {}, readPaths: ['ds-config.json'] }, [spec]), [spec]);
+  // A file the record cut to fit is there and is not what the run read.
+  assert.deepEqual(unanswerable({ files: { [spec]: `{"name":"pi${leftOut(900)}` }, readPaths: [spec] }, [spec]), [spec]);
+  // Nothing read, nothing to be blind to.
+  assert.deepEqual(unanswerable({ files: {} }, []), []);
 });
 
 test('a count that moved by one is a task that passes sometimes, not a difference', () => {

@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { context, decisionPoints, afterPass, makeHome, cleanup, ENGINE_SCRIPT, ENGINE_CALL } from './skill-evals/lib.mjs';
+import { context, decisionPoints, afterPass, makeHome, cleanup, findClaude, agentOf, cliChange, cliLine, ENGINE_SCRIPT, ENGINE_CALL } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken, handEdits } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
@@ -290,6 +290,121 @@ test('the files the engine writes on every run are never the agent\'s change', a
     'contracts/llms.txt', 'llms.txt'];
   const ctx = context([], null, { changed: [...engineWrites, 'src/theme.css', 'design-system-engine-baseline.json'], commits: 1, files: {} });
   assert.deepEqual(ctx.changed, ['src/theme.css', 'design-system-engine-baseline.json']);   // the theme and an accepted debt are the agent's
+});
+
+test('the version recorded is the version of whatever actually ran the tasks', () => {
+  const run = () => '2.1.318 (Claude Code)\n';
+  const read = () => JSON.stringify({ version: '0.3.301' });
+  // With an API key the runs go through the SDK and never spawn the CLI, so the CLI's version is not the one to keep.
+  assert.deepEqual(agentOf({ ANTHROPIC_API_KEY: 'k' }, { cli: '/bin/claude', read, run }), { runner: 'sdk', version: '0.3.301 (Agent SDK)' });
+  // On the plan's login the command line runs them, and its own version is the one to keep.
+  assert.deepEqual(agentOf({}, { cli: '/bin/claude', read, run }), { runner: 'cli', version: '2.1.318 (Claude Code)' });
+  // Neither is guessed at when it is not installed: null, and the caller says which one is missing.
+  assert.deepEqual(agentOf({}, { cli: null, read, run }), { runner: 'cli', version: null });
+  assert.deepEqual(agentOf({ ANTHROPIC_API_KEY: 'k' }, { cli: '/bin/claude', read: () => { throw new Error('no sdk'); }, run }), { runner: 'sdk', version: null });
+});
+
+test('a change of runner is said as itself, never as a version going backwards', () => {
+  const rows = (runner, version, skills = ['schedule']) => Array.from({ length: 3 }, (_, i) => ({ run: i, runner, cli: { version, skills } }));
+  // What happened on 9 November: CLI runs before, SDK runs now, and the SDK bundles an older Claude Code. Read as
+  // one numbering it says 2.1.318 → 2.1.301, a downgrade that never happened.
+  const c = cliChange(rows('sdk', '2.1.301'), rows('cli', '2.1.318'));
+  assert.ok(c.ran, 'the runner changed and that is the thing to say');
+  assert.deepEqual([c.ran.from, c.ran.to], [['cli'], ['sdk']]);
+  const line = cliLine(c);
+  assert.match(line, /went through the Agent SDK where the runs before went through the command line/);
+  assert.match(line, /not one numbering and neither is a step from the other/);
+  // The same runner on both sides and nothing else moved: nothing to say.
+  assert.equal(cliChange(rows('sdk', '2.1.301'), rows('sdk', '2.1.301')), null);
+  // The same runner with other skills is still the plain skills sentence.
+  const skills = cliChange(rows('sdk', '2.1.301', ['a']), rows('sdk', '2.1.301', ['a', 'schedule']));
+  assert.equal(skills.ran, null);
+  assert.match(cliLine(skills), /bundles other skills than in the runs before \(2\.1\.301 → 2\.1\.301; removed schedule\)/);
+  // Rows from before the runner was recorded say so rather than naming one.
+  assert.match(cliLine(cliChange(rows('sdk', '2.1.301'), rows(undefined, '2.1.318'))), /where the runs before went through a runner nothing recorded/);
+});
+
+test('the CLI that runs each task is found where it is installed, not only on the PATH', () => {
+  const at = (...ok) => (p) => ok.includes(p);
+  const none = () => null;
+  // The PATH first: a CLI the person put there is the one they mean.
+  assert.equal(findClaude({ env: {}, exists: () => false, which: () => '/usr/local/bin/claude', execPath: '/n/bin/node' }), '/usr/local/bin/claude');
+  // Then beside the running node, which is where an installer that ships both puts it - and where the shell that
+  // starts an evaluation does not always look, so a whole run died in a stack having measured nothing.
+  assert.equal(findClaude({ env: {}, exists: at('/n/bin/claude'), which: none, execPath: '/n/bin/node' }), '/n/bin/claude');
+  // Then where the installers put it.
+  assert.match(findClaude({ env: {}, exists: (p) => /\.local\/bin\/claude$/.test(p), which: none, execPath: '/n/bin/node' }), /\.local\/bin\/claude$/);
+  assert.match(findClaude({ env: {}, exists: (p) => /\.claude\/local\/claude$/.test(p), which: none, execPath: '/n/bin/node' }), /\.claude\/local\/claude$/);
+  // Nowhere: null, so the caller says what is missing instead of spawning a bare name and dying in ENOENT.
+  assert.equal(findClaude({ env: {}, exists: () => false, which: none, execPath: '/n/bin/node' }), null);
+  // Named by hand, and taken only when it is there: a path that is wrong is said, never quietly replaced.
+  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/claude' }, exists: at('/opt/claude'), which: () => '/usr/bin/claude', execPath: '/n/bin/node' }), '/opt/claude');
+  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/gone' }, exists: () => false, which: () => '/usr/bin/claude', execPath: '/n/bin/node' }), null);
+});
+
+test('a run whose shell could not start the engine is refused, not scored', async () => {
+  const { engineNeverStarted } = await import('./skill-evals/reading.mjs');
+  // Shaped as a run is, so the filter that tells an engine call from any other Bash call is in the way too.
+  const call = (command, result, isError = true) => ({ id: command, name: 'Bash', input: { command }, result, isError });
+  const run = (...calls) => context(calls.flatMap((c) => [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: c.id, name: c.name, input: c.input }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: c.id, content: c.result, is_error: c.isError }] } },
+  ]), '/nonexistent');
+  const died = 'skill-eval-home/bin/rms-design-system-engine: line 2: exec: node: not found';
+
+  // 8 November, first-setup #0: the agent reached for the engine, the shell refused it, and the run was scored.
+  const lost = engineNeverStarted(run(call('rms-design-system-engine --init', died), call('node ~/.claude/skills/rms-design-system-engine/audit.mjs --route "set up"', '(eval):1: command not found: node')));
+  assert.ok(lost, 'a run with no node is not a measurement of the guide');
+  assert.equal(lost.calls, 2);
+
+  // A run that reached the engine is scored, whatever the engine then said - including a refusal of its own.
+  assert.equal(engineNeverStarted(run(call('rms-design-system-engine --init', died), call('rms-design-system-engine --init', 'PARITY AUDIT · 4 components', false))), null);
+  assert.equal(engineNeverStarted(run(call('rms-design-system-engine --audit', '❌ no Figma token: put it in .env'))), null);
+  // A shell command that is not the engine never speaks for it, however it died.
+  assert.equal(engineNeverStarted(run(call('npm test', 'sh: node: command not found'))), null);
+});
+
+test('what a check reads of the engine\'s output is kept with the row, so the run can be scored again', async () => {
+  const { context, keepFiles } = await import('./skill-evals/lib.mjs');
+  const { unanswerable } = await import('./skill-evals/reading.mjs');
+  const dir = tempDir('eval-keeps-');
+  const spec = '.design-system-engine-out/specs/pill.spec.json';
+  mkdirSync(join(dir, '.design-system-engine-out', 'specs'), { recursive: true });
+  writeFileSync(join(dir, spec), '{"name":"pill"}');
+
+  // A live run: the check reads what the engine wrote. `changed` leaves the engine's own output out on purpose,
+  // so before this the row kept nothing of it and scoring the run again read `null` and failed a run that passed.
+  const ctx = context([], dir, null);
+  assert.equal(JSON.parse(ctx.read(spec)).name, 'pill');
+  const files = keepFiles(ctx, []);
+  assert.equal(files[spec], '{"name":"pill"}', 'the row keeps what the check read');
+  assert.ok(!ctx.changed.includes(spec), 'and it is still not counted as the agent\'s change');
+
+  // Scored again from the row alone, with no project behind it: the check reads the same bytes and nothing is blind.
+  const row = { changed: ctx.changed, commits: ctx.commits, files, readPaths: [...ctx.readPaths] };
+  const again = context([], null, row);
+  assert.equal(again.read(spec), '{"name":"pill"}');
+  assert.deepEqual(unanswerable(row, again.readPaths), []);
+
+  // A row from before the keeping cannot see it, and is left exactly as it was scored.
+  const was = { changed: [], commits: 1, files: {} };
+  const blind = context([], null, was);
+  assert.equal(blind.read(spec), null);
+  assert.deepEqual(unanswerable(was, blind.readPaths), [spec]);
+
+  // A file too big to keep was there all the same, so the row never vouches for it as absent: scoring the run
+  // again would otherwise read `null` and call a file that exists an empty one.
+  const big = 'src/huge.css';
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, big), 'a'.repeat(257 * 1024));
+  const heavy = context([], dir, null);
+  heavy.read(big);
+  const heavyFiles = keepFiles(heavy, []);
+  assert.equal(heavyFiles[big], undefined, 'too big to keep');
+  assert.ok(heavy.tooBig.has(big));
+  const heavyRow = { changed: [], commits: 1, files: heavyFiles, readPaths: [...heavy.readPaths].filter((p) => !heavy.tooBig.has(p)) };
+  assert.deepEqual(unanswerable(heavyRow, [big]), [big], 'kept as scored, never read as absent');
+  cleanup(dir);
 });
 
 test('figma-roles: the engine\'s list shown and a yes asked for passes; a claim that Figma was changed, or no engine run, fails', () => {
