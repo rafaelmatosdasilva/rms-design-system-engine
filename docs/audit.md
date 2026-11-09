@@ -40,6 +40,14 @@ From what each variant binds come three rules about the token itself. Like every
 - **A component uses its own tokens and the shared ones.** A chip that binds a button's token is flagged.
 - **A text layer uses a text colour.** A label bound to a background or surface colour is flagged. `on-surface` counts as a text colour.
 
+How your tokens are layered is read from the tokens themselves, so you never have to declare it:
+
+- **The layers come from the aliases.** A group of tokens that point at nothing is a base; one that mostly points at another sits on it. Layers can be collections of their own (Primitives, Semantic) or groups of names inside one collection (`primitives/…`, `semantic/…`).
+- **A token that skips its layer is flagged.** For example, a component token pointing straight at a primitive where the rest go through a semantic token.
+- **So is a long or circular alias chain.** Longer than most of your system's, or one that comes back on itself.
+- **And a token named like another collection's.** For example, `primitives/…` sitting in Semantic.
+- **Nothing is imposed.** A group of tokens that points in every direction has no clear layer, so it gets no rule.
+
 ### Components of one type, built the same way
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
