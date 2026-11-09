@@ -88,3 +88,19 @@ test('alike in a family: a minimum the others do not set', () => {
   const r = familyRules({ skeleton, props: {} }, { familyOf }).find((x) => x.id === 'family-limits');
   assert.deepEqual(off(r), [['chipD', 'its limits at m are min height 40, where its family\'s are min height 32']]);
 });
+
+test('alike in a family: another size step, a part shown another way, a property that changes something else', () => {
+  // Buttons of an icon and a label at two sizes; Size changes the padding on most.
+  const tree = (pad, { iconHidden = false, wired = true, style = 'label/m' } = {}) => ({ layout: { dir: 'HORIZONTAL', pad, gap: 8 },
+    c: [{ t: 'INSTANCE', n: 'Icon', ...(iconHidden ? { hidden: true } : {}), ...(wired ? { wired: { visible: 'showIcon' } } : {}) }, { t: 'TEXT', n: 'Label', styles: { text: style } }] });
+  const button = ({ m = [8, 16, 8, 16], wired = true, sStyle = 'label/m' } = {}) => ({
+    trees: [tree([4, 8, 4, 8], { wired, style: sStyle }), tree(m, { wired }), tree(m, { wired, iconHidden: !wired })],
+    variants: [['Size=s, State=default', 0], ['Size=m, State=default', 1], ['Size=m, State=hover', 2]],
+  });
+  const skeleton = { buttonA: button(), buttonB: button(), buttonC: button(),
+    buttonD: button({ m: [10, 16, 10, 16] }), buttonE: button({ wired: false }), buttonF: button({ sStyle: 'label/s' }) };
+  const r = Object.fromEntries(familyRules({ skeleton, props: {} }, { familyOf }).map((x) => [x.id, x]));
+  assert.deepEqual(off(r['family-size-steps']), [['buttonD', 'at m its padding 10 16 10 16, gap 8, where its family\'s padding 8 16 8 16, gap 8']]);
+  assert.deepEqual(off(r['family-parts-shown']), [['buttonE', 'icon is shown by a variant, where in its family it is shown by a yes/no property']]);
+  assert.deepEqual(off(r['family-property-changes']), [['buttonF', 'Size changes label: text style, the frame: padding, where across its family it changes the frame: padding']]);
+});
