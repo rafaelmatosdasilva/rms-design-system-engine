@@ -408,6 +408,7 @@
     rows.forEach(function (r) {
       body.appendChild(r); r.hidden = !passes(r);
     });
+    tableNone(body.parentNode, 'components');
     Array.prototype.forEach.call(box.querySelectorAll('.sg-chip-menu'), function (b) {
       var g = b.dataset.mxg, w = F[g] || '', list = document.getElementById(b.getAttribute('aria-controls'));
       b.querySelector('.sg-chip-word').textContent = w || 'All';

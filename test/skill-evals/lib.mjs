@@ -12,6 +12,7 @@ import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../../lib/cdp.mjs';
+import { envVar } from '../../lib/names.mjs';
 
 export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -61,9 +62,39 @@ export function withKeyFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE |
 }
 // The SDK, installed for the evaluation only (npm ci --prefix test/.eval-tools): the engine itself has no dependencies.
 const SDK = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
-// The CLI that runs each task, found once on this machine's PATH: a run's own PATH leaves out ~/.local/bin (where
-// install.sh puts the engine's command), and the Claude Code installer puts `claude` there too.
-const CLAUDE = (() => { try { return execFileSync('which', ['claude'], { encoding: 'utf8' }).trim() || 'claude'; } catch { return 'claude'; } })();
+// The CLI that runs each task, found once on this machine - where it is installed, not only on the PATH, the way
+// findChrome finds Chrome. A run's own PATH leaves out ~/.local/bin (where install.sh puts the engine's command),
+// and the Claude Code installer puts `claude` there too; the shell that starts an evaluation does not always carry
+// it either (a client's shell often does not, and the installer that ships node puts `claude` beside it). Falling back
+// to the bare name only moved the failure: `which` missing it ended a measurement in a raw ENOENT, before a task
+// was run. → an absolute path, or null for the caller to say so.
+export function findClaude({ env = process.env, exists = existsSync, which = whichBin, execPath = process.execPath } = {}) {
+  const named = envVar(env, 'EVAL_CLI');
+  if (named) return exists(named) ? named : null;
+  // The PATH first: a CLI the person put there is the one they mean.
+  const onPath = which('claude');
+  if (onPath) return onPath;
+  // Then where it installs itself. Beside the running node comes first: an installer that ships both puts them together.
+  for (const p of [join(dirname(execPath), 'claude'), join(homedir(), '.local', 'bin', 'claude'), join(homedir(), '.claude', 'local', 'claude')]) if (exists(p)) return p;
+  return null;
+}
+function whichBin(name) { try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() || null; } catch { return null; } }
+export const CLAUDE = findClaude();
+
+// The version of what actually runs each task, which is not always the same program. With an API key the runs go
+// through the Agent SDK and the CLI is never spawned, so recording `claude --version` there named a program no run
+// used: an entry compared 2.1.318 from CLI runs with 2.1.301 from SDK runs and called a different program a
+// downgrade. Each side reports its own, and the row says which ran. → { runner, version } (version null when the
+// program is not installed, for the caller to say so).
+export const SDK_PACKAGE = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'package.json');
+export function agentOf(env = withKeyFile(process.env), { cli = CLAUDE, sdkPackage = SDK_PACKAGE, read = readFileSync, run = execFileSync } = {}) {
+  const runner = runnerOf(env);
+  if (runner === 'cli') {
+    if (!cli) return { runner, version: null };
+    try { return { runner, version: run(cli, ['--version'], { encoding: 'utf8' }).trim() }; } catch { return { runner, version: null }; }
+  }
+  try { return { runner, version: `${JSON.parse(read(sdkPackage, 'utf8')).version} (Agent SDK)` }; } catch { return { runner, version: null }; }
+}
 const GIT_ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
 
 const NOT_PROJECT = /expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(\/|$)|node_modules/;
@@ -187,13 +218,23 @@ export function cliChange(rows, before = []) {
   const within = new Set(now.map((r) => (r.cli.skills ?? []).join(','))).size > 1;
   const a = all(now), b = all(was);
   const added = was.length ? [...a].filter((k) => !b.has(k)) : [], removed = was.length ? [...b].filter((k) => !a.has(k)) : [];
-  if (!within && !added.length && !removed.length) return null;
-  return { within, added, removed, versions: [...new Set(now.map((r) => r.cli.version))], was: [...new Set(was.map((r) => r.cli.version))] };
+  // Which program ran the tasks. Two runners' version numbers are two numberings: read as one they say a downgrade
+  // where nothing went backwards, so a change of runner is said as itself and the versions are not compared.
+  const runners = [...new Set(now.map((r) => r.runner).filter(Boolean))];
+  const wasRunners = [...new Set(was.map((r) => r.runner).filter(Boolean))];
+  const sameRunner = runners.length === wasRunners.length && runners.every((r) => wasRunners.includes(r));
+  const ran = was.length && !sameRunner ? { from: wasRunners, to: runners } : null;
+  if (!within && !added.length && !removed.length && !ran) return null;
+  return { within, added, removed, ran, versions: [...new Set(now.map((r) => r.cli.version))], was: [...new Set(was.map((r) => r.cli.version))] };
 }
 // The change, in one sentence for the console and RESULTS.md.
+const RUNNER = { sdk: 'the Agent SDK', cli: 'the command line' };
+const said = (rs) => (rs.length ? rs.map((r) => RUNNER[r] ?? r).join(' and ') : 'a runner nothing recorded');
 export function cliLine(c) {
   if (!c) return '';
   const parts = [];
+  // The runner first: when it changed, the version numbers beside it are two numberings and say nothing on their own.
+  if (c.ran) parts.push(`these runs went through ${said(c.ran.to)} where the runs before went through ${said(c.ran.from)}, so their versions (${c.was.join(', ') || '?'}, ${c.versions.join(', ')}) are not one numbering and neither is a step from the other`);
   if (c.added.length || c.removed.length) parts.push(`the agent's command line bundles other skills than in the runs before (${c.was.join(', ') || '?'} → ${c.versions.join(', ')}${c.added.length ? `; added ${c.added.join(', ')}` : ''}${c.removed.length ? `; removed ${c.removed.join(', ')}` : ''})`);
   if (c.within) parts.push('the runs of this evaluation did not all have the same bundled skills');
   return `${parts.join(', and ')}: a change in the results may come from them, not from the guide.`;
@@ -318,11 +359,15 @@ export function context(events, dir, saved = null) {
     .filter((p) => !ENGINE_WRITES.test(p) && !/(^|\/)(node_modules|\.design-system-engine-out)(\/|$)/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
-  // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project.
-  const read = (p) => { if (saved && savedFiles[p] != null) return savedFiles[p]; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
+  // Every path a check asked for, in the order it asked. Kept on the row, so scoring the run again can tell a file
+  // that was not there when it ran from one the row never kept (reading.mjs, `unanswerable`).
+  const readPaths = new Set(), tooBig = new Set();
+  // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project,
+  // and where there is no project to rebuild (rescore.mjs) only what the row kept can be read at all.
+  const read = (p) => { readPaths.add(p); if (saved && savedFiles[p] != null) return savedFiles[p]; if (!dir) return null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
     calls, bash, engine, mcp, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
-    diff: git('diff', 'HEAD'), read, nextLines, dir,
+    diff: git('diff', 'HEAD'), read, readPaths, tooBig, nextLines, dir,
     usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0), ms: u.ms + (r.duration_ms ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0, ms: 0 }),
   };
 }
@@ -359,9 +404,20 @@ export function hasEngineRun(ctx, pred = () => true) { return ctx.engine.some((b
 export function cleanup(...dirs) { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } }
 
 // The files a scorer may read, kept with the result so the run can be scored again (at most 256 KB each).
+// Whatever the checks actually read goes in too, which is the only list that cannot fall behind them: what the
+// engine wrote is left out of `changed` on purpose, so a check reading the engine's own output (a Figma spec, a
+// change file) kept nothing, read `null` when the run was scored again, and failed a run that had passed.
+// Call this after the checks have run, so `ctx.readPaths` is what they asked for.
 export const KEEP = ['ds-config.json', 'design-system-engine-baseline.json', 'src/theme.css', '.design-system-engine-out/summary.md'];
 export function keepFiles(ctx, extra = []) {
   const out = {};
-  for (const p of new Set([...KEEP, ...extra, ...ctx.changed])) { const t = ctx.read(p); if (t != null && t.length <= 256 * 1024) out[p] = t; }
+  // A file left out for its size was there, so the row must not later vouch for it as absent: `tooBig` takes it
+  // out of what the row says its checks read, and a rescore that needs it leaves the run exactly as it was scored.
+  const tooBig = ctx.tooBig ?? new Set();
+  for (const p of new Set([...KEEP, ...extra, ...ctx.changed, ...(ctx.readPaths ?? [])])) {
+    const t = ctx.read(p);
+    if (t == null) continue;
+    if (t.length <= 256 * 1024) out[p] = t; else tooBig.add(p);
+  }
   return out;
 }

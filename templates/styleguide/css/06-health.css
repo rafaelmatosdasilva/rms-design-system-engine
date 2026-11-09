@@ -55,6 +55,10 @@
 /* Untested is for now only (the browser is still trying it): diagonal stripes, in the bar, its legend, the table and a tab alike. */
 .sg-health-bar > .is-untested, .is-untested > .pg-par-sign { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--sg-muted) 55%, transparent) 0 1px, transparent 1px 2.5px), color-mix(in srgb, var(--sg-muted) 22%, transparent); }   /* dim fill, tight lines */
 .sg-health-bar > .is-done { background: var(--sg-positive); } .sg-health-bar > .is-check { background: var(--sg-warning-ink); } .sg-health-bar > .is-fix { background: var(--sg-negative); }   /* done, to check, to fix: the status dots' colours */
+/* A table a filter left with no row: the head is hidden with the rows, so this stands alone in the card. Shared, as the
+   sort and filter marks are: every page that filters a table uses it. */
+.sg-none { margin: 0; padding: calc(var(--sg-space-xxl) + var(--sg-space-l)) var(--sg-cell-x); text-align: center; color: var(--sg-muted); font-size: var(--sg-s); line-height: var(--sg-lh); }
+.sg-none > strong { display: block; margin-bottom: var(--sg-space-xs); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 th[data-sort] .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }   /* a column head sorts by it, on any table that sorts */
 th[data-sort] .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
 .sg-mx-tri { flex: none; width: calc(0.6em + var(--sg-space-xs)); height: calc(0.6em + var(--sg-space-xs)); opacity: 0; transition: opacity var(--sg-fast), transform var(--sg-fast); }   /* the sorted column: a triangle, down or up */

@@ -38,6 +38,25 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 105k, in 3.4 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-09-every-variant-s-bindings-and`.
 
+## 2026-11: What the evaluation cannot see, it does not score (continuous evaluation)
+
+What changed since the entry below (engine 06654ad): A rescore never writes over a verdict it cannot see, and a run that never started the engine is refused rather than scored. The guide changed in reference/maintainers.md.
+
+Guide set measured: `dd78b6ad6936` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md aabbcc45` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md b820faeb` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md d75da02a` `rms-design-system-engine.md 0f804311`
+
+**The agent changed.** These runs went through the Agent SDK (0.3.301, bundling Claude Code 2.1.301) where the runs before went through the command line (2.1.318, bundling the `schedule` skill these do not): their versions are not one numbering and neither is a step from the other, so a change in the results may come from the agent, not from the guide. The sentence first written here read it as one numbering and called it a downgrade; the rows of this entry carry the command line's version in `cliVersion` because the harness asked the wrong program, which is fixed in this same change (`agentOf`), and each row's own `cli.version` has what actually ran.
+
+| Haiku, engine 4c1d2ef | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.059 | $0.036 |
+| Input a run | 105k | 80k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 80k a run against 105k. no task changed state, and no run moved: the same result. Records: `records/2026-11-09-what-the-evaluation-cannot-see`.
+
 ## 2026-11: Fix, Decide, Done; Source on both pages; an area for a page (continuous evaluation)
 
 What changed since the entry below (engine 91d7a3f): The index page counts the components the code has (#356); Three lines say the rules they mine and the comments they already read (#357); The Rules page: one decision, a table that sorts and filters, and names that say what they mean (#358); Fix, Decide, Done; Source on both pages; an area for a page. The guide changed in `reference/usage.md`.

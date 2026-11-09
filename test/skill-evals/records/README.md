@@ -210,5 +210,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-08-fix-decide-done-source-on` | The 24 guide tasks on Haiku (engine 06654ad) | "Fix, Decide, Done; Source on both pages; an area for a page" |
 | `2026-11-09-every-variant-s-bindings-and` | The 24 guide tasks on Haiku (engine 29b3718) | "Every variant's bindings and how each text layer grows" |
 | `2026-11-09-whether-a-component-binds-the` | The 24 guide tasks on Haiku (engine c349c26) | "Whether a component binds the right token" |
+| `2026-11-09-what-the-evaluation-cannot-see` | The 24 guide tasks on Haiku (engine 4c1d2ef) | "What the evaluation cannot see, it does not score" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

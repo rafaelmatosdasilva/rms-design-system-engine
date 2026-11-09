@@ -25,5 +25,10 @@ test('a skill added since the runs before, or runs that differ, is said; the sam
 test('the RESULTS.md entry says the command line changed, apart from the guide', () => {
   const stats = { tasks: 1, more: [], pass: 1, runs: 1, cost: 0.1, input: 1000, violations: 0, failed: [], engine: 'abc', project: 'p' };
   const e = resultsEntry({ title: 't', what: 'w', guideSet: 'g', now: { 'claude-x': stats }, name: 'n', cli: cliLine(cliChange([row(['debug', 'run'], '2.2.0')], [row(['debug'], '2.1.0')])) });
-  assert.match(e, /\*\*The agent's command line changed\.\*\* The agent's command line bundles other skills/);
+  assert.match(e, /\*\*The agent changed\.\*\* The agent's command line bundles other skills/);
+  // With an API key the runs go through the Agent SDK, where there is no command line to have changed: the heading
+  // says the agent, and the sentence says which program ran them rather than reading two numberings as one.
+  const sdk = resultsEntry({ title: 't', what: 'w', guideSet: 'g', now: { 'claude-x': stats }, name: 'n', cli: cliLine(cliChange([{ runner: 'sdk', ...row(['debug'], '2.1.301') }], [{ runner: 'cli', ...row(['debug'], '2.1.318') }])) });
+  assert.match(sdk, /\*\*The agent changed\.\*\* These runs went through the Agent SDK where the runs before went through the command line/);
+  assert.doesNotMatch(sdk, /2\.1\.318 → 2\.1\.301/, 'two numberings are never shown as a step from one to the other');
 });
