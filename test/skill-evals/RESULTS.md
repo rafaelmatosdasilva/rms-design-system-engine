@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: What the file's own examples say (continuous evaluation)
+
+What changed since the entry below (engine 81cedad): A batch of three: preferred components on swaps and slots, a default its uses take, and the case of a component's words. The guide changed in `reference/usage.md`.
+
+Guide set measured: `a3e2483b1dd5` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 0faed5ac` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 0e3eac9a` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 5e50605 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 78/79 |
+| Mean cost a run | 0.056 | 0.057 |
+| Input a run | 93k | 98k |
+| Turns a run | 3.3 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed, fewer passes than the entry below. Failed: new-ui-saved #8: adds the confirmation, or says the system has no green for it. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-09-what-the-file-s-own`.
+
 ## 2026-11: Opacity, borders, corners and text styles (continuous evaluation)
 
 What changed since the entry below (engine a1156ad): A batch of three: opacity and borders kept beside the trees; corners, opacity and border weights on variables and borders on one side; text styles described and used. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.

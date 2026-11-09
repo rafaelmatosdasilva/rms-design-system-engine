@@ -1418,7 +1418,10 @@ its own dot, and a list for the area and for the side, each saying how many rows
   (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
   opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
   sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a
-  component uses each one (`text-style-used`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  component uses each one (`text-style-used`); the file's own evidence (`use-rules.mjs`): a swap or slot property listing
+  the components it prefers (`swap-preferred`), a variant or yes/no property starting on a value its uses take, never
+  one most of them change, counting its own examples and each time it sits inside another's (`default-in-use`), and a
+  component's words, read from its examples' short labels, in the case most components' are (`words-case`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
