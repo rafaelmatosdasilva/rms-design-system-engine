@@ -76,6 +76,12 @@ The components of one type in Figma (every button, every input) are compared wit
 - **The same states.** A button without the press state the other buttons have.
 - **Text that fits the same way.** A label that truncates where the family's grow.
 
+Three more readings of the library:
+
+- **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
+- **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
+- **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
+
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
 
 ### One Rules page for Figma and the code
