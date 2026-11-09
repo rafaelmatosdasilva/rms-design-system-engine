@@ -22,6 +22,20 @@ Each component's line names its props as the code takes them. Where Figma and th
 
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. Under the tokens it says what each is for in your team's own words, from the descriptions you write on the variables in Figma, the brand's first, so an agent picks a colour by its purpose and not by its name alone. The notes your team writes in Figma outside any component (on its foundations, brand and pattern pages) are said too, by page, once the annotation categories are read (`--annotation-categories`); a note for whoever draws the file (Authoring) is left out. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
+### Icons are held to the ones your code has
+
+A prototype uses your code's icons, never Figma's. An icon that exists only in the Figma library — or one an agent invented from a name it saw there — renders as **nothing** in the product: a blank where a control should be, on a page that otherwise looks finished.
+
+So every icon a page passes is held against the symbols your code actually defines, and one it does not have is an error, with the nearest name your code does have:
+
+```
+Button icon="searc": the code has no such icon, so it draws nothing (its nearest is "icon-search")
+```
+
+The name is compared bare, so `chevron-down` and `icon-chevron-down` are the same icon however your project writes it.
+
+Two things it deliberately does not do. A value the page decides at runtime is left alone — the check cannot know what the data holds, and guessing would be worse than silence. And a project whose icon sources it could not read says nothing at all, rather than calling every icon on the page missing.
+
 ### Lessons: a correction becomes a guard
 
 When you correct what an AI made, the correction is usually said once, in a chat, and lost. The next agent makes the same mistake. A lesson keeps it.
