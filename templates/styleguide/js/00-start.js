@@ -280,14 +280,21 @@
   var FILTER_MARK = '<svg class="sg-dd-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';
   // The mark on the column a table is sorted by, on every table whose heads sort (the Status page's, the Rules page's).
   var MX_TRI = '<svg class="sg-mx-tri" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 2.5h6L4 6.5z" fill="currentColor"/></svg>';
-  // A table a filter has left with no row to show: its column names stand over nothing, so the head goes with the rows
-  // and the card holds one line instead. Called wherever rows are hidden (a chip, a column filter, a ticket). A table
-  // that never had a row is left alone: nothing is filtered there, and saying "nothing matches" of it would be a lie.
-  // said: what the table holds, in the plural ("rules"), for the line under it; without it, the first line alone.
-  function tableNone(table, said) {
+  // A table with no row to show: its column names stand over nothing, so the head goes with the rows and the card holds
+  // one line instead. Two tables are empty for two reasons, and they are not the same thing to say.
+  //   A filter hid them all. The person did it and a click undoes it: "Nothing matches these filters", and how many the
+  //   table holds in all. Called wherever rows are hidden (a chip, a column filter, a ticket).
+  //   It never had a row. Nothing is filtered, the system has none of this yet, and no click undoes it: what the table
+  //   waits for, which only the page that built it knows (yet). Called once as the table is built.
+  // Saying the first of the second reads as a bug - a filter the person never set, that nothing they do will clear - so
+  // a table that never had a row is left alone unless its page says what it waits for.
+  // said: what the table holds, in the plural ("rules"), for the line under the filters one.
+  // yet: { head, say } for a table that never had a row; without it, such a table is left as it is.
+  function tableNone(table, said, yet) {
     if (!table || !table.tBodies.length) return;
     var rows = table.tBodies[0].rows;
-    var none = rows.length > 0 && !Array.prototype.some.call(rows, function (tr) { return !tr.hidden; });
+    var bare = rows.length === 0;
+    var none = bare ? !!yet : !Array.prototype.some.call(rows, function (tr) { return !tr.hidden; });
     if (table.tHead) table.tHead.hidden = none;
     var note = table.nextElementSibling;
     if (!note || note.className !== 'sg-none') {
@@ -296,7 +303,9 @@
       table.parentNode.insertBefore(note, table.nextSibling);
     }
     note.hidden = !none;
-    if (none) note.innerHTML = '<strong>Nothing matches these filters</strong>' + (said ? '<span>' + esc(rows.length + ' ' + said + ' in all, none of them this combination.') + '</span>' : '');
+    if (!none) return;
+    note.innerHTML = bare ? '<strong>' + esc(yet.head) + '</strong>' + (yet.say ? '<span>' + esc(yet.say) + '</span>' : '')
+      : '<strong>Nothing matches these filters</strong>' + (said ? '<span>' + esc(rows.length + ' ' + said + ' in all, none of them this combination.') + '</span>' : '');
   }
   function usersTable(names) {
     if (!names.length) return '<p class="sg-tk-none">No component uses it.</p>';
