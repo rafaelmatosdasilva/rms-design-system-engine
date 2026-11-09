@@ -214,5 +214,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-09-how-a-system-layers-its` | The 24 guide tasks on Haiku (engine 625bf34) | "How a system layers its tokens" |
 | `2026-11-09-the-grammar-of-token-names` | The 24 guide tasks on Haiku (engine 314bd2d) | "The grammar of token names" |
 | `2026-11-09-merge-main-379-into-what` | The 24 guide tasks on Haiku (engine f5dcf56) | "What a component binds, with the name grammar" |
+| `2026-11-09-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine 19fa4c9) | "A family built alike" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
