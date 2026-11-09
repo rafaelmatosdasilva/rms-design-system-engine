@@ -89,6 +89,12 @@ More readings of the library:
 - **Corners, opacity and borders on variables.** A frame with two corners on another radius variable, an opacity of 40% typed in, or a border weight typed in, when most of your library uses variables for these.
 - **Borders on the same side.** A border outside its layer when most borders sit inside.
 - **Text styles that explain themselves.** A text style with no description when most have one, and a text style no component uses.
+- **Swaps and slots say what goes in them.** A slot or swap property that lists no preferred components, when most do.
+- **Defaults your examples use.** A button that starts disabled when every example in your file shows it enabled. Uses inside other components' examples count too.
+- **Words in one case.** Tabs labelled in Title Case when most components' examples are in Sentence case.
+- **Shadows change one way.** A card whose hover shows a separate shadow layer, when most cards change their own effect.
+- **A slot or a swap, consistently.** An `Icon` property that is a slot in one component and an instance swap in most.
+- **The gap between two parts.** An icon and a label spaced by `space/m` in one chip and by `space/xs` in most, at the same size.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.

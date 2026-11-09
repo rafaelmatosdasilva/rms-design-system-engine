@@ -22,6 +22,24 @@ Each component's line names its props as the code takes them. Where Figma and th
 
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. Under the tokens it says what each is for in your team's own words, from the descriptions you write on the variables in Figma, the brand's first, so an agent picks a colour by its purpose and not by its name alone. The notes your team writes in Figma outside any component (on its foundations, brand and pattern pages) are said too, by page, once the annotation categories are read (`--annotation-categories`); a note for whoever draws the file (Authoring) is left out. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
+### It clicks the page, not only draws it
+
+A page can look finished and do nothing. A menu toggle that never opens, a close button with no hover, a sortable header that sorts nothing — all of them photograph perfectly, and all of them cost a reviewer the time the check should have spent.
+
+So the check uses the page it drew. It reads what each control says about itself, and then it clicks the rest:
+
+| What it tries | What it expects |
+|---|---|
+| A part that opens another (a dialog, a menu) | It shows, the focus moves inside, Escape closes it, the focus comes back |
+| A field | It takes what is typed |
+| A toggle (a switch, a toggle button) | It flips, and flips back |
+| A part with `aria-expanded` | It shows what it controls, and hides it again |
+| Everything else clickable — a row, a sortable header, a checkbox over a list, load more | Clicking it changes something on the page |
+
+That last line is the one that catches most. A row or a column header says nothing about itself in its markup, so there is no attribute to check: the page is simply watched while the control is clicked, and a control that changes no element, no attribute and no text anywhere is named.
+
+This runs for a page written in your product's own code as well as for a composition. The page is drawn fresh for it, so a control is judged on the page as a person meets it, not on one the size checks have already stretched.
+
 ### Icons are held to the ones your code has
 
 A prototype uses your code's icons, never Figma's. An icon that exists only in the Figma library — or one an agent invented from a name it saw there — renders as **nothing** in the product: a blank where a control should be, on a page that otherwise looks finished.

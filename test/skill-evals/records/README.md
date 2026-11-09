@@ -218,5 +218,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-09-what-an-agent-reads-of` | The 24 guide tasks on Haiku (engine cf6545c) | "What an agent reads, twins and declared tiers" |
 | `2026-11-09-how-parts-go-together-and` | The 24 guide tasks on Haiku (engine a1156ad) | "How parts go together, and the token-name grammar" |
 | `2026-11-09-opacity-borders-and-corners-and` | The 24 guide tasks on Haiku (engine 81cedad) | "Opacity, borders, corners and text styles" |
+| `2026-11-09-what-the-file-s-own` | The 24 guide tasks on Haiku (engine 5e50605) | "What the file's own examples say" |
+| `2026-11-09-new-ui-saved-alone` | `new-ui-saved` alone, 20 runs on Haiku (engine 5e50605), to read the one miss of the run above | "A question in place of the confirmation, once in thirty" (FINDINGS.md) |
+| `2026-11-09-how-a-shadow-changes-a` | The 24 guide tasks on Haiku (engine 93c09f2) | "Shadows, slots and the gap between parts" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
