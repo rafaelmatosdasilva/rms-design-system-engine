@@ -1,7 +1,11 @@
 name: Tests
 
+# Once for a change, not twice. `push:` on every branch and `pull_request:` together ran the whole suite twice for the
+# same commit - two runs of about fifteen minutes, and a merge waited for both. main keeps its own run, which is what
+# writes the badge below; every other workflow here already limits its push the same way.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
