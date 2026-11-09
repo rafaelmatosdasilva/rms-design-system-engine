@@ -40,7 +40,7 @@
 .sg-health-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); margin-bottom: calc(var(--sg-space-l) + var(--sg-space-s)); }
 @media (max-width: 1200px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .sg-health-tiles { grid-template-columns: minmax(0, 1fr); } }
-.sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-a1); padding: calc(var(--sg-space-l) + var(--sg-space-xs)); display: flex; flex-direction: column; gap: var(--sg-space-l); min-width: 0; }
+.sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-a1); padding: var(--sg-cell-x); display: flex; flex-direction: column; gap: var(--sg-space-l); min-width: 0; }
 :root[data-sg-scheme="light"] :is(.sg-health-tile, .sg-health-card) { background: var(--sg-bg); }   /* in light mode a raised card is lighter than the page, never a shade darker */
 .sg-health-card > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
 .sg-health-card + .sg-health-card { margin-top: var(--sg-space-l); }
@@ -80,7 +80,7 @@ th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
 .sg-health-done { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; font-size: var(--sg-m); color: var(--sg-text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sg-health-done > svg { flex: none; width: var(--sg-mark); height: var(--sg-mark); }
 .sg-health-done > b { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
-.sg-health-go { margin-top: auto; padding-top: calc(var(--sg-space-l) + var(--sg-space-xs)); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
+.sg-health-go { margin-top: auto; padding-top: var(--sg-cell-x); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
 .sg-health-anchor { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-m); cursor: pointer; }   /* a link down to the table: its words and an arrow pointing down */
 .sg-health-anchor > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
 .sg-health-anchor:hover { text-decoration: underline; text-underline-offset: 3px; }

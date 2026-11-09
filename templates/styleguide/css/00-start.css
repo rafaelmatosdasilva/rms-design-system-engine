@@ -58,7 +58,7 @@
   /* The page's two timings: a colour or a line that changes (fast), and something that moves (a card, a panel, a mark). */
   --sg-fast: 0.15s ease;
   --sg-move: 0.3s cubic-bezier(0.2, 0, 0, 1);
-  --sg-cell-x: var(--sg-space-m);   /* the side padding of a card's head, rows and columns (twice that on a wider window) */
+  --sg-cell-x: var(--sg-space-l);   /* the side padding a card holds its contents by: its head, a table's first and last columns, a list's rows, a bar. One value at every width, the same a card pads itself with, so a table's words start where a card's do. */
   --sg-mark: 1rem;   /* every mark the page draws itself (the menu's, a button's, the search's, the way back): one size, so their 1.5 lines read one weight */
   --sg-card-gap: calc(var(--sg-space-xl) + var(--sg-space-s));   /* the room between any two cards or tables, side by side or one under another (32px on an 8px system) */
   --sg-control-h: calc(var(--sg-space-xxl) + var(--sg-space-s));   /* every capsule control's height: a switch, a select, a search, a button (40px on an 8px system) */   /* every table row at least this tall, from the system's spacing */

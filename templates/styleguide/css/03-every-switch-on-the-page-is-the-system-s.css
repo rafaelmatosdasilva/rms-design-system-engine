@@ -4,7 +4,6 @@
 .sg-seg > * { flex: none; }
 .pg-ctl .sg-seg { display: flex; flex-wrap: wrap; width: 100%; }   /* a component's properties: the panel's width, its choices wrapping */
 .pg-ctl .sg-seg > * { flex: 1 1 auto; }
-@media (min-width: 721px) { :root { --sg-cell-x: calc(var(--sg-space-m) * 2); } }
 @media (min-width: 1280px) { .sg-seg.sg-seg-default > button { padding-left: calc(var(--sg-space-m) + var(--sg-space-s)); padding-right: calc(var(--sg-space-m) + var(--sg-space-s)); } .sg-showroom-filter .sg-seg.sg-seg-default > button { padding-left: var(--sg-space-m); padding-right: var(--sg-space-m); } }   /* a large window: 8px more room each side of a switch's words */
 @media (max-width: 720px) { .sg-seg { flex-wrap: wrap; } }   /* a narrow window: the choices wrap rather than spill */
 .sg-seg button { font: inherit; font-weight: var(--sg-text-weight); }
