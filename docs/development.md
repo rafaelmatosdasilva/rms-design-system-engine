@@ -51,6 +51,8 @@ A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `refere
 
 Main takes no direct push. A pull request merges when the privacy check, the test suite and CodeQL pass.
 
+Actions are pinned by commit, so they are updated on purpose rather than by drift. Dependabot watches them and opens one grouped pull request a week when any has moved (`.github/dependabot.yml`); it arrives labelled `release: patch` and goes through the same gate as any other change.
+
 ## Release labels
 
 Every pull request carries exactly one, and it decides the version the release workflow publishes:
@@ -60,3 +62,5 @@ Every pull request carries exactly one, and it decides the version the release w
 | `release: patch` | a fix, docs or internal work |
 | `release: minor` | a new capability |
 | `release: major` | something that works differently for people already using the engine |
+
+A version is published once 50 merged changes are in no release yet, never on a date, and the biggest label in that group sets the step. So a label decides the step of the group a change lands in, not a release of its own, and a change can wait for the group to fill. People do not wait for it either way: an install follows the latest code once a day.
