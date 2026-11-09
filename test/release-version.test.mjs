@@ -38,7 +38,9 @@ test('a malformed tag, bump or version stops the release', () => {
 test('the workflow runs once a week and can be started by hand, reads version tags and pull request labels, and publishes generated notes', () => {
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.match(wf, /workflow_dispatch:/);
-  assert.match(wf, /cron: '0 7 \* \* 1'/, 'a release every Monday: the week\'s record');
+  // Off the hour on purpose: a schedule on the hour waits longest and is dropped most, and this repository's
+  // scheduled runs have each come 7 to 10 hours late.
+  assert.match(wf, /cron: '\d?[1-9] 7 \* \* 1'/, 'a release every Monday, and never at the top of the hour');
   // The highest version, not the nearest tag by ancestry: `git describe` picks a lower version whenever tags do not
   // land in version order, and a run that computes a version below the one already published is refused by npm.
   assert.match(wf, /git tag --list 'v\[0-9\]\*' --merged HEAD --sort=-v:refname \| head -1/);

@@ -13,7 +13,9 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 8 * * *'
+    # Off the hour, for the reason release.yml now carries: a schedule on the hour waits longest and is dropped
+    # most. The push trigger above is what this really leans on; the daily run is the second pair of eyes.
+    - cron: '37 8 * * *'
   workflow_dispatch:
 
 permissions:

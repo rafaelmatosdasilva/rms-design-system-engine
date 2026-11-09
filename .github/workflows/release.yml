@@ -9,7 +9,10 @@ name: release
 
 on:
   schedule:
-    - cron: '0 7 * * 1'
+    # 07:23, not 07:00. A schedule is best-effort, and the top of the hour is when the queue is deepest: of four
+    # scheduled runs this repository has ever had, each came 7 to 10 hours after its minute, and the release's own
+    # 07:00 Monday has never once landed on a Monday. CodeQL and Scorecard were given odd minutes for this reason.
+    - cron: '23 7 * * 1'
   workflow_dispatch:
 
 permissions:
