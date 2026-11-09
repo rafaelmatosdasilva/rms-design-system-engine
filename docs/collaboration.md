@@ -95,6 +95,10 @@ A full build tries every component's accessibility in a browser, so it takes min
   - **Once each.** The page says which engine and which code it was built from, so it is built again only when one of them changed.
   - **Never by an older engine.** With two engines on one computer, neither builds over the other's newer page.
   - **Still nothing in the background.** A turn of yours is what asks; no job and no schedule.
+- **Built again when the engine updates.** Every page this computer built is built again, quickly, the moment the engine gets a new version: a merge pulled in, or its daily update. You do not need to open the project.
+  - **Only the pages it left behind.** A page built by the new engine already, or with `"hooks": false` in its project, stays as it is.
+  - **Its own list.** The engine keeps the folders where it built a page in `~/.claude/.rms-design-system-engine-pages.json`, on this computer only. A folder that is gone leaves the list. Pages built in a temporary folder, by a test or on CI are never on it.
+  - **The installed engine only.** The engine's own git hook does it, and it is written only into the copy Claude Code runs, on `main`. A clone you develop the engine in never builds your pages.
 - **Never published.** A quick page carries a mark, and no store takes it. Build the full guide (`--styleguide`) before you publish.
 - **Its times are kept apart.** `--timing` says where the time went, and `timing.json` keeps them under `styleguide --quick`, so they never replace the full build's.
 
