@@ -256,6 +256,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.
 - A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
 - Every colour and space on the page is one of your tokens, so it looks like your system.
+- Read by machines too: the same page as text beside it, an index and one file per component, so an agent given only its address gets the system's own answers.
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
 - Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
 - The copy on your computer keeps up with your git, the engine and the code. Once you have built it there, it is built again after each commit and each change you pull in, and after a Claude Code turn once the engine updated or the code it reads moved. It is the quick build, for you to look at, and is never published.

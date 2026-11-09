@@ -29,6 +29,7 @@ How the engine publishes the living style guide and the playground. What each pa
 - **The page on your computer keeps up with your git, the engine and the code.** After each commit and each pull, or at the end of a Claude Code turn once the engine or the code it reads moved, it is built again quickly and never published ([See a change in seconds](#see-a-change-in-seconds)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
+- **Read by machines too.** Every build writes the page's twin in text beside it, from the same data the page is drawn from: an index and one file per component ([Read by machines too](#read-by-machines-too)).
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
 - **Three more load when first used.**
   - The brands' embedded fonts, when a brand is chosen.
@@ -277,6 +278,17 @@ Each component and foundation has its own switch for each mode collection, and t
 ### It works on a phone
 
 Every page fits a 320 pixel screen (WCAG 1.4.10). Cards sit two side by side, every table reads as a block per row, and the menu opens from a Menu button.
+
+### Read by machines too
+
+Every build writes the page's twin in text beside it, from the same object the page itself is drawn from, so an agent handed only the page's address gets the system's own answers rather than the most common button on the internet. Written by the build, never by hand, so it cannot drift from the page beside it.
+
+- **Where it is.** `llms.txt` beside `index.html`, and one file per component in `c/`. A component's file is named as the page names its section, so `index.html#c-modal` and `c/modal.md` are the same component.
+- **What the index holds.** A line per component: what it is, its props, what to avoid, its parts, what it composes with, and whether its design and code differ. Then the token families, how many variables the code uses, and how many WCAG criteria are checked. A part is listed under its root, never as a component to choose.
+- **What a component's file holds.** How to write it (its import line, its tag, its syntax), its props with their types, defaults and values, its events and slots, what it is for, when to use it and when not to, its rules, the mistakes made with it, what it cannot do, its parts, what it is used in, the tokens it uses, its accessibility, where its design and code differ, and where it came from.
+- **Nothing is invented.** A fact the data does not hold is a line that is not written, and a heading with nothing under it is left out.
+- **Published with the page.** The job that publishes the style guide publishes the twin with it, so one address serves both readers. A component the system no longer holds leaves with its file.
+- **Not the same as the local index.** For an agent working in your repository the engine also writes `contracts/llms.txt` and `contracts/catalog.json`, with the catalog for checking generated UI. Those stay beside the contracts, where only somebody who can run the engine reaches them. This twin is the published page's.
 
 ### The Status table
 
