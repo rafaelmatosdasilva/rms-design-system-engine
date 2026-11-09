@@ -8,6 +8,49 @@ Newest first.
 
 ---
 
+## What a run reads grew by a seventh, and nothing had grown
+
+**Found** 9 November 2026, reading the entry for Fix, Decide and Done. **Changed** nothing in the engine: nothing in it was at fault. Written down because three explanations were wrong in a row, and the measurement that settled it is cheap enough to make first next time.
+
+**Evidence.** Input a run went 92k to 105k between engine 91d7a3f and 06654ad, a bigger move than any entry before it. The entry's own commit guessed the project had moved under the run. It had not: every entry since 9f4defb1f893 records `Project measured: 13d811a9d668`, the same hash. Nor the guide, which both runs measured at 30695 bytes, nor the agent, which was 2.1.318 with the same 19 bundled skills in both.
+
+It is not one task's data either. Mean input a task, before against after:
+
+```
+new-ui-saved      292425 -> 371563   +79138
+audit-all          51757 ->  85685   +33928
+first-setup        87420 -> 115582   +28162
+refresh-no-figma   34082 ->  57143   +23061
+```
+
+Every task grew, including ones that do nothing but run the engine and read what it says. What they share is the engine's own output, so that is what grew.
+
+**Ruled out.**
+
+- *The guide.* Same bytes, same hash set but for the three short wording changes the entry names.
+- *The project.* Same hash, four entries running.
+- *The agent.* Same version, same skills; the warning that fires when the bundle changes did not.
+- *One task reading more.* The growth is across tasks that share nothing but the engine.
+
+- *The engine saying more.* The guess written when this case was opened: the change that made a check say what it read adds counts to the audit's output. The audit was run on the demo project at both commits. It printed **26059 bytes at each**. The engine says exactly as much as it did.
+
+**What it was.** `usage.input` is the whole run's input, so it counts the conversation again on every turn. Input a turn hardly moved - 26k before, 26k to 27k after. The turns moved:
+
+```
+task              turns         input a turn
+refresh-no-figma  1.3 -> 2.7    26k -> 21k
+audit-all         2.0 -> 2.7    26k -> 32k
+new-ui-saved     10.6 -> 12.7   28k -> 29k
+first-setup       3.3 -> 4.3    26k -> 27k
+overall mean      3.33 -> 3.71
+```
+
+Nothing grew. The agent took more steps, and each step reads the conversation again. `refresh-no-figma` doubled its turns while reading less a turn.
+
+**What is worth asking next.** Every task still passes, so the entry's counts say nothing is wrong, and turns are what cost scales with. A task that needs two steps where it needed one may have lost a shortcut the guide used to give it. Turns a task, beside input, would say it where a pass rate cannot - and would have answered this in a minute rather than three wrong guesses.
+
+---
+
 ## A run measures the working tree, so a checkout during one measures something else
 
 **Found** 8 November 2026, measuring the Rules page. **Changed** nothing in the engine: the measurement is sound and the hazard is in how a run is started. Written down because the run looked like it had worked.
