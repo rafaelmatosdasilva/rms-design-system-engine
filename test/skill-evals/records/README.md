@@ -208,5 +208,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-08-rules-and-documentation-filter-by` | The 24 guide tasks on Haiku (engine 9f4f851) | "Rules and Documentation filter by any of their columns" |
 | `2026-11-08-side-owned-by-and-the` | The 24 guide tasks on Haiku (engine 91d7a3f) | "Side, Owned by, and the statuses read without opening a list" |
 | `2026-11-08-fix-decide-done-source-on` | The 24 guide tasks on Haiku (engine 06654ad) | "Fix, Decide, Done; Source on both pages; an area for a page" |
+| `2026-11-09-what-the-evaluation-cannot-see` | The 24 guide tasks on Haiku (engine 4c1d2ef) | "What the evaluation cannot see, it does not score" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

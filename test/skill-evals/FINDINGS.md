@@ -65,6 +65,58 @@ Nothing grew. The agent took more steps, and each step reads the conversation ag
 
 ---
 
+## The harness asked the PATH for a CLI it had already found
+
+**Found** 9 November 2026, starting the evaluation that this day's own guide change needed, from a client's shell rather than a terminal. **Changed** `findClaude` and `CLAUDE` in `test/skill-evals/lib.mjs`, and the line in `run.mjs` that did not use them.
+
+**Evidence.** `continuous.mjs` printed the Chrome it found and then died, before a task ran:
+
+```
+Chrome: <the browser it found>
+Error: spawnSync claude ENOENT
+    at file:///…/test/skill-evals/run.mjs:73:20
+```
+
+`claude` is installed on this machine beside the node that runs everything, in the folder that installer made. A terminal's profile puts that folder on the PATH; the shell a client hands a session does not, which is why this had never been seen.
+
+**Why it was there to find.** `lib.mjs` resolves the CLI once (`which claude`) and every run spawns what it resolved. One line did not use it: `run.mjs:73` asked the PATH again, by the bare name, for the version it records on each row. So the harness had the answer and threw it away at the one place that failed. The resolver was no better underneath — `which` missing it fell back to the literal `'claude'`, which only moved the failure from a message to a stack.
+
+**Ruled out.**
+
+- *Setting the PATH and moving on.* It works, and it leaves the next person on this machine with the same stack and nothing saying what to install. The engine already answers this question for Chrome, in code (`findChrome`), and the evaluation already refuses a run that is not logged in with a sentence that says what to do.
+- *That it was the same fault as the node case above.* It is not. That one was inside a run, with a PATH the harness builds on purpose; this one is the harness's own shell, and no guard of a run's would have seen it.
+
+**What changed.** `findClaude` follows `findChrome`: a name given by hand (`DESIGN_SYSTEM_ENGINE_EVAL_CLI`, taken only if it is there), then the PATH, then where the installers put it — beside the running node first, then `~/.local/bin`, then `~/.claude/local`. It returns null rather than a bare name, and `run.mjs` says what is missing and where it looked, exiting 2. A test holds each branch with `exists` and `which` injected. The command that died runs on the same PATH now.
+
+**And the same mistake once more, one line down.** `run.mjs` recorded `claude --version` on every row — but with an API key set, the runs go through the Agent SDK and the CLI is never spawned at all. So the version kept beside 79 runs named a program none of them used. The entry compared it with the entry before, where the runs had gone through the command line, and said `2.1.318 → 2.1.301`: a downgrade that never happened, because the SDK bundles its own older Claude Code and the two numbers are two numberings.
+
+`agentOf` asks whichever program `runnerOf` chose — the SDK's package version, or the CLI's `--version` — and the row records which ran. `cliChange` compares versions only within one runner and says a change of runner as itself. This entry's own rows keep the wrong `cliVersion`, since they were written before the fix; their `cli.version` (2.1.301, from each run's init event) is what actually ran, and the entry's sentence has been corrected to say so.
+
+---
+
+## A recording that said `fatal` and carried on
+
+**Found** 9 November 2026, in the same recording as the case above. **Changed** `sh` and the range in `test/skill-evals/record.mjs`.
+
+**Evidence.** Between the records being written and the entry being written, `record.mjs` printed:
+
+```
+fatal: ambiguous argument '06654ad..4c1d2ef': unknown revision or path not in the working tree.
+fatal: bad revision '06654ad'
+```
+
+and then wrote the entry anyway, exit 0.
+
+**Why.** Two faults that look like one. `sh` catches git's failure and returns `''`, but `execFileSync` passes git's stderr to the console, so a handled failure reads like a crash. And what it handled was not nothing: `06654ad` is the engine the entry before was measured on, which this clone does not have, so the range resolved to nothing and the entry quietly lost both the commit list and the guide files it names. The entry only said which guide file changed because `--what` had been passed by hand; without it, it would have said nothing and looked fine.
+
+**Ruled out.** *That the empty answer is harmless because `--what` is usually given.* `guideFiles` comes from the same range and is never given by hand — it is the line that tells a reader which guide files an entry measured.
+
+**What changed.** `sh` keeps git's stderr to itself. The range checks that the commit is in this clone (`rev-parse --verify`) and, when it is not, says so and falls back to the measured commit's own parent — the fallback that already existed for a first entry. Quiet degradation becomes a sentence naming the commit it could not reach.
+
+---
+
+---
+
 ## A run measures the working tree, so a checkout during one measures something else
 
 **Found** 8 November 2026, measuring the Rules page. **Changed** nothing in the engine: the measurement is sound and the hazard is in how a run is started. Written down because the run looked like it had worked.

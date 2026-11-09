@@ -26,7 +26,7 @@ import { join, dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, againstOwnProject, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, againstOwnProject, agentOf, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
 import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
@@ -70,8 +70,18 @@ const tasks = againstOwnProject((sets[SET] ?? []).filter((t) => !ONLY || t.id ==
 const vr = variant(V, { ref: arg('ref', undefined) });
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).trim() + (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ENGINE, encoding: 'utf8' }).trim() ? '+dirty' : '');
-const cliVersion = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+// What will actually run each task, and its version - asked of the SDK or of the CLI, whichever this machine's
+// credentials choose (runnerOf). This line used to ask the PATH for a bare `claude` while every run spawned the one
+// lib.mjs had resolved, so a machine whose shell does not carry it died here in a stack, measuring nothing; and on
+// the SDK route it recorded the version of a program no run used.
+const { runner, version: cliVersion } = agentOf();
+if (!cliVersion) {
+  console.log(runner === 'cli'
+    ? '✗ no `claude` on this machine, and the runs go through it: install Claude Code (https://claude.com/claude-code), or point DESIGN_SYSTEM_ENGINE_EVAL_CLI at it. Looked on the PATH, beside this node, in ~/.local/bin and in ~/.claude/local.'
+    : '✗ no Agent SDK, and the runs go through it (an API key is set): npm ci --prefix test/.eval-tools. Unset ANTHROPIC_API_KEY to run on the plan\'s login through the command line instead.');
+  process.exit(2);
+}
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
