@@ -103,11 +103,11 @@
         decide = '<div class="sg-decide-grid">' + r.ways.map(function (w, k) { return copyBtn(k ? 'change' : 'approve', (k ? '' : 'Suggested: ') + WAY_HEAD[w.way], 'The system\'s construction rule: "' + w.says + '". Run ' + cmd + ' --construction ' + r.id + ' ' + w.way + '.'); }).join('') + '</div>';
       }
       else if (r.status === 'decide') {
-        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' components (' + pct + '%) already do this.') + '</p><p class="sg-il-line">' + (pct >= 50 ? '<strong>' + esc('Suggested: make it the rule, and change the ' + n + ' that don\'t.') + '</strong>' : esc('Fewer than half do: make it the rule only if it is how the system should be built; then ' + n + ' are to change.')) + '</p>';
+        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line">' + (pct >= 50 ? '<strong>' + esc('Suggested: make it the rule, and change the ' + n + ' that don\'t.') + '</strong>' : esc('Fewer than half do: make it the rule only if it is how the system should be built; then ' + n + ' are to change.')) + '</p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Make it the rule', 'Make it a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' yes.') + copyBtn('drop', 'Not a rule', 'It is not a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' no.') + '</div>';
       }
       else {
-        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' components (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + plural2(n) + ' that don\'t, so every one does.') + '</strong></p>';
+        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + unit(r, n) + ' that don\'t, so every one does.') + '</strong></p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
       var head = byComponent(r) ? 'Component' : 'Where';

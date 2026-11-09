@@ -1368,7 +1368,15 @@ component on its family's page. From what each variant binds, three rules on the
 binds that state's own token where the system has one (a disabled button on `…/text/default` when `…/text/disabled`
 exists; held against the same variant at rest, and a component the system has no such token for is left out); a
 component binds its own tokens and the shared ones, never another component's (a chip on `button/…`); and a text
-layer's colour is a text colour, never a surface or background one (`on-surface` is a text colour). From the structure capture: where a component's padding sits (its own frame, or a layer
+layer's colour is a text colour, never a surface or background one (`on-surface` is a text colour). From the tokens'
+own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the system layers them, never a declared
+model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
+collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
+Three rules come of it, each a place (a token) rather than a component: a token of a layer points at the layer it goes
+through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
+the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
+names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
+From the structure capture: where a component's padding sits (its own frame, or a layer
 inside it), and whether a yes/no variant changes how the component looks: one whose two variants differ only in layers
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
 line with the same statuses.
