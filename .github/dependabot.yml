@@ -1,0 +1,28 @@
+version: 2
+
+# A pinned action never moves on its own. Pinning by commit is what makes a workflow reproducible and what keeps a
+# retagged release from running here, but it also holds the workflow on the version it was pinned to - a security
+# fix upstream included. Dependabot is the other half of that trade: it watches the actions these workflows pin and
+# opens one pull request when any of them has moved, carrying the new commit and its version comment.
+#
+# Only the workflows are watched. The engine has no runtime dependencies and `package.json` declares none, so there
+# is no npm ecosystem here to update; the test tools install from their own committed lockfiles under `test/`.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Etc/UTC
+    # One pull request a week for every action that moved, rather than one per action.
+    groups:
+      actions:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    # Every pull request here carries exactly one release label; an action bump is internal work.
+    labels:
+      - 'release: patch'
+    commit-message:
+      prefix: actions
