@@ -30,7 +30,7 @@ import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, kee
 import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
-import { engineFell, kindOf } from './reading.mjs';
+import { engineFell, engineNeverStarted, kindOf } from './reading.mjs';
 import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO, PROTO_FIGMA } from './proto-tasks.mjs';
@@ -118,6 +118,16 @@ async function one({ t, run }) {
     if (r.error) { error = r.error; break; }
   }
   const ctx = context(events, dir);
+  // Before a single check runs: a run whose shell could not start the engine measures this machine, not the guide.
+  // Refused the way a run that is not logged in is, because scoring it is how 15 of 79 came to read as a guide
+  // getting worse (8 November, when every run had lost node from its path). The no-engine side never trips this:
+  // what it takes away is the engine's command, and node goes into every run's bin.
+  const never = vr.engine !== false ? engineNeverStarted(ctx) : null;
+  if (never) {
+    writeFileSync(join(out, 'transcripts', `${SIDE}.${MODEL}.${t.id}.${run}.refused.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+    cleanup(dir, home);
+    throw new Refused(`the engine never started: all ${never.calls} call${never.calls === 1 ? '' : 's'} to it said "${never.said}"`);
+  }
   let taskChecks;
   try { taskChecks = limit ? [{ name: 'the run was given room to finish', ok: false, detail: limit }] : error ? [{ name: 'the run finished', ok: false, detail: error }] : await t.score(ctx); }
   catch (e) { taskChecks = [{ name: 'the scorer ran', ok: false, detail: e.message }]; }
@@ -125,7 +135,11 @@ async function one({ t, run }) {
   // A run that reached an engine which fell over is not the agent's failure: it is kept on the row and counted
   // apart, the same as a run the harness stopped at its own ceiling.
   const fell = engineFell(ctx);
-  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, mcpCalls: ctx.mcp.map((m) => m.tool), decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
+  // After the checks, so what they read is kept with the row and the row says what they read: a path missing from
+  // `files` that is listed here was not there when the run was scored, and one listed nowhere is evidence this row
+  // never held. Scoring the run again reads both (reading.mjs, `unanswerable`).
+  const files = keepFiles(ctx, t.keep ?? []);
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, mcpCalls: ctx.mcp.map((m) => m.tool), decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files, readPaths: [...ctx.readPaths].filter((p) => !ctx.tooBig.has(p)), error, limit, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${SIDE}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
@@ -166,6 +180,8 @@ const left = jobs.length - rows.length;
 if (refused && /credit balance (is )?too low/i.test(refused)) { console.log('✗ the API key has no credits left: the runs carry on with --resume once next month\'s credits arrive, or with credits bought in the Console.'); process.exit(2); }
 // A run with no login never gets one by waiting: stop, so continuous.mjs does not wait out a usage limit that is not there.
 if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN (billed to the plan), or put an API key in ~/.config/rms-engine/anthropic-key (chmod 600) or ANTHROPIC_API_KEY (its API credits, through the Agent SDK: npm ci --prefix test/.eval-tools).'); process.exit(2); }
+// The machine, not the API: no limit resets into a node that is on the path, so this stops rather than pausing.
+if (refused && /the engine never started/.test(refused)) { console.log(`✗ ${refused}. A run's shell starts from a fresh HOME with no profile, so only the PATH makeHome hands it says where node is: check that \`${process.execPath}\` is still there and runnable. Nothing was scored — a run that never reached the engine says nothing about the guide.`); process.exit(2); }
 if (refused) console.log(`⏸ stopped: the API refused a run (${refused}). ${left} runs not measured; run the same command with --resume after the limit resets.`);
 else if (left) console.log(`⚠ ${left} runs failed in the harness; run the same command with --resume to retry them.`);
 // 3: the API refused a run, so waiting helps; 4: runs failed in the harness, which waiting for a limit never fixes.

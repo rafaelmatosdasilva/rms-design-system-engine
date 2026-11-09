@@ -15,7 +15,7 @@
 // Transcripts are never copied (they stay in results/, gitignored). Rescore and summarize read the copies as they read
 // results/.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { readingLine } from './reading.mjs';
+import { readingLine, leftOut } from './reading.mjs';
 import { homedir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,9 +31,12 @@ export function pruneRow(row) {
   for (const [p, t] of Object.entries(row.files ?? {})) {
     if (SKIP.test(p)) continue;
     const text = String(t ?? '');
-    files[p] = text.length > MAX ? `${text.slice(0, MAX)}\n… (${text.length - MAX} more characters left out of the record)` : t;
+    files[p] = text.length > MAX ? `${text.slice(0, MAX)}${leftOut(text.length - MAX)}` : t;
   }
-  return { ...row, changed: (row.changed ?? []).filter((p) => !SKIP.test(p)), files };
+  // A path dropped here is one the record no longer holds, so the row stops vouching for it too: `readPaths` says
+  // "what is not in `files` was not there", and a file taken out to keep the repository clean was there.
+  const readPaths = row.readPaths ? { readPaths: row.readPaths.filter((p) => !SKIP.test(p)) } : {};
+  return { ...row, changed: (row.changed ?? []).filter((p) => !SKIP.test(p)), files, ...readPaths };
 }
 
 function sources(p) {

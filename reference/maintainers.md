@@ -208,12 +208,22 @@ node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet
   (`DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_TASKS`) write only under `DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT`, never in the repository.
 - **A run the API refused is not a result.** A usage limit or a 429 stops the pool without writing a row;
   the same command with `--resume` carries on. A results file from another guide or engine is refused.
+- **A run that never reached the engine is not a result either.** A run whose every call to the engine died in
+  the shell measures the machine, not the guide: it is refused before it is scored, nothing is written, and the
+  message says to check the PATH rather than to wait. The line is node, which `makeHome` puts in every run's bin;
+  the engine's own command missing is what the no-engine side measures and is never refused.
 - **Adoption rule** (`report.mjs`, applied by code, per model): no held-out task with a lower pass rate (a
   lower task is re-run 10 more times on both variants before it counts), no new rule violation, a total pass
   rate equal or higher, and fewer input tokens; the development set shows no lower task either. The report
   refuses to decide on a partial measurement.
 - **Scorers are code, and they are tested** (`test/skill-evals.test.mjs`). When a transcript read by hand
   disagrees with its score, the scorer is fixed, and `rescore.mjs` scores the saved runs again.
+- **A rescore scores only what the row can see.** There is no project behind `rescore.mjs`, so a check reads
+  what the row kept: whatever the checks read is kept with the run, and the row records which paths they read.
+  A run whose checks now read something the row can neither hand over nor vouch for as absent is left exactly
+  as it was scored, naming the file (`⏭ … kept as scored`) - a score on evidence that is not there is not a
+  score, and the live one was. `rescore-build.mjs` rebuilds the run's project from the fixture, so this is not
+  its problem.
 
 Any change to the guide files needs a fresh evaluation run before it is merged. `test/guide-structure.test.mjs`
 keeps the split whole (index, recipe template, a 30 KB cap on the main file, no paragraph in two files, every

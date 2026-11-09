@@ -318,11 +318,15 @@ export function context(events, dir, saved = null) {
     .filter((p) => !ENGINE_WRITES.test(p) && !/(^|\/)(node_modules|\.design-system-engine-out)(\/|$)/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
-  // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project.
-  const read = (p) => { if (saved && savedFiles[p] != null) return savedFiles[p]; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
+  // Every path a check asked for, in the order it asked. Kept on the row, so scoring the run again can tell a file
+  // that was not there when it ran from one the row never kept (reading.mjs, `unanswerable`).
+  const readPaths = new Set(), tooBig = new Set();
+  // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project,
+  // and where there is no project to rebuild (rescore.mjs) only what the row kept can be read at all.
+  const read = (p) => { readPaths.add(p); if (saved && savedFiles[p] != null) return savedFiles[p]; if (!dir) return null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
     calls, bash, engine, mcp, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
-    diff: git('diff', 'HEAD'), read, nextLines, dir,
+    diff: git('diff', 'HEAD'), read, readPaths, tooBig, nextLines, dir,
     usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0), ms: u.ms + (r.duration_ms ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0, ms: 0 }),
   };
 }
@@ -359,9 +363,20 @@ export function hasEngineRun(ctx, pred = () => true) { return ctx.engine.some((b
 export function cleanup(...dirs) { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } }
 
 // The files a scorer may read, kept with the result so the run can be scored again (at most 256 KB each).
+// Whatever the checks actually read goes in too, which is the only list that cannot fall behind them: what the
+// engine wrote is left out of `changed` on purpose, so a check reading the engine's own output (a Figma spec, a
+// change file) kept nothing, read `null` when the run was scored again, and failed a run that had passed.
+// Call this after the checks have run, so `ctx.readPaths` is what they asked for.
 export const KEEP = ['ds-config.json', 'design-system-engine-baseline.json', 'src/theme.css', '.design-system-engine-out/summary.md'];
 export function keepFiles(ctx, extra = []) {
   const out = {};
-  for (const p of new Set([...KEEP, ...extra, ...ctx.changed])) { const t = ctx.read(p); if (t != null && t.length <= 256 * 1024) out[p] = t; }
+  // A file left out for its size was there, so the row must not later vouch for it as absent: `tooBig` takes it
+  // out of what the row says its checks read, and a rescore that needs it leaves the run exactly as it was scored.
+  const tooBig = ctx.tooBig ?? new Set();
+  for (const p of new Set([...KEEP, ...extra, ...ctx.changed, ...(ctx.readPaths ?? [])])) {
+    const t = ctx.read(p);
+    if (t == null) continue;
+    if (t.length <= 256 * 1024) out[p] = t; else tooBig.add(p);
+  }
   return out;
 }

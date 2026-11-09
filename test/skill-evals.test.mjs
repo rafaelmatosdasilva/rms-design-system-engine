@@ -292,6 +292,71 @@ test('the files the engine writes on every run are never the agent\'s change', a
   assert.deepEqual(ctx.changed, ['src/theme.css', 'design-system-engine-baseline.json']);   // the theme and an accepted debt are the agent's
 });
 
+test('a run whose shell could not start the engine is refused, not scored', async () => {
+  const { engineNeverStarted } = await import('./skill-evals/reading.mjs');
+  // Shaped as a run is, so the filter that tells an engine call from any other Bash call is in the way too.
+  const call = (command, result, isError = true) => ({ id: command, name: 'Bash', input: { command }, result, isError });
+  const run = (...calls) => context(calls.flatMap((c) => [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: c.id, name: c.name, input: c.input }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: c.id, content: c.result, is_error: c.isError }] } },
+  ]), '/nonexistent');
+  const died = 'skill-eval-home/bin/rms-design-system-engine: line 2: exec: node: not found';
+
+  // 8 November, first-setup #0: the agent reached for the engine, the shell refused it, and the run was scored.
+  const lost = engineNeverStarted(run(call('rms-design-system-engine --init', died), call('node ~/.claude/skills/rms-design-system-engine/audit.mjs --route "set up"', '(eval):1: command not found: node')));
+  assert.ok(lost, 'a run with no node is not a measurement of the guide');
+  assert.equal(lost.calls, 2);
+
+  // A run that reached the engine is scored, whatever the engine then said - including a refusal of its own.
+  assert.equal(engineNeverStarted(run(call('rms-design-system-engine --init', died), call('rms-design-system-engine --init', 'PARITY AUDIT · 4 components', false))), null);
+  assert.equal(engineNeverStarted(run(call('rms-design-system-engine --audit', '❌ no Figma token: put it in .env'))), null);
+  // A shell command that is not the engine never speaks for it, however it died.
+  assert.equal(engineNeverStarted(run(call('npm test', 'sh: node: command not found'))), null);
+});
+
+test('what a check reads of the engine\'s output is kept with the row, so the run can be scored again', async () => {
+  const { context, keepFiles } = await import('./skill-evals/lib.mjs');
+  const { unanswerable } = await import('./skill-evals/reading.mjs');
+  const dir = tempDir('eval-keeps-');
+  const spec = '.design-system-engine-out/specs/pill.spec.json';
+  mkdirSync(join(dir, '.design-system-engine-out', 'specs'), { recursive: true });
+  writeFileSync(join(dir, spec), '{"name":"pill"}');
+
+  // A live run: the check reads what the engine wrote. `changed` leaves the engine's own output out on purpose,
+  // so before this the row kept nothing of it and scoring the run again read `null` and failed a run that passed.
+  const ctx = context([], dir, null);
+  assert.equal(JSON.parse(ctx.read(spec)).name, 'pill');
+  const files = keepFiles(ctx, []);
+  assert.equal(files[spec], '{"name":"pill"}', 'the row keeps what the check read');
+  assert.ok(!ctx.changed.includes(spec), 'and it is still not counted as the agent\'s change');
+
+  // Scored again from the row alone, with no project behind it: the check reads the same bytes and nothing is blind.
+  const row = { changed: ctx.changed, commits: ctx.commits, files, readPaths: [...ctx.readPaths] };
+  const again = context([], null, row);
+  assert.equal(again.read(spec), '{"name":"pill"}');
+  assert.deepEqual(unanswerable(row, again.readPaths), []);
+
+  // A row from before the keeping cannot see it, and is left exactly as it was scored.
+  const was = { changed: [], commits: 1, files: {} };
+  const blind = context([], null, was);
+  assert.equal(blind.read(spec), null);
+  assert.deepEqual(unanswerable(was, blind.readPaths), [spec]);
+
+  // A file too big to keep was there all the same, so the row never vouches for it as absent: scoring the run
+  // again would otherwise read `null` and call a file that exists an empty one.
+  const big = 'src/huge.css';
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, big), 'a'.repeat(257 * 1024));
+  const heavy = context([], dir, null);
+  heavy.read(big);
+  const heavyFiles = keepFiles(heavy, []);
+  assert.equal(heavyFiles[big], undefined, 'too big to keep');
+  assert.ok(heavy.tooBig.has(big));
+  const heavyRow = { changed: [], commits: 1, files: heavyFiles, readPaths: [...heavy.readPaths].filter((p) => !heavy.tooBig.has(p)) };
+  assert.deepEqual(unanswerable(heavyRow, [big]), [big], 'kept as scored, never read as absent');
+  cleanup(dir);
+});
+
 test('figma-roles: the engine\'s list shown and a yes asked for passes; a claim that Figma was changed, or no engine run, fails', () => {
   const run = (final, cmd = 'rms-design-system-engine --figma-edits') => figmaRolesScore(fakeCtx({ calls: [{ name: 'Bash', input: { command: cmd }, result: '' }], final })).every((c) => c.ok);
   const good = 'The engine lists one Figma change: field gets the annotation "Role: textbox". The chip is a decision for you: Figma says togglebutton, the code renders a plain button. Shall I apply the field change?';

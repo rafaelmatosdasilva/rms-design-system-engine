@@ -109,6 +109,15 @@ The same `\S*` was in two more places: `ENGINE_CALL`, which counts the engine's 
 
 **What changed.** One pattern for an engine run by its path: bare, in double quotes or in single quotes. A test holds it to the quoted path with a space, to a command that is not the engine, and to `handEdits` leaving an engine call that writes a file alone. A rescore that cannot see what a run's engine wrote is an item of its own: until it can, a rescore of a task that reads the engine's output is not a score.
 
+**Closed** 9 November 2026, from both ends.
+
+- *It can see it, from now on.* `keepFiles` keeps what the checks actually read (`ctx.readPaths`), which is the only list that cannot fall behind them — a `keep:` written by hand on each task would have had to be remembered for every check ever added. The row also records the paths its checks read, so a file missing from `files` can be told apart from a file that was not there.
+- *It never writes over what it cannot see.* `rescore.mjs` scores a run again only where the row answers everything its checks read, and leaves it exactly as it was scored otherwise, naming the file (`⏭ … kept as scored, the row holds none of …`). Only here: `rescore-build.mjs` rebuilds the run's project from the fixture, so its files are there to read.
+
+**Measured on the nine.** The nine rows of that day, with their transcripts, rescored on the code as it was: 9 of 9 written over as failures. On this code: 9 of 9 kept, each naming the file it could not see (`specs/pill.spec.json` for the three `figma-build-like`, `changes/chip.change.json` for the six option runs), and the results file byte-identical afterwards. Not a no-op either — across 89 rows of 24 tasks, 73 still rescore and 1 changed verdict.
+
+**What it leaves.** Two `new-ui-saved` rows are kept as scored for a file that genuinely was never written (`changed: []`, the runs that changed nothing and said the system has no green — the case further down). A row from before this cannot tell "absent" from "never kept", so it is treated as the second; rows written from now on say which, and are scored again.
+
 ---
 
 ## Fifteen of seventy-nine, and no run had node
@@ -134,6 +143,12 @@ The agent looked for node in four places, found none, told the person Node.js wa
 - *Widening the filter so it keeps a `.local/bin` that holds node.* That folder can hold an installed engine as well, and then a run could reach it: the filter is right. Node goes in on its own instead, as the engine's command already does.
 
 **What changed.** `makeHome` links `process.execPath` into `bin`, for every task, the ones that take the engine's command away included (the guide's `node <install-dir>/audit.mjs` needs node all the same). A test runs a shell with only that PATH and HOME and finds this node, runs the engine's command, and finds no `.local/bin`; without the link it fails with the runs' own `node: command not found`. The 15-of-79 record was never committed.
+
+**Closed** 9 November 2026, the other half: the fix above stops this machine losing node, and nothing stopped the *next* machine fault being scored as a guide. A run whose every call to the engine died in the shell is now refused before it is scored, the way a run that is not logged in is (`engineNeverStarted`, `reading.mjs`): the pool stops, no row is written, and the message says to check the PATH rather than to wait for a limit to reset.
+
+The line it draws is node, not the engine. Every variant gets node linked into its own bin, so node missing is never something a variant asks for — while `rms-design-system-engine: command not found` is exactly what the no-engine side is there to measure, and must never be refused. Four wordings are held by a test, because two shells and `exec` each say it differently: `(eval):1: command not found: node`, `bash: node: command not found`, `exec: node: not found`, `env: node: No such file or directory`. One call that started means the runtime was there, and the run is scored as it always was.
+
+**What it does not cover.** A machine that breaks in some way other than losing node. The general shape — a run that never reached the engine says nothing about the guide — now has two guards (not logged in, no runtime) and no third.
 
 ---
 
