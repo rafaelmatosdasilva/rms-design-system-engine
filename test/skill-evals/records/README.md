@@ -212,6 +212,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-09-whether-a-component-binds-the` | The 24 guide tasks on Haiku (engine c349c26) | "Whether a component binds the right token" |
 | `2026-11-09-what-the-evaluation-cannot-see` | The 24 guide tasks on Haiku (engine 4c1d2ef) | "What the evaluation cannot see, it does not score" |
 | `2026-11-09-how-a-system-layers-its` | The 24 guide tasks on Haiku (engine 625bf34) | "How a system layers its tokens" |
-| `2026-11-09-what-a-component-binds-held` | The 24 guide tasks on Haiku (engine 3e526c5) | "What a component binds, against the token layers" |
+| `2026-11-09-the-grammar-of-token-names` | The 24 guide tasks on Haiku (engine 314bd2d) | "The grammar of token names" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

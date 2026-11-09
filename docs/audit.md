@@ -40,6 +40,14 @@ From what each variant binds come three rules about the token itself. Like every
 - **A component uses its own tokens and the shared ones.** A chip that binds a button's token is flagged.
 - **A text layer uses a text colour.** A label bound to a background or surface colour is flagged. `on-surface` counts as a text colour.
 
+How your tokens are named is read from the names themselves, the way most of them are written:
+
+- **One case.** A name part written another way, such as `text-color` where the rest is camelCase.
+- **One word for one idea.** `pressed` where the system says `press`, or `bg` beside `background`.
+- **One scale for sizes.** `medium` where every other size is `m`.
+- **Sizes in order.** A set where `m` is larger than `l`.
+- **The usual states.** An interactive role missing the hover or press most roles have. A selected and an unselected colour don't need a hover, so they're left out.
+
 How your tokens are layered is read from the tokens themselves, so you never have to declare it:
 
 - **The layers come from the aliases.** A group of tokens that point at nothing is a base; one that mostly points at another sits on it. Layers can be collections of their own (Primitives, Semantic) or groups of names inside one collection (`primitives/…`, `semantic/…`).
