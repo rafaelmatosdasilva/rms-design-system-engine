@@ -1364,7 +1364,11 @@ component in a section, a link to its code; what each layer of each variant bind
 about which token a variant binds and not only that it binds one; how each text layer grows and truncates (what it
 resizes on, whether it ends in an ellipsis, after how many lines); and for each family of three or more (the buttons, the cards), the shape
 most are built in (its root's auto layout and what it holds, in order); the order a frame's layers come in, and each
-component on its family's page. From the structure capture: where a component's padding sits (its own frame, or a layer
+component on its family's page. From what each variant binds, three rules on the token itself: a variant for a state
+binds that state's own token where the system has one (a disabled button on `…/text/default` when `…/text/disabled`
+exists; held against the same variant at rest, and a component the system has no such token for is left out); a
+component binds its own tokens and the shared ones, never another component's (a chip on `button/…`); and a text
+layer's colour is a text colour, never a surface or background one (`on-surface` is a text colour). From the structure capture: where a component's padding sits (its own frame, or a layer
 inside it), and whether a yes/no variant changes how the component looks: one whose two variants differ only in layers
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
 line with the same statuses.

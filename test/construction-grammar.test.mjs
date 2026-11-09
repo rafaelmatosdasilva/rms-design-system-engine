@@ -190,3 +190,42 @@ test('on the Construction page each row is a rule, a decision included: never a 
   assert.deepEqual([...new Set((page.match(/'(Naming|Structure|Properties|Tokens|Documentation)'/g) || []))].length, 5, 'five areas, no more');
   assert.match(page, /var AREA_ORDER = \['Naming', 'Properties', 'Structure', 'Tokens', 'Documentation'\];/, 'read in the order a person meets them, never A to Z');
 });
+
+test('bindings, from every variant\'s layers: a state\'s own token, a component\'s own tokens, a text colour on a text', () => {
+  // Two buttons, a chip and a card, each with a label; a default and a disabled variant sharing one tree.
+  const tree = { layout: { dir: 'HORIZONTAL' }, c: [{ t: 'TEXT', n: 'Label', id: '1' }] };
+  const comp = (rest, disabled) => ({ trees: [tree], variants: [['State=Default', 0], ['State=Disabled', 0]], binds: { 'State=Default': rest, 'State=Disabled': disabled } });
+  const skeleton = {
+    buttonPrimary: comp({ '0': { fills: 'color/button/text/default' } }, { '0': { fills: 'color/button/text/disabled' } }),
+    // Its disabled variant keeps the default's text colour, though the system has one for disabled.
+    buttonSecondary: comp({ '0': { fills: 'color/button/text/default' } }, { '0': { fills: 'color/button/text/default' } }),
+    // Its background is the button's.
+    chip: comp({ '': { fills: 'color/button/bg' }, '0': { fills: 'color/chip/text/default' } }, { '': { fills: 'color/button/bg' }, '0': { fills: 'color/chip/text/disabled' } }),
+    // Its label is a surface colour; and the system has no disabled colour for a card, so it is no case for the state rule.
+    card: comp({ '0': { fills: 'color/surface/default' } }, { '0': { fills: 'color/surface/default' } }),
+  };
+  const names = ['color/button/text/default', 'color/button/text/disabled', 'color/chip/text/default', 'color/chip/text/disabled', 'color/button/bg', 'color/surface/default', 'color/text/primary'];
+  const varNames = Object.fromEntries(names.map((name, i) => [`VariableID:${i}`, { name }]));
+  const g = grammarOf({ props: {}, skeleton, varNames });
+  const rule = (id) => g.figma.rules.find((r) => r.id === id);
+
+  const state = rule('state-tokens');
+  assert.equal(state.area, 'variables');
+  assert.equal(state.of, 3, 'the card has no disabled token to bind, so it is left out');
+  assert.deepEqual(state.toFix.map((x) => x.component), ['buttonSecondary']);
+  assert.match(state.toFix[0].value, /Label fills in State=Disabled binds color\/button\/text\/default, where color\/button\/text\/disabled exists/);
+  assert.equal(state.status, 'decide', 'two of three: the team decides');
+
+  const own = rule('own-tokens');
+  assert.deepEqual(own.toFix, [{ component: 'chip', value: 'color/button/bg' }], 'a chip on the button\'s background');
+  assert.equal(rule('text-colour-tokens').toFix[0].component, 'card');
+  assert.match(rule('text-colour-tokens').toFix[0].value, /Label binds color\/surface\/default/);
+  // on-surface and other text colours are text colours.
+  const fine = { ...skeleton, card: comp({ '0': { fills: 'color/on-surface' } }, { '0': { fills: 'color/on-surface' } }) };
+  assert.equal(grammarOf({ props: {}, skeleton: fine, varNames }).figma.rules.find((r) => r.id === 'text-colour-tokens').toFix.length, 0);
+  // Each says what to do.
+  assert.match(fixOf(state, state.toFix[0]).say, /^Bind each state's own token: /);
+  // A capture from before the bindings were kept: no binding rule, never one every component "follows".
+  const old = Object.fromEntries(Object.entries(skeleton).map(([n, s]) => [n, { trees: s.trees, variants: s.variants }]));
+  assert.equal(grammarOf({ props: {}, skeleton: old, varNames }).figma.rules.some((r) => /tokens$/.test(r.id) && r.id !== 'variables'), false);
+});
