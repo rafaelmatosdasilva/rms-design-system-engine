@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: What a component binds, against the token layers (continuous evaluation)
+
+What changed since the entry below (engine 625bf34): Four construction rules on what a component binds, held against the token layers: no base token, one radius a family, a shared token shared, an own token used. The runs rescored with the new-ui-saved check that hears the gap in either order. The guide changed in `reference/usage.md`.
+
+Guide set measured: `8e7a1beeb6a1` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md a32cd0bf` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 62e24e18` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 3e526c5 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.056 |
+| Input a run | 101k | 93k |
+| Turns a run | 3.6 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 101k, in 3.3 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-09-what-a-component-binds-held`.
+
 ## 2026-11: How a system layers its tokens (continuous evaluation)
 
 What changed since the entry below (engine c349c26): Three construction rules on the tokens' own layers, read from their aliases: a token that skips its layer, an alias chain longer than the system's or circular, a token named like another collection's. The guide changed in `reference/maintainers.md`, `reference/usage.md`.
