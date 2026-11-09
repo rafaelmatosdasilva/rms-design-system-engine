@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## A held edit said a new colour was a sign-off, so the agent asked and stopped
+
+**Found** 9 November 2026, measuring the Figma capture change. **Changed** the guard: a token whose colour the system holds nowhere is now told as a gap, before any sign-off (`guard.mjs`, `newColours`).
+
+**Evidence.** `new-ui-saved` asks for a green "Saved" confirmation in a system with no green. It came out 8/10. Both misses tried first to add a green token to the theme (`--color-success`, `--confirmation-success: #2e7d32`). The guard held the edit, as it must, but its message led with "tell the person what it adds and ask who signs it off… easy to undo, low risk". Both agents did exactly that: asked who signs off an invented colour, changed nothing, and never said the system has no green. The run that hit the same hold and passed carried on building past it.
+
+**Ruled out.** The change being measured (it described the Figma skeleton; neither miss read anything of it). The scorer: both agents meant to bring in a colour the system lacks, and only the hold stopped them.
+
+**After the fix.** `new-ui-saved` alone, 20 runs on the fixed engine: 20/20. The hold fired in 3, each with the new message, and each agent named the missing green or built with what the system has. 20/20 alone proves little at this task's usual rate; the three held runs are the evidence.
+
+**What it teaches.** A hold that stops an edit is the only thing the agent hears about it, because the edit check never runs on an edit that was not made. So the hold has to say what that check would have said. It is probably also the cause of the "rare intermittent" miss below, which has the same shape; its transcript was not kept, so that stays a guess.
+
+---
+
 ## What a run reads grew by a seventh, and nothing had grown
 
 **Found** 9 November 2026, reading the entry for Fix, Decide and Done. **Changed** nothing in the engine: nothing in it was at fault. Written down because three explanations were wrong in a row, and the measurement that settled it is cheap enough to make first next time.
