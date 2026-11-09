@@ -51,6 +51,8 @@ A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `refere
 
 Main takes no direct push. A pull request merges when the privacy check, the test suite and CodeQL pass.
 
+Actions are pinned by commit, so they are updated on purpose rather than by drift. Dependabot watches them and opens one grouped pull request a week when any has moved (`.github/dependabot.yml`); it arrives labelled `release: patch` and goes through the same gate as any other change.
+
 ## Release labels
 
 Every pull request carries exactly one, and it decides the version the release workflow publishes:
