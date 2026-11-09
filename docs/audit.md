@@ -29,6 +29,11 @@ Code can only match what Figma states, so the summary says first when the file i
 
 Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own, auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library)).
 
+Two more things it reads of every layer, which make a rule about *which* token possible rather than only about whether there is one:
+
+- **What each variant binds, layer by layer.** For every variant, each of its layers and the variable each field of that layer binds. A component can bind a variable everywhere and still bind the wrong one; until now the component was read as a whole, so nothing could say that a disabled button takes the default's text colour.
+- **How each text layer grows and truncates.** What it resizes on, whether it ends in an ellipsis, and after how many lines. A label that truncates at one line and one that grows are different things to build.
+
 ### Components of one type, built the same way
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.

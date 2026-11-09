@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { unpublished, publishedByNode, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
-  COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../lib/figma-capture.mjs';
+  COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip, withoutProse, spansLines } from '../lib/figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
 import { examplesCaptureScript } from '../lib/figma-examples.mjs';
 import { brandsCaptureScript } from '../lib/figma-brands.mjs';
@@ -126,8 +126,11 @@ test('components: the chunk script carries the recipes\' own functions, fits the
   const names = [...COMPONENT_FUNCTIONS, ...AUDIT_FUNCTIONS];
   for (const [i, src] of fns.entries()) assert.match(src, new RegExp(`^(async )?function ${names[i]}\\(`));
   const md = ['refresh-figma.md', 'full-audit.md'].map((f) => readFileSync(join(ENGINE, 'cookbook', f), 'utf8')).join('\n');
-  for (const src of fns) assert.ok(md.includes(src), 'taken from the recipes unchanged');
-  assert.equal(fns[names.indexOf('hygieneOf')], hygieneOf.toString(), 'the engine\'s own hygiene record');
+  // Taken from the recipes unchanged, but for the prose: the cookbook is where a person reads a function, and what goes
+  // to Figma is the code alone. Held against the cookbook read the same way, so the script still cannot drift from it.
+  for (const src of fns) assert.ok(withoutProse(md).includes(src), 'taken from the recipes unchanged, but for its prose');
+  assert.equal(fns[names.indexOf('hygieneOf')], withoutProse(hygieneOf.toString()), 'the engine\'s own hygiene record');
+  for (const src of recipeFunctions(ENGINE, names, { prose: true })) assert.ok(md.includes(src), 'and with its prose it is the cookbook\'s own text');
   for (const s of [componentsScript('sums'), componentsScript('read', { ids: ['1:0'] })]) assert.ok(s.length < SCRIPT_MAX, `${s.length} characters, within what the Figma tool takes`);
   const f = makeFile(3), dir = join(project(), 'cap');
   await captureAll(f, dir);
@@ -135,6 +138,85 @@ test('components: the chunk script carries the recipes\' own functions, fits the
   const keys = new Set(items.filter((x) => x.k === 'component').flatMap((x) => Object.keys(x.v)));
   keys.delete('name');
   for (const k of keys) assert.ok(STRUCTURE_KEYS.includes(k), `${k} is a key the import replaces`);
+});
+
+test('components: the script carries the code and not the cookbook\'s prose', () => {
+  const names = [...COMPONENT_FUNCTIONS, ...AUDIT_FUNCTIONS];
+  // Prose is dropped by the line, which is safe for a line whose first characters are // wherever it sits - except
+  // inside a template literal that spans lines, where such a line is text. No recipe function has one; the moment one
+  // does, this fails and recipeFunctions throws rather than quietly cutting a string in half.
+  for (const [i, src] of recipeFunctions(ENGINE, names, { prose: true }).entries()) {
+    assert.equal(spansLines(src), false, `${names[i]} holds a template literal across lines: dropping prose by the line would cut it`);
+  }
+  // Every function still parses, and the prose was really there to drop.
+  const withProse = recipeFunctions(ENGINE, names, { prose: true }).join('\n').length;
+  const without = recipeFunctions(ENGINE, names).join('\n').length;
+  assert.ok(without < withProse, 'the prose is dropped');
+  assert.ok(withProse - without > 3000, `${withProse - without} characters of prose, worth the drop`);
+  // The one place the saving is spent: the script the Figma tool takes. Its own comments, written where it is built,
+  // stay; what is gone is the prose that sat inside the recipes' functions.
+  const prose = recipeFunctions(ENGINE, names, { prose: true }).join('\n')
+    .split('\n').filter((l) => /^\s*\/\/ \w/.test(l)).map((l) => l.trim());
+  assert.ok(prose.length > 40, `${prose.length} prose lines in the recipes to leave behind`);
+  for (const s of [componentsScript('sums'), componentsScript('read', { ids: ['1:0'] })]) {
+    assert.ok(s.length < SCRIPT_MAX - 1000, `${s.length} characters, with room under the ${SCRIPT_MAX} the Figma tool takes`);
+    for (const line of prose) assert.ok(!s.includes(line), `the recipes' prose stayed in the cookbook: ${line.slice(0, 60)}`);
+  }
+});
+
+test('components: with the prose and without, the recipes read a file into the same answer', async () => {
+  // Parsing is not enough: a line dropped from the wrong place would still parse and read something else. The same
+  // file is read by both, so the node ids are the one file's, and the two answers are held against each other whole.
+  const want = ['prop', 'parseAxes', 'restingVariant', 'restingOf', 'deepHasStroke', 'getBoundPaddingVar', 'childFrames', 'deepFacts', 'paintFacts', 'componentFacts', 'propsFacts', 'skeletonOf', 'stateTokensOf', 'getBindings', 'stateBindingsOf', 'collectRaw', 'hygieneOf'];
+  const figma = standin.asComponentsFigma(standin.largeComponentsFile(7, 12));
+  const vars = {}, map = {};
+  for (const v of await figma.variables.getLocalVariablesAsync()) { vars[v.id] = v; map[v.id] = v.name; }
+  const sets = [];
+  for (const p of figma.root.children) { await p.loadAsync(); for (const s of p.findAllWithCriteria({ types: ['COMPONENT_SET'] })) sets.push(s); }
+  const readAll = async (prose) => {
+    const src = recipeFunctions(ENGINE, want, { prose }).join('\n');
+    const fns = await new AsyncFunction('figma', `${src}\nreturn { skeletonOf, componentFacts, propsFacts, hygieneOf, stateTokensOf, stateBindingsOf, deepFacts };`)(figma);
+    const out = [];
+    for (const s of sets) {
+      fns.deepFacts.byKey = new Map();
+      out.push({ n: s.name, sk: await fns.skeletonOf(s, map), cf: await fns.componentFacts(s, { ...vars }), pf: await fns.propsFacts(s),
+        st: await fns.stateTokensOf(s, map), bd: fns.stateBindingsOf(s, vars), hy: fns.hygieneOf(s, s.description) });
+    }
+    return JSON.stringify(out);
+  };
+  const withProse = await readAll(true), without = await readAll(false);
+  assert.ok(withProse.length > 50000, `${withProse.length} bytes read, enough to tell them apart`);
+  assert.equal(without, withProse, 'the same answer, byte for byte, with the prose dropped');
+});
+
+test('components: every variant\'s bindings and how each text layer grows, kept per layer', async () => {
+  const src = recipeFunctions(ENGINE, ['prop', 'parseAxes', 'restingVariant', 'deepFacts', 'childFrames', 'skeletonOf']).join('\n');
+  const skeletonOf = await new AsyncFunction('figma', `${src}\nreturn skeletonOf;`)(standin.asComponentsFigma(standin.largeComponentsFile()));
+  const bg = 'VariableID:900:100', fg = 'VariableID:901:101', pad = 'VariableID:902:102';
+  const names = { [bg]: 'color/surface/default', [fg]: 'color/text/default', [pad]: 'size/space/8' };
+  const alias = (id) => ({ type: 'VARIABLE_ALIAS', id });
+  // One set, two variants that differ only in what their label binds: the shape is shared, the bindings are not.
+  const label = (id, fill) => ({ type: 'TEXT', id, name: 'Label', characters: 'Go', textAutoResize: 'WIDTH_AND_HEIGHT',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: alias(fill) } }], children: [] });
+  const variant = (id, name, fill) => ({ type: 'COMPONENT', id, name, layoutMode: 'HORIZONTAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    boundVariables: { paddingLeft: alias(pad), fills: [alias(bg)] }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }],
+    children: [label(`${id}:1`, fill), { type: 'TEXT', id: `${id}:2`, name: 'Hint', characters: 'a long hint', textAutoResize: 'NONE', textTruncation: 'ENDING', maxLines: 1, children: [] }] });
+  const set = { type: 'COMPONENT_SET', id: '9:0', name: 'cta', parent: null, componentPropertyDefinitions: {},
+    children: [variant('9:1', 'State=Default', fg), variant('9:2', 'State=Disabled', bg)] };
+  const sk = await skeletonOf(set, names);
+  // The variant itself is '', its first layer '0', the second '1'.
+  assert.deepEqual(sk.binds['State=Default'][''], { paddingLeft: 'size/space/8', fills: 'color/surface/default' }, 'the variant\'s own fields');
+  assert.deepEqual(sk.binds['State=Default']['0'], { fills: 'color/text/default' }, 'its label binds the text colour');
+  assert.deepEqual(sk.binds['State=Disabled']['0'], { fills: 'color/surface/default' }, 'and the disabled one binds another: which variant binds which token, the question the capture could not answer');
+  assert.ok(!('binds' in sk.trees[0]), 'kept beside the trees, never on the shape');
+  assert.equal(sk.trees.length, 1, 'so two variants built alike still share one tree');
+  assert.equal(sk.variants.length, 2);
+  // How each text layer grows and truncates, which is part of the shape: it is the same in both variants here.
+  assert.deepEqual(sk.trees[0].c[0].text, { resize: 'WIDTH_AND_HEIGHT' }, 'a label that grows');
+  assert.deepEqual(sk.trees[0].c[1].text, { truncate: 'ENDING', maxLines: 1 }, 'and one that truncates at a line');
+  // A name the call does not know is read from Figma; one that resolves to nothing is a binding to nothing.
+  const gone = await skeletonOf(set, {});
+  assert.equal(gone.binds, undefined, 'no name, no binding invented');
 });
 
 test('components: no capture script the engine writes switches Figma\'s page; each loads the pages it reads where they are', async () => {
