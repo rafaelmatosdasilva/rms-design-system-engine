@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Shadows, slots and the gap between parts (continuous evaluation)
+
+What changed since the entry below (engine 5e50605): A batch of three: how a shadow changes between variants, a slot or a swap for one kind of content, and the gap between two parts. The guide changed in `reference/usage.md`.
+
+Guide set measured: `283b0d3ec917` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 0faed5ac` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md c5fe3d20` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 93c09f2 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 78/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.059 |
+| Input a run | 98k | 101k |
+| Turns a run | 3.5 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 98k, in 3.6 turns against 3.5. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-09-how-a-shadow-changes-a`.
+
 ## 2026-11: What the file's own examples say (continuous evaluation)
 
 What changed since the entry below (engine 81cedad): A batch of three: preferred components on swaps and slots, a default its uses take, and the case of a component's words. The guide changed in `reference/usage.md`.
