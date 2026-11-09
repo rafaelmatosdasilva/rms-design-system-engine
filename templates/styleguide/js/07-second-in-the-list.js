@@ -147,7 +147,7 @@
     // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
     // and each says how many rows it would leave beside the others.
     var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
-    filterBar(sec, { total: rows.length, chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: AREA_ORDER }, { key: 'source', label: 'Source' }] });
+    filterBar(sec, { total: rows.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: AREA_ORDER }, { key: 'source', label: 'Source' }] });
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
@@ -202,7 +202,7 @@
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-fc-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = FCH.findIndex(function (x) { return fcKey(x) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
     var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
-    pageBar(sec, { chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+    pageBar(sec, { said: 'decisions', chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
   })();
   // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
   // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a
@@ -433,11 +433,12 @@
     headH(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(headH).observe(logHeadEl);
     // The code, Figma, the intent layer or the decisions: a chip for each type the page has, when it has two.
     var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
-    if (kinds.length > 1) pageBar(wn, { chips: kinds });
+    if (kinds.length > 1) pageBar(wn, { said: 'changes', chips: kinds });
     // A ticket's commits alone, said above the table with a way back to every row.
     var onlyBar = box.querySelector('.sg-log-only-bar');
     var showTicket = function (t) {
       Array.prototype.forEach.call(box.querySelectorAll('tbody tr'), function (tr) { tr.hidden = !!t && (tr.getAttribute('data-tickets') || '').indexOf(' ' + t + ' ') < 0; });
+      tableNone(logTable, 'changes');
       onlyBar.hidden = !t;
       onlyBar.innerHTML = t ? esc('The commits of ' + t) + ' ' + sysButton('button', 'Show every change', ' data-ticket-all') : '';
       if (t) Array.prototype.forEach.call(wn.querySelectorAll('.sg-chip[data-chip]'), function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-chip') === 'all' ? 'true' : 'false'); });
@@ -500,6 +501,7 @@
     if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
     var draw = function () {
       trs.forEach(function (tr) { tr.hidden = !passes(tr); });
+      if (trs.length) tableNone(trs[0].closest('table'), o.said);
       var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
       bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
       bar.querySelector('[data-f-clear]').hidden = !on;
@@ -550,7 +552,9 @@
       var b = e.target.closest('.sg-chip[data-chip]'); if (!b) return;
       var k = b.getAttribute('data-chip');
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k && (' ' + (tr.getAttribute('data-chip-group') || '') + ' ').indexOf(' ' + k + ' ') < 0; });   // a chip shows its own rows, or a group of them (data-chip-group, one or several)
+      var chipped = [];
+      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k && (' ' + (tr.getAttribute('data-chip-group') || '') + ' ').indexOf(' ' + k + ' ') < 0; var t = tr.closest('table'); if (t && chipped.indexOf(t) < 0) chipped.push(t); });   // a chip shows its own rows, or a group of them (data-chip-group, one or several)
+      chipped.forEach(function (t) { tableNone(t, o.said); });
       sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
       if (e.isTrusted) setHashQuery({ show: k });
     });
@@ -996,7 +1000,7 @@
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
     var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
-    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length,
+    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length, said: 'pages',
       chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
       cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Code'] }, { key: 'waits', label: 'Waiting on' }] });
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
