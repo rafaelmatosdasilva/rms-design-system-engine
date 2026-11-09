@@ -65,6 +65,30 @@ Nothing grew. The agent took more steps, and each step reads the conversation ag
 
 ---
 
+## A release that computed a version already behind the one published
+
+**Found** 9 November 2026, releasing the two changes above. **Changed** which tag the release workflow reads as the last one (`.github/workflows/release.yml`).
+
+**Evidence.** 37 commits were waiting, four days past the three-day ceiling, because the release of 5 November had failed:
+
+```
+npm error Cannot implicitly apply the "latest" tag because previously
+published version 3.4.0 is higher than the new version 2.0.1.
+```
+
+**Why.** The workflow asked `git describe --tags --abbrev=0` for the last version. That answers a different question: which tag is nearest walking back from HEAD, not which version is highest. The two agree only while tags land in version order. On 5 November a run read v2.0.0 with v3.4.0 already published, computed v2.0.1 from it, and npm refused a version below the one it held — correctly, and the only reason this was caught at all.
+
+**Ruled out.**
+
+- *That `package.json` and the tag arithmetic contradict each other.* Guessed first, from `package.json` being at 1.0.0 while tags are at 3.x. It is not a contradiction: the version there is only the floor for a first release, which is what `CLAUDE.md` means by keeping the first version. Running the real calculation against today's tags gave v3.4.1 and v3.5.0, both above npm's 3.4.0.
+- *That the workflow was broken and had to be fixed before anything could ship.* It was not: the inputs had recovered on their own, and v3.5.0 released cleanly on the unfixed workflow. The fault is latent, not standing, which is exactly why it had sat for four days.
+
+**What changed.** `git tag --list 'v[0-9]*' --merged HEAD --sort=-v:refname | head -1`: the highest version, by git's own version order, among tags HEAD can reach — so a tag on a branch of its own never raises the next version either. A test holds the workflow to it and to the absence of the old command.
+
+**What it teaches.** A gate that fires correctly still tells nobody. npm refused the bad publish, the workflow went red, and 37 commits then waited four days because nothing watches the thing that watches. The engine measures its own guide every time it changes and had no idea its releases had stopped.
+
+---
+
 ## The harness asked the PATH for a CLI it had already found
 
 **Found** 9 November 2026, starting the evaluation that this day's own guide change needed, from a client's shell rather than a terminal. **Changed** `findClaude` and `CLAUDE` in `test/skill-evals/lib.mjs`, and the line in `run.mjs` that did not use them.

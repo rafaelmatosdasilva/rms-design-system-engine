@@ -39,7 +39,11 @@ test('the workflow runs once a week and can be started by hand, reads version ta
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.match(wf, /workflow_dispatch:/);
   assert.match(wf, /cron: '0 7 \* \* 1'/, 'a release every Monday: the week\'s record');
-  assert.match(wf, /--match 'v\[0-9\]\*'/);
+  // The highest version, not the nearest tag by ancestry: `git describe` picks a lower version whenever tags do not
+  // land in version order, and a run that computes a version below the one already published is refused by npm.
+  assert.match(wf, /git tag --list 'v\[0-9\]\*' --merged HEAD --sort=-v:refname \| head -1/);
+  // In a command, not in the comment above it that explains why it is gone.
+  assert.doesNotMatch(wf, /^(?!\s*#).*git describe/m, 'the nearest tag by ancestry is not the highest version');
   assert.match(wf, /gh pr view/);
   assert.match(wf, /release-version\.mjs/);
   assert.match(wf, /--generate-notes/);
