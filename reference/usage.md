@@ -1369,6 +1369,11 @@ binds that state's own token where the system has one (a disabled button on `…
 exists; held against the same variant at rest, and a component the system has no such token for is left out); a
 component binds its own tokens and the shared ones, never another component's (a chip on `button/…`); and a text
 layer's colour is a text colour, never a surface or background one (`on-surface` is a text colour). From the tokens'
+names (`token-grammar.mjs`), the grammar most names share, never one imposed: every part written in the case most
+parts are (`token-name-case`); one idea named one way, the way most names do (`press` or `pressed`, `bg` or
+`background`: `token-one-name`); sizes on one scale (`s, m, l` or `small, medium, large`: `token-one-scale`); a set of
+sizes that grows with its steps (`token-scale-order`); and an interactive role with the states most interactive roles
+have (`token-states`; a selected and an unselected colour answer no hover and are never held to them). From the tokens'
 own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the system layers them, never a declared
 model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
 collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
