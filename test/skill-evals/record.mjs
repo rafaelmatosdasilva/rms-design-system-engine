@@ -58,6 +58,10 @@ export function runStats(rows = []) {
     tasks: byTask.size, runs: rows.length, pass: rows.filter((r) => r.pass).length,
     more: [...byTask].filter(([, n]) => n > usual).map(([t, n]) => `\`${t}\` at ${n} runs`),
     cost: mean(rows.map((r) => r.usage?.cost ?? 0)), input: mean(rows.map((r) => r.usage?.input ?? 0)),
+    // Turns too: input counts the whole conversation again on every turn, so a run that takes one more step reads more
+    // without anything it reads having grown. Every task still passing says nothing about a task that now needs two
+    // steps where it needed one; this does.
+    turns: mean(rows.map((r) => r.usage?.turns ?? 0)),
     violations: rows.reduce((n, r) => n + (r.rules ?? []).filter((c) => !c.ok).length, 0),
     // Runs the harness stopped at its own ceiling (turns, budget). Counted apart: a run never allowed to finish says
     // nothing about the guide, and reading it as a failure is how a task came to read 69/70 on a branch that had not
@@ -75,9 +79,26 @@ export function runStats(rows = []) {
   };
 }
 
+// When what a run reads moved by a tenth or more while what it reads a turn held within a twentieth, the turns moved,
+// not the sizes: the agent took more steps (or fewer), and nothing it reads grew. Names the tasks whose turns moved
+// most. → the sentence, or '' when there is nothing of the kind to say.
+export function moreSteps(b, s) {
+  if (!b?.turns || !s?.turns || !b.input || !s.input) return '';
+  const per = (x) => x.input / x.turns, k = (x) => `${Math.round(x / 1000)}k`;
+  const inputMoved = Math.abs(s.input - b.input) / b.input >= 0.1;
+  const perHeld = Math.abs(per(s) - per(b)) / per(b) < 0.05;
+  if (!inputMoved || !perHeld) return '';
+  const byTask = (rows) => { const m = new Map(); for (const r of rows ?? []) { const t = m.get(r.task) ?? []; t.push(r.usage?.turns ?? 0); m.set(r.task, t); } return m; };
+  const mean = (x) => x.reduce((a, c) => a + c, 0) / x.length;
+  const B = byTask(b.rows), S = byTask(s.rows);
+  const moved = [...S].filter(([t]) => B.has(t)).map(([t, v]) => [t, mean(B.get(t)), mean(v)]).filter(([, x, y]) => Math.abs(y - x) >= 0.5)
+    .sort((x, y) => Math.abs(y[2] - y[1]) - Math.abs(x[2] - x[1])).slice(0, 3).map(([t, x, y]) => `\`${t}\` ${x.toFixed(1)} to ${y.toFixed(1)}`);
+  return `Input moved but input a turn held (${k(per(b))} to ${k(per(s))}): the turns moved, ${b.turns.toFixed(1)} to ${s.turns.toFixed(1)}, and nothing a run reads grew${moved.length ? ` - most in ${moved.join(', ')}` : ''}.`;
+}
+
 // The RESULTS.md entry for one recorded evaluation. `now` and `before` are { model: runStats } (before may be empty).
 export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, fileHashes = null, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {
-  const k = (x) => `${Math.round(x / 1000)}k`, usd = (x) => `$${x.toFixed(3)}`;
+  const k = (x) => `${Math.round(x / 1000)}k`, usd = (x) => `${x.toFixed(3)}`, t = (x) => (x ? x.toFixed(1) : '-');   // turns: an entry recorded before turns were kept has none
   const out = [`## ${date}: ${title} (continuous evaluation)`, ''];
   out.push(`What changed since the entry below${prevEngine ? ` (engine ${prevEngine})` : ''}: ${what}${/[.!?]$/.test(what) ? '' : '.'}${guideFiles.length ? ` The guide changed in ${guideFiles.map((f) => `\`${f}\``).join(', ')}.` : ''}`, '');
   const project = Object.values(now)[0]?.project ?? '';
@@ -93,17 +114,22 @@ export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', gu
     out.push(`| The ${s.tasks} guide tasks${s.more.length ? ` (${s.more.join(', ')})` : ''} | ${b ? `${b.pass}/${b.runs}` : '-'} | ${s.pass}/${s.runs} |`);
     out.push(`| Mean cost a run | ${b ? usd(b.cost) : '-'} | ${usd(s.cost)} |`);
     out.push(`| Input a run | ${b ? k(b.input) : '-'} | ${k(s.input)} |`);
+    if (s.turns) out.push(`| Turns a run | ${t(b?.turns)} | ${t(s.turns)} |`);
     out.push(`| Rule violations | ${b ? b.violations : '-'} | ${s.violations} |`);
     if (s.limits || b?.limits) out.push(`| Runs stopped at a limit | ${b ? b.limits ?? 0 : '-'} | ${s.limits} |`);
     if (s.fell || b?.fell) out.push(`| Runs that reached an engine that fell over | ${b ? b.fell ?? 0 : '-'} | ${s.fell} |`);
     out.push('');
     const lower = b && s.pass / s.runs < b.pass / b.runs;
     reading.push(s.pass === s.runs && !s.violations
-      ? `${MODEL_NAME(model)}: every task passes and no rule is broken${b ? `; runs read ${k(s.input)} a run against ${k(b.input)}` : ''}.`
+      ? `${MODEL_NAME(model)}: every task passes and no rule is broken${b ? `; runs read ${k(s.input)} a run against ${k(b.input)}${s.turns && b.turns ? `, in ${t(s.turns)} turns against ${t(b.turns)}` : ''}` : ''}.`
       : `${MODEL_NAME(model)}: ${s.runs - s.pass} of ${s.runs} runs failed${lower ? ', fewer passes than the entry below' : ''}${s.violations ? `, ${s.violations} rule violation${s.violations === 1 ? '' : 's'}` : ''}${s.limits ? `, and ${s.limits} of them never finished: ${s.limited.slice(0, 3).join('; ')} — read those as the ceiling, not the guide` : ''}. Failed: ${s.failed.slice(0, 6).join('; ')}.`);
     // What actually changed, task by task: a count that moved by one is a task that passes sometimes, not a
     // difference. Said after the failures, because it is what a person should act on.
     if (b?.rows?.length && s.rows?.length) reading.push(readingLine(b.rows, s.rows));
+    // Input that moved while input a turn held is turns, never something grown: said so, with the tasks that took the
+    // most steps more, so nobody goes looking in the guide or the engine for a size that did not change.
+    const steps = moreSteps(b, s);
+    if (steps) reading.push(steps);
     // And loudest of all, because it says the measurement is not about the guide at all.
     if (s.fell) reading.push(`${s.fell} run${s.fell === 1 ? '' : 's'} reached an engine that fell over (${s.fellOver.slice(0, 3).join('; ')}): this measures the engine, not the guide. Fix it and measure again.`);
   }
