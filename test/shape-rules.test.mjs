@@ -44,3 +44,11 @@ test('in the grammar, with what to do', () => {
   assert.equal(r.area, 'variables');
   assert.equal(fixOf(r, r.toFix[0]).say, 'Bind the gap most frames use between these parts: icon and label at m are spaced by space/m, where most are by space/xs');
 });
+
+test('a hover shown another way: a state layer where most change the frame\'s fill', () => {
+  const byFill = () => ({ trees: [{ c: [] }], variants: [['State=default', 0], ['State=hover', 0]], binds: { 'State=default': { '': { fills: 'button/fill' } }, 'State=hover': { '': { fills: 'button/fill/hover' } } } });
+  const byLayer = { trees: [{ c: [{ t: 'FRAME', n: 'stateLayer', hidden: true }] }, { c: [{ t: 'FRAME', n: 'stateLayer' }] }], variants: [['State=default', 0], ['State=hover', 1]] };
+  const r = shapeRules({ skeleton: { a: byFill(), b: byFill(), c: byFill(), d: byLayer } }).find((x) => x.id === 'state-one-way');
+  assert.equal(r.says, 'A hover or press shows by its frame\'s fill, as most components show it');
+  assert.deepEqual(off(r), [['d', 'it shows by a layer shown over it']]);
+});
