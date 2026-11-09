@@ -1404,7 +1404,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   component's options (`variant-grid`), the options and the default most of the family takes on an axis it shares, a
   state axis left out as each component's own (`family-axis-options`, `family-defaults`), its properties in the order
   most of it lists them (`family-property-order`), its frame sized as most of it is (`family-sizing`), the interactive
-  states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
+  states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); a
+  property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
+  component left out); two components built the same that take the same properties, a pair for a person to look at
+  (`no-twins`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
 - **Code**: values written by hand (the census), aliases to a token declared nowhere, a font family written by hand,

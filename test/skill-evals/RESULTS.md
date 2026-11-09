@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: What an agent reads, twins and declared tiers (continuous evaluation)
+
+What changed since the entry below (engine 19fa4c9): A batch of three: a property's name says which layer it drives, no two components built and given alike, and the declared tiers on the Rules page. The guide changed in `reference/usage.md`.
+
+Guide set measured: `9005db5499d0` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md a32cd0bf` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 49bf436d` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine cf6545c | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.055 | 0.055 |
+| Input a run | 91k | 87k |
+| Turns a run | 3.3 | 3.2 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 87k a run against 91k, in 3.2 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-09-what-an-agent-reads-of`.
+
 ## 2026-11: A family built alike (continuous evaluation)
 
 What changed since the entry below (engine f5dcf56): Seven comparisons of a family's components: the variant grid, an axis's options and default, property order, sizing, states and text fit; measured on top of the binding rules. The guide changed in `reference/usage.md`.
