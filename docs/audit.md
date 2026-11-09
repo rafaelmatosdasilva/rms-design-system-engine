@@ -47,6 +47,9 @@ How your tokens are named is read from the names themselves, the way most of the
 - **One scale for sizes.** `medium` where every other size is `m`.
 - **Sizes in order.** A set where `m` is larger than `l`.
 - **The usual states.** An interactive role missing the hover or press most roles have. A selected and an unselected colour don't need a hover, so they're left out.
+- **Parts in their usual place.** A state placed earlier in a name than most names place it.
+- **Values on your scale.** A spacing of 18 where every other spacing and radius is a step of 4. Hairlines (1 or 2px) and pill radii are left out.
+- **Something to sit on a surface.** A role with a background colour and no text or icon colour beside it.
 
 How your tokens are layered is read from the tokens themselves, so you never have to declare it:
 
@@ -76,10 +79,22 @@ The components of one type in Figma (every button, every input) are compared wit
 - **The same states.** A button without the press state the other buttons have.
 - **Text that fits the same way.** A label that truncates where the family's grow.
 
-Three more readings of the library:
+More readings of the library:
 
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
 - **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
+- **One name for one part.** The icon is called `Icon` in most components and `Glyph` in one.
+- **Parts in the usual order.** One button with its label before its icon, where the other buttons put the icon first. It is checked inside a family only, so a trailing icon elsewhere is not flagged.
+- **What a family holds.** A button holding an avatar when no other button does. It's flagged for someone to check, since some nestings are legitimate.
+- **Corners, opacity and borders on variables.** A frame with two corners on another radius variable, an opacity of 40% typed in, or a border weight typed in, when most of your library uses variables for these.
+- **Borders on the same side.** A border outside its layer when most borders sit inside.
+- **Text styles that explain themselves.** A text style with no description when most have one, and a text style no component uses.
+- **Swaps and slots say what goes in them.** A slot or swap property that lists no preferred components, when most do.
+- **Defaults your examples use.** A button that starts disabled when every example in your file shows it enabled. Uses inside other components' examples count too.
+- **Words in one case.** Tabs labelled in Title Case when most components' examples are in Sentence case.
+- **Shadows change one way.** A card whose hover shows a separate shadow layer, when most cards change their own effect.
+- **A slot or a swap, consistently.** An `Icon` property that is a slot in one component and an instance swap in most.
+- **The gap between two parts.** An icon and a label spaced by `space/m` in one chip and by `space/xs` in most, at the same size.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.

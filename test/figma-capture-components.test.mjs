@@ -189,7 +189,7 @@ test('components: with the prose and without, the recipes read a file into the s
   assert.equal(without, withProse, 'the same answer, byte for byte, with the prose dropped');
 });
 
-test('components: every variant\'s bindings and how each text layer grows, kept per layer', async () => {
+test('components: every variant\'s bindings, how it looks and how each text layer grows, kept per layer', async () => {
   const src = recipeFunctions(ENGINE, ['prop', 'parseAxes', 'restingVariant', 'deepFacts', 'childFrames', 'skeletonOf']).join('\n');
   const skeletonOf = await new AsyncFunction('figma', `${src}\nreturn skeletonOf;`)(standin.asComponentsFigma(standin.largeComponentsFile()));
   const bg = 'VariableID:900:100', fg = 'VariableID:901:101', pad = 'VariableID:902:102';
@@ -214,6 +214,12 @@ test('components: every variant\'s bindings and how each text layer grows, kept 
   // How each text layer grows and truncates, which is part of the shape: it is the same in both variants here.
   assert.deepEqual(sk.trees[0].c[0].text, { resize: 'WIDTH_AND_HEIGHT' }, 'a label that grows');
   assert.deepEqual(sk.trees[0].c[1].text, { truncate: 'ENDING', maxLines: 1 }, 'and one that truncates at a line');
+  // How each layer looks, beside the trees as well: the disabled variant at half opacity with a border, the default
+  // with none, and still one tree between them.
+  const dim = { ...set, children: [variant('9:1', 'State=Default', fg), { ...variant('9:2', 'State=Disabled', fg), opacity: 0.5, strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }], strokeWeight: 1, strokeAlign: 'INSIDE' }] };
+  const looked = await skeletonOf(dim, names);
+  assert.deepEqual(looked.looks, { 'State=Disabled': { '': { opacity: 0.5, border: { w: 1, align: 'INSIDE' } } } });
+  assert.equal(looked.trees.length, 1, 'how a variant looks never splits a shared tree');
   // A name the call does not know is read from Figma; one that resolves to nothing is a binding to nothing.
   const gone = await skeletonOf(set, {});
   assert.equal(gone.binds, undefined, 'no name, no binding invented');

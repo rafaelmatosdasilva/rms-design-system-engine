@@ -1373,7 +1373,11 @@ names (`token-grammar.mjs`), the grammar most names share, never one imposed: ev
 parts are (`token-name-case`); one idea named one way, the way most names do (`press` or `pressed`, `bg` or
 `background`: `token-one-name`); sizes on one scale (`s, m, l` or `small, medium, large`: `token-one-scale`); a set of
 sizes that grows with its steps (`token-scale-order`); and an interactive role with the states most interactive roles
-have (`token-states`; a selected and an unselected colour answer no hover and are never held to them). From the tokens'
+have (`token-states`; a selected and an unselected colour answer no hover and are never held to them); a state and a
+size where in a name most of them sit, counted from the end (`token-segment-order`); a spacing or radius value that is
+a step of the system's own scale, the largest of 8, 4 and 2 most values are steps of, a hairline under one step and a
+pill radius left out (`token-on-scale`); and a role with a background that has a text or icon colour beside it
+(`token-on-colour`). From the tokens'
 own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the system layers them, never a declared
 model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
 collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
@@ -1407,7 +1411,21 @@ its own dot, and a list for the area and for the side, each saying how many rows
   states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
-  (`no-twins`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
+  the library names it, one still named after its component left out (`part-one-name`), two parts side by side in the
+  order most of their family puts them (`part-order`), and a component of a family of three or more holding only what
+  others of its family hold (`family-holds`); what each layer binds and how it looks, kept beside the trees
+  (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
+  opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
+  sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a
+  component uses each one (`text-style-used`); the file's own evidence (`use-rules.mjs`): a swap or slot property listing
+  the components it prefers (`swap-preferred`), a variant or yes/no property starting on a value its uses take, never
+  one most of them change, counting its own examples and each time it sits inside another's (`default-in-use`), and a
+  component's words, read from its examples' short labels, in the case most components' are (`words-case`); how a
+  shadow changes between variants, by the layer's own effect or by a shadow layer shown and hidden, as most components
+  change theirs (`shape-rules.mjs`, `shadow-one-way`), a property for one kind of content (Icon, Content) a slot or an
+  instance swap as most of that name are (`slot-or-swap`), and two parts side by side spaced by the variable most
+  frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
