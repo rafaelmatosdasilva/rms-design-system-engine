@@ -65,3 +65,19 @@ test('in the grammar: under Properties, with what to do', () => {
   assert.equal(r.area, 'architecture');
   assert.match(fixOf(r, r.toFix[0]).say, /^Give the axis the options its family takes: size: l, m, s/);
 });
+
+test('alike in a family: content aligned another way, another part filling the frame, padding on other variables', () => {
+  // Four cards built from a title and a body; one centred, one whose title fills, one padded on another variable.
+  const card = ({ main = 'MIN', grow = 'Body', pad = 'space/m' } = {}) => ({
+    trees: [{ layout: { dir: 'VERTICAL', main, cross: 'MIN' }, c: [{ t: 'TEXT', n: 'Title', ...(grow === 'Title' ? { grow: 1 } : {}) }, { t: 'FRAME', n: 'Body', ...(grow === 'Body' ? { grow: 1 } : {}) }] }],
+    variants: [['Size=m', 0]], binds: { 'Size=m': { '': { paddingTop: pad, paddingRight: pad, paddingBottom: pad, paddingLeft: pad } } },
+  });
+  const skeleton = { cardA: card(), cardB: card(), cardC: card({ main: 'CENTER' }), cardD: card({ grow: 'Title' }), cardE: card({ pad: 'space/l' }),
+    // A card built from other parts is no case for the others.
+    cardList: { trees: [{ layout: { dir: 'VERTICAL', main: 'MAX' }, c: [{ t: 'FRAME', n: 'Rows' }] }], variants: [['Size=m', 0]] } };
+  const r = Object.fromEntries(familyRules({ skeleton, props: {} }, { familyOf }).map((x) => [x.id, x]));
+  assert.deepEqual(off(r['family-align']), [['cardC', 'its content is aligned centre along, start across, where its family\'s is start along, start across']]);
+  assert.deepEqual(off(r['family-stretch']), [['cardD', 'title fills its frame, where in its family body does']]);
+  assert.deepEqual(off(r['family-padding']), [['cardE', 'its padding at m is space/l space/l space/l space/l, where its family\'s is space/m space/m space/m space/m']]);
+  assert.equal(fixOf({ id: 'family-align' }, { value: 'x' }).say, 'Align its content as its family does: x');
+});

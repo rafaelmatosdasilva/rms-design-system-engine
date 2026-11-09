@@ -78,6 +78,7 @@ The components of one type in Figma (every button, every input) are compared wit
 - **The same order and sizing.** Properties listed in another order, or a frame that fills where the family hugs.
 - **The same states.** A button without the press state the other buttons have.
 - **Text that fits the same way.** A label that truncates where the family's grow.
+- **Aligned, filled and padded alike.** Among the members of a family built from the same parts: a card centred where the others start at the top, a title that fills where the others let the body fill, or padding on `space/l` where the others use `space/m` at the same size.
 
 More readings of the library:
 

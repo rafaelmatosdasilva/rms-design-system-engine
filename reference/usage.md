@@ -1408,7 +1408,10 @@ its own dot, and a list for the area and for the side, each saying how many rows
   component's options (`variant-grid`), the options and the default most of the family takes on an axis it shares, a
   state axis left out as each component's own (`family-axis-options`, `family-defaults`), its properties in the order
   most of it lists them (`family-property-order`), its frame sized as most of it is (`family-sizing`), the interactive
-  states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); a
+  states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); among
+  the members of a family built from the same parts, its content aligned as most of them align it (`family-align`), the
+  part most of them let fill the frame (`family-stretch`) and the padding variables most of them bind at the same
+  size (`family-padding`); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
