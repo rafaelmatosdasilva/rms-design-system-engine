@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## A question in place of the confirmation, once in thirty
+
+**Found** 9 November 2026, measuring the rules read from the file's own examples. **Changed** nothing: the miss was not the change's.
+
+**Evidence.** The run scored 78 of 79. The miss was `new-ui-saved` #8, the green "Saved" confirmation in a system with no green. Its agent queried the button, the tag and the construction rules, read that the tag's `Positive` tone has no styles in the code, and ended its turn with a question: build the tag first, or use plain HTML with the system's variables? It changed nothing and never said the system has no green, so the second check failed. No guard fired; no rule was broken. The same case alone, 20 runs on the same engine (`records/2026-11-09-new-ui-saved-alone`): 20/20.
+
+**Ruled out.** The batch's own rules. They add lines to the construction answer the agent read, but none of them is about colour or the tag, and 20 runs reading the same answer passed. The guard message changed in the case below: it did not fire here.
+
+**Left open.** An agent that reads the tag's `Positive` tone as the green it was asked for, and stops to ask rather than say the tag is not built. Once in 30 runs is under this task's usual rate; it is worth a look if it comes back.
+
+---
+
 ## The gap said the other way round, and the scorer heard nothing
 
 **Found** 9 November 2026, measuring what a component binds against the token layers. **Changed** the scorer: `new-ui-saved` hears the gap in either order (`NO_GREEN`, `tasks.mjs`).
