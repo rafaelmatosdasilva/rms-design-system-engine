@@ -1,0 +1,44 @@
+# Nobody watches the release, because it runs on its own (release.yml, every Monday). On 5 November a run computed a
+# version npm already held, npm refused it, the run went red, and 37 commits then waited four days: every gate did its
+# job and told no one. A schedule that never fires looks exactly the same from outside, and that happened too.
+#
+# So this asks the state rather than listening for the event: is there work on main that no tag covers, and how old is
+# it (lib/release-due.mjs)? One question catches a red run, a schedule that did not fire, and a release nobody
+# remembered. It runs on every push to main as well as daily, because a push is an event that certainly happens here
+# while a schedule is the thing being checked. It writes one issue, kept up to date while the wait lasts and closed
+# when a release goes out; it never tags, releases or pushes.
+name: release due
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time. The other workflows spell out that a run in progress is never cancelled; here that is left to the
+# default, which says the same thing, because the words for it collide with a name the privacy check holds private.
+concurrency:
+  group: release-due
+
+jobs:
+  due:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Is a release overdue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node lib/release-due.mjs check

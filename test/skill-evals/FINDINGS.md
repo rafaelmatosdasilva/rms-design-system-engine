@@ -87,6 +87,12 @@ published version 3.4.0 is higher than the new version 2.0.1.
 
 **What it teaches.** A gate that fires correctly still tells nobody. npm refused the bad publish, the workflow went red, and 37 commits then waited four days because nothing watches the thing that watches. The engine measures its own guide every time it changes and had no idea its releases had stopped.
 
+**And the runs said something worse than the red one.** Of 18 release runs ever, **one** came from the schedule; every other was started by hand. The cron landed on 28 October, and of the two Mondays since, neither fired — including the Monday this was found, six hours after its hour. So the weekly release in `CLAUDE.md` has never really been weekly, and the four-day wait was not one broken run but a cadence that was never running.
+
+**What changed, the second time.** `release-due.mjs` asks the state instead of listening for the event: is there work on `main` that no tag covers, and how old is it? One question catches a run that went red, a schedule that never fired, and a release nobody remembered — all three look identical from outside, and two of them had already happened here. It runs on every push to `main` as well as daily, because a push is an event that certainly happens in this repository while the schedule is the thing under suspicion; the watcher must not depend on what it watches. Past eight days it opens one issue, keeps it current, and closes it when a release goes out.
+
+**Left open on purpose.** Why GitHub's schedule does not fire here. The watcher makes it visible rather than explaining it, which is the part that was missing; the cause is worth its own look.
+
 ---
 
 ## The harness asked the PATH for a CLI it had already found
