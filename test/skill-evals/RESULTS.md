@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Opacity, borders, corners and text styles (continuous evaluation)
+
+What changed since the entry below (engine a1156ad): A batch of three: opacity and borders kept beside the trees; corners, opacity and border weights on variables and borders on one side; text styles described and used. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `87ada103a762` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 0faed5ac` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 55cf48d1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 81cedad | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.056 |
+| Input a run | 105k | 93k |
+| Turns a run | 3.7 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 105k, in 3.3 turns against 3.7. no task changed state, and no run moved: the same result. Input moved but input a turn held (28k to 28k): the turns moved, 3.7 to 3.3, and nothing a run reads grew - most in `new-ui-saved` 13.1 to 10.4, `first-setup` 5.0 to 4.3, `forbidden-green` 2.7 to 2.0. Records: `records/2026-11-09-opacity-borders-and-corners-and`.
+
 ## 2026-11: How parts go together, and the token-name grammar (continuous evaluation)
 
 What changed since the entry below (engine cf6545c): A batch of three: one name for a part, parts in their family order, what a family holds; where a state sits in a token name, values on the scale, a colour for what sits on a surface. The guide changed in `reference/usage.md`.

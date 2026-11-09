@@ -547,7 +547,7 @@ that differ) is never taken for a number.
 function prop(node, key) { try { return node != null && typeof node === 'object' && key in node ? node[key] : undefined; } catch (e) { return undefined; } }
 ```
 
-**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, and, for a text layer, how it grows and truncates; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
+**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, its opacity and its border (weight and where it sits), and, for a text layer, how it grows and truncates; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
 
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
@@ -1094,7 +1094,8 @@ function propsFacts(root) {
 // component (from another library or not) and the properties set on it: an instance's own layers are its component's.
 // Also where the component lives (page, section), each swap and slot property's default and preferred components, the
 // variables it binds from another library, and its dev resources (links to its code). Beside the trees, what each
-// variant binds: binds[<variant>][<the layer's place in the tree>] = { <field>: <the variable's name> }. Per variant
+// variant binds: binds[<variant>][<the layer's place in the tree>] = { <field>: <the variable's name> }; and how it
+// looks there: looks[<variant>][<place>] = { opacity, border: { w, align } }. Per variant
 // and not on the shape, as the reactions are, so the variants built alike still share one tree. A layer's place is ''
 // for the variant itself, and its parent's place and its own index below that, so '1.0' is the first layer of the
 // second. The names are written out rather than held in a table of their own: a table is smaller as text and larger
@@ -1137,7 +1138,7 @@ async function skeletonOf(root, names = {}) {
   // variable is not in the map, and one deleted since resolves to nothing, which is a binding to nothing.
   const varName = async (id) => { if (!(id in varNames)) { let n = names[id] ?? null;
     if (!n) { try { const v = await figma.variables.getVariableByIdAsync(id); n = v ? v.name : null; } catch (e) { n = null; } } varNames[id] = n; } return varNames[id]; };
-  const layer = async (n, depth, path, into) => {
+  const layer = async (n, depth, path, into, look) => {
     const t = n.type, lm = prop(n, 'layoutMode');
     const limits = {}; for (const k of ['minWidth', 'maxWidth', 'minHeight', 'maxHeight']) { const v = num(prop(n, k)); if (v) limits[k] = v; }
     const refs = prop(n, 'componentPropertyReferences') || {};
@@ -1159,6 +1160,12 @@ async function skeletonOf(root, names = {}) {
     const tf = {};
     if (t === 'TEXT') { const rz = prop(n, 'textAutoResize'), tc = prop(n, 'textTruncation'), ml = num(prop(n, 'maxLines'));
       if (rz && rz !== 'NONE') tf.resize = rz; if (tc && tc !== 'DISABLED') tf.truncate = tc; if (ml) tf.maxLines = ml; }
+    // Its opacity under 1, and its border: the weight (one, or each side's when they differ) and where it sits. Beside
+    // the trees as the bindings are (looks[<variant>][<place>]): a disabled variant at half opacity is still built alike.
+    const op = num(prop(n, 'opacity')), sk = (prop(n, 'strokes') || []).filter((p) => p && p.visible !== false).length, lk = {};
+    if (op < 1) lk.opacity = op;
+    if (sk) lk.border = { w: num(prop(n, 'strokeWeight')) ?? ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].map((k) => num(prop(n, k)) || 0), align: prop(n, 'strokeAlign') };
+    if (Object.keys(lk).length) look[path] = lk;
     const o = {
       t, n: n.name, ...(depth > 0 ? { id: n.id } : {}),
       ...(prop(n, 'visible') === false ? { hidden: true } : {}),
@@ -1184,20 +1191,21 @@ async function skeletonOf(root, names = {}) {
     }
     const kids = prop(n, 'children');
     if (!Array.isArray(kids) || !kids.length) return o;
-    const c = []; for (const [i, k] of kids.entries()) c.push(await layer(k, depth + 1, path ? path + '.' + i : String(i), into));
+    const c = []; for (const [i, k] of kids.entries()) c.push(await layer(k, depth + 1, path ? path + '.' + i : String(i), into, look));
     return { ...o, c };
   };
   // Every variant's tree, in the set's order; one its siblings share is kept once (trees[i]).
-  const trees = [], index = {}, variants = [], reactions = {}, binds = {};
+  const trees = [], index = {}, variants = [], reactions = {}, binds = {}, looks = {};
   for (const v of variantsOf) {
     // Variants that share a tree are kept once, by its shape without the layers' ids (each variant's are its own): the
     // tree holds the first one's, which a change report matches layers by.
-    const mine = {};
-    const tree = await layer(v, 0, '', mine), { n: vn, ...shape } = tree, key = JSON.stringify(shape, (k, x) => (k === 'id' ? undefined : x));
+    const mine = {}, lk = {};
+    const tree = await layer(v, 0, '', mine, lk), { n: vn, ...shape } = tree, key = JSON.stringify(shape, (k, x) => (k === 'id' ? undefined : x));
     if (!(key in index)) { index[key] = trees.length; trees.push(shape); }
     variants.push([vn, index[key]]);
     const rx = reactionsOf(v); if (rx.length) reactions[vn] = rx;
     if (Object.keys(mine).length) binds[vn] = mine;
+    if (Object.keys(lk).length) looks[vn] = lk;
   }
   // Where it lives: its page and the section (or frame) it sits in.
   let page = null, section = null;
@@ -1218,7 +1226,7 @@ async function skeletonOf(root, names = {}) {
     if (v && v.remote) { const c = await collection(v.variableCollectionId); library.push({ name: v.name, ...(c ? { collection: c.name } : {}) }); }
   }
   let dev = []; try { dev = typeof root.getDevResourcesAsync === 'function' ? (await root.getDevResourcesAsync()).map((d) => ({ name: d.name, url: d.url })) : []; } catch (e) { /* none */ }
-  return { trees, variants, ...(Object.keys(binds).length ? { binds } : {}), ...(page ? { page } : {}), ...(section ? { section } : {}), ...(Object.keys(reactions).length ? { reactions } : {}),
+  return { trees, variants, ...(Object.keys(binds).length ? { binds } : {}), ...(Object.keys(looks).length ? { looks } : {}), ...(page ? { page } : {}), ...(section ? { section } : {}), ...(Object.keys(reactions).length ? { reactions } : {}),
     ...(Object.keys(swaps).length ? { swaps } : {}), ...(library.length ? { library } : {}), ...(dev.length ? { dev } : {}) };
 }
 ```

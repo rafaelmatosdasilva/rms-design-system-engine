@@ -86,6 +86,9 @@ More readings of the library:
 - **One name for one part.** The icon is called `Icon` in most components and `Glyph` in one.
 - **Parts in the usual order.** One button with its label before its icon, where the other buttons put the icon first. It is checked inside a family only, so a trailing icon elsewhere is not flagged.
 - **What a family holds.** A button holding an avatar when no other button does. It's flagged for someone to check, since some nestings are legitimate.
+- **Corners, opacity and borders on variables.** A frame with two corners on another radius variable, an opacity of 40% typed in, or a border weight typed in, when most of your library uses variables for these.
+- **Borders on the same side.** A border outside its layer when most borders sit inside.
+- **Text styles that explain themselves.** A text style with no description when most have one, and a text style no component uses.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
