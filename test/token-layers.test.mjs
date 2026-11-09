@@ -38,7 +38,8 @@ test('a token that skips its layer, a chain longer than the system\'s or back on
 
 test('never imposed: a system whose tokens point at nothing has no layers and no rule', () => {
   const flat = { collections: [{ name: 'Tokens', modes: ['Light'] }], tokens: ['a', 'b', 'c', 'd'].map((n) => tok('Tokens', `color/${n}`)) };
-  assert.deepEqual(tokenRules(flat), []);
+  // No layer and nothing to fix: the one rule left is where the category word sits, which every name already does.
+  assert.deepEqual(tokenRules(flat).map((r) => [r.id, r.items.every((i) => i.fits)]), [['token-category-order', true]]);
   assert.deepEqual(tokenRules(null), []);
 });
 
