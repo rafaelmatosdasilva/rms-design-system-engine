@@ -1414,7 +1414,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
   the library names it, one still named after its component left out (`part-one-name`), two parts side by side in the
   order most of their family puts them (`part-order`), and a component of a family of three or more holding only what
-  others of its family hold (`family-holds`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  others of its family hold (`family-holds`); what each layer binds and how it looks, kept beside the trees
+  (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
+  opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
+  sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a
+  component uses each one (`text-style-used`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
