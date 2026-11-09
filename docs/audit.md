@@ -34,6 +34,12 @@ Two more things it reads of every layer, which make a rule about *which* token p
 - **What each variant binds, layer by layer.** For every variant, each of its layers and the variable each field of that layer binds. A component can bind a variable everywhere and still bind the wrong one; until now the component was read as a whole, so nothing could say that a disabled button takes the default's text colour.
 - **How each text layer grows and truncates.** What it resizes on, whether it ends in an ellipsis, and after how many lines. A label that truncates at one line and one that grows are different things to build.
 
+From what each variant binds come three rules about the token itself. Like every rule here, each is what most of your components already do:
+
+- **A state binds its own token.** A disabled button that keeps the default's text colour is flagged, but only when your system has a disabled colour for it to use.
+- **A component uses its own tokens and the shared ones.** A chip that binds a button's token is flagged.
+- **A text layer uses a text colour.** A label bound to a background or surface colour is flagged. `on-surface` counts as a text colour.
+
 ### Components of one type, built the same way
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
