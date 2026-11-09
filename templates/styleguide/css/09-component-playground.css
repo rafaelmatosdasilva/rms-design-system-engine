@@ -166,6 +166,12 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
   .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: var(--sg-space-xs) 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
   .pg-par-table td:first-child { font-weight: var(--sg-heading-weight); color: var(--sg-text); padding-bottom: var(--sg-space-xs); }
   .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+  /* The column that only holds the arrow opening a row keeps, from the table above, a width measured for a column
+     of its own. Stacked, that width leaves its content nothing and the card's side padding fills it, so the name
+     over it wraps a letter a line. It gives the width up and is a block like every other cell here, its arrow
+     under its name where every other value sits. */
+  .sg-matrix :is(td, th).sg-mx-open-cell, .sg-issues :is(td, th).sg-row-go { width: auto; text-align: left; }
+  .sg-matrix td.sg-mx-open-cell .sg-mx-go { justify-content: flex-start; }
   .pg-par-table td:empty { display: none; }
   .pg-a11y .pg-par-type { min-width: 0; }
 }
