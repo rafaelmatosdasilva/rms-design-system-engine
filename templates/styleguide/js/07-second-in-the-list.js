@@ -125,6 +125,7 @@
       panelShow(m, from);
     };
     sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
     // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still finds it.
     var sortKey = null, sortDir = 1;
