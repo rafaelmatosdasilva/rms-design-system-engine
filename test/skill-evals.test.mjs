@@ -279,6 +279,10 @@ test('new-ui-saved: no colour or variable the system does not have, and the conf
   assert.equal(passes('new-ui-saved', ctx('<span style="color: #22c55e">Saved</span>')), false);
   assert.equal(passes('new-ui-saved', ctx('<span style="color: green">Saved</span>')), false);
   assert.equal(passes('new-ui-saved', ctx('<span style="color: var(--success-green)">Saved</span>')), false);
+  // The gap said the other way round: a green that does not exist in the system.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system hook is preventing me from inventing a green color that doesn't exist in the system. You'll need to add a success token to Figma first." })), true);
+  // A green named and nothing said missing is still no answer.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'I added the green confirmation, but it is not in the gallery yet.' })), false);
   // Nothing added, but the gap said: the system has no green.
   assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
   assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);

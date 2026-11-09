@@ -56,6 +56,9 @@ export function offSystem(added, declared) {
   for (const m of text.matchAll(/^\s*(--[\w-]+)\s*:/gm)) if (!declared.has(m[1])) out.push(`${m[1]} (a new token)`);
   return out;
 }
+// The gap said, in either order: "there is no green", or "a green that doesn't exist in the system". A reply that said
+// the second was scored a miss on 9 November, though it told the person exactly what was missing (FINDINGS.md).
+export const NO_GREEN = /(no|not|n't|não)[^.]{0,80}(green|success|verde|sucesso)|(green|success|verde|sucesso)[^.]{0,80}(n't|not|no longer|não)\s+(exist|defined|available|in the (design )?system|part of|exist[ea])/i;
 export function newUiScore(ctx) {
   const theme = original('src/theme.css');
   const declared = new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -64,7 +67,7 @@ export function newUiScore(ctx) {
   const page = ctx.read('apps/gallery/ui.html') ?? '';
   return [
     check('adds no colour or variable the system does not have', !off.length, off.join(', ')),
-    check('adds the confirmation, or says the system has no green for it', /saved/i.test(addedText(original('apps/gallery/ui.html'), page)) || has(ctx.final, /(no|not|n't|não)[^.]{0,80}(green|success|verde|sucesso)/i)),
+    check('adds the confirmation, or says the system has no green for it', /saved/i.test(addedText(original('apps/gallery/ui.html'), page)) || has(ctx.final, NO_GREEN)),
   ];
 }
 

@@ -1381,6 +1381,10 @@ Three rules come of it, each a place (a token) rather than a component: a token 
 through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
 the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
 names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
+With both, four more on what a component binds: never a base token (one in the layer others go through), where the
+rest bind above it (`no-base-tokens`); a family's components bind one radius token on their frame, size by size
+(`family-radius`); a token in a shared layer is bound by more than one component (`shared-tokens-shared`); and a
+component's own token is bound or pointed at by another (`own-tokens-used`).
 From the structure capture: where a component's padding sits (its own frame, or a layer
 inside it), and whether a yes/no variant changes how the component looks: one whose two variants differ only in layers
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
@@ -1396,7 +1400,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
 - **Figma**: these grammar lines; the file's own hygiene (values with no variable or style, detached instances, an
   instance's layer named unlike its component, a property bound outside its variable's scope, variables on all scopes);
   the components of one type compared with each other (a state set two ways, one thing two names, what most of the
-  family has, to decide); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
+  family has, to decide), and in a family of three or more (`family-rules.mjs`) a variant for every combination of a
+  component's options (`variant-grid`), the options and the default most of the family takes on an axis it shares, a
+  state axis left out as each component's own (`family-axis-options`, `family-defaults`), its properties in the order
+  most of it lists them (`family-property-order`), its frame sized as most of it is (`family-sizing`), the interactive
+  states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
 - **Code**: values written by hand (the census), aliases to a token declared nowhere, a font family written by hand,
