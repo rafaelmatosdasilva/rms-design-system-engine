@@ -1360,7 +1360,9 @@ every text layer with a text style, every shadow with an effect style, no layer 
 every boolean, text and swap property driving a layer, icons as instances never drawn vectors, layers in the auto layout
 flow, nested components and variables from this file, no pinned variable mode, one layer structure across a component's
 variants, hover and pressed states reached by prototype reactions, swap properties listing what they take, each
-component in a section, a link to its code; and for each family of three or more (the buttons, the cards), the shape
+component in a section, a link to its code; what each layer of each variant binds, field by field, so a rule can be
+about which token a variant binds and not only that it binds one; how each text layer grows and truncates (what it
+resizes on, whether it ends in an ellipsis, after how many lines); and for each family of three or more (the buttons, the cards), the shape
 most are built in (its root's auto layout and what it holds, in order); the order a frame's layers come in, and each
 component on its family's page. From the structure capture: where a component's padding sits (its own frame, or a layer
 inside it), and whether a yes/no variant changes how the component looks: one whose two variants differ only in layers
