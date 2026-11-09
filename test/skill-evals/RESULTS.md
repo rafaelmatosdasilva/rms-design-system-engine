@@ -2,6 +2,26 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: How a system layers its tokens (continuous evaluation)
+
+What changed since the entry below (engine c349c26): Three construction rules on the tokens' own layers, read from their aliases: a token that skips its layer, an alias chain longer than the system's or circular, a token named like another collection's. The guide changed in `reference/maintainers.md`, `reference/usage.md`.
+
+Guide set measured: `8ffc52c82553` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md a32cd0bf` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 75faccbb` `rms-design-system-engine.md 0f804311`
+
+**The agent changed.** These runs went through the command line where the runs before went through a runner nothing recorded, so their versions (2.1.318, 2.1.318) are not one numbering and neither is a step from the other: a change in the results may come from them, not from the guide.
+
+| Haiku, engine 625bf34 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.056 | 0.058 |
+| Input a run | 93k | 101k |
+| Turns a run | 3.4 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 93k, in 3.6 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-09-how-a-system-layers-its`.
+
 ## 2026-11: Whether a component binds the right token (continuous evaluation)
 
 What changed since the entry below (engine 29b3718): Three construction rules on the token each layer of each variant binds: a state's own token, a component's own tokens, a text colour on a text layer. The guide changed in `reference/usage.md`.
