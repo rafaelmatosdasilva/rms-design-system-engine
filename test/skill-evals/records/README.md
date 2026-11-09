@@ -216,5 +216,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-09-merge-main-379-into-what` | The 24 guide tasks on Haiku (engine f5dcf56) | "What a component binds, with the name grammar" |
 | `2026-11-09-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine 19fa4c9) | "A family built alike" |
 | `2026-11-09-what-an-agent-reads-of` | The 24 guide tasks on Haiku (engine cf6545c) | "What an agent reads, twins and declared tiers" |
+| `2026-11-09-how-parts-go-together-and` | The 24 guide tasks on Haiku (engine a1156ad) | "How parts go together, and the token-name grammar" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
