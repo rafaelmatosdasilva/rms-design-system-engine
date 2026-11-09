@@ -1,7 +1,11 @@
 name: Tests
 
+# Once for a change, not twice. `push:` on every branch and `pull_request:` together ran the whole suite twice for the
+# same commit - two runs of about fifteen minutes, and a merge waited for both. main keeps its own run, which is what
+# writes the badge below; every other workflow here already limits its push the same way.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -10,6 +14,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # What the run counted, for the badge job below.
+    outputs:
+      count: ${{ steps.suite.outputs.count }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -35,6 +42,7 @@ jobs:
       # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite
+        id: suite
         shell: bash
         # A shared runner has few cores and is often busy: the browser tests' time limits get the time it takes (a limit
         # made longer only delays a real hang, it never lets a failing test pass).
@@ -56,4 +64,47 @@ jobs:
             echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
             code=1
           fi
+          # The number the badge shows, taken from the run's own summary rather than counted by hand: the README said
+          # "2,000+" for as long as somebody remembered to change it. Read before the exit, so a failed run still
+          # reports what it managed to count.
+          count=$(grep -m1 '^# tests ' test.log | awk '{print $3}')
+          echo "count=${count:-0}" >> "$GITHUB_OUTPUT"
           exit $code
+
+  # The README's tests badge reads one file on the `badges` branch (an orphan branch holding nothing else). Only main
+  # writes it, and only when the number or the outcome actually changed, so the branch does not take a commit per push.
+  badge:
+    needs: test
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Say what the suite counted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COUNT: ${{ needs.test.outputs.count }}
+          RESULT: ${{ needs.test.result }}
+        run: |
+          set -euo pipefail
+          # Thousands separators without depending on the runner's locale.
+          pretty=$(echo "${COUNT:-0}" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')
+          if [ "$RESULT" = success ]; then
+            message="$pretty passing"; color=brightgreen
+          else
+            message="$pretty failing"; color=red
+          fi
+          json=$(printf '{"schemaVersion":1,"label":"tests","message":"%s","color":"%s"}' "$message" "$color")
+          sha=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .sha 2>/dev/null || true)
+          now=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .content 2>/dev/null | base64 -d 2>/dev/null || true)
+          if [ "$(echo "$now" | tr -d '[:space:]')" = "$(echo "$json" | tr -d '[:space:]')" ]; then
+            echo "Badge already says: $message"
+            exit 0
+          fi
+          gh api -X PUT "repos/$REPO/contents/tests.json" \
+            -f message="tests: $message" \
+            -f branch=badges \
+            -f content="$(printf '%s\n' "$json" | base64 -w0)" \
+            ${sha:+-f sha="$sha"} > /dev/null
+          echo "Badge now says: $message"

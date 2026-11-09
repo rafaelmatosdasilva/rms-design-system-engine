@@ -35,12 +35,16 @@ test('a malformed tag, bump or version stops the release', () => {
   assert.throws(() => nextVersion('', 'minor', 'one'), /not x\.y\.z/);
 });
 
-test('the workflow runs once a week and can be started by hand, reads version tags and pull request labels, and publishes generated notes', () => {
+test('the workflow is asked once a day, reads version tags and pull request labels, and publishes generated notes', () => {
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.match(wf, /workflow_dispatch:/);
-  // Off the hour on purpose: a schedule on the hour waits longest and is dropped most, and this repository's
-  // scheduled runs have each come 7 to 10 hours late.
-  assert.match(wf, /cron: '\d?[1-9] 7 \* \* 1'/, 'a release every Monday, and never at the top of the hour');
+  // Asked daily: a version covers a set amount of work, never a date, so a group that filled today goes out
+  // tomorrow morning and two versions never land the same day.
+  //
+  // And never at the top of the hour, which is when the queue is deepest: of the scheduled runs this repository has
+  // had, each came 7 to 10 hours after its minute. CodeQL and Scorecard carry odd minutes for the same reason.
+  assert.match(wf, /cron: '\d?[1-9] 7 \* \* \*'/, 'asked once a day, and never at the top of the hour');
+  assert.doesNotMatch(wf, /cron: '[^']* 1'/, 'no weekly cadence: the dates said nothing about what a version held');
   // The highest version, not the nearest tag by ancestry: `git describe` picks a lower version whenever tags do not
   // land in version order, and a run that computes a version below the one already published is refused by npm.
   assert.match(wf, /git tag --list 'v\[0-9\]\*' --merged HEAD --sort=-v:refname \| head -1/);
@@ -50,4 +54,14 @@ test('the workflow runs once a week and can be started by hand, reads version ta
   assert.match(wf, /release-version\.mjs/);
   assert.match(wf, /--generate-notes/);
   assert.doesNotMatch(wf, /git push origin main/);
+});
+
+test('a version goes out only once the group is full, and a fix that stops people never waits for it', () => {
+  const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+  // One question, and the number behind it lives in one place (lib/release-due.mjs).
+  assert.match(wf, /verdict=\$\(node lib\/release-due\.mjs due\)/);
+  assert.match(wf, /\[ "\$\{GITHUB_EVENT_NAME:-schedule\}" != workflow_dispatch \] && \[ "\$\{verdict%% \*\}" != yes \]/, 'the gate holds a scheduled run back and lets a hand-started one through');
+  // The gate comes before anything is written, and writes nothing of its own.
+  const gate = wf.indexOf('release-due.mjs due');
+  assert.ok(gate > 0 && gate < wf.indexOf('git tag "$next"'), 'the gate is read before the tag is written');
 });

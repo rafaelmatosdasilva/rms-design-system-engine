@@ -1,0 +1,67 @@
+// A family's components built alike (family-rules.mjs): the variant grid, an axis's options and default, the order of
+// the properties, how the frame sizes, the states most of the family answers and how its text fits.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { familyRules } from '../lib/family-rules.mjs';
+import { grammarOf, familyOf, fixOf } from '../lib/construction-grammar.mjs';
+
+const V = (options, def = options[0]) => ({ type: 'VARIANT', defaultValue: def, variantOptions: options });
+const B = { type: 'BOOLEAN', defaultValue: true };
+// Every combination of a component's axes as variants, unless some are left out.
+const grid = (axes, leaveOut = []) => {
+  let combos = [[]];
+  for (const [k, opts] of Object.entries(axes)) combos = combos.flatMap((c) => opts.map((o) => [...c, `${k}=${o}`]));
+  return combos.map((c) => c.join(', ')).filter((vn) => !leaveOut.includes(vn)).map((vn) => [vn, 0]);
+};
+const tree = (w, h, text) => ({ layout: { dir: 'HORIZONTAL', w, h }, c: [{ t: 'TEXT', n: 'Label', ...(text ? { text } : {}) }] });
+const comp = ({ size = ['s', 'm'], sizeDefault, states = ['default', 'hover', 'press'], order = ['showIcon', 'label'], w = 'HUG', text = { resize: 'WIDTH_AND_HEIGHT' }, leaveOut = [] } = {}) => ({
+  props: { properties: { Size: V(size, sizeDefault), State: V(states), ...Object.fromEntries(order.map((k) => [`${k}#1:0`, k === 'label' ? { type: 'TEXT', defaultValue: 'Go' } : B])) } },
+  skeleton: { trees: [tree(w, 'HUG', text)], variants: grid({ Size: size, State: states }, leaveOut) },
+});
+const family = () => {
+  const c = {
+    buttonPrimary: comp(),
+    buttonSecondary: comp(),
+    buttonTertiary: comp(),
+    // Another scale, another default, the properties the other way round, a fill, no press, a text that truncates.
+    buttonGhost: comp({ size: ['s', 'm', 'l'], states: ['default', 'hover'], order: ['label', 'showIcon'], w: 'FILL', text: { truncate: 'ENDING', maxLines: 1 } }),
+    buttonQuiet: comp({ sizeDefault: 'm', leaveOut: ['Size=m, State=press'] }),
+  };
+  return { props: Object.fromEntries(Object.entries(c).map(([n, x]) => [n, x.props])), skeleton: Object.fromEntries(Object.entries(c).map(([n, x]) => [n, x.skeleton])) };
+};
+const rules = () => Object.fromEntries(familyRules(family(), { familyOf }).map((r) => [r.id, r]));
+const off = (r) => r.items.filter((i) => !i.fits).map((i) => [i.component, i.value]);
+
+test('the variant grid, an axis\'s options, the option a family starts on', () => {
+  const r = rules();
+  assert.deepEqual(off(r['variant-grid']), [['buttonQuiet', 'size=m, state=press']]);
+  assert.deepEqual(off(r['family-axis-options']), [['buttonGhost', 'size: l, m, s, where its family takes m, s']]);
+  assert.deepEqual(off(r['family-defaults']), [['buttonQuiet', 'size starts on m, where its family starts on s']]);
+});
+
+test('the order of the properties, how the frame sizes, the states, how the text fits', () => {
+  const r = rules();
+  assert.deepEqual(off(r['family-property-order']), [['buttonGhost', 'Size, State, label, showIcon, where its family lists Size, State, showIcon, label']]);
+  assert.deepEqual(off(r['family-sizing']), [['buttonGhost', 'sizes fill × hug, where its family sizes hug × hug']]);
+  assert.deepEqual(off(r['family-states']), [['buttonGhost', 'no press, which its family has']]);
+  assert.deepEqual(off(r['family-text-fit']), [['buttonGhost', 'its text is fixed, truncates at 1 line, where its family\'s is width and height, wraps']]);
+});
+
+test('a state axis is each component\'s own; a family of two, and a capture that keeps no text fit, say nothing', () => {
+  // A calendar button with a selected state, beside buttons without: never a family-options finding.
+  const f = family();
+  f.props.buttonPrimary.properties.State = V(['default', 'hover', 'press', 'selected']);
+  assert.ok(!off(familyRules(f, { familyOf }).find((x) => x.id === 'family-axis-options')).some(([n]) => n === 'buttonPrimary'));
+  const two = { props: { chipA: comp().props, chipB: comp({ w: 'FILL' }).props }, skeleton: { chipA: comp().skeleton, chipB: comp({ w: 'FILL' }).skeleton } };
+  assert.equal(familyRules(two, { familyOf }).some((x) => x.id.startsWith('family-')), false);
+  const old = family();
+  for (const s of Object.values(old.skeleton)) delete s.trees[0].c[0].text;
+  assert.equal(familyRules(old, { familyOf }).some((x) => x.id === 'family-text-fit'), false);
+});
+
+test('in the grammar: under Properties, with what to do', () => {
+  const g = grammarOf(family());
+  const r = g.figma.rules.find((x) => x.id === 'family-axis-options');
+  assert.equal(r.area, 'architecture');
+  assert.match(fixOf(r, r.toFix[0]).say, /^Give the axis the options its family takes: size: l, m, s/);
+});

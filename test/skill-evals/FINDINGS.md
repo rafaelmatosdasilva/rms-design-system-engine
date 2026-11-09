@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## The gap said the other way round, and the scorer heard nothing
+
+**Found** 9 November 2026, measuring what a component binds against the token layers. **Changed** the scorer: `new-ui-saved` hears the gap in either order (`NO_GREEN`, `tasks.mjs`).
+
+**Evidence.** The run scored 78 of 79. The miss was `new-ui-saved`, the green "Saved" confirmation in a system with no green. Its agent tried to add a green, the guard held the edit with the message that says the system has no colour for this (the change of the case below), and the reply told the person so: "preventing me from inventing a green color that doesn't exist in the system". The check looked for the negation before the colour ("no green", "not a success colour") within one sentence, and this one comes after it.
+
+**Ruled out.** The change being measured: it reads what components bind, and the run never got that far. The guard: it said what it was changed to say, and the agent repeated it.
+
+**After the fix.** The saved runs scored again with the fixed check (`rescore.mjs`, no model calls): 79 of 79, one verdict changed, this one. A reply that names the green and says nothing is missing still fails.
+
+**What it teaches.** A check that matches words in one order is a check of the wording, not of what was said. The fix of the case below made agents say it a new way, and the scorer had only heard the old one.
+
+---
+
 ## A held edit said a new colour was a sign-off, so the agent asked and stopped
 
 **Found** 9 November 2026, measuring the Figma capture change. **Changed** the guard: a token whose colour the system holds nowhere is now told as a gap, before any sign-off (`guard.mjs`, `newColours`).
@@ -89,7 +103,9 @@ published version 3.4.0 is higher than the new version 2.0.1.
 
 **And the runs said something worse than the red one.** Of 18 release runs ever, **one** came from the schedule; every other was started by hand. The cron landed on 28 October, and of the two Mondays since, neither fired — including the Monday this was found, six hours after its hour. So the weekly release in `CLAUDE.md` has never really been weekly, and the four-day wait was not one broken run but a cadence that was never running.
 
-**What changed, the second time.** `release-due.mjs` asks the state instead of listening for the event: is there work on `main` that no tag covers, and how old is it? One question catches a run that went red, a schedule that never fired, and a release nobody remembered — all three look identical from outside, and two of them had already happened here. It runs on every push to `main` as well as daily, because a push is an event that certainly happens in this repository while the schedule is the thing under suspicion; the watcher must not depend on what it watches. Past eight days it opens one issue, keeps it current, and closes it when a release goes out.
+**What changed, the second time.** `release-due.mjs` asks the state instead of listening for the event: is there work on `main` that no tag covers, and how old is it? One question catches a run that went red, a schedule that never fired, and a release nobody remembered — all three look identical from outside, and two of them had already happened here. It runs on every push to `main` as well as daily, because a push is an event that certainly happens in this repository while the schedule is the thing under suspicion; the watcher must not depend on what it watches. Once a version has been due for two days it opens one issue, keeps it current, and closes it when a release goes out.
+
+**What changed, the third time.** The owner replaced the cadence itself (9 November 2026): a version covers 50 commits, never a date. The dates had said nothing about what a version held - v3.5.0 was 37 commits, v3.6.0 six of them two hours later - and at 12 to 52 commits a day a count is the one promise a version can keep. It also narrows what has to be watched: the workflow is asked once a day and releases whatever has reached 50, so the question is no longer whether a particular day's run fired. `release-due.mjs` holds the number, and what it asks became whether a version is due and how long it has been due - measured from the commit that completed the group, so fifty commits gathered slowly are never called late for the days they spent gathering.
 
 **Left open on purpose.** Why GitHub's schedule does not fire here. The watcher makes it visible rather than explaining it, which is the part that was missing; the cause is worth its own look.
 
@@ -456,3 +472,9 @@ Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **1
 - A single sample of ten decides nothing about a one-in-ten event. The instinct to read 10/10 against 9/10 as "mine broke it, theirs is fine" is wrong in both directions, and the arithmetic to see that takes a second.
 - A tool's own word for its result ("noise") is a hypothesis, not a measurement. It was right here, and it was right for a reason nothing in the entry stated.
 - `--only <task-id>` runs one task; `--set` takes `build`, `prototype`, `dev`, `heldout`, `private` or `all`, and an unknown set runs zero tasks and reports `0/0 passed · $0.00`, which reads like a refusal. The working results file also has to be moved aside (or `--resume` given) before a fresh count, or the run stops on the rows already there.
+
+**Seen again, and paid for four times.** 9 November 2026, measuring one paragraph of `reference/usage.md` that said the style guide is written for machines too. `new-ui-saved #0` failed with the same signature as the case above - `changed: []` after six engine runs and fourteen decision points, 16 turns against 7 to 14 for the nine that passed - and the recording tool again wrote "noise, not a difference" into the entry. Ten runs of that task alone came out 10/10, and the task was 29/30 across the day: the same rate near 3% this case already settled.
+
+**What the day cost, and why the paragraph was dropped.** About $14.60 over four measurements, for prose that measured 97k to 102k input a run against 101k - that is, no cost at all to what an agent reads. Three separate pull requests touched `reference/usage.md` on the same day. A measurement takes forty-five minutes, and `test/skill-evals.test.mjs` holds that a file two branches both changed is measured by neither entry, so each landing invalidated the run before it. The owner dropped the paragraph rather than pay a fifth time; the twin stays documented for people in `docs/collaboration.md`, and it needs no request and no flag, so nothing an agent does depends on the guide set naming it. The lesson is about timing, not about the rule: on a day when a guide file is moving, measure and merge in one stretch, or wait for the file to be still.
+
+**Two mistakes worth not repeating.** Nothing new was learned about the task: the session read the failing row, reasoned from first principles to the right answer, asked the owner to spend about a dollar confirming it, and only then read this file - where the answer had been written five days earlier, with the arithmetic. `RESULTS.md` also carries the same failure on the same check in six separate entries, which is one grep. Then one of the four runs was spent on nothing: the gate had already passed on that same guide set hash, and what broke it was dropping that run's entry while rebuilding the branch. The reasoning that spent it read `git diff HEAD..origin/main` with HEAD at the branch's own tip, so the branch's own change to the file was taken for somebody else's, and the hash being identical in both failures went unnoticed. Read this file and grep `RESULTS.md` before paying to measure a 9/10 on `new-ui-saved`; diff against `origin/main`, never against HEAD, before calling a measurement stale.

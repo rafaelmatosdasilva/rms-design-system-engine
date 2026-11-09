@@ -40,6 +40,14 @@ From what each variant binds come three rules about the token itself. Like every
 - **A component uses its own tokens and the shared ones.** A chip that binds a button's token is flagged.
 - **A text layer uses a text colour.** A label bound to a background or surface colour is flagged. `on-surface` counts as a text colour.
 
+How your tokens are named is read from the names themselves, the way most of them are written:
+
+- **One case.** A name part written another way, such as `text-color` where the rest is camelCase.
+- **One word for one idea.** `pressed` where the system says `press`, or `bg` beside `background`.
+- **One scale for sizes.** `medium` where every other size is `m`.
+- **Sizes in order.** A set where `m` is larger than `l`.
+- **The usual states.** An interactive role missing the hover or press most roles have. A selected and an unselected colour don't need a hover, so they're left out.
+
 How your tokens are layered is read from the tokens themselves, so you never have to declare it:
 
 - **The layers come from the aliases.** A group of tokens that point at nothing is a base; one that mostly points at another sits on it. Layers can be collections of their own (Primitives, Semantic) or groups of names inside one collection (`primitives/…`, `semantic/…`).
@@ -48,6 +56,13 @@ How your tokens are layered is read from the tokens themselves, so you never hav
 - **And a token named like another collection's.** For example, `primitives/…` sitting in Semantic.
 - **Nothing is imposed.** A group of tokens that points in every direction has no clear layer, so it gets no rule.
 
+With the layers known, four more checks on what components bind:
+
+- **No base token on a component.** A primitive bound directly, where the rest of your system binds a semantic or component token.
+- **A family rounds its corners alike.** One button on a different radius token from the others of its size.
+- **A shared token is shared.** A token in a shared layer that only one component uses belongs to that component.
+- **A component's own token is used.** One that nothing binds and no token points at is left over.
+
 ### Components of one type, built the same way
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
@@ -55,6 +70,17 @@ The components of one type in Figma (every button, every input) are compared wit
 - **States set the same way.** Disabled is a property of its own on most buttons and an option of State on a few: those few are named, with the way most of them do it.
 - **One thing, one name.** `labelContent` on most buttons and `Label` on one: that one is named.
 - **What most of them have.** Most inputs have a label and a required mark: one without them is listed to check.
+- **Every combination built.** A variant missing from a component's grid of options, such as no `Size=m, State=press`.
+- **The same options and default.** `buttonPrimary` takes sizes `l, m, s` where the other buttons take `m, s`, or starts on another size. A state axis is each component's own, so it's left out of this one.
+- **The same order and sizing.** Properties listed in another order, or a frame that fills where the family hugs.
+- **The same states.** A button without the press state the other buttons have.
+- **Text that fits the same way.** A label that truncates where the family's grow.
+
+Three more readings of the library:
+
+- **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
+- **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
+- **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
 

@@ -7,7 +7,8 @@
 //   - a private name: a client, its apps, its design system's names, a person credited as a source, a company the
 //     work drew on, the private backlog (stored ONLY as hashes, so this file does not leak them either);
 //   - a person's first name used as a reviewer or an author in examples (a role says it: "QA", "Design");
-//   - an email address that is not a placeholder (example.com and the like) or a no-reply address;
+//   - an email address that is not a placeholder (example.com and the like), a no-reply address, or the address in
+//     a bot's own sign-off trailer ("Signed-off-by: something[bot] <…>");
 //   - an item code of the private backlog (a capital letter and digits, in brackets, after "idea", or opening a
 //     comment or a test name);
 //   - a person credited as a source (a first and last name after "by", or before an article's title);
@@ -2473,9 +2474,16 @@ export function forbiddenHits(text) {
 // An address is fine when it is a placeholder, a no-reply, a git remote, or the credentials of a URL in a test.
 const PLACEHOLDER_DOMAIN = /(^|\.)(example(\.(com|org|net))?|test|invalid|localhost)$/i;
 const FILE_LIKE = /\.(png|jpe?g|svg|gif|webp|avif|otf|ttf|woff2?|css|js|mjs|json)$/i;
+// A bot's own sign-off is nobody's address. Dependabot ends every commit message with
+// "Signed-off-by: dependabot[bot] <support@…>", so this rule - not the diff - refused every dependency update, and a
+// refused update is a dependency that stops being updated (9 November 2026). Only a trailer whose author is marked
+// [bot] is cleared, and only the address inside that trailer's own angle brackets: the same address written anywhere
+// else in the same text is still found.
+const BOT_TRAILER = /^(?:[A-Za-z]+(?:-[A-Za-z]+)*-by):[^<\n]*\[bot\][^<\n]*<([^>\s]+)>[ \t]*$/gim;
+const withoutBotTrailers = (text) => text.replace(BOT_TRAILER, (line) => line.replace(/<[^>\s]+>/, '<bot>'));
 function personalEmails(text) {
   const out = [];
-  for (const m of text.matchAll(/(^|[^\w.%+:/-])([\w.%+-]+)@([\w-]+(?:\.[\w-]+)+)/g)) {
+  for (const m of withoutBotTrailers(text).matchAll(/(^|[^\w.%+:/-])([\w.%+-]+)@([\w-]+(?:\.[\w-]+)+)/g)) {
     const [, , local, domain] = m;
     if (PLACEHOLDER_DOMAIN.test(domain) || FILE_LIKE.test(`@${domain}`) || /^git$/i.test(local)) continue;
     if (/^(no-?reply|noreply\+?.*)$/i.test(local) || /(^|\.)users\.noreply\.github\.com$/i.test(domain)) continue;

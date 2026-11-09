@@ -1,18 +1,19 @@
-# Publishes a release once a week, on Monday, when main has commits since the last version tag (CLAUDE.md, Releases),
-# and at once for a security fix or a fix for a problem that stops people, started by Claude. It tags the next version and creates a GitHub
-# Release whose notes list the pull requests merged since the previous one.
+# Publishes a version once 50 commits on main are in no release yet (CLAUDE.md, Releases; lib/release-due.mjs holds
+# the number), and at once for a security fix or a fix for a problem that stops people, started by Claude. It tags the
+# next version and creates a GitHub Release whose notes list the pull requests merged since the previous one.
 # How big the step is (patch, minor or major) comes from the release labels on those pull requests
-# (release-version.mjs). People's installs follow main every day (self-update.mjs): a release is the week's record, never
-# what brings them a change. Nobody runs this by hand. Only tags, releases and the package are written: main itself is never
-# pushed to.
+# (release-version.mjs). A version covers a set amount of work, never a date: it is asked once a day, so two versions
+# never land the same day and none covers a handful of commits. People's installs follow main every day
+# (self-update.mjs): a release is the record of what went in, never what brings them a change. Nobody runs this by
+# hand. Only tags, releases and the package are written: main itself is never pushed to.
 name: release
 
 on:
   schedule:
-    # 07:23, not 07:00. A schedule is best-effort, and the top of the hour is when the queue is deepest: of four
-    # scheduled runs this repository has ever had, each came 7 to 10 hours after its minute, and the release's own
-    # 07:00 Monday has never once landed on a Monday. CodeQL and Scorecard were given odd minutes for this reason.
-    - cron: '23 7 * * 1'
+    # 07:23, not 07:00. A schedule is best-effort and the top of the hour is when the queue is deepest: of the
+    # scheduled runs this repository has had, each came 7 to 10 hours after its minute, and more than one never ran
+    # at all. CodeQL and Scorecard carry odd minutes for this reason and are the ones whose schedules fire.
+    - cron: '23 7 * * *'
   workflow_dispatch:
 
 permissions:
@@ -56,6 +57,15 @@ jobs:
           range=${last:+$last..}HEAD
           if [ -n "$last" ] && [ "$(git rev-list --count "$range")" = 0 ]; then
             echo "No commits since $last: nothing to release."
+            echo "next=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Is a version due: the one question release-due.mjs answers for the issue it raises, asked here so the
+          # number lives in one place. A run started by hand is a security fix or a fix for a problem that stops
+          # people, which is exactly the release that must not wait for the group to fill.
+          verdict=$(node lib/release-due.mjs due)
+          echo "$verdict"
+          if [ "${GITHUB_EVENT_NAME:-schedule}" != workflow_dispatch ] && [ "${verdict%% *}" != yes ]; then
             echo "next=" >> "$GITHUB_OUTPUT"
             exit 0
           fi

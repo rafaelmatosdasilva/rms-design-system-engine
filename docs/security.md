@@ -92,13 +92,13 @@ Why the engine can be trusted with a team's code, design files and credentials: 
 | Exposure of credentials (CWE-200, CWE-532) | Tokens live in a git-ignored `.env`, are sent only to their host, are never printed; a required privacy check refuses private names and addresses on every pull request |
 | Cross-site scripting in the style guide (CWE-79) | Project data is embedded as JSON with `<` escaped, the page escapes text through one helper when it shows it, and icons are stripped of scripts and event attributes |
 | Prototype pollution (CWE-1321) | Name lookups use own keys only; found and covered by the property tests |
-| Supply-chain compromise (CWE-1357) | No runtime dependencies; workflow actions pinned by commit; test tools installed from committed lockfiles; advisories tracked by OpenSSF Scorecard |
+| Supply-chain compromise (CWE-1357) | No runtime dependencies; workflow actions pinned by commit and watched for updates, so a pin never outlives its own security fixes; test tools installed from committed lockfiles; advisories tracked by OpenSSF Scorecard |
 | Tampered releases (CWE-494) | Each release carries a Sigstore provenance attestation (`gh attestation verify`), and npm versions carry npm provenance |
 
 ### How this is checked
 
 - **On every change:** the full test suite (more than 2,000 tests, including planted mistakes and property tests with fast-check), CodeQL code scanning, and the privacy check, all required before a merge.
-- **Every week:** OpenSSF Scorecard, on every change to main as well.
+- **Every week:** OpenSSF Scorecard, on every change to main as well; and Dependabot, which opens one pull request for the pinned actions that moved.
 - **Self-certified:** the [OpenSSF Best Practices](https://www.bestpractices.dev/projects/16082) passing level.
 
 ### Known limits
