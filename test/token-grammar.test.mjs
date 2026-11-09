@@ -56,3 +56,17 @@ test('in the grammar: under Tokens, a token a place, with what to do', () => {
   assert.deepEqual(r.toFix, [{ where: 'link/textColor/pressed', value: 'pressed, where the system says press' }]);
   assert.equal(fixOf(r, r.toFix[0]).say, 'Rename it with the system\'s word: pressed, where the system says press');
 });
+
+test('where a state sits, a value off the scale, a surface with nothing for what sits on it', () => {
+  const r = Object.fromEntries(nameRules({ tokens: [...system().tokens, t('chip/hover/textColor'),
+    t('radius/s', 4), t('radius/m', 8), t('radius/full', 9999), t('space/gap/xl', 18),
+    t('card/fillColor/default'), t('card/textColor/default'), t('menu/textColor/rest'), t('menu/fillColor/rest'), t('sheet/fillColor/default')] }).map((x) => [x.id, x]));
+  assert.equal(r['token-segment-order'].says, 'A token\'s name puts its state as the last part and its size as the last part');
+  assert.deepEqual(off(r['token-segment-order']), [['chip/hover/textColor', 'its state is the part before the last, where most names have it as the last part']]);
+  assert.equal(r['token-on-scale'].says, 'A spacing or radius value is a step of the system\'s 4px scale');
+  assert.deepEqual(off(r['token-on-scale']), [['space/gap/xl', '18, between 16 and 20']], 'a pill radius (9999) is no step');
+  // tag and menu fill with no text beside them in the system tokens, sheet as well; card and menu/rest have theirs.
+  assert.ok(off(r['token-on-colour']).some(([w, v]) => w === 'sheet/fillColor' && v === 'no text or icon colour beside it under sheet'));
+  assert.ok(!off(r['token-on-colour']).some(([w]) => w === 'card/fillColor' || w === 'menu/fillColor'));
+  assert.equal(fixOf({ id: 'token-on-scale' }, { value: '18, between 16 and 20' }).say, 'Give it a value on the system\'s scale: 18, between 16 and 20');
+});
