@@ -44,6 +44,38 @@ test('the guard holds such an edit until a named person signed it off, and the r
   assert.equal(judge({ tool_name: 'Write', cwd: root, tool_input: { file_path: join(root, SIGN_OFFS), content: '{}' } }, { cfg, userText: 'yes' }).decision, 'deny');
 });
 
+test('a token that brings in a colour the system holds nowhere is told as a gap, before any sign-off', () => {
+  // The system has a blue and a text colour; Figma also knows a green the theme does not declare yet.
+  const root = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'src/theme.css' } },
+    'src/theme.css': ':root {\n  --button-background: #1f5fd6;\n  --text-primary: #1b2433;\n}\n',
+    'src/figma-vars.snapshot.json': { color: { light: { 'status/positive/color': '#1e8e3e' } } },
+  });
+  const add = (decl) => judge({ tool_name: 'Edit', cwd: root, tool_input: { file_path: join(root, 'src/theme.css'), old_string: '  --text-primary: #1b2433;\n', new_string: `  --text-primary: #1b2433;\n  ${decl}\n` } },
+    { cfg, userText: 'add a small green "Saved" confirmation next to the Save button' });
+  // A green nothing holds: the gap first, in so many words, and the sign-off only as the way in once someone decides.
+  const fresh = add('--color-success: #2e7d32;');
+  assert.equal(fresh.decision, 'deny');
+  assert.match(fresh.reason, /^This edit brings into the design system a colour it does not have \(--color-success: #2e7d32\)/);
+  assert.match(fresh.reason, /the system has no colour for this\. Tell the person so/);
+  assert.match(fresh.reason, /or leave that part out and say it is missing/);
+  assert.match(fresh.reason, /If they decide to add it[\s\S]*--sign-off "the token --color-success" --by "<who>"/);
+  assert.doesNotMatch(fresh.reason, /low risk|easy to undo|ask who signs it off/, 'never a routine change waiting on a signature');
+  // However it is written, a colour is the same colour.
+  assert.match(add('--color-success: rgb(46, 125, 50);').reason, /a colour it does not have/);
+  // Not a gap, so the sign-off as it was: a new name for a colour the theme has, a token that points at one,
+  // a colour Figma already has, and a value that is not a colour.
+  for (const decl of ['--button-fill: #1F5FD6;', '--button-fill: var(--button-background);', '--status-positive: #1e8e3e;', '--chip-gap: 4px;']) {
+    const r = add(decl);
+    assert.equal(r.decision, 'deny', decl);
+    assert.match(r.reason, /^This edit adds to the design system itself/, decl);
+    assert.doesNotMatch(r.reason, /a colour it does not have/, decl);
+  }
+  // Signed off, it goes through like any other.
+  recordSignOff(root, { what: 'the token --color-success', by: 'the system owner' });
+  assert.equal(add('--color-success: #2e7d32;'), null);
+});
+
 test('a sign-off the person did not give is asked for; one they gave is recorded by --sign-off', () => {
   const root = project();
   const cmd = { tool_name: 'Bash', cwd: root, tool_input: { command: 'rms-design-system-engine --sign-off "chip size=xl" --by "the system owner"' } };
