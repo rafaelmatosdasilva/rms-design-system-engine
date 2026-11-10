@@ -236,11 +236,31 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 **What you get, and what you don't.**
 
 - **You get** the answers about your system (each component's props, each token and what it is for), the check of a UI an AI tool built, and every audit the command line runs.
-- **You don't get** what makes Claude Code the measured way to use it: the guide that routes each request to its recipe, the [hooks that keep the rules](#the-hooks-keep-the-rules) while the agent works, and the skill evaluation, which runs on Claude.
+- **In Cursor and Codex you also get** the guide and the [hooks that keep the rules](#the-hooks-keep-the-rules), set up as below.
+- **You don't get** the skill evaluation anywhere but Claude Code: it runs on Claude, so how well another tool follows the guide is not measured yet.
 
-### A tool with a terminal
+### In Cursor and Codex
 
-Cursor, Windsurf, Codex, Gemini CLI and VS Code's agent can run commands, so they use the command line directly, as in [from the terminal](#from-the-terminal). Add this to the tool's own instructions for the project (`AGENTS.md`, `.cursor/rules`, `GEMINI.md` or `.github/copilot-instructions.md`), so the agent asks the system before it guesses:
+Both read the guide from the project's instructions and run the same guard as Claude Code, as their own hooks. In the project, run:
+
+```bash
+rms-design-system-engine --agent-rules --write
+rms-design-system-engine --install-hooks --tool cursor,codex
+```
+
+- **The guide.** The first command writes the engine's section into the instruction files the project already has, or into `AGENTS.md`, which both tools read, when it has none. A project with a `.cursor/rules` folder also gets `.cursor/rules/design-system.mdc`. To choose the file yourself, use `--write=AGENTS.md`. It tells the agent to route each request first (`--route`) and follow what it prints, the same recipes Claude Code follows.
+- **The guard.** The second writes `.cursor/hooks.json` and `.codex/hooks.json`. Name only the tools you use. A project that already has a `.cursor` or `.codex` folder gets them with every `--install-hooks`. Hooks you wrote there are kept, and both files are added to `.gitignore`, since they hold this machine's path to the engine.
+- **Trust them once.** Cursor runs a project's hooks in a trusted workspace. Codex runs them once you trust them: open `/hooks` in Codex and trust each one.
+
+**Where they differ from Claude Code.**
+
+- **Neither can ask you before a file edit.** Where Claude Code would ask, Cursor and Codex hold the edit and tell the agent why. Ask for the change in your own words and the agent can try again. Cursor still asks you before a command, such as a push.
+- **Cursor routes from the guide, not the hook.** Its hooks cannot add the route to your message, so the line in `AGENTS.md` does it.
+- **Not measured yet.** The skill evaluation runs on Claude, so how reliably each tool follows the guide is still to be measured.
+
+### Another tool with a terminal
+
+Windsurf, Gemini CLI and VS Code's agent, like Cursor and Codex, can run commands, so they use the command line directly, as in [from the terminal](#from-the-terminal). Add this to the tool's own instructions for the project (`AGENTS.md`, `.cursor/rules`, `GEMINI.md` or `.github/copilot-instructions.md`), so the agent asks the system before it guesses:
 
 ```text
 This project has a design system checked by rms-design-system-engine.
