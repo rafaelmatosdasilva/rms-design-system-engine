@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pruneRow, runStats, resultsEntry, moreSteps } from './skill-evals/record.mjs';
+import { pruneRow, runStats, resultsEntry, moreSteps, scrubPaths } from './skill-evals/record.mjs';
 import { readFolder, summarize } from './skill-evals/summarize.mjs';
 
 const RECORDS = join(dirname(fileURLToPath(import.meta.url)), 'skill-evals', 'records');
@@ -87,4 +87,23 @@ test('a run stopped at the harness\'s own limit is recorded apart from one that 
   const clean = runStats([row('a', 0, true), row('a', 1, true)]);
   assert.equal(clean.limits, 0);
   assert.doesNotMatch(resultsEntry({ title: 't', what: 'x', guideSet: 'abcdef123456', now: { 'claude-haiku-4-5-20251001': clean }, name: 'n', date: '2026-10' }), /stopped at a limit/);
+});
+
+test('a record carries no folder of this computer, the engine\'s own included', () => {
+  // The home folder was the only root written out, and a run measured from a worktree put the engine somewhere
+  // else: a temporary folder whose path still spelt the person's name, flattened into one segment that homedir()
+  // never matched. It reached the record, and the privacy hook caught it on the way to a public repository.
+  const home = '/Users/someone';
+  const engine = '/private/tmp/claude-501/-Users-someone-Documents-engine/abc/scratchpad/wt-x';
+  const said = scrubPaths(`ran ${engine}/audit.mjs, read ${home}/notes.md`, { engine, home });
+  assert.equal(said, 'ran <engine>/audit.mjs, read ~/notes.md');
+  assert.doesNotMatch(said, /someone/);
+
+  // The engine under the home folder is still the engine: the longer root wins, so neither is half-written.
+  const under = '/Users/someone/Documents/engine';
+  assert.equal(scrubPaths(`${under}/lib/x.mjs`, { engine: under, home }), '<engine>/lib/x.mjs');
+  // Nothing of this computer in it is left as it is.
+  assert.equal(scrubPaths('a line with no path', { engine, home }), 'a line with no path');
+  // A root that is the whole disk would blank every path there is.
+  assert.equal(scrubPaths('/etc/hosts', { engine: '/', home: '/' }), '/etc/hosts');
 });
