@@ -843,14 +843,6 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-panel-body { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
 .sg-panel-body .pg-inspect-head { top: var(--sg-panel-head-h, 0px); }   /* a card's head right under the panel's head, whose own bottom padding is the gap: the first card starts there, so its head never rests lower than it sits, over its own first line */
 .sg-panel-body .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-panel-head-h, 0px) + var(--pg-card-head-h, 0px)); }   /* its table's head under it */
-.sg-tk-users { table-layout: fixed; width: 100%; }
-.sg-tk-users th, .sg-tk-users td { min-width: 0; }
-.sg-tk-users th:first-child { width: 46%; }
-.sg-tk-users .sg-mx-open-cell { width: calc(var(--sg-space-xxl) * 1.5); text-align: right; }
-.sg-tk-users td { padding-block: var(--sg-space-m); }   /* the Status table's row height */
-.sg-tk-users .sg-mx-row.is-link { cursor: pointer; }   /* a row opens its component, as a Status row does */
-.sg-tk-users .sg-mx-row.is-link:hover > td { background: var(--sg-a2); }
-.sg-tk-users .sg-mx-row.is-link:active > td { background: var(--sg-a3); }
 .sg-tk-none { margin: 0; padding: var(--sg-space-m) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); }
 .sg-tk-row { --d: 0; position: relative; display: flex; align-items: center; gap: var(--sg-space-xxs); padding-left: calc(var(--d) * var(--tk-ind)); border-radius: var(--sg-control-radius); }   /* indented by its depth, its fill the list's whole width */
 .sg-tk-row > .sg-tk-item { flex: 1; min-width: 0; background: none; }
@@ -906,8 +898,6 @@ table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where 
 .sg-tk-alias > .sg-token-swatch, .sg-tk-name > .sg-token-swatch { margin: 0; }
 /* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
 .sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
-.sg-tk-facts th[scope="row"] { width: 30%; position: static; background: none; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
-.sg-tk-facts tr:last-child > *, .sg-tk-facts tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) > * { border-bottom: 0; --sg-th-line: none; }   /* the card's own edge closes it: its head cell's drawn line goes with its border */
 .sg-tk-code-line { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-s); }   /* its name and Copy on one line */
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
@@ -965,8 +955,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
 .sg-row-detail-body .pg-a11y-item { display: block; }
 .sg-row-detail-body .pg-a11y-item > [class^="pg-par--"]:first-child { display: none; }
-.sg-affects th, .sg-affects td { position: static; white-space: normal; overflow-wrap: normal; word-break: normal; }
-.sg-affects { table-layout: auto; }   /* each column as wide as its words, never a word cut in two */   /* in a panel's card: a plain table, nothing sticks */
 .sg-affects .pg-par-val { display: block; }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
 /* In a panel, each point is a block of its own: its title a step larger, its words the body's own size, a clear space
@@ -986,6 +974,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-cx-draft { margin-top: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius-s); overflow: clip; }   /* what a construction rule's suggestion changes, in the card that suggests it */
 .sg-row-detail-body .sg-cx-draft-head { margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-tint); color: var(--sg-text); font-size: var(--sg-s); font-weight: var(--sg-heading-weight); }
 .sg-row-detail-body :is(.sg-cx-draft, .sg-il-line) + .sg-decide-grid { margin-top: var(--sg-space-xl); }   /* the decision under the draft it is for */
+.sg-row-detail-body .sg-cx-group { padding: var(--sg-space-s) var(--sg-space-m); }   /* one change, said once, above the components that take it */
+.sg-row-detail-body .sg-cx-group + .sg-cx-group { border-top: var(--sg-line); }
+.sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: var(--sg-space-s) 0 0; padding: 0; list-style: none; }
+.sg-row-detail-body .sg-cx-ways { margin: 0; padding: 0; list-style: none; }   /* each way a family is built, and how many are built so */
+.sg-row-detail-body .sg-cx-ways li { display: flex; justify-content: space-between; gap: var(--sg-space-m); padding: var(--sg-space-s) var(--sg-space-m); }
+.sg-row-detail-body .sg-cx-ways li + li { border-top: var(--sg-line); }
+.sg-row-detail-body .sg-cx-figma { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }   /* a component opened in Figma, with Figma's mark */
 .sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
 .sg-row-detail-body .sg-il-example code { font-size: var(--sg-s); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }
@@ -1133,3 +1128,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 /* The checks that wait on a fresh read of Figma, above the Rules table (capture-waits.mjs). */
 .sg-cx-wait { padding: var(--sg-space-m); margin-bottom: var(--sg-space-l); }
 .sg-cx-wait > p { margin: 0 0 var(--sg-space-s); }
+
+/* Labelled values in a panel opened from a table's row (kvOne, kvList): never another table. */
+.sg-kv { display: grid; gap: var(--sg-space-s); margin: 0; padding: var(--sg-space-m); }
+.sg-kv > div { display: grid; grid-template-columns: minmax(7rem, 30%) 1fr; gap: var(--sg-space-m); align-items: baseline; }
+.sg-kv dt { color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.sg-kv-list { margin: 0; padding: 0; list-style: none; }
+.sg-kv-list > li + li { border-top: var(--sg-line); }
