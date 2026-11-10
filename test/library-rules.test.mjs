@@ -50,3 +50,10 @@ test('in the grammar: each judged, with what to do', () => {
   assert.equal(twins.area, 'architecture');
   assert.match(fixOf(twins, twins.toFix[0]).say, /^Look at it beside its twin/);
 });
+
+test('a nested component that keeps its properties out of the parent\'s panel, where most show them', () => {
+  const nest = (exposed) => ({ trees: [{ c: [{ t: 'INSTANCE', n: 'Badge', of: { name: 'badge' }, with: { Tone: 'Info' }, ...(exposed ? { exposed: true } : {}) }] }], variants: [['x', 0]] });
+  const r = rule({ skeleton: { cardA: nest(true), cardB: nest(true), cardC: nest(true), cardD: nest(false) } }, 'nested-exposed');
+  assert.deepEqual(off(r), [['cardD', 'Badge keeps its properties out of the panel']]);
+  assert.equal(rule({ skeleton: { cardA: nest(false), cardB: nest(false), cardC: nest(false) } }, 'nested-exposed'), undefined, 'a capture that never says exposed is no rule');
+});
