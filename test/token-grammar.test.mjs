@@ -77,3 +77,9 @@ test('a category word where most names do not put it', () => {
   assert.equal(r.says, 'A token\'s name puts color as the last part, radius as the part before the last');
   assert.deepEqual(off(r), [['color/tag/fill', 'color is part 3 from the end, where most names have it as the last part']]);
 });
+
+test('a state before what a colour is for, where most names put it after', () => {
+  const r = nameRules({ tokens: ['button/background/hover', 'chip/background/hover', 'card/text/hover', 'tag/hover/background'].map((n) => t(n)) }).find((x) => x.id === 'token-property-order');
+  assert.equal(r.says, 'A token\'s name puts what a colour is for before its state (background/hover)');
+  assert.deepEqual(off(r), [['tag/hover/background', 'its state comes before what it is for']]);
+});

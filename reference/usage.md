@@ -1375,7 +1375,8 @@ parts are (`token-name-case`); one idea named one way, the way most names do (`p
 sizes that grows with its steps (`token-scale-order`); and an interactive role with the states most interactive roles
 have (`token-states`; a selected and an unselected colour answer no hover and are never held to them); a state and a
 size where in a name most of them sit, counted from the end (`token-segment-order`); each category word (`color`,
-`radius`, `shadow`) where most names holding it put it (`token-category-order`); a spacing or radius value that is
+`radius`, `shadow`) where most names holding it put it (`token-category-order`); what a colour is for (`background`,
+`text`, `border`) and its state in the order most names holding both use (`token-property-order`); a spacing or radius value that is
 a step of the system's own scale, the largest of 8, 4 and 2 most values are steps of, a hairline under one step and a
 pill radius left out (`token-on-scale`); and a role with a background that has a text or icon colour beside it
 (`token-on-colour`). From the tokens'
@@ -1437,7 +1438,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   shadow changes between variants, by the layer's own effect or by a shadow layer shown and hidden, as most components
   change theirs (`shape-rules.mjs`, `shadow-one-way`), a property for one kind of content (Icon, Content) a slot or an
   instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
-  over it or its opacity, as most components show theirs (`state-one-way`), and two parts side by side spaced by the variable most
+  over it or its opacity, as most components show theirs (`state-one-way`), the library's size scale - at each size
+  option, the minimum height and the icon size most components have there (`size-scale-height`, `size-scale-icon`) - and two parts side by side spaced by the variable most
   frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
