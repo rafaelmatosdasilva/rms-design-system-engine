@@ -82,6 +82,7 @@ The components of one type in Figma (every button, every input) are compared wit
 
 More readings of the library:
 
+- **Annotated like its family.** A tab with no Accessibility annotation when almost every other tab has one.
 - **Nested properties within reach.** A badge inside a card whose own properties don't show in the card's properties panel, when most nested components show theirs. An agent can only set what the panel shows.
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
 - **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.

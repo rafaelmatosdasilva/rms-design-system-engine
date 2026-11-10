@@ -163,6 +163,7 @@ rms-design-system-engine --figma-a11y                    # write the read-only s
 rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's hooks (done by --init): pre-commit and pre-push check the change; post-commit, post-merge and post-rewrite build the local style guide again, quickly, where one was built (--git-rebuild); --remove-hooks takes them out
+rms-design-system-engine --install-hooks --tool cursor,codex  # the same guard in Cursor's and Codex's own hooks (.cursor/hooks.json, .codex/hooks.json); a project with a .cursor or .codex folder gets them with every --install-hooks
 rms-design-system-engine --git-check commit|push         # what git's hooks run: only for what the change uses; commit warns and exits 0, push exits 1 while a finding is left
 rms-design-system-engine --git-rebuild commit|merge|rewrite  # what git's post-commit, post-merge and post-rewrite run: the local style guide built again quickly, in a process of its own, where a page was built; never on CI or with "hooks": false; always exits 0
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
@@ -1423,7 +1424,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   property or by a variant (`family-parts-shown`), and what a property changes between two variants that differ by it
   alone (the frame's padding and gap, a part's text style, a field bound to another variable) as most of them
   (`family-property-changes`), and the frame's fill bound at rest as most of them bind it, to a token of its own, a
-  shared one or none (`family-fill`); a nested component with properties of its own showing them in the parent's
+  shared one or none (`family-fill`); and, in a family of three or more, the categories of the designer's own Figma
+  annotations (Accessibility, Content) most of it carries (`family-annotated`, read from a capture that keeps them); a nested component with properties of its own showing them in the parent's
   properties panel, as most do (`nested-exposed`, read from a capture that records it); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at

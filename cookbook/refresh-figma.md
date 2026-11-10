@@ -547,7 +547,7 @@ that differ) is never taken for a number.
 function prop(node, key) { try { return node != null && typeof node === 'object' && key in node ? node[key] : undefined; } catch (e) { return undefined; } }
 ```
 
-**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, its opacity and its border (weight and where it sits), and, for a text layer, how it grows and truncates; whether a nested instance is exposed in the parent's properties panel; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
+**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, its opacity and its border (weight and where it sits), and, for a text layer, how it grows and truncates; whether a nested instance is exposed in the parent's properties panel; the categories of the designer's own annotations on each layer; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
 
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
@@ -1095,7 +1095,7 @@ function propsFacts(root) {
 // Also where the component lives (page, section), each swap and slot property's default and preferred components, the
 // variables it binds from another library, and its dev resources (links to its code). Beside the trees, what each
 // variant binds: binds[<variant>][<the layer's place in the tree>] = { <field>: <the variable's name> }; and how it
-// looks there: looks[<variant>][<place>] = { opacity, border: { w, align } }. Per variant
+// looks there: looks[<variant>][<place>] = { opacity, border: { w, align }, notes: [<annotation categories>] }. Per variant
 // and not on the shape, as the reactions are, so the variants built alike still share one tree. A layer's place is ''
 // for the variant itself, and its parent's place and its own index below that, so '1.0' is the first layer of the
 // second. The names are written out rather than held in a table of their own: a table is smaller as text and larger
@@ -1104,6 +1104,9 @@ async function skeletonOf(root, names = {}) {
   const styles = {}, collections = {}, vars = {}, varNames = {};
   const clean = (k) => String(k).replace(/#[^#]*$/, '');
   const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : undefined);
+  // An annotation's category by its name (Accessibility, Content), read once and kept.
+  const cats = {};
+  const catName = async (id) => { if (!id) return null; if (!(id in cats)) { let c = null; try { c = await figma.annotations.getAnnotationCategoryByIdAsync(id); } catch (e) { /* gone */ } cats[id] = c ? c.label : null; } return cats[id]; };
   const styleName = async (id) => {
     if (typeof id !== 'string' || !id) return undefined;
     if (!(id in styles)) { let s = null; try { s = await figma.getStyleByIdAsync(id); } catch (e) { /* gone */ } styles[id] = s ? s.name : null; }
@@ -1162,9 +1165,12 @@ async function skeletonOf(root, names = {}) {
       if (rz && rz !== 'NONE') tf.resize = rz; if (tc && tc !== 'DISABLED') tf.truncate = tc; if (ml) tf.maxLines = ml; }
     // Its opacity under 1, and its border: the weight (one, or each side's when they differ) and where it sits. Beside
     // the trees as the bindings are (looks[<variant>][<place>]): a disabled variant at half opacity is still built alike.
+    // The designer's own annotations on it, by category (an annotation with none is said as a note).
+    const an = []; for (const a of prop(n, 'annotations') || []) { const c = (await catName(a && a.categoryId)) || 'note'; if (!an.includes(c)) an.push(c); }
     const op = num(prop(n, 'opacity')), sk = (prop(n, 'strokes') || []).filter((p) => p && p.visible !== false).length, lk = {};
     if (op < 1) lk.opacity = op;
     if (sk) lk.border = { w: num(prop(n, 'strokeWeight')) ?? ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].map((k) => num(prop(n, k)) || 0), align: prop(n, 'strokeAlign') };
+    if (an.length) lk.notes = an;
     if (Object.keys(lk).length) look[path] = lk;
     const o = {
       t, n: n.name, ...(depth > 0 ? { id: n.id } : {}),
