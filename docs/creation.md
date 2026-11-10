@@ -82,6 +82,26 @@ A rule counts as covering a behaviour when the component's own documentation des
 
 Said once per component and behaviour, never once per use. And when no documentation has been read at all, nothing is held to a rule — reporting every behaviour on every page because nothing was loaded would be worse than saying nothing.
 
+### A gap reaches the team by itself
+
+A prototype finds what your system does not have — a component it lacks, an option, a token. Those used to sit in a file and a chat, and someone had to remember to carry them to the people who decide. On the run this came from, they were only written up after being asked for twice.
+
+Now the check drafts them itself, on the page each one belongs to:
+
+```
+3 gaps drafted for the team, on 2 pages:
+   Button - Options: 1
+   System - When to use: 2
+   Written here only. They reach the team's drafts with --commit:
+   the intent layer is theirs, not the engine's.
+```
+
+**Each gap goes where it would be answered.** One naming a component of your system goes on that component's page, under the section that would answer it (an option under Options, a token under Tokens). One naming nothing your system has is the System page's — it is a thing your system does not have yet. A page is never guessed from the words of the need: only a component name your system actually has counts.
+
+**Nothing is sent until you ask.** The intent layer is your repository. The drafts are written locally and reach the team's Drafts to review with `--commit` — the same gate `--draft` has always used.
+
+Each line says what was needed, what the prototype did meanwhile, and which prototype asked, so whoever reads it can go and look.
+
 ### A preview to review it in
 
 The route writes a prototype in your product's own code and checks it — and used to leave nowhere to look at it. On the run this came from, the agent built a viewer by hand, and reviewing the page in it is where most of what the check missed was found. Every team would otherwise build that same thing.
