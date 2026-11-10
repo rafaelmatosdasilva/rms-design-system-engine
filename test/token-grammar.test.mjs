@@ -42,7 +42,8 @@ test('a set of sizes out of order, and an interactive role without the states mo
 
 test('never imposed: what no name does is no rule', () => {
   const plain = { tokens: ['color/a', 'color/b', 'color/c', 'color/d'].map((n) => t(n)) };
-  assert.deepEqual(nameRules(plain), []);
+  // Only where the category word sits, which every name already does: a rule with nothing to fix.
+  assert.deepEqual(nameRules(plain).map((r) => [r.id, r.items.every((i) => i.fits)]), [['token-category-order', true]]);
   assert.deepEqual(nameRules(null), []);
   // A selected and an unselected colour answer no hover: never held to the interactive states.
   const sel = { tokens: [...system().tokens, t('row/fill/default'), t('row/fill/selected')] };
@@ -69,4 +70,10 @@ test('where a state sits, a value off the scale, a surface with nothing for what
   assert.ok(off(r['token-on-colour']).some(([w, v]) => w === 'sheet/fillColor' && v === 'no text or icon colour beside it under sheet'));
   assert.ok(!off(r['token-on-colour']).some(([w]) => w === 'card/fillColor' || w === 'menu/fillColor'));
   assert.equal(fixOf({ id: 'token-on-scale' }, { value: '18, between 16 and 20' }).say, 'Give it a value on the system\'s scale: 18, between 16 and 20');
+});
+
+test('a category word where most names do not put it', () => {
+  const r = nameRules({ tokens: ['button/fill/color', 'chip/fill/color', 'card/fill/color', 'color/tag/fill', 'radius/s', 'radius/m', 'radius/l'].map((n) => t(n)) }).find((x) => x.id === 'token-category-order');
+  assert.equal(r.says, 'A token\'s name puts color as the last part, radius as the part before the last');
+  assert.deepEqual(off(r), [['color/tag/fill', 'color is part 3 from the end, where most names have it as the last part']]);
 });

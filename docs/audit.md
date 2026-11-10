@@ -47,7 +47,7 @@ How your tokens are named is read from the names themselves, the way most of the
 - **One scale for sizes.** `medium` where every other size is `m`.
 - **Sizes in order.** A set where `m` is larger than `l`.
 - **The usual states.** An interactive role missing the hover or press most roles have. A selected and an unselected colour don't need a hover, so they're left out.
-- **Parts in their usual place.** A state placed earlier in a name than most names place it.
+- **Parts in their usual place.** A state placed earlier in a name than most names place it, or `color` at the start of a name where most names end with it.
 - **Values on your scale.** A spacing of 18 where every other spacing and radius is a step of 4. Hairlines (1 or 2px) and pill radii are left out.
 - **Something to sit on a surface.** A role with a background colour and no text or icon colour beside it.
 
@@ -78,7 +78,7 @@ The components of one type in Figma (every button, every input) are compared wit
 - **The same order and sizing.** Properties listed in another order, or a frame that fills where the family hugs.
 - **The same states.** A button without the press state the other buttons have.
 - **Text that fits the same way.** A label that truncates where the family's grow.
-- **Aligned, filled and padded alike.** Among the members of a family built from the same parts: a card centred where the others start at the top, a title that fills where the others let the body fill, or padding on `space/l` where the others use `space/m` at the same size.
+- **Aligned, filled and padded alike.** Among the members of a family built from the same parts: a card centred where the others start at the top, a title that fills where the others let the body fill, padding on `space/l` where the others use `space/m` at the same size, or a minimum height the others don't set.
 
 More readings of the library:
 
@@ -94,6 +94,7 @@ More readings of the library:
 - **Defaults your examples use.** A button that starts disabled when every example in your file shows it enabled. Uses inside other components' examples count too.
 - **Words in one case.** Tabs labelled in Title Case when most components' examples are in Sentence case.
 - **Shadows change one way.** A card whose hover shows a separate shadow layer, when most cards change their own effect.
+- **Hover shown one way.** A button that shows its hover with an overlay layer when most change their own fill.
 - **A slot or a swap, consistently.** An `Icon` property that is a slot in one component and an instance swap in most.
 - **The gap between two parts.** An icon and a label spaced by `space/m` in one chip and by `space/xs` in most, at the same size.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.

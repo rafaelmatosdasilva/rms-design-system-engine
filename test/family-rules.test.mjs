@@ -81,3 +81,10 @@ test('alike in a family: content aligned another way, another part filling the f
   assert.deepEqual(off(r['family-padding']), [['cardE', 'its padding at m is space/l space/l space/l space/l, where its family\'s is space/m space/m space/m space/m']]);
   assert.equal(fixOf({ id: 'family-align' }, { value: 'x' }).say, 'Align its content as its family does: x');
 });
+
+test('alike in a family: a minimum the others do not set', () => {
+  const chip = (limits) => ({ trees: [{ ...(limits ? { limits } : {}), c: [{ t: 'TEXT', n: 'Label' }] }], variants: [['Size=m', 0]] });
+  const skeleton = { chipA: chip({ minHeight: 32 }), chipB: chip({ minHeight: 32 }), chipC: chip({ minHeight: 32 }), chipD: chip({ minHeight: 40 }) };
+  const r = familyRules({ skeleton, props: {} }, { familyOf }).find((x) => x.id === 'family-limits');
+  assert.deepEqual(off(r), [['chipD', 'its limits at m are min height 40, where its family\'s are min height 32']]);
+});

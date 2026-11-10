@@ -1374,7 +1374,8 @@ parts are (`token-name-case`); one idea named one way, the way most names do (`p
 `background`: `token-one-name`); sizes on one scale (`s, m, l` or `small, medium, large`: `token-one-scale`); a set of
 sizes that grows with its steps (`token-scale-order`); and an interactive role with the states most interactive roles
 have (`token-states`; a selected and an unselected colour answer no hover and are never held to them); a state and a
-size where in a name most of them sit, counted from the end (`token-segment-order`); a spacing or radius value that is
+size where in a name most of them sit, counted from the end (`token-segment-order`); each category word (`color`,
+`radius`, `shadow`) where most names holding it put it (`token-category-order`); a spacing or radius value that is
 a step of the system's own scale, the largest of 8, 4 and 2 most values are steps of, a hairline under one step and a
 pill radius left out (`token-on-scale`); and a role with a background that has a text or icon colour beside it
 (`token-on-colour`). From the tokens'
@@ -1411,7 +1412,7 @@ its own dot, and a list for the area and for the side, each saying how many rows
   states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); among
   the members of a family built from the same parts, its content aligned as most of them align it (`family-align`), the
   part most of them let fill the frame (`family-stretch`) and the padding variables most of them bind at the same
-  size (`family-padding`); a
+  size (`family-padding`) and the minimum and maximum most of them set at the same size (`family-limits`); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
@@ -1427,7 +1428,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   component's words, read from its examples' short labels, in the case most components' are (`words-case`); how a
   shadow changes between variants, by the layer's own effect or by a shadow layer shown and hidden, as most components
   change theirs (`shape-rules.mjs`, `shadow-one-way`), a property for one kind of content (Icon, Content) a slot or an
-  instance swap as most of that name are (`slot-or-swap`), and two parts side by side spaced by the variable most
+  instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
+  over it or its opacity, as most components show theirs (`state-one-way`), and two parts side by side spaced by the variable most
   frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
