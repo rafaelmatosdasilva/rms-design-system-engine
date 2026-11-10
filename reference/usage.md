@@ -1419,7 +1419,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   property or by a variant (`family-parts-shown`), and what a property changes between two variants that differ by it
   alone (the frame's padding and gap, a part's text style, a field bound to another variable) as most of them
   (`family-property-changes`), and the frame's fill bound at rest as most of them bind it, to a token of its own, a
-  shared one or none (`family-fill`); a nested component with properties of its own showing them in the parent's
+  shared one or none (`family-fill`); and, in a family of three or more, the categories of the designer's own Figma
+  annotations (Accessibility, Content) most of it carries (`family-annotated`, read from a capture that keeps them); a nested component with properties of its own showing them in the parent's
   properties panel, as most do (`nested-exposed`, read from a capture that records it); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
