@@ -43,11 +43,12 @@ test('a rule\'s draft: each change said once above its components, each a Figma 
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#rules .sg-cx-table tbody tr')`, { attempts: 200 }), true, 'the Rules table has its rows');
     // Each rule's draft, opened from its row: a list, never a table inside the rules' table; each change said once, above
     // the components that take it; each component a link to its node in the Figma file, with Figma's mark.
-    const draftOf = (rule) => run(`(() => { const tr = [...document.querySelectorAll('#rules tr.sg-row-open')].find((x) => ${JSON.stringify(rule)} === x.cells[0].textContent.trim()); if (!tr) return null; tr.cells[0].click();
+    const rules = await run(`[...document.querySelectorAll('#rules tr.sg-row-open')].map((x) => x.cells[0].textContent.trim())`);
+    // By the row's place in the table, a number: the page is never handed a rule's words to run as code.
+    const draftOf = (rule) => run(`(() => { const tr = [...document.querySelectorAll('#rules tr.sg-row-open')][${Number(rules.indexOf(rule))}]; if (!tr) return null; tr.cells[0].click();
       const d = document.querySelector('#sg-cx-panel .sg-cx-draft'); if (!d) return { none: true };
       return { tables: d.querySelectorAll('table').length, groups: [...d.querySelectorAll('.sg-cx-group')].map((g) => ({ say: g.querySelector('.sg-il-line').textContent,
         pills: [...g.querySelectorAll('.sg-cx-pills li')].map((li) => { const a = li.querySelector('a'); return [li.textContent, a && a.getAttribute('href'), a && a.target, !!(a && a.querySelector('svg'))]; }) })) }; })()`);
-    const rules = await run(`[...document.querySelectorAll('#rules tr.sg-row-open')].map((x) => x.cells[0].textContent.trim())`);
     const layout = rules.find((x) => /auto layout/.test(x)), described = rules.find((x) => /description in Figma/.test(x));
     assert.ok(layout && described, 'both rules are on the page');
     for (const [rule, comps] of [[described, ['iconButton']], [layout, ['badge', 'button', 'iconButton']]]) {
