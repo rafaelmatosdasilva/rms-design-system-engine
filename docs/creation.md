@@ -40,6 +40,30 @@ That last line is the one that catches most. A row or a column header says nothi
 
 This runs for a page written in your product's own code as well as for a composition. The page is drawn fresh for it, so a control is judged on the page as a person meets it, not on one the size checks have already stretched.
 
+### A behaviour has to rest on a rule
+
+Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
+
+A review request is a **question about your documentation**, not an instruction. So when a page wires one of these behaviours and nothing in your documentation describes it, the check says so:
+
+| Behaviour | Wired as |
+|---|---|
+| selection | `select`, `selected`, `v-model`, `checked` |
+| sorting | `sort`, `sortBy`, `order` |
+| expansion | `expand`, `expanded`, `toggle`, `collapse` |
+| filters | `filter`, `filters` |
+
+```
+Table wires selection (update:selected) and no rule describes it:
+leave it as the code does it, and put the question to the team
+```
+
+Each card says which behaviours your documentation already covers, so an agent knows before it wires one — and says nothing where it covers none, since most components select, sort, expand and filter nothing and a line on every card saying so is noise.
+
+A rule counts as covering a behaviour when the component's own documentation describes it, or when a product rule names that component. A rule about a gallery does not license sorting on a table.
+
+Said once per component and behaviour, never once per use. And when no documentation has been read at all, nothing is held to a rule — reporting every behaviour on every page because nothing was loaded would be worse than saying nothing.
+
 ### Icons are held to the ones your code has
 
 A prototype uses your code's icons, never Figma's. An icon that exists only in the Figma library — or one an agent invented from a name it saw there — renders as **nothing** in the product: a blank where a control should be, on a page that otherwise looks finished.
