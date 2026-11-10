@@ -40,6 +40,7 @@
     var rows = RULES.slice().sort(function (a, b) { return (a.side === 'code') - (b.side === 'code') || ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
+    var FIGMA_URLS = G.figmaUrls || {};
     var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>' : esc(n); };
     // What a rule breaks at: a component, or a place (a file and line, a token, a brand) when it is not one.
     var atOf = function (t) { return t.component || t.where || ''; };
@@ -110,10 +111,15 @@
         suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + unit(r, n) + ' that don\'t, so every one does.') + '</strong></p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
-      var head = byComponent(r) ? 'Component' : 'Where';
-      // The draft: every component or place the suggestion changes, with the change it takes.
-      var list = n ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>' + head + '</th><th>What changes</th></tr></thead><tbody>'
-        + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
+      // The draft: every component or place the suggestion changes, grouped by the change it takes, so a change several
+      // take is said once above them. A list, never a table: the draft sits in a row of the rules' own table. A component
+      // a Figma rule changes opens in Figma, where a person checks it; one in the code opens its page.
+      var sayOf = function (c) { return byC[c].map(function (t) { return (t.fix && t.fix.say) || t.value; }).join(' '); };
+      var groups = [], at = {};
+      cs.forEach(function (c) { var k = sayOf(c); if (!(k in at)) { at[k] = groups.length; groups.push({ say: k, cs: [] }); } groups[at[k]].cs.push(c); });
+      var pill = function (c) { var u = r.side !== 'code' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code>' + esc(c) + '</code>'; };
+      var list = n ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p>'
+        + groups.map(function (g) { return '<div class="sg-cx-group"><p class="sg-il-line">' + esc(g.say) + '</p><ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
       var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';

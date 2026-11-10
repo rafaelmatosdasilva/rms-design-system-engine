@@ -986,6 +986,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-cx-draft { margin-top: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius-s); overflow: clip; }   /* what a construction rule's suggestion changes, in the card that suggests it */
 .sg-row-detail-body .sg-cx-draft-head { margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-tint); color: var(--sg-text); font-size: var(--sg-s); font-weight: var(--sg-heading-weight); }
 .sg-row-detail-body :is(.sg-cx-draft, .sg-il-line) + .sg-decide-grid { margin-top: var(--sg-space-xl); }   /* the decision under the draft it is for */
+.sg-row-detail-body .sg-cx-group { padding: var(--sg-space-s) var(--sg-space-m); }   /* one change, said once, above the components that take it */
+.sg-row-detail-body .sg-cx-group + .sg-cx-group { border-top: var(--sg-line); }
+.sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: var(--sg-space-s) 0 0; padding: 0; list-style: none; }
+.sg-row-detail-body .sg-cx-figma { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }   /* a component opened in Figma, with Figma's mark */
 .sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
 .sg-row-detail-body .sg-il-example code { font-size: var(--sg-s); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }

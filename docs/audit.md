@@ -112,6 +112,8 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 - **Sort it your way.** Every column head sorts by it, and again for the other way round.
 - **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Area and one for Side. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
 - **One card for the decision.** A row opens in the side panel: what the engine suggests, every component or place it would change, and the approval under it, in one card to read top to bottom.
+- **Each change said once.** Components that take the same change are listed under it together, as a list, not a table.
+- **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
 - **In the code.** What [Lint your codebase](#lint-your-codebase) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
 - **The code is never changed for you.** A code fix is handed back as a patch to apply.
