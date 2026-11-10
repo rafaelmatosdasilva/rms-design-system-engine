@@ -174,9 +174,11 @@
     var SIGN = { added: '+', removed: '−', renamed: '↻', moved: '→', changed: '~' };
     var SECT = { skeleton: 'Its layers', architecture: 'Axes, options and properties', variables: 'Variables' };
     var diffTable = function (d) {
-      var rows = [];
-      ['skeleton', 'architecture', 'variables'].forEach(function (k) { (d && d[k] || []).forEach(function (x) { rows.push('<tr><td>' + esc(SECT[k]) + '</td><td><span aria-hidden="true">' + esc(SIGN[x.change] || '·') + '</span> ' + esc(capital(x.change)) + ' ' + esc(x.what) + '</td><td>' + (x.from != null ? '<code>' + esc(x.from) + '</code>' : '') + (x.from != null && x.to != null ? ' → ' : '') + (x.to != null ? '<code>' + esc(x.to) + '</code>' : '') + '</td></tr>'); }); });
-      return rows.length ? '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Part</th><th>What</th><th>Before → after</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' : '<p class="sg-il-line">Nothing changes.</p>';
+      var items = [];
+      ['skeleton', 'architecture', 'variables'].forEach(function (k) { (d && d[k] || []).forEach(function (x) { items.push([['Part', esc(SECT[k])], ['What', '<span aria-hidden="true">' + esc(SIGN[x.change] || '·') + '</span> ' + esc(capital(x.change)) + ' ' + esc(x.what)],
+        ['Before → after', (x.from != null ? '<code>' + esc(x.from) + '</code>' : '') + (x.from != null && x.to != null ? ' → ' : '') + (x.to != null ? '<code>' + esc(x.to) + '</code>' : '')]]); }); });
+      // A list: the panel opens from a row of the Changes in Figma table.
+      return items.length ? kvList(items) : '<p class="sg-il-line">Nothing changes.</p>';
     };
     var rowHTML = function (x, i) {
       return '<tr class="sg-row-open" tabindex="0" data-fc-row="' + i + '" data-chip="' + esc(x.status) + '"><td>' + compHTML(x.component) + '</td><td><strong>' + esc(x.asked || x.steps[0] || '') + '</strong><span class="pg-par-val">' + esc(x.steps.length + ' step' + (x.steps.length === 1 ? '' : 's')) + '</span></td><td>' + esc(String(x.at || '').slice(0, 10)) + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
