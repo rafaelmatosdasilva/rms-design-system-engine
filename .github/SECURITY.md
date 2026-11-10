@@ -2,7 +2,7 @@
 
 ## Report a vulnerability
 
-Report it privately, never in a public issue: on this repository's **Security** tab, choose **Report a vulnerability**. The aim is an answer within a week, and a fix or a plan within thirty days. Once the fix ships, the advisory is published with your name, if you want it there.
+Report it privately, never in a public issue: on this repository's **Security** tab, choose **Report a vulnerability**. The aim is an answer within three working days, and a fix or a plan within thirty days. Once the fix ships, the advisory is published with your name, if you want it there.
 
 Worth reporting:
 
@@ -12,9 +12,13 @@ Worth reporting:
 - A command built from what a project, Figma file or page contains that runs something else.
 - Anything sent to a host the [Security and data](../docs/security.md#security-and-data) page does not list.
 
+## Safe harbour
+
+Research done in good faith to find and report a vulnerability is welcome, and no legal action will be taken over it. Good faith means: test on your own installs, projects and design files only; reach no one else's data; report it privately here; and give a reasonable time for a fix before you tell anyone else. If you are unsure whether something is in scope, ask in a private report first.
+
 ## How a report is handled
 
-1. **Acknowledged** within a week, in the private advisory, with a first read of how serious it is.
+1. **Acknowledged** within three working days, in the private advisory, with a first read of how serious it is.
 2. **Confirmed** by reproducing it. If it is not a vulnerability, the reporter is told why, and the advisory is closed.
 3. **Fixed in private.** The fix is prepared in the advisory's private fork, with a test that fails without it, and passes the same gate as every change: the privacy check, the full test suite and CodeQL.
 4. **Released.** The fix ships in a release, and the self-update brings it to every install within a day.
