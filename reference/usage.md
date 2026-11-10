@@ -1422,7 +1422,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
   the library names it, one still named after its component left out (`part-one-name`), two parts side by side in the
   order most of their family puts them (`part-order`), and a component of a family of three or more holding only what
-  others of its family hold (`family-holds`); what each layer binds and how it looks, kept beside the trees
+  others of its family hold (`family-holds`), and an icon beside a label the size most of the library puts beside that
+  text style, read from its size option or the size its name ends in (`icon-with-label`); whether the library needed a
+  component (`need-rules.mjs`): one placed on a page of the file or held by another (`component-used`, read with the
+  examples), and none that is another with an option that other already takes, `buttonLarge` beside a `button` whose
+  Size takes large (`no-option-twins`); what each layer binds and how it looks, kept beside the trees
   (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
   opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
   sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a

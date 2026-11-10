@@ -174,7 +174,7 @@ test('a yes/no is named by one case rule whether Figma makes it a boolean or a v
   const p = rule(g, 'boolean-property-prefix');
   assert.match(p.says, /^A boolean property begins with "show"/);
   assert.ok(!p.toFix.some((x) => /disabled|active|Wide/.test(x.value)), 'a state is never told to begin with "show"');
-  assert.ok(g.figma.rules.every((r) => ['naming', 'layout', 'variables', 'documentation'].includes(r.area)), 'each rule in a kind of rule: names together');
+  assert.ok(g.figma.rules.every((r) => ['naming', 'layout', 'variables', 'documentation', 'architecture'].includes(r.area)), 'each rule in a kind of rule: names together (a component that repeats another with an option is read from the properties alone)');
 });
 
 test('on the Construction page each row is a rule, a decision included: never a question', () => {

@@ -83,9 +83,12 @@ The components of one type in Figma (every button, every input) are compared wit
 More readings of the library:
 
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
+- **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.
+- **A component that repeats an option.** `buttonLarge` beside a `button` whose Size already takes `large`.
 - **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
 - **One name for one part.** The icon is called `Icon` in most components and `Glyph` in one.
 - **Parts in the usual order.** One button with its label before its icon, where the other buttons put the icon first. It is checked inside a family only, so a trailing icon elsewhere is not flagged.
+- **The icon that goes with a label.** An `xs` icon beside an `s/strong` label, where almost every `s/strong` label in your library has an `m` icon.
 - **What a family holds.** A button holding an avatar when no other button does. It's flagged for someone to check, since some nestings are legitimate.
 - **Corners, opacity and borders on variables.** A frame with two corners on another radius variable, an opacity of 40% typed in, or a border weight typed in, when most of your library uses variables for these.
 - **Borders on the same side.** A border outside its layer when most borders sit inside.
