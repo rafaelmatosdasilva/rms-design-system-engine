@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A check that waits on Figma says so (continuous evaluation)
+
+What changed since the entry below (engine da5d214): The checks that read what the last Figma capture does not keep are said, on the Rules page and in the rules' summary, with the request to refresh Figma. The guide changed in `reference/usage.md`.
+
+Guide set measured: `1f47b42fb1eb` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6b287769` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 5ec81050` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 91486bcd` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 385ac8c7` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine cdab86a | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.058 |
+| Input a run | 103k | 97k |
+| Turns a run | 3.7 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 103k, in 3.5 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-10-merge-branch-cursor-codex-guard`.
+
 ## 2026-11: The engine in Cursor and Codex (continuous evaluation)
 
 What changed since the entry below (engine a4781c9): The guard as Cursor's and Codex's own hooks, and the guide in AGENTS.md routing each request first. The guide changed in `reference/usage.md`.
