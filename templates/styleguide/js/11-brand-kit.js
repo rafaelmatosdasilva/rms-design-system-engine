@@ -1754,7 +1754,8 @@
           var cp = e.target.closest('.sg-tk-copy'); if (cp) { copyText(cp.getAttribute('data-copy-text'), cp, null); return; }
           // A component's whole row opens it, as a Status row does.
           var alias = e.target.closest('.sg-tk-detail .sg-tk-alias'); if (alias) { openTokenPanel(alias.getAttribute('data-alias'), m._from); return; }
-          var urow = e.target.closest('.sg-tk-users tr.is-link'); if (urow && !e.target.closest('a')) { var go = urow.querySelector('a.sg-mx-go'); if (go) { location.hash = go.getAttribute('href'); shut(); return; } }
+          // A component that uses the token opens its page, and the panel closes behind it.
+          if (e.target.closest('.sg-tk-users a.sg-uses-link')) { shut(); return; }
           if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-tk-detail a[href^="#c-"]')) shut();
         });
         m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); shut(); } });
@@ -1765,12 +1766,12 @@
       comps.sort();
       var row = function (k, v) { return v ? '<div><dt>' + esc(k) + '</dt><dd>' + v + '</dd></div>' : ''; };
       // Its values as the main table shows them: one row, each mode a column, in the theme chosen on the page.
-      var vals = '<div class="pg-par-scroll"><table class="pg-par-table sg-tk-vals"><thead><tr>' + r.labels.map(function (l) { return '<th scope="col">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody><tr>' +
-        r.labels.map(function (l, i) { return tkCell(r, l, i); }).join('') + '</tr></tbody></table></div>';
+      // A label for each mode over its value, the main table's cell without its cell: the panel opens from that table's row.
+      var vals = kvOne(r.labels.map(function (l, i) { return [l, tkCell(r, l, i).replace(/^<td[^>]*>/, '').replace(/<\/td>$/, '')]; }), 'sg-tk-vals');
       var det = m.querySelector('.sg-tk-detail');
       det.innerHTML = sidePanelPage({ crumbs: trailHere(from).concat([r.coll || 'Tokens']).concat(r.path.slice(0, -1)), title: r.path[r.path.length - 1], sub: r.t.figma, body:
-        // What it is, in a card's table as every part of a panel is: what it styles, its name in the code, what it is for.
-        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div><table class="pg-par-table sg-tk-facts"><tbody>' + [['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']].map(function (x) { return '<tr><th scope="row">' + esc(x[0]) + '</th><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        // What it is, a label over each value: what it styles, its name in the code, what it is for.
+        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div>' + kvOne([['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']], 'sg-tk-facts') + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
       m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');

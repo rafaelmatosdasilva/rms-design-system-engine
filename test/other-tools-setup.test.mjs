@@ -30,7 +30,7 @@ test('every config is valid and starts the engine\'s own MCP server', () => {
   const [toml] = blocks('toml');
   assert.match(toml, /^\[mcp_servers\.design-system\]\ncommand = "node"\nargs = \["<engine>\/mcp\.mjs", "--project=<project>"\]\n$/, 'Codex');
   assert.ok(existsSync(join(ENGINE, 'mcp.mjs')), 'mcp.mjs is at the install folder\'s root, where the snippets point');
-  const [cmd] = blocks('bash');
+  const cmd = blocks('bash').find((b) => /claude mcp add/.test(b));   // the section's other bash block sets up Cursor and Codex
   assert.match(cmd, /^claude mcp add design-system -- node ~\/\.claude\/skills\/rms-design-system-engine\/mcp\.mjs --project="\$PWD"\n$/);
 });
 
