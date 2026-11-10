@@ -112,12 +112,13 @@
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
       // The draft: every component or place the suggestion changes, grouped by the change it takes, so a change several
-      // take is said once above them. A list, never a table: the draft sits in a row of the rules' own table. A component
-      // a Figma rule changes opens in Figma, where a person checks it; one in the code opens its page.
+      // take is said once above them. A list, never a table: the draft sits in a row of the rules' own table. Only a
+      // Figma task links to Figma, so the person can check there whether it holds and what it is about; any other opens
+      // the component's page.
       var sayOf = function (c) { return byC[c].map(function (t) { return (t.fix && t.fix.say) || t.value; }).join(' '); };
       var groups = [], at = {};
       cs.forEach(function (c) { var k = sayOf(c); if (!(k in at)) { at[k] = groups.length; groups.push({ say: k, cs: [] }); } groups[at[k]].cs.push(c); });
-      var pill = function (c) { var u = r.side !== 'code' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code>' + esc(c) + '</code>'; };
+      var pill = function (c) { var u = r.side === 'figma' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code>' + esc(c) + '</code>'; };
       var list = n ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p>'
         + groups.map(function (g) { return '<div class="sg-cx-group"><p class="sg-il-line">' + esc(g.say) + '</p><ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
