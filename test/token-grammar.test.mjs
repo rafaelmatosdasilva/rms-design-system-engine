@@ -83,3 +83,9 @@ test('a state before what a colour is for, where most names put it after', () =>
   assert.equal(r.says, 'A token\'s name puts what a colour is for before its state (background/hover)');
   assert.deepEqual(off(r), [['tag/hover/background', 'its state comes before what it is for']]);
 });
+
+test('a variant before what a colour is for, where most names put it after', () => {
+  const r = nameRules({ tokens: ['button/text/primary', 'chip/text/negative', 'card/background/brand', 'tag/positive/text'].map((n) => t(n)) }).find((x) => x.id === 'token-variant-order');
+  assert.equal(r.says, 'A token\'s name puts what a colour is for before its variant (text/negative)');
+  assert.deepEqual(off(r), [['tag/positive/text', 'its variant comes before what it is for']]);
+});

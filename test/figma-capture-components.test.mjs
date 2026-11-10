@@ -220,6 +220,11 @@ test('components: every variant\'s bindings, how it looks and how each text laye
   const looked = await skeletonOf(dim, names);
   assert.deepEqual(looked.looks, { 'State=Disabled': { '': { opacity: 0.5, border: { w: 1, align: 'INSIDE' } } } });
   assert.equal(looked.trees.length, 1, 'how a variant looks never splits a shared tree');
+  // A nested component exposed in the parent's properties panel says so; one that is not says nothing.
+  const nest = (exposed) => ({ type: 'INSTANCE', id: 'n:1', name: 'Badge', isExposedInstance: exposed, componentProperties: {}, getMainComponentAsync: async () => null, children: [] });
+  const withNest = { ...set, children: [{ ...variant('9:1', 'State=Default', fg), children: [nest(true)] }, { ...variant('9:2', 'State=Disabled', fg), children: [nest(false)] }] };
+  const nested = await skeletonOf(withNest, names);
+  assert.deepEqual(nested.trees.map((t) => t.c[0].exposed), [true, undefined]);
   // A name the call does not know is read from Figma; one that resolves to nothing is a binding to nothing.
   const gone = await skeletonOf(set, {});
   assert.equal(gone.binds, undefined, 'no name, no binding invented');
