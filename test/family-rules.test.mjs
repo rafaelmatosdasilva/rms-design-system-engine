@@ -111,3 +111,11 @@ test('alike in a family: a fill bound to a shared token where the others bind th
   const r = familyRules({ skeleton, props: {} }, { familyOf }).find((x) => x.id === 'family-fill');
   assert.deepEqual(off(r), [['cardD', 'its frame binds a shared fill token, where its family\'s bind a fill token of its own']]);
 });
+
+test('a family\'s annotations: one member without the Accessibility note most of its family carries', () => {
+  const comp = (notes) => ({ trees: [{ c: [] }], variants: [['x', 0]], ...(notes ? { looks: { x: { '': { notes } } } } : {}) });
+  const skeleton = { tabA: comp(['Accessibility']), tabB: comp(['Accessibility', 'Content']), tabC: comp(['Accessibility']), tabE: comp(['Accessibility']), tabD: comp(null) };
+  const r = familyRules({ skeleton, props: {} }, { familyOf }).find((x) => x.id === 'family-annotated');
+  assert.deepEqual(off(r), [['tabD', 'no Accessibility annotation, which most of its family has']]);
+  assert.equal(familyRules({ skeleton: { tabA: comp(null), tabB: comp(null), tabC: comp(null) }, props: {} }, { familyOf }).some((x) => x.id === 'family-annotated'), false, 'a capture with no annotations says nothing');
+});
