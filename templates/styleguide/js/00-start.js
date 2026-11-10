@@ -307,12 +307,15 @@
     note.innerHTML = bare ? '<strong>' + esc(yet.head) + '</strong>' + (yet.say ? '<span>' + esc(yet.say) + '</span>' : '')
       : '<strong>Nothing matches these filters</strong>' + (said ? '<span>' + esc(rows.length + ' ' + said + ' in all, none of them this combination.') + '</span>' : '');
   }
+  // What a table would say, inside a panel that opens from a table's row: labelled values, never another table (the
+  // owner's rule). kvOne: one item, each label over its value; kvList: several, each its own block. An empty value is left out.
+  function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + esc(p[0]) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
+  function kvList(items, cls) { return '<ul class="sg-kv-list' + (cls ? ' ' + cls : '') + '">' + items.map(function (pairs) { return '<li>' + kvOne(pairs) + '</li>'; }).join('') + '</ul>'; }
+  // The components that use a token: each its name (its page when it has one) and where it is, in Figma and in the code.
   function usersTable(names) {
     if (!names.length) return '<p class="sg-tk-none">No component uses it.</p>';
-    return '<div class="pg-par-scroll"><table class="pg-par-table sg-tk-users"><thead><tr><th scope="col">Component</th><th scope="col">Figma</th><th scope="col">Code</th><th scope="col" class="sg-mx-open-cell"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' +
-      names.map(function (n) { var c = HAS_PAGE[n], inFigma = c ? !c.codeOnly : true, inCode = !!c;
-        return '<tr class="sg-mx-row' + (c ? ' is-link' : '') + '"><td><span class="sg-mx-name" title="' + esc(n) + '">' + esc(n) + '</span></td><td>' + STATUS_PILL(inFigma) + '</td><td>' + STATUS_PILL(inCode, 'Built') + '</td>' +
-          '<td class="sg-mx-open-cell">' + (c ? '<a class="sg-mx-go" href="#' + esc(cid(n)) + '" aria-label="Open ' + esc(n) + '">' + USERS_ARROW + '</a>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    return kvList(names.map(function (n) { var c = HAS_PAGE[n], inFigma = c ? !c.codeOnly : true, inCode = !!c;
+      return [['Component', c ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>' : esc(n)], ['Figma', STATUS_PILL(inFigma)], ['Code', STATUS_PILL(inCode, 'Built')]]; }), 'sg-tk-users');
   }
   function usesOf(v, figma) {
     var u = (v && USES[v]) || { direct: [], via: [] }, f = USES_F[String(figma || '').replace(/\/colou?r$/i, '')] || [], direct = (u.direct || []).slice();

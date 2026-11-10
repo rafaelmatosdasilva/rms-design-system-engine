@@ -1777,7 +1777,7 @@ test('History: Done by names each person once, by the name they sign with, where
 
 test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
   const tpl = templateText();
-  for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table', '.sg-tk-facts']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
+  for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
 });
 
 test('a component named with a note in brackets gives no part to draw, and the playground never throws on one', async () => {
