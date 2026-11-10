@@ -104,3 +104,10 @@ test('alike in a family: another size step, a part shown another way, a property
   assert.deepEqual(off(r['family-parts-shown']), [['buttonE', 'icon is shown by a variant, where in its family it is shown by a yes/no property']]);
   assert.deepEqual(off(r['family-property-changes']), [['buttonF', 'Size changes label: text style, the frame: padding, where across its family it changes the frame: padding']]);
 });
+
+test('alike in a family: a fill bound to a shared token where the others bind their own', () => {
+  const card = (fill) => ({ trees: [{ c: [{ t: 'TEXT', n: 'Title' }] }], variants: [['Type=primary', 0]], binds: { 'Type=primary': { '': fill ? { fills: fill } : {} } } });
+  const skeleton = { cardA: card('card/background/primary'), cardB: card('card/background/secondary'), cardC: card('cardC/fill'), cardD: card('surface/default') };
+  const r = familyRules({ skeleton, props: {} }, { familyOf }).find((x) => x.id === 'family-fill');
+  assert.deepEqual(off(r), [['cardD', 'its frame binds a shared fill token, where its family\'s bind a fill token of its own']]);
+});

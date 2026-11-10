@@ -547,7 +547,7 @@ that differ) is never taken for a number.
 function prop(node, key) { try { return node != null && typeof node === 'object' && key in node ? node[key] : undefined; } catch (e) { return undefined; } }
 ```
 
-**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, its opacity and its border (weight and where it sits), and, for a text layer, how it grows and truncates; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
+**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes, shadows, the variables it binds field by field, its opacity and its border (weight and where it sits), and, for a text layer, how it grows and truncates; whether a nested instance is exposed in the parent's properties panel; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
 
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
@@ -1187,7 +1187,8 @@ async function skeletonOf(root, names = {}) {
     if (t === 'INSTANCE') {
       const c = await compOf(n), cp = prop(n, 'componentProperties') || {}, given = {};
       for (const [k, v] of Object.entries(cp)) if (v && v.type !== 'INSTANCE_SWAP') given[clean(k)] = v.value;
-      return { ...o, ...(c ? { of: c } : {}), ...(Object.keys(given).length ? { with: given } : {}) };
+      // Exposed: its own properties shown in the parent's properties panel (Figma's isExposedInstance), all an agent sees.
+      return { ...o, ...(c ? { of: c } : {}), ...(Object.keys(given).length ? { with: given } : {}), ...(prop(n, 'isExposedInstance') ? { exposed: true } : {}) };
     }
     const kids = prop(n, 'children');
     if (!Array.isArray(kids) || !kids.length) return o;
