@@ -1412,7 +1412,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   states most of it answers (`family-states`) and its first text fitted as most of it is (`family-text-fit`); among
   the members of a family built from the same parts, its content aligned as most of them align it (`family-align`), the
   part most of them let fill the frame (`family-stretch`) and the padding variables most of them bind at the same
-  size (`family-padding`) and the minimum and maximum most of them set at the same size (`family-limits`); a
+  size (`family-padding`) and the minimum and maximum most of them set at the same size (`family-limits`), the padding and gap in pixels most
+  of them have at each size (`family-size-steps`), each part shown as most of them show it, always, by a yes/no
+  property or by a variant (`family-parts-shown`), and what a property changes between two variants that differ by it
+  alone (the frame's padding and gap, a part's text style, a field bound to another variable) as most of them
+  (`family-property-changes`); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
