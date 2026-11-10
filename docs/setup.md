@@ -1,12 +1,13 @@
 # Setup
 
-How to install the engine, keep it up to date and run it, what it adds to Claude Code, and the files and settings it uses. What each part promises, and what to ask for it, is on the [features page](features.md#set-up). All pages: [technical documentation](README.md).
+How to install the engine, keep it up to date and run it, what it adds to Claude Code and how other AI tools reach it, and the files and settings it uses. What each part promises, and what to ask for it, is on the [features page](features.md#set-up). All pages: [technical documentation](README.md).
 
 **On this page**
 
 - [Install and update](#install-and-update)
 - [Run it](#run-it)
 - [Inside Claude Code](#inside-claude-code)
+- [In other AI tools](#in-other-ai-tools)
 - [The files it creates](#the-files-it-creates)
 - [Good to know](#good-to-know)
 - [Environment variables](#environment-variables)
@@ -227,6 +228,73 @@ The AI reads a short guide, then only the recipe the task needs (`rms-design-sys
 - `rms-design-system-engine --guide classic` switches to the old one-file guide, and `--guide current` switches back.
 - `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns the hooks off. Projects set up before a hook existed get it on their next run.
 - `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` records which recipes and commands ran, in `.design-system-engine-out/skill-usage.json`. It is local only, and nothing is ever sent anywhere.
+
+## In other AI tools
+
+The engine is built for Claude Code, but its answers and checks work in any AI tool. Install it as usual (the installer puts it in `~/.claude/skills/rms-design-system-engine` and the `rms-design-system-engine` command on your PATH), then connect your tool one of two ways.
+
+**What you get, and what you don't.**
+
+- **You get** the answers about your system (each component's props, each token and what it is for), the check of a UI an AI tool built, and every audit the command line runs.
+- **You don't get** what makes Claude Code the measured way to use it: the guide that routes each request to its recipe, the [hooks that keep the rules](#the-hooks-keep-the-rules) while the agent works, and the skill evaluation, which runs on Claude.
+
+### A tool with a terminal
+
+Cursor, Windsurf, Codex, Gemini CLI and VS Code's agent can run commands, so they use the command line directly, as in [from the terminal](#from-the-terminal). Add this to the tool's own instructions for the project (`AGENTS.md`, `.cursor/rules`, `GEMINI.md` or `.github/copilot-instructions.md`), so the agent asks the system before it guesses:
+
+```text
+This project has a design system checked by rms-design-system-engine.
+Before using a component or token, run: rms-design-system-engine --query <its name>
+After building a UI, check it: rms-design-system-engine --check-ui <the file>
+Never invent a component, prop or token the query does not list.
+```
+
+### A tool through MCP
+
+A tool with no terminal, or one you would rather connect through MCP, starts the engine's MCP server. It answers with four tools: `query`, `catalog`, `check_ui` and `summary` (what each returns is in `reference/usage.md`, under The same answers through MCP). In each snippet, replace `<engine>` with the install folder (`~/.claude/skills/rms-design-system-engine` written out in full, since these files do not expand `~`) and `<project>` with your project's folder.
+
+Claude Desktop (`claude_desktop_config.json`), Cursor (`.cursor/mcp.json`), Windsurf (`~/.codeium/windsurf/mcp_config.json`) and Gemini CLI (`.gemini/settings.json`) share one format:
+
+```json
+{
+  "mcpServers": {
+    "design-system": {
+      "command": "node",
+      "args": ["<engine>/mcp.mjs", "--project=<project>"]
+    }
+  }
+}
+```
+
+VS Code (`.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "design-system": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["<engine>/mcp.mjs", "--project=<project>"]
+    }
+  }
+}
+```
+
+Codex (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.design-system]
+command = "node"
+args = ["<engine>/mcp.mjs", "--project=<project>"]
+```
+
+Claude Code itself, when you want the server there too:
+
+```bash
+claude mcp add design-system -- node ~/.claude/skills/rms-design-system-engine/mcp.mjs --project="$PWD"
+```
+
+Restart the tool, then ask it something only the engine knows, such as "Use the design-system query tool to look up the button", to check it is connected.
 
 ## The files it creates
 
