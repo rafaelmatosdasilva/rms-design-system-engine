@@ -44,3 +44,10 @@ test('in the grammar: under architecture, with what to do', () => {
   assert.equal(r.area, 'architecture');
   assert.equal(fixOf(r, r.toFix[0]).say, 'Rename the part as the library names it: Glyph, where the library names iconGeneric Icon');
 });
+
+test('an icon beside a label at another size than most labels of that style have', () => {
+  const row = (size) => comp({ t: 'INSTANCE', n: 'Icon', of: { name: `arrow-${size}` } }, { t: 'TEXT', n: 'Label', styles: { text: 'label/m' } });
+  const r = partRules({ skeleton: { a: row('m'), b: row('m'), c: row('m'), d: row('s') } }, { familyOf }).find((x) => x.id === 'icon-with-label');
+  assert.equal(r.says, 'An icon beside a label is the size most of the library puts beside that text style (m beside label/m)');
+  assert.deepEqual(off(r), [['d', 'an s icon beside label/m, where most labels in label/m have an m one']]);
+});
