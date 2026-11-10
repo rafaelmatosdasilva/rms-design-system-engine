@@ -38,9 +38,12 @@ test('a malformed tag, bump or version stops the release', () => {
 test('the workflow is asked once a day, reads version tags and pull request labels, and publishes generated notes', () => {
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.match(wf, /workflow_dispatch:/);
-  // A version covers a set amount of work, never a date. Asked daily, so a group that filled today goes out
+  // Asked daily: a version covers a set amount of work, never a date, so a group that filled today goes out
   // tomorrow morning and two versions never land the same day.
-  assert.match(wf, /cron: '0 7 \* \* \*'/, 'asked once a day');
+  //
+  // And never at the top of the hour, which is when the queue is deepest: of the scheduled runs this repository has
+  // had, each came 7 to 10 hours after its minute. CodeQL and Scorecard carry odd minutes for the same reason.
+  assert.match(wf, /cron: '\d?[1-9] 7 \* \* \*'/, 'asked once a day, and never at the top of the hour');
   assert.doesNotMatch(wf, /cron: '[^']* 1'/, 'no weekly cadence: the dates said nothing about what a version held');
   // The highest version, not the nearest tag by ancestry: `git describe` picks a lower version whenever tags do not
   // land in version order, and a run that computes a version below the one already published is refused by npm.
