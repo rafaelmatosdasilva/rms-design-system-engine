@@ -11,6 +11,19 @@ What the engine reads, sends and may change, and why it can be trusted with a te
 
 What a security review asks, in one place.
 
+### At a glance
+
+For whoever approves tools for a team: each line links to its detail below.
+
+- **No telemetry.** The engine sends nothing about you, your project or how you use it to its author or anyone else. There is no analytics, no crash report and no usage ping.
+- **No server and no account.** It runs on your computer or your CI runner, as plain Node scripts ([what runs where](#what-runs-where)).
+- **No npm dependencies.** No third-party package to trust.
+- **A fixed list of hosts.** It talks only to the services you use (Figma, your code host, Notion) and the few downloads listed in [what goes over the network](#what-goes-over-the-network). [Allow it through a firewall](#allow-it-through-a-firewall) lists them by name.
+- **Your tokens stay with you.** Each lives in your own git-ignored `.env`, goes only to its own host, and is never printed ([tokens](#tokens)).
+- **It never changes code people wrote.** Findings come back as patches for a person to apply ([what it may change](#what-it-may-change)).
+- **What it keeps is in your project.** Nothing is stored anywhere else but one list of the pages it built ([what it keeps on disk](#what-it-keeps-on-disk)).
+- **Compliance.** No personal data is collected or processed, and nothing runs on a server of ours ([compliance](#compliance)).
+
 ### What runs where
 
 - **On your computer, or your CI runner.** The engine is a set of Node scripts. There is no engine server and no engine account, and nothing it reads is sent to its author.
@@ -44,6 +57,39 @@ Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTE
 - **Figma, generated code, its own files, your issue tracker:** yes, ask or no, per project ([where the engine may write](setup.md#where-the-engine-may-write-and-where-it-must-never)). On CI, ask becomes no, and the design file and product code are never written.
 - **In Claude Code,** the hooks make the AI ask before a commit, a push or a setting change, and it cannot make a check pass on its own ([the hooks keep the rules](setup.md#the-hooks-keep-the-rules)).
 - **In git,** a commit warns and a push refuses only for what the change uses ([a commit warns, a push refuses](audit.md#a-commit-warns-a-push-refuses)).
+
+### What it keeps on disk
+
+Everything it writes stays on your computer, and almost all of it in the project you run it in:
+
+- **The captures it reads from Figma and the code** (`*.snapshot.json`), where `ds-config.json` says.
+- **What it builds** (the style guide, findings, contracts), in `.design-system-engine-out/`.
+- **Your tokens,** in the git-ignored `.env`, only when you put them there.
+- **A usage log,** only when you turn it on (`DESIGN_SYSTEM_ENGINE_USAGE_LOG=1`): which route each request took, never the request's text, in `.design-system-engine-out/skill-usage.json`.
+- **Outside the project, one file:** the list of style guide pages this computer built, so they can be rebuilt when the engine updates (`~/.claude/.rms-design-system-engine-pages.json`). It holds paths only.
+
+Delete the project's `.design-system-engine-out/` and that one file, and nothing of the engine's is left beside the engine itself.
+
+### Allow it through a firewall
+
+An IT team can allow only these hosts. Leave out the ones for a service you do not use.
+
+| Host | For |
+|---|---|
+| `api.figma.com`, `www.figma.com` | Reading the Figma file and its images |
+| Your GitLab host, or `github.com`, `api.github.com` and `raw.githubusercontent.com` | Reading code and documentation, installing and the daily self-update |
+| `api.notion.com` | Guidelines kept in Notion |
+| `cdnjs.cloudflare.com`, with `registry.npmjs.org` as its fallback | Downloading axe-core once, for the accessibility checks |
+| `fonts.googleapis.com`, `fonts.gstatic.com`, `api.fontsource.org` and `cdn.jsdelivr.net` | Embedding the system's web fonts in the style guide |
+
+With the self-update off (`DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1`) and axe-core already downloaded, the engine needs only the hosts of the services your system lives in.
+
+### Compliance
+
+- **GDPR.** The engine collects and processes no personal data of its own. What it reads (files, design files, commit authors on History) stays on your computer, under your own access.
+- **SOC 2 and ISO 27001.** Not held: there is no service to certify. The engine is software you run, so your own controls apply to it as to any tool on your machines.
+- **HIPAA.** Not applicable: it is not built to read or store health data.
+- **The AI model.** In Claude Code, the agent's work goes to Anthropic under your own account and its terms, which your organisation's agreement with Anthropic covers.
 
 ### Install without piping into a shell
 

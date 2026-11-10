@@ -47,7 +47,7 @@ How your tokens are named is read from the names themselves, the way most of the
 - **One scale for sizes.** `medium` where every other size is `m`.
 - **Sizes in order.** A set where `m` is larger than `l`.
 - **The usual states.** An interactive role missing the hover or press most roles have. A selected and an unselected colour don't need a hover, so they're left out.
-- **Parts in their usual place.** A state placed earlier in a name than most names place it, `color` at the start of a name where most names end with it, or `hover/background` where most names say `background/hover`.
+- **Parts in their usual place.** A state placed earlier in a name than most names place it, `color` at the start of a name where most names end with it, `hover/background` where most names say `background/hover`, or `negative/text` where most say `text/negative`.
 - **Values on your scale.** A spacing of 18 where every other spacing and radius is a step of 4. Hairlines (1 or 2px) and pill radii are left out.
 - **Something to sit on a surface.** A role with a background colour and no text or icon colour beside it.
 
@@ -78,10 +78,12 @@ The components of one type in Figma (every button, every input) are compared wit
 - **The same order and sizing.** Properties listed in another order, or a frame that fills where the family hugs.
 - **The same states.** A button without the press state the other buttons have.
 - **Text that fits the same way.** A label that truncates where the family's grow.
-- **Aligned, filled and padded alike.** Among the members of a family built from the same parts: a card centred where the others start at the top, a title that fills where the others let the body fill, padding on `space/l` where the others use `space/m` at the same size, a minimum height the others don't set, 10px of padding at size m where the others have 8px, an icon shown by a variant where the others use a yes/no property, or a Size property that also changes the label's text style when on the others it changes only the padding.
+- **Aligned, filled and padded alike.** Among the members of a family built from the same parts: a card centred where the others start at the top, a title that fills where the others let the body fill, padding on `space/l` where the others use `space/m` at the same size, a minimum height the others don't set, 10px of padding at size m where the others have 8px, an icon shown by a variant where the others use a yes/no property, a Size property that also changes the label's text style when on the others it changes only the padding, or a card whose fill uses a shared token when the others use a card token.
 
 More readings of the library:
 
+- **Annotated like its family.** A tab with no Accessibility annotation when almost every other tab has one.
+- **Nested properties within reach.** A badge inside a card whose own properties don't show in the card's properties panel, when most nested components show theirs. An agent can only set what the panel shows.
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
 - **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.
 - **A component that repeats an option.** `buttonLarge` beside a `button` whose Size already takes `large`.
