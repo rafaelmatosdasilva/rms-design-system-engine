@@ -122,7 +122,8 @@
         + groups.map(function (g) { return '<div class="sg-cx-group"><p class="sg-il-line">' + esc(g.say) + '</p><ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
-      var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
+      // A list, as the draft is: the panel opens from a row of the rules' table.
+      var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><ul class="sg-cx-ways">' + fam.shapes.map(function (x) { return '<li><span>' + esc(x[0]) + '</span><strong>' + esc(x[1] + (x[1] === 1 ? ' component' : ' components')) + '</strong></li>'; }).join('') + '</ul></div>' : '';
       // What is suggested, what it changes and the decision are one card: the draft is read, then approved under it.
       var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);

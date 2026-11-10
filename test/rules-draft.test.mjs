@@ -65,3 +65,10 @@ test('a rule\'s draft: each change said once above its components, each a Figma 
     close();
   } finally { c.kill(); }
 });
+
+test('nothing the Rules panel draws is a table: it opens from a row of the rules\' table', () => {
+  const src = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '07-second-in-the-list.js'), 'utf8');
+  const start = src.indexOf('var panel = function'), end = src.indexOf("m.querySelector('.sg-row-detail').innerHTML = sidePanelPage", start);
+  assert.ok(start > 0 && end > start, 'the Rules panel is where it was');
+  assert.equal(/<table/.test(src.slice(start, end)), false, 'the draft and a family\'s ways are lists');
+});
