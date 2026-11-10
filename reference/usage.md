@@ -1376,7 +1376,8 @@ sizes that grows with its steps (`token-scale-order`); and an interactive role w
 have (`token-states`; a selected and an unselected colour answer no hover and are never held to them); a state and a
 size where in a name most of them sit, counted from the end (`token-segment-order`); each category word (`color`,
 `radius`, `shadow`) where most names holding it put it (`token-category-order`); what a colour is for (`background`,
-`text`, `border`) and its state in the order most names holding both use (`token-property-order`); a spacing or radius value that is
+`text`, `border`) and its state in the order most names holding both use (`token-property-order`), and what a
+colour is for and its variant (`primary`, `negative`) the same way (`token-variant-order`); a spacing or radius value that is
 a step of the system's own scale, the largest of 8, 4 and 2 most values are steps of, a hairline under one step and a
 pill radius left out (`token-on-scale`); and a role with a background that has a text or icon colour beside it
 (`token-on-colour`). From the tokens'
@@ -1417,7 +1418,9 @@ its own dot, and a list for the area and for the side, each saying how many rows
   of them have at each size (`family-size-steps`), each part shown as most of them show it, always, by a yes/no
   property or by a variant (`family-parts-shown`), and what a property changes between two variants that differ by it
   alone (the frame's padding and gap, a part's text style, a field bound to another variable) as most of them
-  (`family-property-changes`); a
+  (`family-property-changes`), and the frame's fill bound at rest as most of them bind it, to a token of its own, a
+  shared one or none (`family-fill`); a nested component with properties of its own showing them in the parent's
+  properties panel, as most do (`nested-exposed`, read from a capture that records it); a
   property's name that says which layer it drives (`property-names-say-layer`, a nested component still named after its
   component left out); two components built the same that take the same properties, a pair for a person to look at
   (`no-twins`); how a component's parts go together (`part-rules.mjs`): an instance of one component named as most of
