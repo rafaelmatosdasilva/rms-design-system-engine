@@ -52,3 +52,10 @@ test('a hover shown another way: a state layer where most change the frame\'s fi
   assert.equal(r.says, 'A hover or press shows by its frame\'s fill, as most components show it');
   assert.deepEqual(off(r), [['d', 'it shows by a layer shown over it']]);
 });
+
+test('the library\'s size scale: a height and an icon size off what most components have at that size', () => {
+  const c = (h, icon) => ({ trees: [{ limits: { minHeight: h }, c: [{ t: 'INSTANCE', n: 'Icon', of: { name: `arrow-${icon}` } }] }], variants: [['Size=s, State=default', 0]] });
+  const r = Object.fromEntries(shapeRules({ skeleton: { a: c(40, 's'), b: c(40, 's'), c: c(40, 's'), d: c(32, 'm') } }).map((x) => [x.id, x]));
+  assert.deepEqual(off(r['size-scale-height']), [['d', 'at s a minimum height of 32, where most have a minimum height of 40']]);
+  assert.deepEqual(off(r['size-scale-icon']), [['d', 'at s an m icon, where most have an s icon']]);
+});
