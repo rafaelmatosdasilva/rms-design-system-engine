@@ -58,6 +58,29 @@ Where the two disagree, the page check says so — naming both sides and the rul
 **A difference is a finding, not a gap.** A gap means your design system lacks something and the design team must decide — that list writes into Figma. A width the code and the design disagree about is neither: it is a fact about the code, reported where the other page findings are.
 
 **Every reading says how sure it is.** A value read from one source alone, or one your two readings disagreed on, is marked as such rather than printed as plain fact; a width the capture could not read is said out loud, because silence would read as "the code constrains nothing" — the opposite.
+### A behaviour has to rest on a rule
+
+Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
+
+A review request is a **question about your documentation**, not an instruction. So when a page wires one of these behaviours and nothing in your documentation describes it, the check says so:
+
+| Behaviour | Wired as |
+|---|---|
+| selection | `select`, `selected`, `v-model`, `checked` |
+| sorting | `sort`, `sortBy`, `order` |
+| expansion | `expand`, `expanded`, `toggle`, `collapse` |
+| filters | `filter`, `filters` |
+
+```
+Table wires selection (update:selected) and no rule describes it:
+leave it as the code does it, and put the question to the team
+```
+
+Each card says which behaviours your documentation already covers, so an agent knows before it wires one — and says nothing where it covers none, since most components select, sort, expand and filter nothing and a line on every card saying so is noise.
+
+A rule counts as covering a behaviour when the component's own documentation describes it, or when a product rule names that component. A rule about a gallery does not license sorting on a table.
+
+Said once per component and behaviour, never once per use. And when no documentation has been read at all, nothing is held to a rule — reporting every behaviour on every page because nothing was loaded would be worse than saying nothing.
 
 ### Icons are held to the ones your code has
 
