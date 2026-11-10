@@ -40,6 +40,24 @@ That last line is the one that catches most. A row or a column header says nothi
 
 This runs for a page written in your product's own code as well as for a composition. The page is drawn fresh for it, so a control is judged on the page as a person meets it, not on one the size checks have already stretched.
 
+### The code's own width, beside the design's
+
+A card used to say what the design drew and nothing about what your code does with it. That is half the story, and the missing half is the one that breaks a layout: an agent kept filter buttons at the width the design gave them, laid three beside a search bar the code lets fill the row, and every label was cut to a letter.
+
+So each card now carries both:
+
+```
+width:             fixed at 90px, never under 200px
+width in the code: fixed at 90px, never under 70px
+```
+
+Where the two disagree, the page check says so — naming both sides and the rule in your code that decided it, so you can go straight to it.
+
+**It reads your code's capture, never a component's own file.** A width usually lives in a rule several components share (a dropdown's 280–500 in its base, through tokens), and reading one file alone would call it missing.
+
+**A difference is a finding, not a gap.** A gap means your design system lacks something and the design team must decide — that list writes into Figma. A width the code and the design disagree about is neither: it is a fact about the code, reported where the other page findings are.
+
+**Every reading says how sure it is.** A value read from one source alone, or one your two readings disagreed on, is marked as such rather than printed as plain fact; a width the capture could not read is said out loud, because silence would read as "the code constrains nothing" — the opposite.
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
