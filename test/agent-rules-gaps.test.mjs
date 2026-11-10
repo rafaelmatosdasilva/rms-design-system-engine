@@ -17,6 +17,8 @@ const dir = () => tempDir('agent-rules-');
 test('the rules say to ask for the contract, use only the system, run the edit check, and what never to do alone', () => {
   const s = rulesSection();
   assert.ok(s.startsWith(START) && s.endsWith(END));
+  assert.match(s, /rms-design-system-engine --route "<the request/, 'each request routed first, as in Claude Code');
+  assert.match(s, /--recipe <name>/);
   assert.match(s, /rms-design-system-engine --query <component>/);
   assert.match(s, /rms-design-system-engine --edit-check/);
   assert.match(s, /no colour, size, radius, shadow or font written by hand/);
