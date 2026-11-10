@@ -110,7 +110,7 @@ test('the workflow reads the state on every push and daily, and writes only an i
   // A push is an event that certainly happens here; a schedule is the thing being checked, so it cannot be the
   // only trigger - that is how the silence lasted four days.
   assert.match(wf, /push:\s*\n\s*branches: \[main\]/);
-  assert.match(wf, /cron: '0 8 \* \* \*'/);
+  assert.match(wf, /cron: '\d?[1-9] 8 \* \* \*'/, 'daily, and never at the top of the hour');
   assert.match(wf, /workflow_dispatch:/);
   assert.match(wf, /issues: write/);
   assert.match(wf, /concurrency:\n\s*group: release-due/, 'one run at a time; a run in progress is never cancelled, by the default');
