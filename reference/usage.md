@@ -1638,7 +1638,9 @@ and whose examples (`Example:`) are shown as examples.
   cut, wraps inside a control, or is under 24px to tap on a phone is said with its words. A page it cannot draw (another
   framework, a page or a component on it that throws) says why, and nothing is guessed; `--no-browser` skips it. Each
   ⚠️ line is fixed, or the reply says why it stays. A composition gets the habits the browser review does not measure
-  (🎨 HABITS).
+  (🎨 HABITS). `--prototype <file> --preview` leaves that same page open for a person to look at, served by the
+  project's own build, with each gap outlined where it sits and labelled with what is needed; Ctrl-C closes it. Only
+  when asked: a server nobody wants is a server nobody closes.
 - **What agents invent, and why.** Each page check (the command and the edit hook) keeps every mistake in
   `.design-system-engine-out/prototypes/inventions.json`, each with why: a gap in the documentation (the component has
   no page in the intent layer, its page shows no example of it in use, or its code comment does not say what a list

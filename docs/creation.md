@@ -82,6 +82,23 @@ A rule counts as covering a behaviour when the component's own documentation des
 
 Said once per component and behaviour, never once per use. And when no documentation has been read at all, nothing is held to a rule — reporting every behaviour on every page because nothing was loaded would be worse than saying nothing.
 
+### A preview to review it in
+
+The route writes a prototype in your product's own code and checks it — and used to leave nowhere to look at it. On the run this came from, the agent built a viewer by hand, and reviewing the page in it is where most of what the check missed was found. Every team would otherwise build that same thing.
+
+```
+rms-design-system-engine --prototype prototypes/settings.vue --preview
+```
+
+It is **the page the check measured**, served by your project's own build — not a second rendering that might differ. Each gap is outlined where it sits and labelled with what is needed, so a need the system does not meet is visible rather than buried in a list:
+
+```
+Preview: http://localhost:5173/…
+   2 gaps are drawn on it where they sit: each is a need the system does not meet.
+```
+
+Only when you ask for it. A server nobody wants is a server nobody closes; Ctrl-C ends it.
+
 ### Icons are held to the ones your code has
 
 A prototype uses your code's icons, never Figma's. An icon that exists only in the Figma library — or one an agent invented from a name it saw there — renders as **nothing** in the product: a blank where a control should be, on a page that otherwise looks finished.
