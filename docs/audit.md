@@ -359,7 +359,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
   - A component a screen draws only as another component's part (a status bar's divider) belongs to that component.
   - `"Product/component"` in `knownReimplementations` keeps one on purpose.
 - **Clean CSS.** Nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
-- **Nested components keep their own styles.** One component's look does not leak into another.
+- **Nested components keep their own styles.** One component's look does not leak into another. It also catches a component that loses its own hover, press or focus to the component around it: a chip whose `.chip .button { background: none }` comes after the button's hover, so the button never shows it.
 - **Structure.** The right height, spacing and corners, from the design.
   - A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke.
   - A border, outline or background the code draws on a component Figma draws with none, in any variant, fails (focus rules aside). This holds for the system's rules and a product's alike, on the component itself, its `::before` or its `::after`.
