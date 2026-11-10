@@ -40,6 +40,20 @@ That last line is the one that catches most. A row or a column header says nothi
 
 This runs for a page written in your product's own code as well as for a composition. The page is drawn fresh for it, so a control is judged on the page as a person meets it, not on one the size checks have already stretched.
 
+### Icons are held to the ones your code has
+
+A prototype uses your code's icons, never Figma's. An icon that exists only in the Figma library — or one an agent invented from a name it saw there — renders as **nothing** in the product: a blank where a control should be, on a page that otherwise looks finished.
+
+So every icon a page passes is held against the symbols your code actually defines, and one it does not have is an error, with the nearest name your code does have:
+
+```
+Button icon="searc": the code has no such icon, so it draws nothing (its nearest is "icon-search")
+```
+
+The name is compared bare, so `chevron-down` and `icon-chevron-down` are the same icon however your project writes it.
+
+Two things it deliberately does not do. A value the page decides at runtime is left alone — the check cannot know what the data holds, and guessing would be worse than silence. And a project whose icon sources it could not read says nothing at all, rather than calling every icon on the page missing.
+
 ### Lessons: a correction becomes a guard
 
 When you correct what an AI made, the correction is usually said once, in a chat, and lost. The next agent makes the same mistake. A lesson keeps it.
