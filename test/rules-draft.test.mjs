@@ -18,6 +18,8 @@ test('the view carries a Figma link only for a component a Figma rule changes', 
     figmaUrls: { chip: 'https://www.figma.com/design/K?node-id=1-2', card: 'https://www.figma.com/design/K?node-id=3-4', tag: 'https://www.figma.com/design/K?node-id=5-6' } });
   assert.deepEqual(v.figmaUrls, { chip: 'https://www.figma.com/design/K?node-id=1-2' }, 'the code rule\'s card and the unnamed tag are left out');
   assert.equal(constructionView({ grammar: [{ id: 'd', says: 'x', toFix: [] }] }).figmaUrls, undefined);
+  // Only a Figma task's component: a rule that says no side is not one.
+  assert.equal(constructionView({ code: [{ id: 'r', says: 'z', toFix: [{ component: 'chip', value: '' }] }], figmaUrls: { chip: 'https://www.figma.com/design/K?node-id=1-2' } }).figmaUrls, undefined);
 });
 
 test('a rule\'s draft: each change said once above its components, each a Figma link, no table inside', { timeout: budget(300000) }, async (t) => {
