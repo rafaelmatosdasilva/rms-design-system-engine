@@ -406,7 +406,7 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   };
   const sides = [['paddingTop', 'top'], ['paddingRight', 'right'], ['paddingBottom', 'bottom'], ['paddingLeft', 'left']];
   let detached = null;
-  const walk = (n, at) => {
+  const walk = (n, at, inner = false) => {
     if (!n || typeof n !== 'object' || budget.n <= 0) return;
     budget.n--;
     if (n.type === 'INSTANCE') {   // an instance, overrides included, reads as its own component's values
@@ -419,6 +419,10 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     // A layer hidden with no property to show it is never drawn: none of its values is one anyone sees. One a boolean
     // property shows is drawn whenever it is on, so it counts. A mask's own paint never shows either.
     if (get(n, 'visible') === false && !(get(n, 'componentPropertyReferences') || {}).visible) return;
+    // An empty frame inside a variant: no layers, and nothing it paints (no fill, border or shadow). It draws nothing; as
+    // a spacer it is a gap the auto layout should hold, else it is left over. A slot is empty on purpose.
+    const shows = (list) => paintsOf(n, list).some((p) => p && p.visible !== false && (p.opacity ?? 1) > 0);
+    if (inner && n.type === 'FRAME' && !kids(n).length && !shows('fills') && !shows('strokes') && !(get(n, 'effects') || []).some((e) => e && e.visible !== false)) { out.empty = out.empty || []; out.empty.push(at); }
     const mask = get(n, 'isMask') === true;
     const fillScope = n.type === 'TEXT' ? 'TEXT_FILL' : /^(FRAME|COMPONENT|SECTION)$/.test(n.type) ? 'FRAME_FILL' : 'SHAPE_FILL';
     const bvs = get(n, 'boundVariables') || {};
@@ -486,7 +490,7 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       if (loose.length) raw(at, 'text', loose.join(', '));
     }
     // A boolean operation paints with its own fill and stroke: the shapes it merges are never drawn as themselves.
-    if (n.type !== 'BOOLEAN_OPERATION') for (const c of kids(n)) walk(c, `${at}/${c.name}`);
+    if (n.type !== 'BOOLEAN_OPERATION') for (const c of kids(n)) walk(c, `${at}/${c.name}`, true);
   };
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {

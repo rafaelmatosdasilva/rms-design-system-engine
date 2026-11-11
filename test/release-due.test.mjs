@@ -1,5 +1,5 @@
-// release-due.mjs - a version covers 50 commits, never a date, and releasing stops silently because it runs on its
-// own and every gate reports to nobody. This reads the state (work on main that no release covers, whether that is a
+// release-due.mjs - a version covers a set number of commits, never a date, and releasing stops silently because it
+// runs on its own and every gate reports to nobody. This reads the state (work on main that no release covers, whether
 // version yet and how long it has been one) rather than listening for a failure event, so one question catches a red
 // run, a schedule that never fired, and a release nobody remembered.
 import { test } from 'node:test';
@@ -95,12 +95,12 @@ test('a repository with no tag at all is every commit waiting', () => {
 test('the issue names what is waiting, the rule it is measured against, and the three things it can be', () => {
   const body = issueBody({ tag: 'v3.4.0', commits: 62, days: 9, dueDays: 4 }, 'acme/engine');
   assert.match(body, /62 commits on `main` are in no release, and the oldest has waited 9 days/);
-  assert.match(body, /A version covers 50 commits, so this one has been due for 4 days/);
+  assert.match(body, new RegExp(`A version covers ${RELEASE_EVERY} commits, so this one has been due for 4 days`));
   assert.match(body, /`v3\.4\.0`/);
   assert.match(body, /A run went red/);
   assert.match(body, /The schedule did not fire/);
   assert.match(body, /Nothing is wrong and this is noise/, 'the number being wrong is an answer too');
-  assert.match(body, /50 commits a version is the wrong number/);
+  assert.match(body, new RegExp(`${RELEASE_EVERY} commits a version is the wrong number`));
   assert.match(body, /acme\/engine\/actions\/workflows\/release\.yml/);
   assert.doesNotMatch(body, /\$\{|`\$/, 'the text is written here, never built in a shell');
 });

@@ -365,13 +365,22 @@
       add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r));
     }); });
     // Figma: what each read changed in each component, a row each; the components read for the first time, one row.
+    // Who did it: the designers who saved the versions since the read before (figma-versions.mjs), then whoever ran the read.
+    var figmaBys = function (r) { return (r.editors || []).concat(r.by && (r.editors || []).indexOf(r.by) < 0 ? [r.by] : []); };
     order.forEach(function (g) {
       if (!g.read) return;
       var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
-      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', line(esc(c.changed.map(figmaChange).join('; '))) + saved, [x.r.by], pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', line(esc(c.changed.map(figmaChange).join('; '))) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
-      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, [x.r.by], pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
+      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
     });
+    // The comments left on a component in Figma (figma-comments.mjs): a thread a row, what it says, its replies, and
+    // whether it is resolved; who wrote it and who answered. No link to the file: only a Figma task carries one.
+    COMPONENTS.forEach(function (c) { (c.figmaComments || []).forEach(function (t) {
+      var said = esc('“' + t.text + '”') + ((t.replies || []).length ? ' ' + quiet(t.replies.length + ' repl' + (t.replies.length === 1 ? 'y' : 'ies')) : '') + ' ' + quiet(t.resolved ? 'Resolved' : 'Open');
+      var bys = [t.by].concat((t.replies || []).map(function (r) { return r.by; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
+      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at);
+    }); });
     // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
     // A change the engine sent in parts (GitLab refuses one commit that large: "… (part 2 of 3)") is one change: one row,
     // its pages and files together, each of its commits named.
