@@ -1279,7 +1279,10 @@ only while the snapshot still matches the code:
 dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
 `NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
-value, font against the first text element, background as "paints or not" (Figma often paints on a child
+value, each part paired with its class by name (`part-pairing.mjs`; captured as `part-0`, `part-1` with its Figma
+`name`) compared on its own element against the gap and padding Figma binds on the frame of that name, the difference
+carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
+background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
 runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a

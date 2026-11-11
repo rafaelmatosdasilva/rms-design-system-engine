@@ -333,6 +333,8 @@ The engine reads what your design system defines in Figma, its tokens and each c
 - **Motion and effects.** How each component moves, and what it draws beyond its colours (both below).
 - **Product screens.** Where each product puts each component (below).
 
+- **Parts.** Each part paired with its class by name (Label with `.btn__label`) is measured on its own element: the gap and padding Figma sets on the frame of that name are compared there, and the difference names the part (`chip › Content gap`) with the rule and the line that set it.
+
 Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
 
 ### Data and tokens
