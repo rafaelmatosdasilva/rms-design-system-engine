@@ -633,7 +633,8 @@
       // Picking: what is under the pointer is outlined; a click picks its component, which flashes once and then shows
       // as it is, so nothing sits over what is being changed. Nothing in the screen does what it
       // would on its own (a link, a field, a button).
-      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: 2px; } #ts-screen .ts-picked { outline: 2px solid transparent !important; outline-offset: 2px; animation: ts-picked-flash 1s ease-out; } @keyframes ts-picked-flash { 0%, 40% { outline-color: var(--sg-accent, #2563eb); } 100% { outline-color: transparent; } } @media (prefers-reduced-motion: reduce) { #ts-screen .ts-picked { animation-duration: 0.6s; animation-timing-function: steps(1, end); } }'; fdoc.head.appendChild(hl);
+      // Drawn inside the element's own edge: outside it, a tile's clipping or the cell beside it cut its sides off.
+      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked { outline: 2px solid transparent !important; outline-offset: -2px !important; animation: ts-picked-flash 1s ease-out; } @keyframes ts-picked-flash { 0%, 40% { outline-color: var(--sg-accent, #2563eb); } 100% { outline-color: transparent; } } @media (prefers-reduced-motion: reduce) { #ts-screen .ts-picked { animation-duration: 0.6s; animation-timing-function: steps(1, end); } }'; fdoc.head.appendChild(hl);
       var hovered = null, stop = function (e) { e.preventDefault(); e.stopPropagation(); };
       ['mousedown', 'mouseup', 'submit', 'keydown', 'dblclick', 'contextmenu'].forEach(function (t) { fdoc.addEventListener(t, stop, true); });
       fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.part ? partEl(e.target, n.el, n.part) : n.el; if (hovered) hovered.classList.add('ts-hover'); }, true);   // what the next click picks, a layer too
@@ -650,8 +651,22 @@
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
     // A colour in light, and in dark: set by hand, else worked out from light when light was changed, else the system's.
-    var lightOf = function (v) { return tokOver.light[v.var] || shown(v, 'light') || '#000000'; };
-    var darkOf = function (v) { return tokOver.dark[v.var] || (tokOver.light[v.var] ? tokenDark({ v: v.var }, tokOver.light[v.var]) : shown(v, 'dark')) || lightOf(v); };
+    // What the preview draws each token as in a mode, the theme on it (its colours, the primary moved, each change by
+    // hand): read from the frame once per mode and paint, so a component picked shows the values it has now, never
+    // the system's from before the theme. The other mode is read with its own CSS in place for that moment.
+    var THEMED = {};
+    var themed = function (md) {
+      if (THEMED[md]) return THEMED[md];
+      var out = THEMED[md] = {}; if (!fdoc || !screenEl || !tstyle) return out;
+      var was = tstyle.textContent, swap = md !== mode;
+      if (swap) { if (source === 'scratch') tstyle.textContent = themeCss(current(), '#ts-screen', md); setMode(md); }
+      var cs = fdoc.defaultView.getComputedStyle(screenEl);
+      VARS.forEach(function (v) { if (v.var) { var x = cs.getPropertyValue(v.var).trim(); if (x) out[v.var] = x; } });
+      if (swap) { setMode(mode); tstyle.textContent = was; }
+      return out;
+    };
+    var lightOf = function (v) { return tokOver.light[v.var] || hexOf(themed('light')[v.var]) || shown(v, 'light') || '#000000'; };
+    var darkOf = function (v) { return tokOver.dark[v.var] || (tokOver.light[v.var] ? tokenDark({ v: v.var }, tokOver.light[v.var]) : hexOf(themed('dark')[v.var]) || shown(v, 'dark')) || lightOf(v); };
     // Every component an element sits in, the outermost first: a click picks the innermost, the others a click away.
     // The layer clicked inside a component: an icon (an svg or anything named icon), else a text (an element with words
     // of its own), else none (the component as a whole).
@@ -825,6 +840,7 @@
       var on = source === 'scratch', b = current();
       if (on && b.fontFamily && fdoc) ensureFont(b.fontFamily, fdoc);
       if (tstyle) tstyle.textContent = on ? themeCss(b, '#ts-screen', mode) : '';
+      THEMED = {};   // the theme changed: what each token is now is read again
       // No shadows, no blur to set: its slider is off with them.
       var noShadow = segVal('shadows') === 'false';
       ['ts-blur', 'ts-blur-num'].forEach(function (id) { var x = $(id); if (x) x.disabled = noShadow; });
@@ -836,6 +852,8 @@
         if (document.activeElement !== f) f.value = d; pick.value = hex6(d);
       });
       STOPS.forEach(function (st) { var f = $(st.id + '-d-hex'), pick = $(st.id + '-d'), hex = (b.grad || {})[st.v]; if (!f || !hex || f.dataset.hand === '1') return; var d = tokenDark(st, hex); if (document.activeElement !== f) f.value = d; pick.value = hex6(d); });
+      // A component picked shows its tokens as they are now: drawn again, unless one of its own fields is being typed in.
+      if (picked && !pickCard.contains(document.activeElement)) pick(picked, true);
       fit();
     };
     var later = null, repaint = function () { clearTimeout(later); later = setTimeout(paint, 40); };
