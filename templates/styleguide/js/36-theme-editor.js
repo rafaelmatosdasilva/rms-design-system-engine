@@ -484,6 +484,7 @@
     }
     // A text given another of the system's text styles: its size, weight and line height from that style's own variables,
     // so it changes with each breakpoint as the system's text does.
+    Object.keys(tk.radius || {}).forEach(function (sel) { extra += '\n' + scope + ' ' + sel + ' { border-radius: ' + (+tk.radius[sel] || 0) + 'px !important; }'; });
     Object.keys(tk.text || {}).forEach(function (sel) {
       var st = TEXT_STYLES.filter(function (x) { return x.scale === tk.text[sel]; })[0]; if (!st) return;
       var val = function (p) { return p ? (p.var ? 'var(' + p.var + ')' : p.value) : null; }, props = [['font-size', val(st.size)], ['font-weight', val(st.weight)], ['line-height', val(st.lh)]].filter(function (p) { return p[1]; });
@@ -569,7 +570,7 @@
   var editing = null;   // the saved theme being edited, else null (a new one)
   var open = function (from, kind, theme) {
     editing = theme || null;
-    var tokOver = { light: {}, dark: {}, all: {}, text: {} }, picked = null;
+    var tokOver = { light: {}, dark: {}, all: {}, text: {}, radius: {} }, picked = null;
     if (theme) { source = 'scratch'; brief = Object.assign({}, start, theme.brief || {}, { name: theme.name }); baseTheme = theme.base || ''; }
     else {
       if (kind) source = kind;
@@ -635,7 +636,7 @@
       if (!box) return;
       var s = previewScreens().filter(function (x) { return x.key === key; })[0]; if (!s) return;
       box.setAttribute('data-screen', key); size = [(s.size && s.size[0]) || 1280, (s.size && s.size[1]) || 800];
-      box.innerHTML = ''; frame = document.createElement('iframe'); frame.className = 'sg-ts-frame'; frame.title = 'Preview: ' + (s.title || s.key); frame.tabIndex = -1; box.appendChild(frame);
+      box.innerHTML = ''; frame = document.createElement('iframe'); frame.className = 'sg-ts-frame'; frame.style.visibility = 'hidden'; /* shown once the theme is on it, never the brand under it first */ frame.title = 'Preview: ' + (s.title || s.key); frame.tabIndex = -1; box.appendChild(frame);
       fdoc = frame.contentDocument; fdoc.open(); fdoc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); fdoc.close();
       Array.prototype.forEach.call(document.documentElement.attributes, function (a) { if (a.name !== 'class' && a.name !== 'style') fdoc.documentElement.setAttribute(a.name, a.value); });
       if (baseTheme) fdoc.documentElement.setAttribute('data-brand', baseTheme); else fdoc.documentElement.removeAttribute('data-brand');
@@ -664,10 +665,13 @@
       if (picked) { var again = screenEl.querySelector('.' + picked.cls); if (again) { again.classList.add('ts-picked'); picked.el = again; picked.node = null; picked.part = null; } }
       ['dark', 'light'].forEach(function (md) { setMode(md); readLive(screenEl, md); }); setMode(mode);
       if (FONT) live.font = firstFamily(fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(FONT.v));
+      // The theme put on the new screen before it shows (its system's colours read above, without it).
+      if (drawnOnce) paint();
+      frame.style.visibility = '';
       fit();
     };
     var tokSaved = (brief.tokens && typeof brief.tokens === 'object') ? brief.tokens : {};   // a theme being edited keeps its own
-    ['light', 'dark', 'all', 'text'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
+    ['light', 'dark', 'all', 'text', 'radius'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
     var pickCard = root.querySelector('.sg-ts-pick');
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
@@ -729,7 +733,7 @@
           for (var i = 0; i < r.style.length; i++) {
             var prop = r.style[i], val = r.style.getPropertyValue(prop), m, re = /var\((--[\w-]+)/g, vars = [];
             while ((m = re.exec(val))) vars.push(m[1]);
-            if (vars.length) decls.push({ prop: prop, vars: vars, imp: r.style.getPropertyPriority(prop) === 'important' });
+            if (vars.length) decls.push({ prop: prop, vars: vars, val: val, imp: r.style.getPropertyPriority(prop) === 'important' });
           }
           if (!decls.length) return;
           var sels = String(r.selectorText).split(',').map(function (sel) {
@@ -742,12 +746,22 @@
       if (c.key === '__app') return null;   // the screen: its own tokens, never every rule of the page
       var root0 = c.part && c.node ? c.node : c.el;   // a layer picked: that layer alone
       var targets = [root0].concat(Array.prototype.filter.call(root0.querySelectorAll('*'), function (n) { var ch = compChain(n); return !ch.length || ch[ch.length - 1].el === c.el; }));
+      // How each token is used, read from the rules that name it: calc(var(--x) * 1%) is a percentage, * 1px pixels, an
+      // opacity a fraction shown as a percentage; a token is never given a unit its rules do not give it.
+      var units = c.units = {}, unitIn = function (d, v) {
+        if (units[v]) return;
+        var m = new RegExp('var\\(' + v.replace(/[-]/g, '\\-') + '[^)]*\\)\\s*\\*\\s*1(%|px|rem|em|deg|ms|s)(?![a-z])').exec(d.val || '');
+        if (m) units[v] = { unit: m[1], scale: 1 };
+        else if (/(^|-)opacity$/.test(d.prop)) units[v] = { unit: '%', scale: 100 };
+        else if (/radius|width|height|gap|padding|margin|inset|top|left|right|bottom|size|spacing|blur|offset/.test(d.prop)) units[v] = { unit: 'px', scale: 1 };
+      };
       var win = {}, states = {}, who = {}, hit = function (v, el) { (who[v] = who[v] || []).indexOf(el) < 0 && who[v].push(el); };
       fdoc._tokRules.forEach(function (r) {
         targets.forEach(function (t, ti) {
           r.sels.forEach(function (x) {
             var ok = false; try { ok = t.matches(x.s); } catch (e) { ok = false; } if (!ok) return;
             r.decls.forEach(function (d) {
+              d.vars.forEach(function (v) { unitIn(d, v); });
               if (x.dyn) { d.vars.forEach(function (v) { states[v] = 1; hit(v, t); }); return; }
               var key = ti + '|' + x.pe + '|' + d.prop, w = win[key], rank = [d.imp ? 1 : 0, x.spec, r.order];
               if (!w || rank[0] > w.rank[0] || (rank[0] === w.rank[0] && (rank[1] > w.rank[1] || (rank[1] === w.rank[1] && rank[2] >= w.rank[2])))) win[key] = { rank: rank, vars: d.vars, t: t };
@@ -843,6 +857,17 @@
       });
       return best;
     };
+    // A token's unit as its rules use it (usedBy), else as its value is written (px when it says px, none when not).
+    var unitOf = function (v, cur) { var u = picked && picked.units && picked.units[v.var]; return u || (/px$/.test(String(cur).trim()) ? { unit: 'px', scale: 1 } : { unit: '', scale: 1 }); };
+    // Its corners: the radius it is drawn with now, changed for this component in every copy (its own rule over it),
+    // whether its radius is a token of its own or the system's shared one.
+    var radiusRow = function (c) {
+      if (c.key === '__app') return '';
+      var el = c.node || c.el, sel = '.' + CSS.escape(c.cls || '') + (el === c.el ? '' : ' ' + nodeSel(el));
+      var now = parseFloat(fdoc.defaultView.getComputedStyle(el).borderTopLeftRadius) || 0, set = tokOver.radius[sel];
+      return '<p class="sg-ts-tok-group">Corners</p><div class="pg-ctl sg-ts-tok"><span class="sg-mode-label">Corner radius</span><div class="sg-ts-field sg-ts-tok-field"><label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-kind="radius" data-sel="' + esc(sel) + '" min="0" step="1" value="' + esc(set != null ? set : Math.round(now * 10) / 10) + '" aria-label="Corner radius in px"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>' +
+        '<button type="button" class="sg-ts-auto" data-radius-reset="' + esc(sel) + '" title="Back to the component\'s own" aria-label="Back to the component\'s own corner radius"' + (set != null ? '' : ' hidden') + '>' + RESET + '</button></div></div>';
+    };
     var textRow = function (c) {
       if (!TEXT_STYLES.length || c.key === '__app') return '';
       var el = textElOf(c.node || c.el); if (!el) return '';
@@ -869,7 +894,7 @@
       var rowOf = function (x) {
         var cur = nowOf(x.v), over = tokOver.all[x.v.var], ctl;
         if (x.kind === 'colour') ctl = '<div class="sg-ts-pair">' + colourOf(x, 'light') + (COLOUR_AXIS ? colourOf(x, 'dark') : '') + '</div>';
-        else if (x.kind === 'size') ctl = '<label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="size" step="0.5" value="' + esc(parseFloat(cur) || 0) + '" aria-label="' + esc(x.label + ' in px') + '"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>';
+        else if (x.kind === 'size') { var u = unitOf(x.v, cur); ctl = '<label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="size" data-scale="' + u.scale + '" data-px="' + (/px$/.test(String(cur).trim()) ? 1 : '') + '" step="' + (u.scale === 100 ? 1 : 0.5) + '" value="' + esc(Math.round((parseFloat(cur) || 0) * u.scale * 100) / 100) + '" aria-label="' + esc(x.label + (u.unit ? ' in ' + (u.unit === '%' ? 'percent' : u.unit) : '')) + '">' + (u.unit ? '<span class="sg-ts-mode-tag" aria-hidden="true">' + esc(u.unit) + '</span>' : '') + '</label>'; }
         else ctl = toggle(' data-tok="' + esc(x.v.var) + '" data-kind="bool" aria-label="' + esc(x.label) + '"', /^true$/i.test(cur));
         return '<div class="pg-ctl sg-ts-tok" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
           (x.kind !== 'size' ? '' : '<button type="button" class="sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
@@ -886,7 +911,7 @@
       var PART = { icon: /icon/i, text: /text|label|title|font|typo/i };
       var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || !PART[c.part] || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
       if (!shownG.length) shownG = Object.keys(groups);
-      html += textRow(c);
+      html += radiusRow(c) + textRow(c);
       shownG.sort().forEach(function (g) { html += '<p class="sg-ts-tok-group">' + esc(g) + '</p>' + groups[g].map(function (x) { n++; return rowOf(x); }).join(''); });
       pickCard.innerHTML = html + (n ? '' : '<p class="sg-ts-hint">Nothing to change here: its tokens are not colours, sizes or switches.</p>') + '</div>';
       placeLabel(); dropdowns(pickCard);
@@ -911,10 +936,11 @@
     };
     pickCard.addEventListener('input', function (e) {
       e.stopPropagation();
-      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v) return;
+      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v && k !== 'radius') return;
       if (k === 'colour') { t.parentNode.querySelector('[data-kind="colour-hex"]').value = t.value; showMode(md); setTok(v, 'colour', t.value, md); }
       else if (k === 'colour-hex') { var hx = hexOf(t.value); if (hx) { t.parentNode.querySelector('[data-kind="colour"]').value = hex6(hx); showMode(md); setTok(v, 'colour', hx, md); } }
-      else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) setTok(v, 'size', n + 'px'); }
+      else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) { n = n / (+t.getAttribute('data-scale') || 1); setTok(v, 'size', String(Math.round(n * 10000) / 10000) + (t.getAttribute('data-px') ? 'px' : '')); } }
+      else if (k === 'radius') { var r = parseFloat(t.value); if (!isNaN(r)) { tokOver.radius[t.getAttribute('data-sel')] = Math.max(0, r); var rb = pickCard.querySelector('[data-radius-reset]'); if (rb) rb.hidden = false; changed(); repaint(); } }
     });
     pickCard.addEventListener('change', function (e) {
       e.stopPropagation();
@@ -934,6 +960,7 @@
     }); });
     pickCard.addEventListener('click', function (e) {
       e.stopPropagation();
+      var rr = e.target.closest('[data-radius-reset]'); if (rr) { delete tokOver.radius[rr.getAttribute('data-radius-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var kd = e.target.closest('[data-tok-kid]'); if (kd && picked && picked.kids) { var y = picked.kids[+kd.getAttribute('data-tok-kid')]; if (y) { y.el.classList.remove('ts-hover'); pick({ el: y.el, key: y.key, cls: y.cls, chain: y.chain }); } return; }
       if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); placeLabel(); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = '<p class="sg-ts-hint sg-ts-pick-empty">Click a component in the preview to change its tokens.</p>'; return; }
@@ -974,6 +1001,7 @@
       if (picked && !pickCard.contains(document.activeElement)) pick(picked, true);
       fit(); placeLabel();
     };
+    var drawnOnce = false;   // the first screen is themed by the opening's own paint, after its fields are filled
     var later = null, repaint = function () { clearTimeout(later); later = setTimeout(paint, 40); };
     // The colours the theme starts from, as the screen shows them; written into the fields when asked (a theme just
     // opened, or another one chosen to start from).
@@ -991,7 +1019,7 @@
     if (box) {
       draw(box.getAttribute('data-screen'));
       seed(!draft.brief && !editing);   // a theme being edited keeps its own colours
-      paint(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(box.parentNode); }
+      paint(); drawnOnce = true; if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(box.parentNode); }
     panel.el.addEventListener('transitionend', fit, { once: true });
     // The preview stays in view while the form scrolls, just under the panel's own title (which stays too).
     var head = panel.el.querySelector('.sg-panel-head'), pv = root.querySelector('.sg-ts-preview');
