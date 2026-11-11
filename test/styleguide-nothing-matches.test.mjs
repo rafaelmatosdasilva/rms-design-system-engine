@@ -60,11 +60,23 @@ test('a table filtered to nothing: the head goes with the rows, and one line say
     assert.equal(await headGone(), false, 'the head is there while rows are');
     assert.equal(await note(), null, 'and nothing is said');
     // A column value and a chip that share no row: the one combination the filter bar cannot talk you out of, since a
-    // chip shows its count rather than hiding itself.
-    await run(`document.querySelector('#rules .sg-chip-menu[data-fg="source"]').click()`);
-    await run(`document.querySelector('#sg-f-rules-source [data-f="source:Code"]').click()`);
-    const zero = await run(`(() => { const z = [...document.querySelectorAll('#rules .sg-chips .sg-chip[data-chip]')].find((c) => /\\b0\\b/.test(c.textContent)); if (!z) return null; z.click(); return z.getAttribute('data-chip'); })()`);
-    assert.ok(zero, 'a chip the chosen column leaves no row in');
+    // chip shows its count rather than hiding itself. Which source leaves a status empty is the demo's business and
+    // changes whenever a rule is added, so each source is tried until one does, rather than naming one here.
+    const groups = await run(`[...document.querySelectorAll('#rules .sg-chip-menu[data-fg]')].map((m) => m.getAttribute('data-fg'))`);
+    let zero = null, tried = [];
+    for (const g of groups) {
+      await run(`(() => { const m = document.querySelector('#rules .sg-chip-menu[data-fg="${g}"]'); if (m) m.click(); })()`);
+      const values = await run(`[...document.querySelectorAll('#sg-f-rules-${g} [data-f^="${g}:"]')].map((b) => b.getAttribute('data-f')).filter((f) => f !== '${g}:')`);
+      for (const v of values) {
+        tried.push(v);
+        await run(`(() => { const b = document.querySelector('#sg-f-rules-${g} [data-f="${v}"]'); if (b) b.click(); })()`);
+        zero = await run(`(() => { const z = [...document.querySelectorAll('#rules .sg-chips .sg-chip[data-chip]')].find((c) => /\\b0\\b/.test(c.textContent)); if (!z) return null; z.click(); return z.getAttribute('data-chip'); })()`);
+        if (zero) break;
+        await run(`(() => { const b = document.querySelector('#sg-f-rules-${g} [data-f="${v}"]'); if (b) b.click(); })()`);   // put it back before the next
+      }
+      if (zero) break;
+    }
+    assert.ok(zero, `a chip some column value leaves no row in (tried ${tried.join(', ')})`);
     assert.equal(await shown(), 0, 'every row hidden');
     assert.equal(await headGone(), true, 'the column names go with the rows they stood over');
     assert.equal(await note(), `Nothing matches these filters ${all} rules in all, none of them this combination.`, 'one line, and how many the table holds in all');
