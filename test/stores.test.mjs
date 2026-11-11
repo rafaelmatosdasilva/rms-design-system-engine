@@ -5,7 +5,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush } from '../lib/stores.mjs';
+import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush, lastWriterOf } from '../lib/stores.mjs';
 import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../lib/intent-changes.mjs';
 import { tempDir } from './helpers.mjs';
@@ -839,4 +839,26 @@ test('the real sender: a trigger that takes an empty POST, over Node\'s own http
     assert.deepEqual(got, [['POST', '/job/style-guide/build', `Basic ${Buffer.from('builder:api-secret').toString('base64')}`, '0', 0]]);
     assert.match(r.line, /🔔 Style guide: told 127\.0\.0\.1:\d+\/job\/style-guide\/build \(201\)$/);
   } finally { server.close(); }
+});
+
+test('who last wrote a part in its store: the author GitLab recorded on its newest commit there, asked only of a GitLab store', async () => {
+  const asked = [];
+  const http = {
+    get: async (url) => {
+      asked.push(url);
+      const u = new URL(url);
+      if (!u.pathname.endsWith('/repository/commits')) return { ok: true, status: 200, json: async () => ({ default_branch: 'main' }) };
+      return { ok: true, status: 200, json: async () => [{ id: 'c1', author_name: 'QA Lead', committer_name: 'Design system bot' }] };
+    },
+    send: async () => ({ ok: false, status: 405, json: async () => ({}) }),
+  };
+  const ROOT = tempDir('stores-writer-');
+  const cfg = { stores: { contracts: { read: { gitlab: `https://${HOST}/design/snapshots`, path: 'specs/contracts' } } } };
+  assert.equal(await lastWriterOf(ROOT, cfg, 'contracts', { env, http }), 'QA Lead', 'the author: whose run wrote them, not the token that carried it');
+  const q = new URL(asked.find((u) => u.includes('/repository/commits')));
+  assert.equal(q.searchParams.get('path'), 'specs/contracts', 'its own path in the store');
+  assert.equal(q.searchParams.get('per_page'), '1');
+  assert.equal(await lastWriterOf(ROOT, cfg, 'contracts', { env, http, offline: true }), null, 'offline: nothing asked');
+  assert.equal(await lastWriterOf(ROOT, { stores: { contracts: { read: { folder: '../contracts' } } } }, 'contracts', { env, http }), null, 'a folder has no commit to read');
+  assert.equal(await lastWriterOf(ROOT, {}, 'contracts', { env, http }), null, 'no store: none');
 });
