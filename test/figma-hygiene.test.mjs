@@ -256,3 +256,18 @@ test('a building block\'s file check joins the lists, and only them: its values 
   assert.equal(withBlocks(values, null), values, 'no skeleton, no change');
   assert.equal(withBlocks(values, { chip: {} }), values, 'no blocks, no change');
 });
+
+test('an empty frame inside a variant draws nothing: it is listed, while a frame that paints, holds a layer or is the variant itself is not', () => {
+  const f = (name, extra = {}, children = []) => ({ type: 'FRAME', name, children, fills: [], strokes: [], effects: [], ...extra });
+  const root = { type: 'COMPONENT_SET', name: 'promoTile', children: [f('state=default', {}, [
+    f('Spacer'), f('Card', { fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'v' } } }] }),
+    f('Glow', { effects: [{ type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0, a: 0.2 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'e' } }, radius: 0 }], effectStyleId: 'S:1' }),
+    f('Body', {}, [{ type: 'TEXT', name: 'Title', fills: [], textStyleId: 'S:2' }]), f('Off', { fills: [{ type: 'SOLID', visible: false, color: { r: 1, g: 0, b: 0 } }] }),
+    f('Hidden', { visible: false }),
+  ]), f('state=empty')] };
+  const h = hygieneOf(root, 'A tile.');
+  assert.deepEqual(h.empty, ['state=default/Spacer', 'state=default/Off'], 'a paint switched off paints nothing; a hidden layer is never drawn; an empty variant is the variant\'s own business');
+  const found = hygieneFindings({ promoTile: { hygiene: h } }).filter((x) => x.kind === 'empty');
+  assert.match(found[0].text, /^state=default\/Spacer is an empty frame/);
+  assert.match(hygieneBlock({ promoTile: { hygiene: h } }).join('\n'), /2 empty frames/);
+});

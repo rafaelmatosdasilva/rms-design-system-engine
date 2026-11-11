@@ -17,7 +17,7 @@
     var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
     // Figma: when it was last read, then every read that changed what Figma says of it, with what changed.
     var fig = (u.figmaRead ? '<tr><td>Last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') +
-      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + doneByHTML(r) + what(/first time/.test(r.changed[0]) ? [] : r.changed) + '</td></tr>'; }).join('');
+      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + ((r.editors || []).length ? ' <span class="pg-log-date">changed in Figma by ' + esc(r.editors.join(', ')) + '</span>' : '') + doneByHTML(r) + what(/first time/.test(r.changed[0]) ? [] : r.changed) + '</td></tr>'; }).join('');
     // What the team decided about it, gathered from wherever each decision was made (decisions.mjs). First, because
     // a decision outlives every commit under it: an option somebody looked at and did not want is the one thing a
     // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
