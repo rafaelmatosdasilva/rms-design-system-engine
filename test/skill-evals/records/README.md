@@ -248,5 +248,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-the-style-guide-says-one` | The 24 guide tasks on Haiku (engine f815a8a) | "The style guide says one number, reads as text, and sorts every table" |
 | `2026-11-11-history-a-contract-change-is` | The 24 guide tasks on Haiku (engine 9f794e9) | "History: a contract change is done by the engine, under Contracts" |
 | `2026-11-11-a-component-s-examples-feed` | The 24 guide tasks on Haiku (engine 531ed97) | "A component's examples are read with its guidance" |
+| `2026-11-11-a-contract-change-is-named` | The 24 guide tasks on Haiku (engine 0e03ff5) | "A contract change is named by its store's commit, as the intent layer's are" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
