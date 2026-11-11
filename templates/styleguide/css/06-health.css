@@ -48,7 +48,7 @@
 .sg-health-num { font-size: calc(var(--sg-h1) * 4); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
 .sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
-.sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
+.sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: var(--sg-a4);   /* the empty track, clear enough to read as one */ overflow: hidden; }
 .sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
 .sg-health-bar { gap: var(--sg-space-xxs); }
 .sg-health-bar > .is-none { background: none; }   /* N/A: no colour, the bar's empty track; its legend word has no dot */

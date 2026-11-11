@@ -69,15 +69,15 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-no-tasks .sg-todo-no, .sg-no-tasks .sg-todo-no-head { display: none; }
 /* Every column wide enough that a short value keeps to one or two lines; the long ones take the rest. */
 @media (min-width: 721px) { .pg-par-table th, .pg-par-table td { min-width: calc(var(--sg-space-xxl) * 3.5); } .pg-par-table .sg-todo-no, .pg-par-table .sg-todo-no-head { min-width: 0; } }
-.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
-.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
+.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) calc(var(--sg-space-s) + var(--sg-space-xs)); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
+.pg-par-table td { padding: var(--sg-space-s) calc(var(--sg-space-s) + var(--sg-space-xs));   /* 12px a side at the default scale, a step over the system's s */ border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
 .pg-par-table :is(th, td):first-child { padding-left: var(--sg-cell-x); } .pg-par-table :is(th, td):last-child { padding-right: var(--sg-cell-x); }   /* its content starts and ends with the card's head and the chips above it */
 .pg-par-table td > code { display: block; }
 .pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
-.pg-par-table .sg-cx-share { display: inline; }   /* how many follow a construction rule and the share of them, on one line */
+.pg-par-table .sg-cx-share { display: inline; font-variant-numeric: tabular-nums; }   /* how many follow a construction rule and the share of them, on one line */
 .pg-par-table .pg-par-none { color: var(--sg-muted); }
 .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { white-space: nowrap; color: var(--sg-text-2); }
 /* Accessibility: under a criterion, each finding or duty on its own line, its source below it in small. */
@@ -237,7 +237,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 /* The Construction table: the rule widest, the rest even, its status last. */
 .sg-cx-table { table-layout: fixed; width: 100%; min-width: 64rem; }   /* narrower, it scrolls: no word broken in two */
 .sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
-.sg-cx-table col.sg-cx-rule { width: 32%; } .sg-cx-table col.sg-cx-col { width: 12.5%; }
+.sg-cx-table col.sg-cx-rule { width: 32%; } .sg-cx-table col.sg-cx-col { width: 12%; } .sg-cx-table col.sg-cx-follow-col { width: 16%; } .sg-cx-table col.sg-cx-owner-col { width: 16%; }   /* Follow it holds a count, its share and the bar under them */
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
@@ -252,7 +252,6 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
   border: var(--sg-line); border-radius: var(--sg-radius-pill); padding: 0 var(--sg-space-xs); margin-right: var(--sg-space-xs); vertical-align: 1px; white-space: nowrap; }
 .sg-todo-scope { display: block; color: var(--sg-muted); margin-bottom: var(--sg-space-xxs); }   /* local or shared, and on whom a shared one waits: its reason on hover and in the row's panel */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
-.sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }
 .sg-issues td { overflow-wrap: break-word; }
 .sg-issues .sg-todo-area { white-space: normal; }
 .sg-issues .pg-at-date { display: block; color: var(--sg-muted); font-size: var(--sg-s); font-variant-numeric: tabular-nums; }   /* its own column: when it was last updated */   /* when it was last updated, under its status */
@@ -1137,10 +1136,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-kv-list { margin: 0; padding: 0; list-style: none; }
 .sg-kv-list > li + li { border-top: var(--sg-line); }
 
-/* The library's health above the Rules table (library-score.mjs). */
-.sg-cx-score { padding: var(--sg-space-m); margin-bottom: var(--sg-space-l); }
-.sg-cx-score-head { margin: 0 0 var(--sg-space-s); font-size: var(--sg-l); }
-.sg-cx-score-trend { color: var(--sg-muted); font-size: var(--sg-s); margin-left: var(--sg-space-s); }
-.sg-cx-score-areas { display: flex; flex-wrap: wrap; gap: var(--sg-space-m); margin: 0 0 var(--sg-space-s); padding: 0; list-style: none; }
-.sg-cx-score-areas li { display: flex; gap: var(--sg-space-xs); align-items: baseline; }
-.sg-cx-score-note { margin: 0; color: var(--sg-muted); font-size: var(--sg-s); }
+/* The rules followed everywhere, above the Rules table: the Status page's tiles, cards and bars (06-health.css), so one
+   change there changes both. Its own: a card a side, half the width each; the ring; each area on a line, name and bar. */
+.sg-health-tiles.sg-cx-scores { grid-template-columns: repeat(var(--sg-cx-cards, 2), minmax(0, 1fr)); }   /* every card on one row */
+@media (max-width: 720px) { .sg-health-tiles.sg-cx-scores { grid-template-columns: minmax(0, 1fr); } }
+.sg-cx-score-body { display: flex; flex-wrap: wrap; gap: var(--sg-space-xl); align-items: center; }   /* the areas beside the ring, under it when the card is too narrow for both */
+.sg-cx-score-body > .sg-cx-score-areas { flex: 1 1 calc(var(--sg-space-xxl) * 6); }
+.sg-cx-ring { position: relative; display: block; width: calc(var(--sg-space-xxl) * 4.5); aspect-ratio: 1; }   /* 144px at the default scale */
+.sg-cx-ring svg { display: block; width: 100%; height: 100%; fill: none; stroke-width: 5.5; }   /* about 9px drawn at 184px */
+.sg-cx-ring-track { stroke: var(--sg-a4); }
+/* Each state's arc, from the top, in the Status bars' colours (06-health.css): done, to check, to fix. */
+.sg-cx-ring svg > circle:not(.sg-cx-ring-track) { transform: rotate(-90deg); transform-origin: center; }
+.sg-cx-ring-done { stroke: var(--sg-positive); } .sg-cx-ring-check { stroke: var(--sg-warning-ink); } .sg-cx-ring-fix { stroke: var(--sg-negative); }
+.sg-cx-ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.sg-cx-ring-text .sg-health-num { font-size: var(--sg-title); line-height: normal; }   /* the page title's size, the step under the Status big number */
+.sg-cx-score-areas { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sg-space-xs) var(--sg-space-m); align-items: center; margin: 0; padding: 0; list-style: none; }
+.sg-cx-score-areas li { display: contents; }   /* every area's name and bar in the list's two columns, so the bars start and end together */
+.sg-cx-score-areas .sg-health-bar { height: calc(var(--sg-space-xs) * 1.5); }   /* as thin as the table's */
+/* Follow it on two lines: how many, then the bar and its share. */
+.sg-cx-follow { display: block; white-space: nowrap; font-variant-numeric: tabular-nums; }   /* the count and its share on one line */
+.sg-cx-follow-bar { display: flex; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-space-xs); min-width: 7rem;   /* the bar 8px further under its count than it was */ }
+.sg-cx-follow-bar .sg-health-bar { flex: 1; height: calc(var(--sg-space-xs) * 1.5); }   /* as thick as the status dot in the same table */
