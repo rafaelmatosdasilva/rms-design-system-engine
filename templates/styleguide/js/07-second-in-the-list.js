@@ -134,6 +134,15 @@
     };
     // The checks that wait on a fresh read of Figma: a check that finds nothing because the capture predates it must
     // never read as a library with nothing wrong (capture-waits.mjs).
+    // The library's health: one number from the rules the team keeps, each kind's beside it, and the change since the
+    // last day it was built (library-score.mjs). A list, as everything around the rules' table is.
+    if (G.score) {
+      var SC = G.score, delta = SC.previous ? SC.score - SC.previous.score : null;
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-score"><p class="sg-cx-score-head"><strong>' + esc('Library health ' + SC.score) + '</strong>'
+        + (delta == null ? '' : ' <span class="sg-cx-score-trend">' + esc((delta > 0 ? '+' : delta < 0 ? '−' : '±') + Math.abs(delta) + ' since ' + String(SC.previous.at).slice(0, 10)) + '</span>') + '</p>'
+        + '<ul class="sg-cx-score-areas">' + SC.areas.map(function (a) { return '<li><span>' + esc(AREA[a.area] || capital(a.area)) + '</span><strong>' + esc(String(a.score)) + '</strong></li>'; }).join('') + '</ul>'
+        + '<p class="sg-cx-score-note">' + esc('From the rules the team keeps: the share of components each already fits, averaged by kind. A rule still to decide counts for nothing.') + '</p></div>');
+    }
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
       sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
