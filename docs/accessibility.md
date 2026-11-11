@@ -27,6 +27,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 
 - **Every state and colour mode.** Each control is measured again while hovered, focused and pressed, in every colour mode, its text and its edge.
 - **The keyboard.** The Tab key is followed through the page. It finds an element a mouse can click that Tab never reaches, a keyboard trap, focus that jumps back up the page and focus that lands where no one can see it. A modal dialog must keep the focus inside.
+- **Reading order.** On each variant, the words, images and controls come in the code in the order they are seen, with one control or none as well as many (WCAG 1.3.2). Content hidden from screen readers is left out.
 - **A control by what it does.** A `<div>` that answers a click with no role and no tab stop is a control no keyboard reaches, on its component's page too, not a part that needs no focus.
 - **Screen readers.** Each press that shows something is heard as a screen reader hears it, so a toast or an error that appears with nothing said is found. The report prints what a screen reader says for each component (`checkbox, Remember me, not checked`), so you can judge the words without opening VoiceOver or NVDA.
 - **Contrast.** Measured against what is really painted behind the text, see-through text and colours in `oklch()` included. An icon that carries meaning and a control's edge are held to 3:1 in every colour mode.
@@ -282,6 +283,7 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
 - **Role.** A component whose name says it is a control (`iconButton`, `textField`) and has no `Role:` note.
 - **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
 - **Error.** An error state with no message, so the error is shown by colour alone.
+- **Reading order.** Words placed by hand in another layer order than they are seen in, so the code built from the layers reads in another order (WCAG 1.3.2). A frame in auto layout is always in order, artwork is never read, and labels that share no row or column (round a chart) have no order to keep.
 
 Each gap reaches the design team:
 

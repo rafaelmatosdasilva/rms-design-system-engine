@@ -130,6 +130,26 @@ test('page: a tip or a menu that closes on any press is not the pressed control 
   });
 });
 
+test('page: words a screen reader reads in another order than they are seen fail 1.3.2, with one control or none', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  await inPage(async (ev) => {
+    const r = await ev(`(() => {
+      const mk = (html) => { const d = document.createElement('div'); d.innerHTML = html; document.body.appendChild(d); return d.firstElementChild; };
+      const run = (el) => { const a = window.__wcag21.check(el, { name: 'x' }); el.parentElement.remove(); return { f: a.findings.filter((x) => x.kind === 'readorder').map((x) => x.sc + ' ' + x.desc), ran: a.ran.includes('readorder') }; };
+      return {
+        reversed: run(mk('<div style="display:flex;flex-direction:column-reverse"><span class="name">Savings</span><span class="balance">1 200,00</span></div>')),
+        inOrder: run(mk('<div style="display:flex;flex-direction:column"><span class="name">Savings</span><span class="balance">1 200,00</span></div>')),
+        decorative: run(mk('<div style="display:flex;flex-direction:row-reverse"><span>Pay</span><span aria-hidden="true">→</span></div>')),
+        lone: run(mk('<div><button type="button">Save</button></div>')),
+      };
+    })()`);
+    assert.equal(r.reversed.f.length, 1, JSON.stringify(r));
+    assert.match(r.reversed.f[0], /^1\.3\.2 span\.balance \(read after span\.name, which is shown after it\)$/);
+    assert.deepEqual([r.inOrder.f, r.inOrder.ran], [[], true], 'in order: tried, and fine');
+    assert.deepEqual([r.decorative.f, r.decorative.ran], [[], false], 'an arrow hidden from a screen reader is not read');
+    assert.deepEqual([r.lone.f, r.lone.ran], [[], false], 'one control holding its own words: nothing to put in order');
+  });
+});
+
 test('page: each WCAG 2.1 problem the page breaks once is found, and the part that is fine is left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const good = await ev(`(async () => { const r = document.getElementById('good'); const a = window.__wcag21.check(r, { name: 'x' }); const b = await window.__wcag21.interact(r); return { f: a.findings.concat(b.findings), ran: a.ran.concat(b.ran) }; })()`);

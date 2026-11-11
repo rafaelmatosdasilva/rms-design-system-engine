@@ -3,7 +3,7 @@
 // needed; and every gap handed to the design team's to do list in Figma (figma-edits.mjs designA11yEdits).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf } from '../lib/design-a11y.mjs';
+import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf, readingOrderFindings } from '../lib/design-a11y.mjs';
 import { designA11yEdits, applyScript, editLines } from '../lib/figma-edits.mjs';
 
 // Acme, an invented system: a light and a dark mode.
@@ -122,4 +122,24 @@ test('every gap reaches the design team\'s to do list in Figma: its own frame on
   assert.deepEqual(r.changed, [], 'nothing else in the file is touched');
   await go();
   assert.deepEqual([doc.children.length, doc.children[0].children.length], [1, 1], 'written afresh, not added twice');
+});
+
+test('reading order in Figma: words placed by hand in another order than they are seen, once a component; artwork and auto layout never', () => {
+  // A card laid out by hand: its layers list the balance first, but the name is drawn above it.
+  const tree = (kids) => ({ t: 'COMPONENT', n: 'size=m', c: kids });
+  const text = (n) => ({ t: 'TEXT', n });
+  const skeleton = {
+    cardOffer: { trees: [tree([text('Balance'), text('Name')])], variants: [['size=m', 0], ['size=l', 0]], looks: { 'size=m': { 0: { at: [16, 60, 120, 20] }, 1: { at: [16, 16, 120, 20] } }, 'size=l': { 0: { at: [16, 80, 160, 24] }, 1: { at: [16, 16, 160, 24] } } } },
+    cardTidy: { trees: [tree([text('Name'), text('Balance')])], variants: [['size=m', 0]], looks: { 'size=m': { 0: { at: [16, 16, 120, 20] }, 1: { at: [16, 60, 120, 20] } } } },
+    chipRow: { trees: [tree([text('Label'), text('Count')])], variants: [['size=m', 0]], looks: { 'size=m': { 0: { at: [8, 4, 40, 16] }, 1: { at: [52, 4, 16, 16] } } } },
+    logoMark: { trees: [tree([{ t: 'VECTOR', n: 'Vector 2' }, { t: 'VECTOR', n: 'Vector 1' }])], variants: [['size=m', 0]], looks: { 'size=m': { 0: { at: [20, 0, 8, 8] }, 1: { at: [0, 0, 8, 8] } } } },
+    rowAuto: { trees: [tree([text('Second'), text('First')])], variants: [['size=m', 0]] },
+    pieLabels: { trees: [tree([text('Slice one'), text('Slice two')])], variants: [['size=m', 0]], looks: { 'size=m': { 0: { at: [400, 160, 180, 28] }, 1: { at: [16, 48, 160, 32] } } } },
+  };
+  const found = readingOrderFindings(skeleton);
+  assert.deepEqual(found.map((f) => f.component), ['cardOffer'], 'once, whatever the variants; a row read left to right, labels round a chart, artwork and auto layout are fine');
+  assert.match(found[0].text, /^cardOffer: "Name" is seen before "Balance" but comes after it in the layers \(size=m\)/);
+  assert.equal(wcagOf(found[0]), 'WCAG 1.3.2 Meaningful Sequence (A)');
+  assert.deepEqual(readingOrderFindings(skeleton, { only: ['cardTidy'] }), []);
+  assert.equal(designA11yGaps({ skeleton }).filter((f) => f.kind === 'readorder').length, 1, 'among what the design owes');
 });
