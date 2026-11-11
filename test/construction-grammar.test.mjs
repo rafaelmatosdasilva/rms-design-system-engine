@@ -86,6 +86,12 @@ test('layers-named reads every layer of every variant in the skeleton, never wha
   assert.deepEqual(named.toFix.filter((e) => e.component !== 'Promo Banner'), [{ component: 'checkTick', value: 'Union, Rectangle 4' }, { component: 'tabNav', value: 'Frame 1' }]);
 });
 
+test('a text layer Figma names after its words (autoRename) is no name of its own either; one a person named stays', () => {
+  const tree = { t: 'COMPONENT', n: 'Default', c: [{ t: 'TEXT', n: 'Pay now', auto: true }, { t: 'TEXT', n: 'Title' }] };
+  const g = grammarOf({ props: { tagChip: { properties: {} }, ...props }, structure, values, skeleton: { tagChip: { trees: [tree] } } });
+  assert.deepEqual(rule(g, 'layers-named').toFix.filter((e) => e.component === 'tagChip'), [{ component: 'tagChip', value: 'Pay now' }]);
+});
+
 test('layers-named reads the building blocks too: a component the library does not publish is still built by someone', () => {
   const tree = (kids) => ({ t: 'COMPONENT', n: 'Default', c: kids });
   const skeleton = { _blocks: { '.rowShade': { trees: [tree([{ t: 'FRAME', n: 'Frame 3', c: [{ t: 'TEXT', n: 'Label' }] }])] }, '_base': { trees: [tree([{ t: 'FRAME', n: 'Body' }])] } } };
