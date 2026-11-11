@@ -5,24 +5,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { waiting, lastTag, issueBody, said, RELEASE_EVERY, OVERDUE_DAYS, ISSUE_TITLE } from '../lib/release-due.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com' };
-// A repository whose commits and tags are laid down at the days given, so age is a fact and never the clock.
+// A repository whose commits and tags are laid down at the days given, so age is a fact and never the clock. Built in
+// one `git fast-import`, never a git command per commit: with fifty commits that was over a hundred processes, and on a
+// loaded machine one of them found the repository mid-write ("could not parse HEAD"). One process has nothing to
+// interleave with, and the history it writes is the same: each commit its file, its message, its author and
+// committer dates, and a lightweight tag where asked.
 function repoAt(steps) {
   const d = tempDir('release-due-');
-  const git = (...a) => execFileSync('git', a, { cwd: d, encoding: 'utf8', env: { ...process.env, ...ENV }, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: d, env: { ...process.env, ...ENV }, stdio: 'ignore' });
+  const who = (t) => `${ENV.GIT_AUTHOR_NAME} <${ENV.GIT_AUTHOR_EMAIL}> ${Math.floor(Date.parse(t) / 1000)} +0000`;
+  const data = (text) => `data ${Buffer.byteLength(text)}\n${text}\n`;
+  let stream = '';
   for (const [i, s] of steps.entries()) {
-    writeFileSync(join(d, `f${i}.txt`), String(i));
-    git('add', '-A');
-    execFileSync('git', ['commit', '-q', '-m', s.msg ?? `c${i}`], { cwd: d, env: { ...process.env, ...ENV, GIT_AUTHOR_DATE: s.at, GIT_COMMITTER_DATE: s.at }, stdio: ['ignore', 'pipe', 'pipe'] });
-    if (s.tag) git('tag', s.tag);
+    stream += `commit refs/heads/main\nmark :${i + 1}\nauthor ${who(s.at)}\ncommitter ${who(s.at)}\n${data(s.msg ?? `c${i}`)}`;
+    if (i) stream += `from :${i}\n`;
+    stream += `M 100644 inline f${i}.txt\n${data(String(i))}\n`;
+    if (s.tag) stream += `reset refs/tags/${s.tag}\nfrom :${i + 1}\n\n`;
   }
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: d, input: stream, env: { ...process.env, ...ENV }, stdio: ['pipe', 'ignore', 'pipe'] });
+  execFileSync('git', ['checkout', '-q', '-f', 'main'], { cwd: d, stdio: 'ignore' });
   return d;
 }
 const day = (n) => new Date(Date.UTC(2026, 10, n)).toISOString();

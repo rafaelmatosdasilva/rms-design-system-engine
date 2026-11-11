@@ -1354,7 +1354,14 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. The Rules
+page opens with the library's health (`library-score.mjs`): a score from the Figma rules the team keeps (each rule's
+share of components that follow it, averaged by kind, the kinds averaged), each kind's score, and the change since the
+last day the guide was built (`library-score.json` in the engine's output); a rule still to decide counts for nothing. A rule that
+reads what the last capture does not keep (each layer's bindings, its opacity and border, a nested component's exposure,
+the designer's annotations; the skeleton snapshot's `_keeps`, `capture-waits.mjs`) finds nothing until Figma is read
+again: the summary's last line and the Rules page say which checks wait and that the request is "refresh the Figma
+data", so a capture that predates a check never reads as a library with nothing to fix.
 
 How each component is built inside comes from the skeleton the Figma capture reads (`figma-skeleton.snapshot.json`):
 every text layer with a text style, every shadow with an effect style, no layer hidden without a property to show it,
@@ -1432,7 +1439,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   text style, read from its size option or the size its name ends in (`icon-with-label`); whether the library needed a
   component (`need-rules.mjs`): one placed on a page of the file or held by another (`component-used`, read with the
   examples), and none that is another with an option that other already takes, `buttonLarge` beside a `button` whose
-  Size takes large (`no-option-twins`); what each layer binds and how it looks, kept beside the trees
+  Size takes large (`no-option-twins`), and a component the code builds that a product's code uses, read from the
+  contracts' catalog where it knows the products (`component-in-products`); what each layer binds and how it looks, kept beside the trees
   (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
   opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
   sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a

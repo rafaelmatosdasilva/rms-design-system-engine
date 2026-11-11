@@ -1125,6 +1125,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   .pg-inspect-grid.pg-grid-2, .pg-examples { grid-template-columns: 1fr; }   /* Parity and Do and Don't in one column on a phone */
 }
 
+/* The checks that wait on a fresh read of Figma, above the Rules table (capture-waits.mjs). */
+.sg-cx-wait { padding: var(--sg-space-m); margin-bottom: var(--sg-space-l); }
+.sg-cx-wait > p { margin: 0 0 var(--sg-space-s); }
+
 /* Labelled values in a panel opened from a table's row (kvOne, kvList): never another table. */
 .sg-kv { display: grid; gap: var(--sg-space-s); margin: 0; padding: var(--sg-space-m); }
 .sg-kv > div { display: grid; grid-template-columns: minmax(7rem, 30%) 1fr; gap: var(--sg-space-m); align-items: baseline; }
@@ -1132,3 +1136,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .sg-kv-list { margin: 0; padding: 0; list-style: none; }
 .sg-kv-list > li + li { border-top: var(--sg-line); }
+
+/* The library's health above the Rules table (library-score.mjs). */
+.sg-cx-score { padding: var(--sg-space-m); margin-bottom: var(--sg-space-l); }
+.sg-cx-score-head { margin: 0 0 var(--sg-space-s); font-size: var(--sg-l); }
+.sg-cx-score-trend { color: var(--sg-muted); font-size: var(--sg-s); margin-left: var(--sg-space-s); }
+.sg-cx-score-areas { display: flex; flex-wrap: wrap; gap: var(--sg-space-m); margin: 0 0 var(--sg-space-s); padding: 0; list-style: none; }
+.sg-cx-score-areas li { display: flex; gap: var(--sg-space-xs); align-items: baseline; }
+.sg-cx-score-note { margin: 0; color: var(--sg-muted); font-size: var(--sg-s); }

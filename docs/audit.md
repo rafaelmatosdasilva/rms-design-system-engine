@@ -85,6 +85,7 @@ More readings of the library:
 - **Annotated like its family.** A tab with no Accessibility annotation when almost every other tab has one.
 - **Nested properties within reach.** A badge inside a card whose own properties don't show in the card's properties panel, when most nested components show theirs. An agent can only set what the panel shows.
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
+- **Components no product uses.** One your code builds that no product's code uses, read from the contracts' catalog. Your style guide's own pages don't count as a product.
 - **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.
 - **A component that repeats an option.** `buttonLarge` beside a `button` whose Size already takes `large`.
 - **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
@@ -111,9 +112,11 @@ Each is a decision for your team in Figma, and keeping it as it is, as a known e
 
 How your system is built, on both sides, is one page in the style guide's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
 
+- **The library's health in one number.** Above the table: a score from the rules your team keeps (the share of components that already follow each, averaged by kind), each kind's own score beside it, and the change since the last day the guide was built. A rule still to decide counts for nothing.
 - **One table, a row per rule.** Each row says its side (Figma or Code), how many follow it, and who owns it: Design, Engineering, or both. A rule nothing breaks says so.
 - **Sort it your way.** Every column head sorts by it, and again for the other way round.
 - **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Area and one for Side. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
+- **Checks that wait on Figma are named.** A new check that reads something your last Figma capture doesn't have yet finds nothing until Figma is read again. Rather than look like a clean library, the page says how many checks wait and what they read, with the request to refresh Figma ready to copy ([how to ask](features.md#set-up)). The summary of the rules says it too.
 - **One card for the decision.** A row opens in the side panel: what the engine suggests, every component or place it would change, and the approval under it, in one card to read top to bottom.
 - **Each change said once.** Components that take the same change are listed under it together, as a list, not a table.
 - **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
@@ -361,7 +364,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
   - A component a screen draws only as another component's part (a status bar's divider) belongs to that component.
   - `"Product/component"` in `knownReimplementations` keeps one on purpose.
 - **Clean CSS.** Nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
-- **Nested components keep their own styles.** One component's look does not leak into another.
+- **Nested components keep their own styles.** One component's look does not leak into another. It also catches a component that loses its own hover, press or focus to the component around it: a chip whose `.chip .button { background: none }` comes after the button's hover, so the button never shows it.
 - **Structure.** The right height, spacing and corners, from the design.
   - A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke.
   - A border, outline or background the code draws on a component Figma draws with none, in any variant, fails (focus rules aside). This holds for the system's rules and a product's alike, on the component itself, its `::before` or its `::after`.
