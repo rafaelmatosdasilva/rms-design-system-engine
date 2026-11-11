@@ -32,6 +32,7 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
+| [Design themes over your system](#design-themes-over-your-system) | A new theme of your system's tokens, its colours, type, corners and spacing, set live in light and dark. | Coming soon |
 | [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | Coming soon |
 | [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | Coming soon |
 | [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | Coming soon |
@@ -287,6 +288,25 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.
 - A link keeps what you set, so it opens that exact variant.
+
+## Design themes over your system
+
+**Coming soon** · **Why it matters:** A team can see its system as a new brand, or a product's own theme, before anyone writes a token.
+
+*Today: a theme starts from scratch. Starting from a Figma file, a file of tokens or pictures is on its menu, and comes next.*
+
+- Opens from the style guide's Theme choice, as **Create new theme…**, beside the system's own themes.
+- Sets the colours, the font, the corners, the spacing, the borders and the shadows, with the screen on the right taking each change live.
+- Works out dark from light the way your system does, so a new colour keeps each step of a scale as light as yours, and every text it sits under stays readable (WCAG AA).
+- Click a component on the screen to see the tokens it really draws with, then change one of them alone.
+- A theme you make is applied across the whole guide, kept as a file in your own themes folder, and named in the link, so the link opens it.
+- It changes no code: a theme is tokens over your system, and the team's themes store shares it with everyone.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine make a new theme in the style guide` | The style guide built, with Create new theme… in its Theme choice |
 
 ## Turn Figma into code
 
