@@ -19,7 +19,20 @@
   function srcNames(src) {
     var name = function (x) { x = String(x || ''); return /intent layer/i.test(x) ? 'Intent layer' : /contract/i.test(x) ? 'Contract' : /figma|variables/i.test(x) ? 'Figma' : /guideline|\.md\b|notion|wiki/i.test(x) ? 'Guidelines' : /code|css|\.(vue|jsx?|tsx?)\b|comment|stylesheet/i.test(x) ? 'Code' : /^(the )?references|pictures|\.png\b/i.test(x) ? 'References' : x; };
     var out = []; (src || []).forEach(function (x) { var n = name(x); if (n && out.indexOf(n) < 0) out.push(n); }); return out;
+  }  // Documentation has four sources and no other (the owner's rule): Figma, the code, the contract, the intent layer. The
+  // team's own written pages, wherever they live (a Markdown file, Notion, a wiki), are its intent layer; a picture is
+  // Figma's; anything else is no source of documentation.
+  var DOC_SOURCES = ['Intent layer', 'Figma', 'Contract', 'Code'];
+  function docSrcNames(src) {
+    var out = [];
+    // The code is a source where it says something itself (its element read, a comment above a prop); a bare file path a
+    // line merely cites (the stylesheet a guidance line points to) documents nothing.
+    (src || []).forEach(function (x) { var n = srcNames([x])[0], w = n === 'Guidelines' ? 'Intent layer' : n === 'References' ? 'Figma' : n;
+      if (w === 'Code' && /^[\w@./-]+\.(css|scss|less|js|mjs|cjs|ts|tsx|jsx|vue|svelte)$/i.test(String(x).trim())) return;
+      if (DOC_SOURCES.indexOf(w) >= 0 && out.indexOf(w) < 0) out.push(w); });
+    return out;
   }
+
   function statusLine(r) {
     var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
     return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || (r.writeTo || r.area === 'Documentation' ? '' : how((r.src || []).filter(Boolean)[0]));   // a Documentation row's Source says where
@@ -49,7 +62,7 @@
     whoCell: function (r) { return '<td class="sg-todo-whocell">' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + '</td>'; },
     // Where it was read, by name only (Figma, Intent layer, Code, Contract, Guidelines); the file and its path are in the
     // row's panel.
-    source: function (r) { return '<td class="sg-src-cell">' + esc(srcNames(r.src).join(' · ')) + '</td>'; },
+    source: function (r) { return '<td class="sg-src-cell">' + esc((r.area === 'Documentation' ? docSrcNames : srcNames)(r.src).join(' · ')) + '</td>'; },
     // Its status in the table: the word, and one line under it (what it says, else that it is new, else where it was
     // read, unless its table has a Source column); every source is in the row's panel.
     status: function (r) {

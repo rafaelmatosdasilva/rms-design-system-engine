@@ -148,14 +148,17 @@
     var GAP = DONE_STATES.filter(function (k) { return all[k]; }).length > 1 ? 1.5 : 0;
     var arcs = DONE_STATES.map(function (k) { if (!all[k]) return ''; var len = C * all[k] / t, draw = Math.max(0.5, len - GAP), a = '<circle class="sg-cx-ring-' + k + '" cx="54" cy="54" r="' + R + '" stroke-dasharray="' + draw.toFixed(2) + ' ' + (C - draw).toFixed(2) + '" stroke-dashoffset="' + (-(at + GAP / 2)).toFixed(2) + '"/>'; at += len; return a; }).join('');
     var ring = '<span class="sg-cx-ring"><svg viewBox="0 0 108 108" aria-hidden="true"><circle class="sg-cx-ring-track" cx="54" cy="54" r="' + R + '"/>' + arcs
-      + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(pct + '%') + '</span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
+      + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(String(pct)) + '<small>%</small></span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
     return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p></div>'
       + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div></div>';
   }
   // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
   function doneCards(sec, cards) {
     if (!cards) return;
-    var n = (cards.match(/class="sg-health-tile /g) || []).length;   // all on one row: two a row at the least, so one card is still half the width
+    // On one row up to three, wider than a third each never; more wrap, three a row: a card narrower than that has no room
+    // for its ring and its areas side by side, and its number spills over the ring. Two a row at the least, so one card is
+    // still half the width.
+    var n = Math.min(3, (cards.match(/class="sg-health-tile /g) || []).length);
     var html = '<div class="sg-health-box"><div class="sg-health-tiles sg-cx-scores" style="--sg-cx-cards:' + Math.max(2, n) + '">' + cards + '</div></div>';
     var fb = sec.querySelector(':scope > .sg-todo-head');
     if (fb) fb.insertAdjacentHTML('beforebegin', html); else (sec.querySelector(':scope > h2') || sec).insertAdjacentHTML('afterend', html);
