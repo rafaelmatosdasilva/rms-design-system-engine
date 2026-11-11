@@ -85,6 +85,7 @@ More readings of the library:
 - **Annotated like its family.** A tab with no Accessibility annotation when almost every other tab has one.
 - **Nested properties within reach.** A badge inside a card whose own properties don't show in the card's properties panel, when most nested components show theirs. An agent can only set what the panel shows.
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
+- **Components no product uses.** One your code builds that no product's code uses, read from the contracts' catalog. Your style guide's own pages don't count as a product.
 - **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.
 - **A component that repeats an option.** `buttonLarge` beside a `button` whose Size already takes `large`.
 - **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
@@ -111,6 +112,7 @@ Each is a decision for your team in Figma, and keeping it as it is, as a known e
 
 How your system is built, on both sides, is one page in the style guide's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
 
+- **The library's health in one number.** Above the table: a score from the rules your team keeps (the share of components that already follow each, averaged by kind), each kind's own score beside it, and the change since the last day the guide was built. A rule still to decide counts for nothing.
 - **One table, a row per rule.** Each row says its side (Figma or Code), how many follow it, and who owns it: Design, Engineering, or both. A rule nothing breaks says so.
 - **Sort it your way.** Every column head sorts by it, and again for the other way round.
 - **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Area and one for Side. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
