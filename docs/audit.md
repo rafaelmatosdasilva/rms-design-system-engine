@@ -164,6 +164,31 @@ Beside the rules, each component's anatomy, read as deeply as Figma's:
 
 It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
 
+### Classes nothing styles, and styles nothing uses
+
+The checks above read what your styles *do* with the system's values, so they see a colour written by hand and miss the debt that has no styles at all. This reads your two lists of classes against each other, in both directions:
+
+- **A class your markup puts on an element that no stylesheet styles.** Usually a style that was deleted and left the class behind. It is the oldest thing in a product and the cheapest to delete.
+- **A class a stylesheet defines that no markup ever puts on.** A rule nothing can reach.
+
+Both appear on the style guide's Rules page under Code, each with its file and line. The engine deletes nothing: each one is handed back for a person to decide.
+
+Nothing is guessed:
+
+- A class your code builds at runtime (`` `card--${kind}` ``) is never called unused, nor are the ones a router or a transition puts on.
+- An id is not a class, and a dot inside a comment, an attribute selector or a `url()` is not a class either.
+- A bound class is its quoted names, never the props that decide them: `:class="{ 'error': errorState }"` puts on `error`.
+
+### A score for your code's health
+
+Your Figma library gets one number from the rules your team keeps. Your code now gets the same number, from its own rules, because the two checks are one idea on different material: read what the thing is built on, then say how closely it is followed.
+
+- **One number a side**, on the Rules page's Figma and Code cards: how closely the rules are followed, across everything they read.
+- **Classified by area**, so you can see which part is weakest.
+- **With its trend**: the change since the last day the page was built. Each side keeps its own history.
+
+A rule still to decide, or one your team set aside, counts for nothing. The ring on each card still says how many rules are done, which is a different thing, so neither number stands for the other.
+
 ### In your tokens and themes
 
 Advice on keeping the system healthy as it grows, never a failure.
