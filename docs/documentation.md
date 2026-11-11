@@ -324,6 +324,7 @@ The style guide shows them in **History** (it was the Changelog): one table, a r
   - **Somebody else brought it in:** *Done by* the author, *pushed by* the committer, when the commit's committer is not its author, as when a maintainer merges, rebases or cherry-picks someone else's work. A commit pushed exactly as it was written keeps its author as its committer, so it shows one name: git does not keep who pushed.
   - **A pipeline:** a run started by a push, by hand or by a merge request names the person who started it. A scheduled run has nobody behind it, and GitLab names whoever owns the schedule, so the engine never takes that name: its commit says `Run-by: schedule`, and its row says *Done by the schedule*.
   - **An account:** a host's merge button, an app or an access token's bot is said as *a pipeline*, never as if it were a person.
+  - **A read of Figma:** the designers who saved Figma versions since the read before come first, then whoever ran the read. Figma keeps each version with its author, so this needs `FIGMA_TOKEN`; a read through the session's Figma tool names nobody rather than guessing.
   - **A name only**, never an address: the guide is shared with the whole team.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
@@ -332,6 +333,7 @@ The part that pays is what agents get. A card now carries what was already ruled
 
 A page is right when it is written. Then its component changes: a prop is added, a value is dropped, a token is renamed. The page still says what was true before.
 
+- **Figma's own history, asked for.** `--figma-history <component>` says what changed in it between two versions of the file and who saved the versions between; `--figma-blame <component> --property <name>` (or `--layer`) finds the version that brought one in, with its day and author. Both read Figma's versions with `FIGMA_TOKEN` ([the options](../reference/usage.md)).
 - **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots, from the snapshots store or from the commits of your own repository. Each commit is read once and kept, so a run reads only the new ones. It never asks Figma or GitLab again for this. The first read of Figma is not a change.
 - **The page is marked, not removed.** On the Documentation page its status is Review, Changed since written, with what changed and since when. Agents still read every line, with a note beside it: check it against the contract.
 - **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.

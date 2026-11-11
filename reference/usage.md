@@ -1337,6 +1337,23 @@ command none covers (the audit, `--component`, `--recipe`) is left as written wi
 No tool changes the project's code or design file. Where there is a shell, the command line comes first: measured on
 the same tasks, an agent with both used the command line, and the server is what an agent with no shell needs.
 
+#### Figma's version history (`--figma-history`, `--figma-blame`)
+
+Figma keeps a version of the file at every save, autosaves included, each with its author, never with the component it
+changed. With `FIGMA_TOKEN` set (the environment or `.env`), the engine reads them (`figma-versions.mjs`):
+
+- **At each read of Figma.** The authors of the versions saved since the read before are kept with the read (the props
+  snapshot's `_editors`) and named on its row on History, beside whoever ran it. The first read has none to compare.
+- **`--figma-history <component…> [--from <version id | YYYY-MM-DD>] [--to <version id>]`.** What changed in each
+  component between two versions (its properties, variants, layers, description and the values bound to variables),
+  with how many versions were saved between and by whom. With no `--from`, since the last read; `--to` is the file as
+  it is now unless named.
+- **`--figma-blame <component> --property <name> | --layer <name>`.** The version that brought in a property or a
+  layer, with its day and author, found by a binary search over the versions (about log2 of them are read).
+
+A read through the session's Figma tool has no token: it names nobody, never a guess. Components are named as the
+props snapshot names them, which holds their node ids.
+
 #### The construction grammar (`--query construction`, `--construction`, `--figma-fix`, `--construction-check`)
 
 How the system builds a component in Figma, mined on every run from its own components and written to
