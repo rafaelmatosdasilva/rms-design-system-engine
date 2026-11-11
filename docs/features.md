@@ -8,34 +8,35 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Check your Figma library](#check-your-figma-library) | Finds missing tokens, detached instances, missing auto layout and components built against your library's own rules. | Ready to use |
-| [Lint your codebase](#lint-your-codebase) | Finds tokens named by look, aliases to deleted tokens, hard-coded colours, copied components and breaks in your own rules, and stops a push that adds them. | Ready to use |
-| [Compare Figma and code](#compare-figma-and-code) | A deep design-code parity check of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
-| [Test accessibility](#test-accessibility) | Tests contrast, keyboard focus, touch targets and zoom on every component, in a real browser. | Early development |
+| [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | Ready to use |
+| [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
+| [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, tested in a real browser. | Early development |
+| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Coming soon |
 
 ### Documentation
 
 | Feature | What it does | Status |
 |---|---|---|
 | [Write component specs](#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | Ready to use |
-| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs, and drafted where missing. | Ready to use |
-| [Annotate Figma from the code](#annotate-figma-from-the-code) | Writes accessibility specs, pins problems on your screens and links each component to its code, after you approve. | Coming soon |
+| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | Ready to use |
+| [Annotate Figma from the code](#annotate-figma-from-the-code) | Accessibility specs written into Figma, problems pinned on your screens and each component linked to its code, after you approve. | Coming soon |
 
 ### Collaboration
 
 | Feature | What it does | Status |
 |---|---|---|
 | [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | Ready to use |
-| [Try components in a playground](#try-components-in-a-playground) | Change a component's props live, in every state and theme, as the code draws it. | Early development |
+| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it. | Early development |
 
 ### Creation
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Turn Figma into code](#turn-figma-into-code) | Turns a Figma-only system into code, piece by piece, checking each one. | Coming soon |
-| [Bring code components into Figma](#bring-code-components-into-figma) | Turns a component that exists only in your code into a Figma component, with its props and tokens, for designers to fine-tune. | Coming soon |
-| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built in Figma, code or both. | Coming soon |
-| [Prototype with your real components](#prototype-with-your-real-components) | AI builds prototypes with your real components, and nothing invented gets past the checks. | Coming soon |
+| [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | Coming soon |
+| [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | Coming soon |
+| [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | Coming soon |
+| [Generate in code from a prompt](#generate-in-code-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and written in code from its rules. | Coming soon |
+| [Prototype with your real components](#prototype-with-your-real-components) | Prototypes built by AI from your real components, with nothing invented getting past the checks. | Coming soon |
 
 ## Set up
 
@@ -53,7 +54,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine take the hosted token stylesheets again` | The stylesheets your product loads its token values from, downloaded again into one local file, every mode of them, with the address kept so a later run does it by itself |
 | `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
 
-## Check your Figma library
+## Check your Figma library rules
 
 **Ready to use** · **Why it matters:** Every other result is only as good as the file it compares against.
 
@@ -72,49 +73,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
 | `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
 
-## Lint your codebase
-
-**Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
-
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
-
-**In your tokens and themes**
-
-- Tokens named by look (blue-500) or after a product, instead of by role.
-- Aliases that point at a removed token, with the change that removed it.
-- Tokens in a layer where they never change, that could live a layer up.
-- What breaks only in a combination of modes, such as dark on a phone.
-- Brands that pin a value they should inherit from the brand they extend.
-- Two components whose own rules are nearly the same.
-- A health number per area on the style guide's Status page.
-
-**In your apps' code**
-
-- Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
-- Spots a product screen or an AI edit that builds its own copy of a system component.
-- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
-- Flags CSS variables and text casing the design never asked for.
-- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
-- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
-- Checks Tailwind classes against Figma.
-- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
-- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
-- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
-- Renames a token everywhere in one change, with a patch for each product. *(Coming soon)*
-- Lists every place still using a retired component or token, with what to use instead. *(Coming soon)*
-- Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs. *(Coming soon)*
-- Names a product late to move on the Status page, for its own team. *(Coming soon)*
-- Opens one issue per difference in your tracker, and closes it once it is fixed. *(Coming soon)*
-- Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
-- Reads products kept in their own repositories. *(Coming soon)*
-
-### What to ask
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
-
-## Compare Figma and code
+## Measure Figma-code parity
 
 **Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
 
@@ -173,6 +132,48 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
 | `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
+
+## Lint your codebase rules
+
+**Coming soon** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
+
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+
+**In your tokens and themes**
+
+- Tokens named by look (blue-500) or after a product, instead of by role.
+- Aliases that point at a removed token, with the change that removed it.
+- Tokens in a layer where they never change, that could live a layer up.
+- What breaks only in a combination of modes, such as dark on a phone.
+- Brands that pin a value they should inherit from the brand they extend.
+- Two components whose own rules are nearly the same.
+- A health number per area on the style guide's Status page.
+
+**In your apps' code**
+
+- Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
+- Spots a product screen or an AI edit that builds its own copy of a system component.
+- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
+- Flags CSS variables and text casing the design never asked for.
+- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
+- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
+- Checks Tailwind classes against Figma.
+- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
+- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
+- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
+- Renames a token everywhere in one change, with a patch for each product. *(Coming soon)*
+- Lists every place still using a retired component or token, with what to use instead. *(Coming soon)*
+- Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs. *(Coming soon)*
+- Names a product late to move on the Status page, for its own team. *(Coming soon)*
+- Opens one issue per difference in your tracker, and closes it once it is fixed. *(Coming soon)*
+- Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
+- Reads products kept in their own repositories. *(Coming soon)*
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 
 ## Write component specs
 
@@ -293,7 +294,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Gives Claude Figma's exact names and values before it writes the code.
 - Checks every piece once it is built.
 
-## Bring code components into Figma
+## Turn code into Figma
 
 **Coming soon** · **Why it matters:** A component that exists only in code gets a Figma home, so designers can fine-tune it and Figma and the code can be compared.
 
@@ -302,13 +303,10 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.
 
-## Generate components in Figma and code
+## Generate in Figma from a prompt
 
-**Coming soon** · **Why it matters:** New components follow the system's rules from the start, in the design and in the code.
+**Coming soon** · **Why it matters:** A new piece of the system follows its rules from the start, drawn in Figma rather than described in a ticket.
 
-- You choose where it is built: in Figma and in code, only in Figma, or only in code, from the same description.
-- In code, it is written the way your components already are: your framework, file layout, props, tokens and names, with nothing the system does not have.
-- Built in both, the two are checked against each other before anyone signs off, so they start out matching.
 - The AI builds a new component from your description ("a tag like the chip"), starting from the one it is most like.
 - Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
 - Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
@@ -318,6 +316,16 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Grows the component set to hold new variants, so none is clipped.
 - Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
+- Writes nothing until someone signs it off and you say yes, then checks the result.
+
+## Generate in code from a prompt
+
+**Coming soon** · **Why it matters:** The same prompt reaches the code, written the way your own components already are.
+
+- Written the way your components already are: your framework, file layout, props, tokens and names, with nothing the system does not have.
+- Follows the construction rules read from your own code, not a general idea of how components are written.
+- Built in both from the same prompt, the two are checked against each other before anyone signs off, so they start out matching.
+- You choose where it is built: in Figma, in code, or both.
 - Writes nothing until someone signs it off and you say yes, then checks the result.
 
 ## Prototype with your real components

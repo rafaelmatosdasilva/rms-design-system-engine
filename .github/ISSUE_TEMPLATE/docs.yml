@@ -13,18 +13,19 @@ body:
       label: Which part
       description: The part of the [features page](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md) the page is about, or Not sure.
       options:
-        - Check your Figma library
-        - Lint your codebase
-        - Compare Figma and code
+        - Check your Figma library rules
+        - Measure Figma-code parity
         - Test accessibility
+        - Lint your codebase rules
         - Write component specs
         - Gather usage guidelines
         - Annotate Figma from the code
         - Publish a living style guide
         - Try components in a playground
         - Turn Figma into code
-        - Bring code components into Figma
-        - Generate components in Figma and code
+        - Turn code into Figma
+        - Generate in Figma from a prompt
+        - Generate in code from a prompt
         - Prototype with your real components
         - Setting up or updating it
         - Not sure

@@ -4,12 +4,12 @@ How the engine checks your Figma library, lints your code and compares Figma wit
 
 **On this page**
 
-- [Check your Figma library](#check-your-figma-library)
-- [Lint your codebase](#lint-your-codebase)
-- [Compare Figma and code](#compare-figma-and-code)
+- [Check your Figma library](#check-your-figma-library-rules)
+- [Lint your codebase](#lint-your-codebase-rules)
+- [Compare Figma and code](#measure-figma-code-parity)
 - [What a check actually is](#what-a-check-actually-is)
 
-## Check your Figma library
+## Check your Figma library rules
 
 These read the Figma file for whoever keeps it, and never fail a run.
 
@@ -28,7 +28,7 @@ Code can only match what Figma states, so the summary says first when the file i
 
 ### How your system builds a component in Figma
 
-Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it), auto layout everywhere (a variant's own frame, and each row of words or controls inside it placed by hand, such as a divider and its label set side by side; a chart, a map or an image's overlay is drawn freely on purpose and left out), whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library)).
+Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it), auto layout everywhere (a variant's own frame, and each row of words or controls inside it placed by hand, such as a divider and its label set side by side; a chart, a map or an image's overlay is drawn freely on purpose and left out), whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library-rules)).
 
 Two more things it reads of every layer, which make a rule about *which* token possible rather than only about whether there is one:
 
@@ -122,12 +122,12 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 - **Each change said once.** Components that take the same change are listed under it together, as a list, not a table.
 - **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
-- **In the code.** What [Lint your codebase](#lint-your-codebase) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
+- **In the code.** What [Lint your codebase](#lint-your-codebase-rules) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
 - **The code is never changed for you.** A code fix is handed back as a patch to apply.
 
 To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all options](../reference/config.md)).
 
-## Lint your codebase
+## Lint your codebase rules
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
 
@@ -289,9 +289,9 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 - **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
 - `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
-## Compare Figma and code
+## Measure Figma-code parity
 
-Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Compare Figma and code](features.md#compare-figma-and-code) on the Commands page.
+Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Compare Figma and code](features.md#measure-figma-code-parity) on the Commands page.
 
 The engine reads what your design system defines in Figma, its tokens and each component's parts, states and options. Then it checks your code against it, value by value and in a real browser. It is not a screenshot comparison.
 
@@ -414,7 +414,7 @@ It is written whether or not you have a style guide, and the summary of every ch
 
 ### Differences you keep on purpose
 
-Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#compare-figma-and-code) and give the reason.
+Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#measure-figma-code-parity) and give the reason.
 
 - It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
 - Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
