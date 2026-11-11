@@ -54,6 +54,7 @@
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
     guideKind('limitations', 'Limitations'),
+    guideKind('examples', 'Examples'),
     // Its do and don't: written in its intent-layer page, else as Do: and Don't: lines in its Figma description, the
     // code's note or the contract (what agents read), and its pictures in Figma for people.
     ['Do and don\'t', function (c) { var n = (c.examples || []).length, g = guideDo(c); return ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') : g ? KNOW_FROM(g.from) : n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
@@ -309,9 +310,11 @@
   function notesHTML(notes, how) { return (notes.length ? '<strong>Points to cover</strong></p><ul class="sg-doc-notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><p class="pg-par-val">' : '') + esc(how); }
   function docRowsOf(c, tok, ag, ir, lr) {
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
-      var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && (k[0] === 'Role' ? !!roleClash(c) : k[0] !== 'Do and don\'t' && WEAK(body));   // a role is one word by nature: it is to check only when two sources name two roles
+      var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && (k[0] === 'Role' ? !!roleClash(c) : k[0] !== 'Do and don\'t' && WEAK(body));
+      // Every line a draft (**Draft:**, as the engine writes one): written, but not the team's word until a person approves it.
+      var drafted = has && k[0] === 'Examples' && /^\s*(?:\*\*|__)?draft/i.test(plainText(body).replace(/^\s+/, ''));   // a role is one word by nature: it is to check only when two sources name two roles
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), notes: has && !weak ? [] : docNotes(k[0], c), how: has && !weak ? '' : (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
+        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), notes: has && !weak ? [] : docNotes(k[0], c), how: has && !weak ? '' : (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak || drafted ? 'check' : 'done', rel: weak ? 'Too thin' : drafted ? 'A draft to approve' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
