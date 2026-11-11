@@ -23,6 +23,18 @@ test('each component in its Figma variants: the default, each other value, each 
   assert.deepEqual(propsOf({ 'Show Icon': 'True' }), { 'Show Icon': true, showIcon: true });
 });
 
+test('a state axis whose Figma default is a state it is brought into starts at rest, and that state is a case of its own', () => {
+  // The set lists disabled first, so Figma's default is disabled: drawn only there, Tab would pass it by and nothing
+  // else of it would ever be tried.
+  const entry = { properties: { 'labelContent#1:0': { type: 'TEXT', defaultValue: 'Label' }, state: { type: 'VARIANT', defaultValue: 'disabled', variantOptions: ['disabled', 'default', 'error', 'loading'] } } };
+  const cases = harnessCases(entry);
+  assert.equal(cases[0].props.state, 'default', 'the default case is the field a person meets');
+  assert.deepEqual(cases.map((c) => c.label), ['default', 'state=disabled', 'state=error', 'state=loading']);
+  // With no resting word among the options, the first that is no such state.
+  const kinds = harnessCases({ properties: { status: { type: 'VARIANT', defaultValue: 'error', variantOptions: ['error', 'info', 'success'] } } });
+  assert.equal(kinds[0].props.status, 'info');
+});
+
 test('the page sits on the system\'s own surface and text colour when its CSS names them', () => {
   assert.deepEqual(pageColours(':root { --surface-page: #fff; --text-primary: #111; --chip-background: #eee; }'), { surface: '--surface-page', ink: '--text-primary' });
   assert.deepEqual(pageColours(':root { --bg: #fff; --fg: #000; }'), { surface: '--bg', ink: '--fg' });

@@ -16,6 +16,17 @@
     });
     return all.filter(function (e) { return e.tabIndex > 0; }).sort(function (a, b) { return a.tabIndex - b.tabIndex; }).concat(all.filter(function (e) { return e.tabIndex === 0; }));
   }
+  // What answers a click and Tab never reaches: a control by what it does as well as by its role, read as the full check
+  // reads it (a11y-check.mjs). A click handler where a framework keeps it (an onclick, React's props, Vue's invokers),
+  // else the pointer cursor the page gives it (the outermost, since the cursor is inherited). A part of a control, one
+  // around its own control, one with a control's role and one shown disabled are not.
+  function unreachedClicks(root, stops) {
+    var handles = function (el) { return typeof el.onclick === 'function' || el.hasAttribute('onclick') || Object.keys(el).some(function (k) { return (k.indexOf('__reactProps$') === 0 && el[k] && (el[k].onClick || el[k].onMouseDown || el[k].onPointerDown)) || (k === '_vei' && el[k] && (el[k].onClick || el[k].onMousedown || el[k].onPointerdown)); }); };
+    var points = function (el) { return getComputedStyle(el).cursor === 'pointer' && !(el !== root && el.parentElement && root.contains(el.parentElement) && getComputedStyle(el.parentElement).cursor === 'pointer'); };
+    return [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).filter(function (el) {
+      return stops.indexOf(el) < 0 && shown(el) && !el.closest('[disabled], [aria-disabled="true"]') && !el.matches(FOCUSABLE) && !el.querySelector(FOCUSABLE) && !(el.parentElement && el.parentElement.closest(FOCUSABLE)) && !INTERACTIVE.test(el.getAttribute('role') || '') && (handles(el) || points(el));
+    });
+  }
   // Its accessible name, as a screen reader reads it (the common cases): a label, its words, an icon's title.
   function textName(el) {
     var out = '';
@@ -111,13 +122,15 @@
     liveA11yHTML.keys = [];
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
+    var unreached = unreachedClicks(root, stops);
     // Disabled as set: Tab passes it by, as it should, and its behaviours are not tried.
     var offAll = !stops.length && [root].concat(Array.prototype.slice.call(root.querySelectorAll('input, button, select, textarea, [aria-disabled="true"]'))).some(function (el) { return el.disabled || el.getAttribute('aria-disabled') === 'true'; });
     if (offAll) return line(true, 'It is disabled as set, so Tab passes it by and a screen reader says it is unavailable.', 'WCAG 4.1.2 Name, Role, Value (A)');
     if (stops.length) out.push(line(true, 'Tab reaches ' + (stops.length === 1 ? 'it once: ' : stops.length + ' stops in this order: ') + stops.map(function (s, i) { return (stops.length > 1 ? (i + 1) + ' ' : '') + who(s); }).join(', ') + '.', 'WCAG 2.1.1 Keyboard (A)'));
-    else if (wants || interactive.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.', 'WCAG 2.1.1 Keyboard (A)'));
+    else if (wants || interactive.length || unreached.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.' + (!wants && !interactive.length ? ' It answers a click, and has no role and no tab stop.' : ''), 'WCAG 2.1.1 Keyboard (A)'));
     else out.push(a11yRow('none', 'In the browser', 'Nothing in it takes the focus, and as drawn nothing in it needs to.', 'WCAG 2.1.1 Keyboard (A)', FROM_PAGE));
     interactive.filter(function (el) { return stops.indexOf(el) < 0 && !el.closest('[disabled], [aria-disabled="true"]') && !(el.type === 'radio' && el.name); }).forEach(function (el) { out.push(line(false, who(el) + ' acts as a ' + el.getAttribute('role') + ' but Tab does not reach it.', 'WCAG 2.1.1 Keyboard (A)')); });
+    if (stops.length) unreached.filter(function (el) { return interactive.indexOf(el) < 0; }).forEach(function (el) { out.push(line(false, who(el) + ' answers a click but Tab does not reach it.', 'WCAG 2.1.1 Keyboard (A)')); });
     stops.filter(function (el) { return el.tabIndex > 0; }).forEach(function (el) { out.push(line(false, who(el) + ' sets its own place in the Tab order (tabindex="' + el.tabIndex + '"), ahead of the page.', 'WCAG 2.4.3 Focus Order (A)')); });
     // Drawn as disabled (its class says so) while Tab still reaches it: a screen reader offers a control that does nothing.
     var looksOff = function (el) { for (var n = el; n && (n === root || root.contains(n)); n = n.parentElement) if (/(^|[-_\s])(is-)?disabled\b/i.test(typeof n.className === 'string' ? n.className : '')) return true; return false; };

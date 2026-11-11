@@ -1180,7 +1180,10 @@ the Code Connect `valueMap`; `inverted` when the code holds the opposite of the 
 each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
 keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
-on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`), and
+on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`; each part a
+person named in Figma paired with the class the component's own file puts on it, where one class is the part's name or
+ends in it after the component's prefix, `pairedBy: "name"`, `part-pairing.mjs`; the structure contract's `children`
+win, and `cssSelector: null` stays unpaired), and
 `source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
 file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
@@ -1276,7 +1279,10 @@ only while the snapshot still matches the code:
 dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
 `NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
-value, font against the first text element, background as "paints or not" (Figma often paints on a child
+value, each part paired with its class by name (`part-pairing.mjs`; captured as `part-0`, `part-1` with its Figma
+`name`) compared on its own element against the gap and padding Figma binds on the frame of that name, the difference
+carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
+background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
 runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
@@ -1354,7 +1360,10 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. A rule that
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. The Rules
+page opens with the library's health (`library-score.mjs`): a score from the Figma rules the team keeps (each rule's
+share of components that follow it, averaged by kind, the kinds averaged), each kind's score, and the change since the
+last day the guide was built (`library-score.json` in the engine's output); a rule still to decide counts for nothing. A rule that
 reads what the last capture does not keep (each layer's bindings, its opacity and border, a nested component's exposure,
 the designer's annotations; the skeleton snapshot's `_keeps`, `capture-waits.mjs`) finds nothing until Figma is read
 again: the summary's last line and the Rules page say which checks wait and that the request is "refresh the Figma
@@ -1436,7 +1445,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   text style, read from its size option or the size its name ends in (`icon-with-label`); whether the library needed a
   component (`need-rules.mjs`): one placed on a page of the file or held by another (`component-used`, read with the
   examples), and none that is another with an option that other already takes, `buttonLarge` beside a `button` whose
-  Size takes large (`no-option-twins`); what each layer binds and how it looks, kept beside the trees
+  Size takes large (`no-option-twins`), and a component the code builds that a product's code uses, read from the
+  contracts' catalog where it knows the products (`component-in-products`); what each layer binds and how it looks, kept beside the trees
   (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
   opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
   sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a
