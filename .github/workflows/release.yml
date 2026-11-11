@@ -69,22 +69,27 @@ jobs:
             echo "next=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # The labels of each pull request merged in the range, as [[...], [...]].
-          labels='['
+          # Each pull request merged in the range, with its labels, read once: the release labels set how big the
+          # step is (release-version.mjs) and the "after:" labels say what a person does to see it
+          # (release-after.mjs).
+          labels='[' ; prs='['
           for n in $(git log "$range" --format=%s | sed -nE 's/.*\(#([0-9]+)\)$/\1/p'); do
             l=$(gh pr view "$n" --json labels --jq '[.labels[].name]' 2>/dev/null || echo '[]')
             labels="$labels$l,"
+            prs="$prs{\"number\":$n,\"labels\":$l},"
           done
-          labels="${labels%,}]"
+          labels="${labels%,}]" ; prs="${prs%,}]"
           next=$(node lib/release-version.mjs "$last" "$(node -p "require('./package.json').version")" "$labels")
           echo "Releasing $next (previous: ${last:-none})"
           git tag "$next"
           git push origin "$next"
-          if [ -n "$last" ]; then
-            gh release create "$next" --title "$next" --generate-notes --notes-start-tag "$last"
-          else
-            gh release create "$next" --title "$next" --generate-notes
-          fi
+          # What to do, above the notes GitHub generates: a release that asks nothing says so in one line, because
+          # silence reads as nobody having written it down.
+          node lib/release-after.mjs "$prs" > "$RUNNER_TEMP/notes.md"
+          printf '\n' >> "$RUNNER_TEMP/notes.md"
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$next" \
+            ${last:+-f previous_tag_name="$last"} --jq .body >> "$RUNNER_TEMP/notes.md"
+          gh release create "$next" --title "$next" --notes-file "$RUNNER_TEMP/notes.md"
           echo "next=$next" >> "$GITHUB_OUTPUT"
       # The release's code as one archive, with signed provenance: a Sigstore attestation that this workflow built it
       # from that tag, which anyone can check with `gh attestation verify <archive> --repo <this repository>`.
