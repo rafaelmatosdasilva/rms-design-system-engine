@@ -17,7 +17,8 @@ test('four sources, no other: the team\'s pages are its intent layer, a picture 
   assert.deepEqual(docSrcNames(['Something else entirely']), [], 'what is none of the four is no source of documentation');
 });
 
-test('the code is a source only where it says something itself', () => {
+test('the code is a source where it says something itself, never a file path a line cites', () => {
   assert.deepEqual(docSrcNames(['packages/ui/src/theme.css', 'ui-shared.js']), [], 'a file a line merely names documents nothing');
   assert.deepEqual(docSrcNames(['The comment above it in Chip.vue']), ['Code']);
+  assert.deepEqual(docSrcNames(['Its code (Chip.vue)']), ['Code'], 'its element, read from its own code');
 });

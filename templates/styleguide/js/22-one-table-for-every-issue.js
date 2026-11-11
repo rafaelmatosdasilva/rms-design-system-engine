@@ -25,10 +25,10 @@
   var DOC_SOURCES = ['Intent layer', 'Figma', 'Contract', 'Code'];
   function docSrcNames(src) {
     var out = [];
-    // The code is a source only where it says something itself (a comment, a note): a file a line merely names (the
-    // stylesheet a guidance line points to) documents nothing.
+    // The code is a source where it says something itself (its element read, a comment above a prop); a bare file path a
+    // line merely cites (the stylesheet a guidance line points to) documents nothing.
     (src || []).forEach(function (x) { var n = srcNames([x])[0], w = n === 'Guidelines' ? 'Intent layer' : n === 'References' ? 'Figma' : n;
-      if (w === 'Code' && !/comment|note|docblock|jsdoc/i.test(String(x))) return;
+      if (w === 'Code' && /^[\w@./-]+\.(css|scss|less|js|mjs|cjs|ts|tsx|jsx|vue|svelte)$/i.test(String(x).trim())) return;
       if (DOC_SOURCES.indexOf(w) >= 0 && out.indexOf(w) < 0) out.push(w); });
     return out;
   }
