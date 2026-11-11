@@ -232,5 +232,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-10-merge-branch-cursor-codex-guard` | The 24 guide tasks on Haiku (engine cdab86a) | "A check that waits on Figma says so" |
 | `2026-11-10-merge-branch-capture-waits-into` | The 24 guide tasks on Haiku (engine 6889d8a) | "A parent that cancels a nested state" |
 | `2026-11-11-the-figma-library-s-health` | The 24 guide tasks on Haiku (engine 53c56b9) | "Library health, unused components, a steady release test" |
+| `2026-11-11-the-figma-file-read-as` | The 24 guide tasks on Haiku (engine fe7e963) | "The Figma file read as Figma draws it" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
