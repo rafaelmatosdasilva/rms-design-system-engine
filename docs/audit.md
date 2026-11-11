@@ -97,9 +97,13 @@ More readings of the library:
 - **Corners, opacity and borders on variables.** A frame with two corners on another radius variable, an opacity of 40% typed in, or a border weight typed in, when most of your library uses variables for these.
 - **Borders on the same side.** A border outside its layer when most borders sit inside.
 - **Text styles that explain themselves.** A text style with no description when most have one, and a text style no component uses.
+- **Text styles used as they say.** A description that names *Chip Labels* as an example, when no chip sets a text in that style. Only the components a description names are read, never what a layer happens to be called.
 - **Swaps and slots say what goes in them.** A slot or swap property that lists no preferred components, when most do.
 - **Defaults your examples use.** A button that starts disabled when every example in your file shows it enabled. Uses inside other components' examples count too.
 - **Words in one case.** Tabs labelled in Title Case when most components' examples are in Sentence case.
+- **What a use must fill in.** A text property every example replaces, which starts on words that read as real (`42%`) rather than a placeholder (`Label`), so a use left on it looks finished. Agents also get the list of text properties a use must set.
+- **Room for long words.** A label that grows on one line with nothing to stop it, when its examples run past four words. Ending in an ellipsis or a maximum width gives it room.
+- **Icon-only uses keep their name.** An icon-only button whose hidden label is left on `Label`. Those words are what a screen reader calls it.
 - **Shadows change one way.** A card whose hover shows a separate shadow layer, when most cards change their own effect.
 - **One size scale.** At size `s`, a component 32px tall when most are 40px, or one holding an `xl` icon at size `m` where most hold an `m` icon. With the scale written down, a new size can be built from it instead of copied.
 - **Hover shown one way.** A button that shows its hover with an overlay layer when most change their own fill.
@@ -336,7 +340,13 @@ The engine reads what your design system defines in Figma, its tokens and each c
 - **Motion and effects.** How each component moves, and what it draws beyond its colours (both below).
 - **Product screens.** Where each product puts each component (below).
 
-- **Parts.** Each part paired with its class by name (Label with `.btn__label`) is measured on its own element: the gap and padding Figma sets on the frame of that name are compared there, and the difference names the part (`chip › Content gap`) with the rule and the line that set it.
+- **Parts.** Each part of a component is paired with the element that draws it, and measured on its own element.
+  - Paired by its name (Label with `.btn__label`).
+  - Or by the Figma layer's own id, written on the element (`data-figma-node="12:34"`), for a part whose class says nothing of its name.
+  - Or, for a part that is another component (an icon), by that component's class, when the file puts it on one element only.
+  - Its gap and padding are compared with the frame of that name in Figma, and its text with the text style Figma sets that layer in.
+  - A difference names the part (`chip › Label font weight`) with the rule and the line that set it.
+- **Sub-frames in the structure contract.** A frame the contract names whose gap or padding differs is said with the file and line of the rule that sets it.
 
 Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
 
