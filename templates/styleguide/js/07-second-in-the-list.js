@@ -142,8 +142,8 @@
     // One card a side (doneCard, 00-start.js): every rule in the colour of its state, the share done in the middle.
     // Done is green, to decide amber and to fix red, as the filters' dots under them say.
     var RULE_STATE = { rule: 'done', decide: 'check', fix: 'fix' };
-    var sideCard = function (side, name, score) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; }), score); };
-    var cards = sideCard('figma', 'Figma', G.score) + sideCard('code', 'Code', G.scoreCode);
+    var sideCard = function (side, name) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; })); };
+    var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
       sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
