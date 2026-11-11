@@ -241,5 +241,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-the-file-check-counts-only` | The 24 guide tasks on Haiku (engine 40b1d33) | "Reading order, and only what Figma draws" |
 | `2026-11-11-building-blocks-checked-controls-known` | The 24 guide tasks on Haiku (engine 84cc359) | "Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge" |
 | `2026-11-11-empty-frames-and-figma-s` | The 24 guide tasks on Haiku (engine 9dd7442) | "Empty frames, and Figma's own version history" |
+| `2026-11-11-figma-s-version-history-the` | The 24 guide tasks on Haiku (engine 95fea56) | "Figma's version history: the file's pages, and its rate limit waited out or said" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
