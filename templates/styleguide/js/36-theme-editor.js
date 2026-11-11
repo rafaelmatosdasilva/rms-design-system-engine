@@ -206,12 +206,22 @@
   var normN = function (n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
   var COMP_TOK = {};
   var OWNER = {};   // a component token's CSS variable → its component's key
+  var TEXT_STYLES = (T.typography || []).filter(function (x) { return x && x.scale && x.size; });   // the system's text styles, each with its variables
   VARS.forEach(function (v) { var p = String(v.figma).split('/'); if (!v.var || p.length < 3 || !/^(advanced|components?)$/i.test(p[0])) return; var k = normN(p[1]); (COMP_TOK[k] = COMP_TOK[k] || { name: p[1], toks: [] }).toks.push(v); OWNER[v.var] = k; });
+  // The screen itself, picked where no component is: the app's background tokens (an app, page or canvas background,
+  // none of a component's own), so the background a whole product sits on is a click away too.
+  (function () {
+    var toks = VARS.filter(function (v) { return v.var && !OWNER[v.var] && /(app|page|canvas|screen|body)[\s_/-]*(background|bg|surface)|(background|surface)[\s_/-]*(app|page|canvas|primary|default|base)\b/i.test(v.figma) && hexOf(v.values && v.values[0]); }).slice(0, 12);
+    if (toks.length) COMP_TOK.__app = { name: 'App background', toks: toks };
+  })();
   // The component an element of a screen belongs to: the nearest one whose class names it (card-primary, has-card-primary…).
+  // A class names its component with what is around the name taken off (has-, is-, data-; -wrapper, -container…):
+  // data-table-wrapper is the table's.
+  var compKey = function (c) { var a = String(c).replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles|root|wrap)$/, ''), k = normN(a); if (COMP_TOK[k]) return k; var b = normN(a.replace(/^(data|ds|ui|app|c)-/, '')); return COMP_TOK[b] ? b : k; };
   var compOf = function (el) {
     for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
       var cls = String(n.getAttribute('class') || '').split(/\s+/);
-      for (var i = 0; i < cls.length; i++) { var k = normN(cls[i].replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles)$/, '')); if (k && COMP_TOK[k]) return { el: n, key: k }; }
+      for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k]) return { el: n, key: k }; }
     }
     return null;
   };
@@ -472,11 +482,20 @@
         shadowRules += '\n' + sel + ' { box-shadow: ' + [px(g.x, '0px'), px(g.y, '2px'), b.shadowBlur != null ? b.shadowBlur + 'px' : px(g.blur, '16px'), px(g.spread, '0px'), colour].join(' ') + ' !important; }';
       });
     }
+    // A text given another of the system's text styles: its size, weight and line height from that style's own variables,
+    // so it changes with each breakpoint as the system's text does.
+    Object.keys(tk.text || {}).forEach(function (sel) {
+      var st = TEXT_STYLES.filter(function (x) { return x.scale === tk.text[sel]; })[0]; if (!st) return;
+      var val = function (p) { return p ? (p.var ? 'var(' + p.var + ')' : p.value) : null; }, props = [['font-size', val(st.size)], ['font-weight', val(st.weight)], ['line-height', val(st.lh)]].filter(function (p) { return p[1]; });
+      extra += '\n' + scope + ' ' + sel + ' { ' + props.map(function (p) { return p[0] + ': ' + p[1] + ' !important'; }).join('; ') + '; }';
+    });
     return scope + ' { ' + decl.join('; ') + (decl.length ? ';' : '') + ' }' + shadowRules + extra + (b.shadows ? '' : '\n' + [' ', '::before', '::after'].map(function (p) { return scope + ' ' + OWN + p.trim(); }).join(', ') + ' { box-shadow: none !important; }') + '\n' + scope + ' { font-family: var(' + ((T.typeFamily && T.typeFamily.var) || '--x') + ', inherit); }';
   };
 
   // The controls, in the page's own rows (a name on the left, its control on the right).
   var row = function (label, id, control, hint) { return '<div class="pg-ctl"><label class="sg-mode-label" for="' + id + '">' + esc(label) + '</label><div class="sg-ts-field">' + control + (hint ? '<p class="sg-ts-hint">' + esc(hint) + '</p>' : '') + '<p class="sg-ts-error" id="' + id + '-error" hidden></p></div></div>'; };
+  // On or off: the playground's own switch (pg-switch), so a switch reads the same everywhere on the page.
+  var toggle = function (attrs, on) { return '<button type="button" class="pg-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '"' + attrs + '></button>'; };
   var seg = function (name, opts, on) { return '<div class="sg-seg sg-seg-default sg-ts-seg" role="group" data-seg="' + name + '">' + opts.map(function (o) { return '<button type="button" data-v="' + esc(o[0]) + '" aria-pressed="' + (String(o[0]) === String(on)) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>'; };
   // A choice: the guide's own dropdown (as its Theme choice), drawn over a select that keeps the value.
   var select = function (id, opts, on, label) { return '<span class="sg-hidden-text" id="' + id + '-label">' + esc(label) + '</span><span class="sg-dd sg-ts-dd"><select id="' + id + '" class="sg-input sg-select-native" tabindex="-1" aria-hidden="true">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(on) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></span>'; };
@@ -528,7 +547,7 @@
         row('Card roundness', 'ts-card-r', slider('ts-card-r', brief.cardRadius, 'Card roundness')) +
         (SPACES.length ? row('Spacing', 'ts-space', slider('ts-space', brief.spacing || 100, 'Spacing', 200, 5, '%', 50)) : '') +
         (BORDER ? row('Border thickness', 'ts-border', slider('ts-border', brief.borderWidth, 'Border thickness', 8, 0.5)) : '') +
-        '<div class="pg-ctl"><span class="sg-mode-label" id="ts-shadows-label">Shadows</span><div class="sg-ts-field">' + seg('shadows', [['true', 'On'], ['false', 'Off']], String(brief.shadows)) + '</div></div>' +
+        '<div class="pg-ctl"><span class="sg-mode-label" id="ts-shadows-label">Shadows</span><div class="sg-ts-field">' + toggle(' data-sw="shadows" aria-labelledby="ts-shadows-label"', brief.shadows !== false) + '</div></div>' +
         (BLUR ? row('Shadow blur', 'ts-blur', slider('ts-blur', brief.shadowBlur, 'Shadow blur', 40, 1)) : '') +
       '</div></div>' +
       '<p class="sg-info sg-ts-done" role="status" hidden></p>' +
@@ -550,7 +569,7 @@
   var editing = null;   // the saved theme being edited, else null (a new one)
   var open = function (from, kind, theme) {
     editing = theme || null;
-    var tokOver = { light: {}, dark: {}, all: {} }, picked = null;
+    var tokOver = { light: {}, dark: {}, all: {}, text: {} }, picked = null;
     if (theme) { source = 'scratch'; brief = Object.assign({}, start, theme.brief || {}, { name: theme.name }); baseTheme = theme.base || ''; }
     else {
       if (kind) source = kind;
@@ -564,6 +583,7 @@
     if (phead && !phead.querySelector('.sg-ts-actions')) phead.insertAdjacentHTML('beforeend', '<div class="sg-ts-actions">' + SG.sysButton('button', 'Cancel', ' data-ts="cancel"') + SG.sysButton('button', editing ? 'Save changes' : 'Create theme', ' data-ts="create" data-tone="primary"' + (editing ? ' disabled' : '')) + '</div>');
     phead.querySelector('.sg-ts-actions').onclick = function (e) { var a = e.target.closest('[data-ts]'); if (!a) return; if (a.getAttribute('data-ts') === 'cancel') return panel.close(); create(); };
     var err = function (id, text) { var e = $(id + '-error'); if (!e) return; e.textContent = text || ''; e.hidden = !text; var f = $(id); if (f) { if (text) f.setAttribute('aria-invalid', 'true'); else f.removeAttribute('aria-invalid'); } };
+    var swVal = function (name) { var b = root.querySelector('[data-sw="' + name + '"]'); return b ? (b.getAttribute('aria-checked') === 'true' ? 'true' : 'false') : null; };
     var segVal = function (name) { var b = root.querySelector('[data-seg="' + name + '"] [aria-pressed="true"]'); return b ? b.getAttribute('data-v') : null; };
 
     // The preview's box, and the page's own style for the theme (kept empty: the theme goes in the preview's frame).
@@ -594,7 +614,8 @@
       // is narrower), so it fills the stage's width and the panel's height.
       var k = Math.max(0.2, Math.min(1, w / size[0])), lw = Math.round(w / k), lh = Math.round((h > 160 ? h : size[1] * k) / k);
       frame.style.width = lw + 'px'; frame.style.height = lh + 'px'; frame.style.transform = 'scale(' + k + ')';
-      if (screenEl) { screenEl.style.width = lw + 'px'; if (screenEl._flow) { screenEl.style.height = 'auto'; screenEl.style.minHeight = lh + 'px'; } else screenEl.style.height = lh + 'px'; }
+      // Every screen scrolls in its frame: the specimen as long as it runs, a Showroom screen at its own height at least.
+      if (screenEl) { screenEl.style.width = lw + 'px'; screenEl.style.minHeight = lh + 'px'; screenEl.style.height = screenEl._flow ? 'auto' : Math.max(lh, size[1]) + 'px'; }
       box.style.width = Math.floor(lw * k) + 'px'; box.style.height = Math.floor(lh * k) + 'px'; box.style.marginInline = 'auto';
     };
     window.addEventListener('resize', function () { fit(); });
@@ -634,19 +655,19 @@
       // as it is, so nothing sits over what is being changed. Nothing in the screen does what it
       // would on its own (a link, a field, a button).
       // Drawn inside the element's own edge: outside it, a tile's clipping or the cell beside it cut its sides off.
-      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked { outline: 2px solid transparent !important; outline-offset: -2px !important; animation: ts-picked-flash 1s ease-out; } @keyframes ts-picked-flash { 0%, 40% { outline-color: var(--sg-accent, #2563eb); } 100% { outline-color: transparent; } } @media (prefers-reduced-motion: reduce) { #ts-screen .ts-picked { animation-duration: 0.6s; animation-timing-function: steps(1, end); } }'; fdoc.head.appendChild(hl);
+      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked, #ts-screen .ts-picked-part { outline: 2px solid var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked:has(.ts-picked-part) { outline-style: dotted !important; } #ts-screen .ts-tok-hit { outline: 3px dashed var(--sg-accent, #2563eb) !important; outline-offset: -3px !important; } #ts-pick-label { position: absolute; z-index: 2147483647; pointer-events: none; padding: 1px 6px; border-radius: 3px; background: var(--sg-accent, #2563eb); color: #fff; font: 600 11px/1.5 system-ui, sans-serif; white-space: nowrap; }'; fdoc.head.appendChild(hl);
       var hovered = null, stop = function (e) { e.preventDefault(); e.stopPropagation(); };
       ['mousedown', 'mouseup', 'submit', 'keydown', 'dblclick', 'contextmenu'].forEach(function (t) { fdoc.addEventListener(t, stop, true); });
-      fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.part ? partEl(e.target, n.el, n.part) : n.el; if (hovered) hovered.classList.add('ts-hover'); }, true);   // what the next click picks, a layer too
+      fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.node || n.el; if (hovered) hovered.classList.add('ts-hover'); }, true);   // what the next click picks, a layer too
       fdoc.addEventListener('mouseleave', function () { if (hovered) hovered.classList.remove('ts-hover'); hovered = null; }, true);
       fdoc.addEventListener('click', function (e) { stop(e); var n = nextPick(e.target); if (n) pick(n, n.same); }, true);
-      if (picked) { var again = screenEl.querySelector('.' + picked.cls); if (again) again.classList.add('ts-picked'); }
+      if (picked) { var again = screenEl.querySelector('.' + picked.cls); if (again) { again.classList.add('ts-picked'); picked.el = again; picked.node = null; picked.part = null; } }
       ['dark', 'light'].forEach(function (md) { setMode(md); readLive(screenEl, md); }); setMode(mode);
       if (FONT) live.font = firstFamily(fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(FONT.v));
       fit();
     };
     var tokSaved = (brief.tokens && typeof brief.tokens === 'object') ? brief.tokens : {};   // a theme being edited keeps its own
-    ['light', 'dark', 'all'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
+    ['light', 'dark', 'all', 'text'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
     var pickCard = root.querySelector('.sg-ts-pick');
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
@@ -718,24 +739,26 @@
           fdoc._tokRules.push({ order: order, sels: sels, decls: decls });
         });
       }
+      if (c.key === '__app') return null;   // the screen: its own tokens, never every rule of the page
       var root0 = c.part && c.node ? c.node : c.el;   // a layer picked: that layer alone
       var targets = [root0].concat(Array.prototype.filter.call(root0.querySelectorAll('*'), function (n) { var ch = compChain(n); return !ch.length || ch[ch.length - 1].el === c.el; }));
-      var win = {}, states = {};
+      var win = {}, states = {}, who = {}, hit = function (v, el) { (who[v] = who[v] || []).indexOf(el) < 0 && who[v].push(el); };
       fdoc._tokRules.forEach(function (r) {
         targets.forEach(function (t, ti) {
           r.sels.forEach(function (x) {
             var ok = false; try { ok = t.matches(x.s); } catch (e) { ok = false; } if (!ok) return;
             r.decls.forEach(function (d) {
-              if (x.dyn) { d.vars.forEach(function (v) { states[v] = 1; }); return; }
+              if (x.dyn) { d.vars.forEach(function (v) { states[v] = 1; hit(v, t); }); return; }
               var key = ti + '|' + x.pe + '|' + d.prop, w = win[key], rank = [d.imp ? 1 : 0, x.spec, r.order];
-              if (!w || rank[0] > w.rank[0] || (rank[0] === w.rank[0] && (rank[1] > w.rank[1] || (rank[1] === w.rank[1] && rank[2] >= w.rank[2])))) win[key] = { rank: rank, vars: d.vars };
+              if (!w || rank[0] > w.rank[0] || (rank[0] === w.rank[0] && (rank[1] > w.rank[1] || (rank[1] === w.rank[1] && rank[2] >= w.rank[2])))) win[key] = { rank: rank, vars: d.vars, t: t };
             });
           });
         });
       });
       // The winners' tokens, followed through the custom properties they set (a part's own --x: var(--token)).
       var out = {};
-      Object.keys(win).forEach(function (k) { win[k].vars.forEach(function (v) { out[v] = 1; }); });
+      Object.keys(win).forEach(function (k) { win[k].vars.forEach(function (v) { out[v] = 1; hit(v, win[k].t); }); });
+      c.who = who;   // each token, the elements that draw with it: what a token's row outlines on the screen
       Object.keys(states).forEach(function (v) { out[v] = 1; });
       var toks = Object.keys(out).filter(function (v) { return OWNER[v]; }).map(function (v) { return BYVAR[v]; }).filter(Boolean);
       return toks.length ? toks : null;
@@ -743,21 +766,91 @@
     // What a click picks, as in Figma: the outermost component under the pointer first (all its tokens); a click inside
     // the one picked goes a level deeper: the component nested in it, then the layer clicked (its icon or its text).
     var nextPick = function (t) {
-      var chain = compChain(t); if (!chain.length) return null;
+      var chain = compChain(t);
+      // Nothing of a component under the pointer: the screen itself, its app background and the tokens around it.
+      if (!chain.length) { var bg = appPick(); return bg && !(picked && picked.key === '__app') ? bg : null; }
       var at = picked ? chain.map(function (x) { return x.el; }).indexOf(picked.el) : -1;
       var mk = function (x, part) { return { el: x.el, key: x.key, cls: x.cls, chain: chain, part: part || null }; };
       if (at < 0) return mk(chain[0]);
       if (at < chain.length - 1) return mk(chain[at + 1]);
-      var part = partOf(t, picked.el); if (!part || part === picked.part) return null;
-      var n = mk(chain[at], part); n.same = true; n.node = partEl(t, picked.el, part); return n;
+      // The deepest component picked: each click goes one layer deeper toward what was clicked (a table, its row, the
+      // cell, its text), as Figma's does. A wrapper the same size as the one layer inside it is passed through.
+      var from = picked.node && picked.node.contains(t) ? picked.node : picked.el;
+      if (t === from) return null;
+      var step = t; while (step.parentElement && step.parentElement !== from) step = step.parentElement;
+      if (!from.contains(step) || step === from) return null;
+      while (step.children.length === 1 && step.children[0].contains(t) && !ownText(step) && sameBox(step, step.children[0])) step = step.children[0];
+      var n = mk(chain[at], layerName(step)); n.same = true; n.node = step; return n;
     };
+    var ownText = function (el) { return Array.prototype.some.call(el.childNodes || [], function (x) { return x.nodeType === 3 && x.textContent.trim(); }); };
+    var sameBox = function (a, b) { var x = a.getBoundingClientRect(), y = b.getBoundingClientRect(); return Math.abs(x.width - y.width) < 2 && Math.abs(x.height - y.height) < 2; };
+    // A layer named for what it is: a row, a cell, an icon, a text…, else after its own class.
+    var layerName = function (el) {
+      var tag = String(el.tagName || '').toLowerCase(), cls = String(el.getAttribute('class') || '');
+      var byTag = { tr: 'row', td: 'cell', th: 'header cell', thead: 'header', tbody: 'rows', tfoot: 'footer', li: 'item', label: 'label', button: 'button', a: 'link', input: 'field', textarea: 'field', select: 'field', svg: 'icon', img: 'image' };
+      if (/(^|[\s-])icon/i.test(cls)) return 'icon';
+      if (byTag[tag]) return byTag[tag];
+      if (/(^|[\s_-])row([\s_-]|$)/i.test(cls)) return 'row';
+      if (/(^|[\s_-])cell([\s_-]|$)/i.test(cls)) return 'cell';
+      if (ownText(el)) return 'text';
+      var first = cls.split(/\s+/).filter(function (x) { return x && !/^ts-/.test(x); }).pop();
+      return first ? first.replace(/[-_]+/g, ' ') : tag;
+    };
+    var appPick = function () { return COMP_TOK.__app && screenEl && screenEl.firstElementChild ? { el: screenEl.firstElementChild, key: '__app', cls: '', chain: [] } : null; };
     var compChain = function (el) {
       var out = [];
       for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
         var cls = String(n.getAttribute('class') || '').split(/\s+/);
-        for (var i = 0; i < cls.length; i++) { var k = normN(cls[i].replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles)$/, '')); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: cls[i] }); break; } }
+        for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: cls[i] }); break; } }
       }
       return out;
+    };
+    // What is being changed stays marked on the screen: its outline, and a label with its name (and the layer, an icon
+    // or a text, when one is picked), placed at its top left and moved with it.
+    var placeLabel = function () {
+      if (!fdoc || !screenEl) return;
+      var lab = fdoc.getElementById('ts-pick-label');
+      Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked-part'), function (x) { if (!picked || x !== picked.node) x.classList.remove('ts-picked-part'); });
+      if (!picked || !picked.el || !picked.el.isConnected) { if (lab) lab.remove(); return; }
+      if (picked.part && picked.node) picked.node.classList.add('ts-picked-part');
+      if (!lab) { lab = fdoc.createElement('div'); lab.id = 'ts-pick-label'; lab.setAttribute('aria-hidden', 'true'); screenEl.appendChild(lab); }
+      lab.textContent = COMP_TOK[picked.key].name + (picked.part ? ' › ' + picked.part : '');
+      var t = (picked.part && picked.node) || picked.el, r = t.getBoundingClientRect(), sr = screenEl.getBoundingClientRect();
+      var top = r.top - sr.top - lab.offsetHeight - 2; if (top < 0) top = r.top - sr.top + 2;
+      lab.style.top = top + 'px'; lab.style.left = Math.max(0, r.left - sr.left) + 'px';
+    };
+    // The components right inside the one picked, each a click away: a nested one is hard to hit on the screen itself.
+    var kidsOf = function (c) {
+      var out = [], seen = {};
+      Array.prototype.forEach.call(c.el.querySelectorAll('*'), function (n) {
+        var ch = compChain(n); if (ch.length < 2 || ch[ch.length - 1].el !== n || ch[ch.length - 2].el !== c.el) return;
+        var x = ch[ch.length - 1]; if (seen[x.key]) return; seen[x.key] = 1; out.push({ el: n, key: x.key, cls: x.cls, chain: ch });
+      });
+      return out;
+    };
+    // The text style a picked text is drawn in: the system's style whose own variables, read where the text is (so at the
+    // screen's breakpoint), give its size, weight and line height; and a choice of the others, for this text in every
+    // copy of the component.
+    var textElOf = function (t) { if (ownText(t)) return t; var all = t.querySelectorAll('*'); for (var i = 0; i < all.length; i++) if (ownText(all[i])) return all[i]; return null; };
+    var nodeSel = function (el) { var cl = Array.prototype.filter.call(el.classList, function (x) { return !/^ts-/.test(x); }); return cl.length ? cl.map(function (x) { return '.' + CSS.escape(x); }).join('') : el.tagName.toLowerCase(); };
+    var styleOf = function (el) {
+      var cs = fdoc.defaultView.getComputedStyle(el), px = function (v) { return Math.round(parseFloat(v) * 10) / 10; }, best = null, bestScore = 0;
+      TEXT_STYLES.forEach(function (st) {
+        var get = function (p) { return p ? (p.var ? cs.getPropertyValue(p.var).trim() : String(p.value)) : ''; };
+        if (px(get(st.size)) !== px(cs.fontSize)) return;
+        var sc = 1 + (st.weight && String(parseInt(get(st.weight), 10)) === String(parseInt(cs.fontWeight, 10)) ? 2 : 0) + (st.lh && px(get(st.lh)) === px(cs.lineHeight) ? 1 : 0);
+        if (sc > bestScore) { best = st; bestScore = sc; }
+      });
+      return best;
+    };
+    var textRow = function (c) {
+      if (!TEXT_STYLES.length || c.key === '__app') return '';
+      var el = textElOf(c.node || c.el); if (!el) return '';
+      var sel = '.' + CSS.escape(c.cls || '') + (el === c.el ? '' : ' ' + nodeSel(el));
+      var chosen = tokOver.text[sel], now = styleOf(el), pickNow = chosen || (now && now.scale) || '';
+      return '<p class="sg-ts-tok-group">Text style</p><div class="pg-ctl sg-ts-tok"><span class="sg-mode-label">Style</span><div class="sg-ts-field sg-ts-tok-field">' +
+        select('ts-textstyle', (pickNow ? [] : [['', 'Not one of the system\'s styles']]).concat(TEXT_STYLES.map(function (x) { return [x.scale, x.scale + (x.size && x.size.value ? ' · ' + x.size.value : '')]; })), pickNow, 'Text style').replace('<select ', '<select data-sel="' + esc(sel) + '" data-was="' + esc(now ? now.scale : '') + '" ') +
+        '<button type="button" class="sg-ts-auto" data-text-reset="' + esc(sel) + '" title="Back to the component\'s own" aria-label="Back to the component\'s own text style"' + (chosen ? '' : ' hidden') + '>' + RESET + '</button></div></div>';
     };
     var pick = function (c, keep) {
       if (!keep) {
@@ -777,19 +870,26 @@
         var cur = nowOf(x.v), over = tokOver.all[x.v.var], ctl;
         if (x.kind === 'colour') ctl = '<div class="sg-ts-pair">' + colourOf(x, 'light') + (COLOUR_AXIS ? colourOf(x, 'dark') : '') + '</div>';
         else if (x.kind === 'size') ctl = '<label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="size" step="0.5" value="' + esc(parseFloat(cur) || 0) + '" aria-label="' + esc(x.label + ' in px') + '"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>';
-        else { var on = /^true$/i.test(cur); ctl = '<div class="sg-seg sg-seg-default sg-ts-seg" role="group" aria-label="' + esc(x.label) + '">' + [['true', 'On'], ['false', 'Off']].map(function (o) { return '<button type="button" data-tok="' + esc(x.v.var) + '" data-kind="bool" data-v="' + o[0] + '" aria-pressed="' + (String(on) === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>'; }
-        return '<div class="pg-ctl sg-ts-tok"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
+        else ctl = toggle(' data-tok="' + esc(x.v.var) + '" data-kind="bool" aria-label="' + esc(x.label) + '"', /^true$/i.test(cur));
+        return '<div class="pg-ctl sg-ts-tok" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
           (x.kind !== 'size' ? '' : '<button type="button" class="sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
       };
       // Its head stays in view: the components it sits in (each a click away), the one picked, and Done.
-      var trail = (c.chain || [c]).map(function (x, i) { var name = COMP_TOK[x.key].name; return x.key === c.key && !c.part ? '<b>' + esc(name) + '</b>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + i + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
-      if (c.part) trail += '<span class="sg-ts-trail-sep" aria-hidden="true">›</span><b>' + esc(c.part) + '</b>';
-      var n = 0, html = '<div class="pg-inspect-head sg-ts-pick-head"><span class="sg-ts-pick-trail">' + trail + '</span>' + SG.sysButton('button', 'Done', ' data-tok-done') + '</div><div class="pg-controls">';
+      var trail = (c.chain && c.chain.length ? c.chain : [c]).map(function (x, i) { var name = COMP_TOK[x.key].name; return x.key === c.key && !c.part ? '<b>' + esc(name) + '</b>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + i + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
+      // The layers from the component down to the one picked, each a click back to it (a pass-through wrapper left out).
+      c.layers = [];
+      if (c.part && c.node) { for (var q = c.node; q && q !== c.el; q = q.parentElement) if (!(q !== c.node && q.children.length === 1 && !ownText(q) && sameBox(q, q.children[0]))) c.layers.unshift(q); }
+      trail += c.layers.map(function (q, i) { var sep = '<span class="sg-ts-trail-sep" aria-hidden="true">›</span>'; return sep + (i === c.layers.length - 1 ? '<b>' + esc(layerName(q)) + '</b>' : '<button type="button" class="sg-ts-trail" data-tok-layer="' + i + '">' + esc(layerName(q)) + '</button>'); }).join('');
+      c.kids = c.key === '__app' ? [] : kidsOf(c);
+      var kids = c.kids.length ? '<span class="sg-ts-kids"><span class="sg-ts-kids-label">Inside</span>' + c.kids.map(function (x, i) { return '<button type="button" class="sg-ts-kid" data-tok-kid="' + i + '">' + esc(COMP_TOK[x.key].name) + '</button>'; }).join('') + '</span>' : '';
+      var n = 0, html = '<div class="pg-inspect-head sg-ts-pick-head"><span class="sg-ts-pick-trail">' + trail + kids + '</span>' + SG.sysButton('button', 'Done', ' data-tok-done') + '</div><div class="pg-controls">';
       var PART = { icon: /icon/i, text: /text|label|title|font|typo/i };
-      var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
+      var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || !PART[c.part] || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
       if (!shownG.length) shownG = Object.keys(groups);
+      html += textRow(c);
       shownG.sort().forEach(function (g) { html += '<p class="sg-ts-tok-group">' + esc(g) + '</p>' + groups[g].map(function (x) { n++; return rowOf(x); }).join(''); });
       pickCard.innerHTML = html + (n ? '' : '<p class="sg-ts-hint">Nothing to change here: its tokens are not colours, sizes or switches.</p>') + '</div>';
+      placeLabel(); dropdowns(pickCard);
       // Its head stays just under the panel's own; picked, the panel scrolls to the card's top.
       var ph = panel.el.querySelector('.sg-panel-head'), col = root.querySelector('.sg-ts'), own = col && getComputedStyle(col).overflowY === 'auto', sc = own ? col : panel.el.querySelector('.sg-tk-detail'), off = own ? 0 : (ph ? ph.offsetHeight : 0);
       if (ph) root.style.setProperty('--ts-head', ph.offsetHeight + 'px');
@@ -816,13 +916,31 @@
       else if (k === 'colour-hex') { var hx = hexOf(t.value); if (hx) { t.parentNode.querySelector('[data-kind="colour"]').value = hex6(hx); showMode(md); setTok(v, 'colour', hx, md); } }
       else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) setTok(v, 'size', n + 'px'); }
     });
-    pickCard.addEventListener('change', function (e) { e.stopPropagation(); });
+    pickCard.addEventListener('change', function (e) {
+      e.stopPropagation();
+      var t = e.target; if (t.id !== 'ts-textstyle') return;
+      var sel = t.getAttribute('data-sel'); if (!t.value || t.value === t.getAttribute('data-was')) delete tokOver.text[sel]; else tokOver.text[sel] = t.value;
+      changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80);
+    });
+    // A nested component's button outlines it on the screen while the pointer is on it, so it is found before it is picked.
+    ['mouseover', 'mouseout', 'focusin', 'focusout'].forEach(function (t) { pickCard.addEventListener(t, function (e) {
+      var kd = e.target.closest && e.target.closest('[data-tok-kid]'), y = kd && picked && picked.kids && picked.kids[+kd.getAttribute('data-tok-kid')];
+      if (y) y.el.classList.toggle('ts-hover', t === 'mouseover' || t === 'focusin');
+      // A token's row: the parts of the screen drawn with it, outlined while the pointer (or the focus) is on the row.
+      var row = e.target.closest && e.target.closest('[data-hit]');
+      if (row && fdoc) { var on = t === 'mouseover' || t === 'focusin', els = (picked && picked.who && picked.who[row.getAttribute('data-hit')]) || [];
+        Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-tok-hit'), function (x) { x.classList.remove('ts-tok-hit'); });
+        if (on) (els.length ? els : [picked && (picked.node || picked.el)]).forEach(function (x) { if (x) x.classList.add('ts-tok-hit'); }); }
+    }); });
     pickCard.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = '<p class="sg-ts-hint sg-ts-pick-empty">Click a component in the preview to change its tokens.</p>'; return; }
+      var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      var kd = e.target.closest('[data-tok-kid]'); if (kd && picked && picked.kids) { var y = picked.kids[+kd.getAttribute('data-tok-kid')]; if (y) { y.el.classList.remove('ts-hover'); pick({ el: y.el, key: y.key, cls: y.cls, chain: y.chain }); } return; }
+      if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); placeLabel(); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = '<p class="sg-ts-hint sg-ts-pick-empty">Click a component in the preview to change its tokens.</p>'; return; }
       var ch = e.target.closest('[data-tok-chain]'); if (ch && picked && picked.chain) { var x = picked.chain[+ch.getAttribute('data-tok-chain')]; if (x) pick({ el: x.el, key: x.key, cls: x.cls, chain: picked.chain }); return; }
-      if (e.target.closest('[data-tok-part-clear]') && picked) { picked.part = null; pick(picked, true); return; }
-      var bt = e.target.closest('[data-kind="bool"]'); if (bt) { Array.prototype.forEach.call(bt.parentNode.children, function (x) { x.setAttribute('aria-pressed', String(x === bt)); }); setTok(bt.getAttribute('data-tok'), 'bool', bt.getAttribute('data-v')); return; }
+      if (e.target.closest('[data-tok-part-clear]') && picked) { picked.part = null; picked.node = null; pick(picked, true); return; }
+      var ly = e.target.closest('[data-tok-layer]'); if (ly && picked && picked.layers) { var q = picked.layers[+ly.getAttribute('data-tok-layer')]; if (q) { picked.node = q; picked.part = layerName(q); pick(picked, true); } return; }
+      var bt = e.target.closest('[data-kind="bool"]'); if (bt) { var to = bt.getAttribute('aria-checked') === 'true' ? 'false' : 'true'; bt.setAttribute('aria-checked', to); setTok(bt.getAttribute('data-tok'), 'bool', to); return; }
       var rs = e.target.closest('[data-tok-reset]'); if (rs) { e.preventDefault(); setTok(rs.getAttribute('data-tok-reset'), rs.getAttribute('data-kind'), null, rs.getAttribute('data-mode')); setTimeout(function () { if (picked) pick(picked, true); }, 60); }
     });
     var lastSide = 'bg';   // the menu's background or its content (the colours drawn on it): which was edited last
@@ -833,7 +951,7 @@
         buttonRadius: Math.max(0, Math.round(+$('ts-btn-r-num').value || 0)), cardRadius: Math.max(0, Math.round(+$('ts-card-r-num').value || 0)), spacing: $('ts-space-num') ? Math.max(0, +$('ts-space-num').value || 100) : 100, borderWidth: $('ts-border-num') ? Math.max(0, +$('ts-border-num').value || 0) : start.borderWidth, shadowBlur: $('ts-blur-num') ? Math.max(0, +$('ts-blur-num').value || 0) : start.shadowBlur,
         grad: STOPS.reduce(function (o, st) { var f = $(st.id + '-hex'); if (f && hexOf(f.value)) o[st.v] = hexOf(f.value); return o; }, {}),
         menuLead: lastSide, tokens: JSON.parse(JSON.stringify(tokOver)),
-        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: segVal('shadows') !== 'false' };
+        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: swVal('shadows') !== 'false' };
     };
     var paint = function () {
       if (!box) return;
@@ -842,7 +960,7 @@
       if (tstyle) tstyle.textContent = on ? themeCss(b, '#ts-screen', mode) : '';
       THEMED = {};   // the theme changed: what each token is now is read again
       // No shadows, no blur to set: its slider is off with them.
-      var noShadow = segVal('shadows') === 'false';
+      var noShadow = swVal('shadows') === 'false';
       ['ts-blur', 'ts-blur-num'].forEach(function (id) { var x = $(id); if (x) x.disabled = noShadow; });
       var blurRow = $('ts-blur') && $('ts-blur').closest('.pg-ctl'); if (blurRow) blurRow.classList.toggle('is-off', noShadow);
       // Each colour's dark field shows the value worked out from light until it is set by hand.
@@ -854,7 +972,7 @@
       STOPS.forEach(function (st) { var f = $(st.id + '-d-hex'), pick = $(st.id + '-d'), hex = (b.grad || {})[st.v]; if (!f || !hex || f.dataset.hand === '1') return; var d = tokenDark(st, hex); if (document.activeElement !== f) f.value = d; pick.value = hex6(d); });
       // A component picked shows its tokens as they are now: drawn again, unless one of its own fields is being typed in.
       if (picked && !pickCard.contains(document.activeElement)) pick(picked, true);
-      fit();
+      fit(); placeLabel();
     };
     var later = null, repaint = function () { clearTimeout(later); later = setTimeout(paint, 40); };
     // The colours the theme starts from, as the screen shows them; written into the fields when asked (a theme just
@@ -896,6 +1014,7 @@
         if (which === 'source') { source = b.getAttribute('data-v'); Array.prototype.forEach.call(root.querySelectorAll('[data-pane]'), function (p) { p.hidden = p.getAttribute('data-pane') !== source; }); root.querySelector('.sg-ts-done').hidden = true; }
         repaint(); return;
       }
+      var sw = e.target.closest('[data-sw]'); if (sw) { sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); changed(); repaint(); return; }
       var au = e.target.closest('[data-auto]');
       if (au) { e.preventDefault(); var f = $(au.getAttribute('data-auto') + '-hex'); f.dataset.hand = ''; f.value = ''; au.hidden = true; paint(); return; }
       var a = e.target.closest('[data-ts]'); if (!a) return;

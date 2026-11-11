@@ -151,3 +151,22 @@
 .sg-ts-preview:fullscreen .sg-ts-screen { border-radius: 0; }
 .sg-ts-preview:fullscreen::backdrop { background: var(--sg-bg); }
 .sg-ts-preview:fullscreen > .sg-ts-preview-head { position: static; top: auto; }   /* the page's sticky heads stop under its own bar, which full screen has not */
+/* The components inside the one picked, after its trail: each a click away. */
+.sg-ts-kids { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-xs); margin-left: var(--sg-space-m); padding-left: var(--sg-space-m); border-left: var(--sg-line); }
+.sg-ts-kids-label { color: var(--sg-muted); }
+.sg-ts-kid { padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sg-ts-kid:hover, .sg-ts-kid:focus-visible { color: var(--sg-accent); }
+/* A colour's hex in full, light and dark alike: each field as wide as seven characters and its tags, the pair one above
+   the other where the row is too narrow for both side by side. */
+.sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.sg-ts-colour .sg-ts-hex { min-width: 7.5ch; font-variant-numeric: tabular-nums; }
+/* A colour field: its swatch, then its hex with Light or Dark small under it, then its reset; the hex has the field's
+   whole width, so it is read and selected in full. */
+.sg-ts-colour.sg-input { display: grid; grid-template-columns: auto minmax(7.5ch, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--sg-space-s); row-gap: 0; align-items: center; height: auto; min-height: var(--sg-control-h); padding-block: var(--sg-space-xxs); }
+.sg-ts-colour input[type="color"] { grid-column: 1; grid-row: 1 / 3; }
+.sg-ts-colour .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; }
+.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; font-size: var(--sg-xxs, 0.6875rem); line-height: 1.2; }
+.sg-ts-colour .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
+.sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
+/* A card's sticky head inside its round corners: the card clips what it holds (clip, not hidden, so the head still sticks). */
+.sg-ts .sg-token-card, .sg-ts-preview { overflow: clip; }
