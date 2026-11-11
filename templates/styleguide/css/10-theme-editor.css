@@ -131,7 +131,7 @@
 .sg-spec-hero-art { grid-area: art; position: relative; height: 260px; }
 .sg-spec-blob { position: absolute; border-radius: 50%; }
 .sg-spec-blob.is-a { width: 220px; height: 220px; right: 90px; top: 0; }
-.sg-spec-blob.is-b { width: 150px; height: 150px; right: 0; bottom: 0; opacity: 0.9; mix-blend-mode: multiply; }
+.sg-spec-blob.is-b { width: 150px; height: 150px; right: 0; bottom: 0; }
 .sg-spec-glyph { position: absolute; left: 0; bottom: -10px; font-size: 168px; line-height: 1; font-weight: 700; letter-spacing: -0.04em; }
 .sg-spec-swatches { grid-area: sw; display: flex; flex-wrap: wrap; gap: 28px; }
 .sg-spec-sw { display: flex; align-items: center; gap: 12px; font-size: 14px; }
@@ -144,3 +144,10 @@
 .sg-spec-stage { position: relative; min-width: 0; max-width: 100%; overflow: hidden; }
 /* An overlay (a modal, a tooltip, a toast) stays in its tile: a transform makes the tile the box its fixed parts sit in. */
 .sg-spec-tile.is-overlay > .sg-spec-stage { transform: translateZ(0); height: 240px; }
+/* The preview at full screen: the whole screen for the system, its head kept (the screen, the mode, the way back). */
+.sg-ts-full svg { width: 1rem; height: 1rem; }
+.sg-ts-preview:fullscreen { position: static; width: 100vw; height: 100vh; display: flex; flex-direction: column; border-radius: 0; background: var(--sg-bg); overflow: hidden; }
+.sg-ts-preview:fullscreen > .sg-ts-stage { flex: 1 1 auto; min-height: 0; padding: 0; }
+.sg-ts-preview:fullscreen .sg-ts-screen { border-radius: 0; }
+.sg-ts-preview:fullscreen::backdrop { background: var(--sg-bg); }
+.sg-ts-preview:fullscreen > .sg-ts-preview-head { position: static; top: auto; }   /* the page's sticky heads stop under its own bar, which full screen has not */

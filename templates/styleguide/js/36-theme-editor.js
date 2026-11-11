@@ -535,7 +535,7 @@
     '</div>';
     var preview = screens.length ? '<div class="sg-ts-preview pg-inspect sg-token-card"><div class="pg-inspect-head sg-ts-preview-head"><span>Preview</span>' +
         (screens.length > 1 ? select('ts-screen', screens.map(function (s) { return [s.key, s.title || s.key]; }), screenKey, 'Screen') : '<span>' + esc(screens[0].title || screens[0].key) + '</span>') +
-        (COLOUR_AXIS ? seg('mode', [['light', 'Light'], ['dark', 'Dark']], 'light') : '') + '</div><div class="sg-ts-stage"><div class="sg-ts-screen" data-screen="' + esc(screenKey) + '"></div></div></div>' : '';
+        (COLOUR_AXIS ? seg('mode', [['light', 'Light'], ['dark', 'Dark']], 'light') : '') + (document.fullscreenEnabled ? SG.sysButton('button', '', ' data-ts-full aria-pressed="false" aria-label="Full screen" title="Full screen"', 'sg-ts-full', null, FULL_ICON) : '') + '</div><div class="sg-ts-stage"><div class="sg-ts-screen" data-screen="' + esc(screenKey) + '"></div></div></div>' : '';
     return '<div class="sg-ts-split">' + form + preview + '</div>';
   };
 
@@ -587,7 +587,8 @@
       var sc = box.closest('.sg-tk-detail'), pvEl = box.closest('.sg-ts-preview'), headEl = pvEl && pvEl.querySelector('.sg-ts-preview-head');
       var top = parseFloat(getComputedStyle(root).getPropertyValue('--ts-top')) || 0;
       var oneScroll = getComputedStyle(root.querySelector('.sg-ts')).overflowY === 'auto';   // side by side: the split is the room
-      var h = oneScroll ? root.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 :
+      var full = pvEl && document.fullscreenElement === pvEl;   // full screen: the whole screen is the room
+      var h = full ? pvEl.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) : oneScroll ? root.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 :
         sc ? sc.clientHeight - top - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 : Infinity;
       // Fluid: the screen laid out in all the room there is (its own width at least, scaled down to fit when the room
       // is narrower), so it fills the stage's width and the panel's height.
@@ -597,6 +598,18 @@
       box.style.width = Math.floor(lw * k) + 'px'; box.style.height = Math.floor(lh * k) + 'px'; box.style.marginInline = 'auto';
     };
     window.addEventListener('resize', function () { fit(); });
+    // Full screen: the preview alone, at its own size, to judge the theme as a person will see it; the button or Escape
+    // brings the form back, and the theme and the mode chosen stay as they were.
+    var fullBtn = root.querySelector('[data-ts-full]'), pvBox = root.querySelector('.sg-ts-preview');
+    if (fullBtn && pvBox) {
+      fullBtn.addEventListener('click', function () { if (document.fullscreenElement === pvBox) document.exitFullscreen(); else pvBox.requestFullscreen().catch(function () { /* refused: it stays in the panel */ }); });
+      document.addEventListener('fullscreenchange', function () {
+        var on = document.fullscreenElement === pvBox;
+        fullBtn.setAttribute('aria-pressed', String(on)); fullBtn.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); fullBtn.title = on ? 'Exit full screen' : 'Full screen';
+        fullBtn.innerHTML = on ? EXIT_ICON : FULL_ICON;
+        requestAnimationFrame(fit);
+      });
+    }
     var draw = function (key) {
       if (!box) return;
       var s = previewScreens().filter(function (x) { return x.key === key; })[0]; if (!s) return;
@@ -1087,6 +1100,8 @@
       new MutationObserver(function () { if (list.hidden) { var r = list.querySelector('.sg-ts-new-row'); if (r) unfold(r, false); } }).observe(list, { attributes: true, attributeFilter: ['hidden'] });
     }
   };
+  var FULL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>';
+  var EXIT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg>';
   var CHEVRON = '<svg class="sg-ts-icon sg-ts-chev" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
   var PLUS_ICON = '<svg class="sg-ts-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>';
   var PENCIL = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3l7.5-7.5Z"/><path d="M9 4l3 3"/></svg>';
