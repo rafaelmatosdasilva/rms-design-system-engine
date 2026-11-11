@@ -25,7 +25,11 @@
   var DOC_SOURCES = ['Intent layer', 'Figma', 'Contract', 'Code'];
   function docSrcNames(src) {
     var out = [];
-    srcNames(src).forEach(function (n) { var w = n === 'Guidelines' ? 'Intent layer' : n === 'References' ? 'Figma' : n; if (DOC_SOURCES.indexOf(w) >= 0 && out.indexOf(w) < 0) out.push(w); });
+    // The code is a source only where it says something itself (a comment, a note): a file a line merely names (the
+    // stylesheet a guidance line points to) documents nothing.
+    (src || []).forEach(function (x) { var n = srcNames([x])[0], w = n === 'Guidelines' ? 'Intent layer' : n === 'References' ? 'Figma' : n;
+      if (w === 'Code' && !/comment|note|docblock|jsdoc/i.test(String(x))) return;
+      if (DOC_SOURCES.indexOf(w) >= 0 && out.indexOf(w) < 0) out.push(w); });
     return out;
   }
 
