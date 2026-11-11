@@ -297,6 +297,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Opens from the style guide's Theme choice, as **Create new theme…**, beside the system's own themes.
 - Sets the colours, the font, the corners, the spacing, the borders and the shadows, with the screen on the right taking each change live.
+- Previews every system on a specimen of its own components, as your code renders them, each checked against the catalog so nothing is invented.
 - Works out dark from light the way your system does, so a new colour keeps each step of a scale as light as yours, and every text it sits under stays readable (WCAG AA).
 - Click a component on the screen to see the tokens it really draws with, then change one of them alone.
 - A theme you make is applied across the whole guide, kept as a file in your own themes folder, and named in the link, so the link opens it.

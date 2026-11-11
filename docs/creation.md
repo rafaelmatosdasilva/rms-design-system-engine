@@ -28,13 +28,22 @@ The theme editor is part of every style guide the engine builds. It needs no set
 
 ### What the form sets
 
-The panel shows the form on the left and one of your Showroom's screens on the right, in a frame of its own. Only that frame takes the theme while you work, so the rest of the guide stays as your system draws it.
+The panel shows the form on the left and a preview on the right, in a frame of its own. Only that frame takes the theme while you work, so the rest of the guide stays as your system draws it.
 
 - **Name** and **font family**: the families your system uses, common web fonts, or any other by name. A font your computer lacks is loaded from Google Fonts, so what you pick is what you see.
 - **Primary and secondary colours**, the **app background**, and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
 - **Button and card roundness**, **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
 
 Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
+
+### The preview
+
+The preview opens on the **specimen**, a screen the engine builds from your own system, so every system has something to preview. Your Showroom's screens follow it in the same list.
+
+- **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
+- **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
+- **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back.
+- **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
 
 ### Light and dark
 
@@ -45,17 +54,21 @@ Each setting reaches the tokens named for it and every token that follows them, 
 
 ### One component's tokens
 
-Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, down to its icon or its text.
+Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, layer by layer toward where you clicked (a table, its rows, a row, a cell, its text).
 
-- The form then shows only the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included.
-- Each token is a colour (light and dark), a size or a switch. A change there wins over the theme's wider settings.
-- **Done** brings the theme's own settings back.
+- **What you edit stays marked.** The picked part keeps its outline and a label with its name. The head of the card shows the path to it, each step a click back, and lists the components inside it, each a click away.
+- **Only its own tokens.** The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
+- **Values as they are now.** Each token shows its value with the theme on it, in light and dark, and follows as you change the theme.
+- **Units from how a token is used.** A token its rules use as `calc(var(…) * 1%)` reads as a percentage, an opacity from 0 to 1 as a percentage, a size in pixels as px, and anything else as a plain number.
+- **Corner radius and text style.** A picked part shows its corner radius, and a text shows which of your text styles it is drawn in. Changing either changes that part in every copy of the component. A text style keeps changing per breakpoint as yours do, since it is set through the style's own variables.
+- **The app background.** Clicking where no component is picks the screen itself.
+- A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 
 ### Where a theme is kept
 
 | Place | What it holds |
 |---|---|
-| This browser | A working copy of each theme, and the one in use |
+| This browser | A working copy of each theme, and the one in use, kept per system so a theme made on one guide never shows on another |
 | Your themes folder | One file per theme, `<name>.theme.json`, in a folder per system: `~/.claude/rms-design-system-engine-themes/<system>/` unless `styleguide.themes` names another |
 | The team's themes store | Every theme the team made, when `stores.themes` is set: each build sends yours that it lacks |
 

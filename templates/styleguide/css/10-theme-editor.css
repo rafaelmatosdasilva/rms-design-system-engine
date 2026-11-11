@@ -122,24 +122,24 @@
 }
 /* The specimen (36-theme-editor.js): a screen made of the system's own components, as its code renders them. Its layout
    takes the system's tokens through the properties set on .sg-spec (its accent, its card corner), never the guide's. */
-.sg-spec { --spec-accent: currentColor; --spec-accent-2: currentColor; --spec-r: 16px; --spec-line: color-mix(in srgb, currentColor 12%, transparent); --spec-soft: color-mix(in srgb, currentColor 4%, transparent); box-sizing: border-box; min-height: 100%; padding: 56px 64px 96px; display: flex; flex-direction: column; gap: 40px; }
+.sg-spec { --spec-accent: currentColor; --spec-accent-2: currentColor; --spec-r: 16px; --spec-line: color-mix(in srgb, currentColor 12%, transparent); --spec-soft: color-mix(in srgb, currentColor 4%, transparent); box-sizing: border-box; min-height: 100%; padding: var(--sg-space-xxl) calc(var(--sg-space-xxl) * 2) calc(var(--sg-space-xxl) * 3); display: flex; flex-direction: column; gap: var(--sg-space-xxl); }
 .sg-spec *, .sg-spec *::before, .sg-spec *::after { box-sizing: border-box; }
-.sg-spec-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "text art" "sw sw"; gap: 40px 56px; align-items: center; padding-bottom: 8px; }
-.sg-spec-hero-text { grid-area: text; display: flex; flex-direction: column; gap: 16px; }
-.sg-spec-title { margin: 0; font-size: 64px; line-height: 1.02; font-weight: 700; letter-spacing: -0.02em; }
-.sg-spec-hero-acts { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+.sg-spec-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "text art" "sw sw"; gap: var(--sg-space-xxl) calc(var(--sg-space-xxl) * 1.5); align-items: center; padding-bottom: var(--sg-space-s); }
+.sg-spec-hero-text { grid-area: text; display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.sg-spec-title { margin: 0; font-size: calc(var(--sg-title) * 1.6); line-height: var(--sg-lh); font-weight: var(--sg-heading-weight); letter-spacing: -0.02em; }
+.sg-spec-hero-acts { display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: center; margin-top: var(--sg-space-s); }
 .sg-spec-hero-art { grid-area: art; position: relative; height: 260px; }
 .sg-spec-blob { position: absolute; border-radius: 50%; }
 .sg-spec-blob.is-a { width: 220px; height: 220px; right: 90px; top: 0; }
 .sg-spec-blob.is-b { width: 150px; height: 150px; right: 0; bottom: 0; }
-.sg-spec-glyph { position: absolute; left: 0; bottom: -10px; font-size: 168px; line-height: 1; font-weight: 700; letter-spacing: -0.04em; }
-.sg-spec-swatches { grid-area: sw; display: flex; flex-wrap: wrap; gap: 28px; }
-.sg-spec-sw { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.sg-spec-glyph { position: absolute; left: 0; bottom: -10px; font-size: calc(var(--sg-title) * 4); line-height: var(--sg-lh); font-weight: var(--sg-heading-weight); letter-spacing: -0.04em; }
+.sg-spec-swatches { grid-area: sw; display: flex; flex-wrap: wrap; gap: var(--sg-space-xl); }
+.sg-spec-sw { display: flex; align-items: center; gap: var(--sg-space-m); font-size: var(--sg-m); }
 .sg-spec-dot { width: 44px; height: 44px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--spec-line); }
 .sg-spec-shape { width: 44px; height: 44px; border: 2px solid var(--spec-accent); background: var(--spec-soft); }
-.sg-spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
-.sg-spec-tile { margin: 0; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: var(--spec-r); background: var(--spec-soft); box-shadow: inset 0 0 0 1px var(--spec-line); min-width: 0; }
-.sg-spec-tile.is-buttons { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; }
+.sg-spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-flow: row dense; gap: var(--sg-space-l); align-items: start; }
+.sg-spec-tile { margin: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); padding: var(--sg-space-xl); border-radius: var(--spec-r); background: var(--spec-soft); box-shadow: inset 0 0 0 1px var(--spec-line); min-width: 0; }
+.sg-spec-tile.is-buttons { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--sg-space-m); }
 .sg-spec-tile.is-wide { grid-column: span 2; }
 .sg-spec-stage { position: relative; min-width: 0; max-width: 100%; overflow: hidden; }
 /* An overlay (a modal, a tooltip, a toast) stays in its tile: a transform makes the tile the box its fixed parts sit in. */
@@ -165,7 +165,7 @@
 .sg-ts-colour.sg-input { display: grid; grid-template-columns: auto minmax(7.5ch, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--sg-space-s); row-gap: 0; align-items: center; height: auto; min-height: var(--sg-control-h); padding-block: var(--sg-space-xxs); }
 .sg-ts-colour input[type="color"] { grid-column: 1; grid-row: 1 / 3; }
 .sg-ts-colour .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; }
-.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; font-size: var(--sg-xxs, 0.6875rem); line-height: 1.2; }
+.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; font-size: var(--sg-xs); line-height: var(--sg-lh); }
 .sg-ts-colour .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
 .sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
 /* A card's sticky head inside its round corners: the card clips what it holds (clip, not hidden, so the head still sticks). */
