@@ -3,7 +3,7 @@
 // needed; and every gap handed to the design team's to do list in Figma (figma-edits.mjs designA11yEdits).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf, readingOrderFindings } from '../lib/design-a11y.mjs';
+import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf, readingOrderFindings, edgeFindings } from '../lib/design-a11y.mjs';
 import { designA11yEdits, applyScript, editLines } from '../lib/figma-edits.mjs';
 
 // Acme, an invented system: a light and a dark mode.
@@ -20,9 +20,12 @@ test('the role a name says, and the surfaces the system defines', () => {
   assert.deepEqual(['iconButton', 'Text field', 'menuItem', 'checkbox', 'buttonGroup', 'fieldLabel', 'cardTile', 'Tab bar'].map(nameRole), ['button', 'textbox', 'menuitem', 'checkbox', null, null, null, null]);
   // A system that names the type first: the kind after it does not hide the control. A group, a part or a row of them is not one.
   assert.deepEqual(['buttonBold', 'tabUnderline', 'fieldPlain', 'checkboxRound', 'iconButtonGhost', 'stepperCompact'].map(nameRole), ['button', 'tab', 'textbox', 'checkbox', 'button', 'spinbutton']);
-  assert.deepEqual(['checkboxStack', 'linkListLabel', 'dropdownPickerRow', 'tabBar', 'cardOffer'].map(nameRole), [null, null, null, null, null]);
+  assert.deepEqual(['checkboxStack', 'linkListLabel', 'tabBar', 'cardOffer', 'Layout/Header'].map(nameRole), [null, null, null, null, null]);
+  // A row of what opens to pick from is what is picked; a path's last part names it; a segmented control is a radio group.
+  assert.deepEqual(['dropdownPickerRow', 'selectFlagRow', 'menuRow', 'nav/TabCompact', 'segmentedButtonCompact'].map(nameRole), ['option', 'option', 'menuitem', 'tab', 'radiogroup']);
   assert.deepEqual(systemSurfaces(VARS).light.map((s) => s.token), ['surface/page/color', 'surface/raised/color']);
   assert.deepEqual(systemSurfaces(VARS, ['cardTile/background']).dark.map((s) => s.token), ['cardTile/background/color'], 'a11y.surfaces names them');
+  assert.deepEqual(systemSurfaces({ color: { light: { 'base/appBackground/color': '#ffffff', 'base/appBackground/text/color': '#111111', 'cardTile/background/color': '#eeeeee' } } }).light.map((s) => s.token), ['base/appBackground/color'], 'an app\'s own background is one; its text is not, nor a component\'s own background');
 });
 
 test('contrast from the variables alone: each text on the fill under it and on every surface when nothing is under it, in every mode', () => {
@@ -145,4 +148,53 @@ test('reading order in Figma: words placed by hand in another order than they ar
   assert.equal(wcagOf(found[0]), 'WCAG 1.3.2 Meaningful Sequence (A)');
   assert.deepEqual(readingOrderFindings(skeleton, { only: ['cardTidy'] }), []);
   assert.equal(designA11yGaps({ skeleton }).filter((f) => f.kind === 'readorder').length, 1, 'among what the design owes');
+});
+
+test('once the browser measured the code, what Tab reaches there is a control in Figma, whatever its name says', () => {
+  const props = { actionList: { properties: {} }, 'nav/TabCompact': { properties: { State: { type: 'VARIANT', variantOptions: ['Default', 'Focus'] } } }, buttonDecor: { properties: {} }, linkPlain: { properties: {} },
+    cardTile: { properties: {} } };
+  const measured = { actionList: { role: 'button', focusable: true, own: true }, TabCompact: { role: 'tab', focusable: true, own: true }, buttonDecor: { role: null, focusable: false, own: true }, cardTile: { role: null, focusable: true, own: true } };
+  const f = designA11yFindings(props, {}, { measured });
+  const of = (kind) => f.filter((x) => x.kind === kind).map((x) => x.component).sort();
+  assert.deepEqual(of('nofocus'), ['actionList', 'buttonDecor', 'cardTile', 'linkPlain'], 'a list the code makes a button, a card Tab reaches; a link never measured goes by its name; a path matched by its last part has its focus state');
+  assert.ok(f.some((x) => x.component === 'buttonDecor' && x.kind === 'nofocus'), 'a measurement that found no tab stop says nothing: its name still says a button');
+  assert.match(f.find((x) => x.kind === 'norole' && x.component === 'actionList').text, /the code makes it a button, and nothing in Figma says so/);
+  assert.match(f.find((x) => x.kind === 'norole' && x.component === 'cardTile').text, /the code makes it something Tab reaches/);
+  assert.equal(f.find((x) => x.kind === 'norole' && x.component === 'cardTile').fix, 'add a "Role:" annotation with the role it has');
+  // A dialog's facts are its first button's: the code says nothing of the dialog itself, nor do facts saved before own.
+  const held = designA11yFindings({ modalPlain: { properties: {} }, cardOld: { properties: {} } }, {}, { measured: { modalPlain: { role: 'button', focusable: true, own: false }, cardOld: { role: 'button', focusable: true } } });
+  assert.deepEqual(held, [], 'neither is a control');
+});
+
+test('a field, a checkbox or a switch is found by its edge: its best layer 3:1 against what is behind it, in every mode; a button needs none', () => {
+  const edges = (list, [variant] = ['state=default']) => [{ variant, n: 1, list }];
+  const structure = {
+    // Its box fades into the page in light mode only.
+    checkboxPlain: { edges: edges([{ fill: 'text/muted/color', on: 'surface/page/color' }]) },
+    // A pale fill, but a dark border: one edge that shows is enough.
+    textField: { edges: edges([{ fill: 'surface/raised/color', on: 'surface/page/color' }, { stroke: 'text/body/color', on: 'surface/raised/color' }]) },
+    // On nothing of its own: held to every surface, in every mode; its track drawn at 30%.
+    switchToggle: { edges: edges([{ fill: 'text/body/color', on: 'surface', o: 0.3 }], ['on=true']) },
+    // Words of its own: no edge asked of it, however faint.
+    buttonGhost: { edges: edges([{ fill: 'surface/raised/color', on: 'surface/page/color' }]) },
+    // A colour with no variable is measured as it is.
+    radioDot: { edges: edges([{ stroke: '#5a5a5a', on: '#ffffff' }]) },
+  };
+  const f = edgeFindings({}, structure, { vars: VARS });
+  assert.deepEqual(f.map((x) => [x.component, x.ratio, x.modes]).sort(), [['checkboxPlain', 2.81, ['light']], ['switchToggle', 1.91, ['light', 'dark']]]);
+  assert.match(f.find((x) => x.component === 'switchToggle').text, /^switchToggle's edge is 1\.91:1 against what is behind it in every mode \(on=true\), under 3:1, so the control is hard to find \(WCAG 1\.4\.11\)$/);
+  assert.equal(wcagOf(f[0]), 'WCAG 1.4.11 Non-text Contrast (AA)');
+  // The code's role or a note can make one a control its name does not say; nothing measured, nothing said.
+  assert.equal(edgeFindings({ pinCells: { annotations: [{ label: 'Role: textbox' }] } }, { pinCells: structure.checkboxPlain }, { vars: VARS }).length, 1);
+  assert.deepEqual(edgeFindings({}, structure, { vars: null }), []);
+  assert.ok(designA11yGaps({ structure, vars: VARS }).some((x) => x.kind === 'boundary' && x.component === 'checkboxPlain'), 'among what the Figma file owes');
+});
+
+test('a word that names only an input holds whatever role the code gives; one that names other things too holds only when the code confirms an input', () => {
+  const faint = [{ variants: ['state=default'], list: [{ fill: 'surface/raised/color', on: 'surface/page/color' }] }];
+  const structure = { checkboxPlain: { edges: faint }, menuToggle: { edges: faint }, dropdownTagChip: { edges: faint }, dropdownPlain: { edges: faint }, priceField: { edges: faint },
+    stepperSteps: { edges: faint }, stepperCount: { edges: faint } };
+  const measured = { checkboxPlain: { role: 'button', focusable: true, own: true }, menuToggle: { role: 'button', focusable: true, own: true }, dropdownTagChip: { role: 'button', focusable: true, own: true },
+    dropdownPlain: { role: null, focusable: false, own: true }, priceField: { role: 'textbox', focusable: false, own: true }, stepperSteps: { role: null, focusable: false, own: true } };
+  assert.deepEqual(edgeFindings({}, structure, { vars: VARS, measured }).map((x) => x.component).sort(), ['checkboxPlain', 'dropdownPlain', 'priceField'], 'a field the code confirms holds; a stepper or a toggle the code does not confirm is not asked');
 });

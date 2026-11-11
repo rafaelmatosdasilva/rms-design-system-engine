@@ -278,11 +278,18 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
 - **Contrast.** Each text colour on each surface it is drawn on, in every mode: 4.5:1 for text, 3:1 for an icon or large text.
 - **What it is drawn on.** The fill painted right under the text, looked for inside the layers before it too, so a button's fill on the `Background` inside its state instance counts.
 - **Pairs the system makes.** A text colour is also measured on the background its name pairs it with, and on every surface when nothing is drawn under it.
-- **Not measured, said.** A text on nothing its own component paints, when no surface is known, is said to be unmeasured, never passed. `a11y.surfaces` in `ds-config.json` names the surfaces.
+- **Not measured, said.** A text on nothing its own component paints, when no surface is known, is said to be unmeasured, never passed. The surfaces are the colours named as one (`surface/…`, `background/…`, an app's own background such as `appBackground`), or the ones `a11y.surfaces` in `ds-config.json` names.
 - **Focus.** An interactive component with no focus state, so the code has to invent the focus ring.
 - **Focus ring.** A ring drawn in the focus state is held to 3:1 against every surface, in every mode.
+- **A control's edge.** A field, a dropdown, a checkbox, a radio, a switch or a slider is found by its edge, not its words. A name that could mean something else (a toggle, a stepper, a field shown read-only) counts only when the code confirms an input. The capture reads these edges for the components whose name says they take input, so the answers Figma sends stay small. In each variant that is not disabled, at least one of its layers (its fill or its border) must reach 3:1 against what is painted under it, in every mode (WCAG 1.4.11). On nothing of its own, it is held against every surface the system defines. A button or a chip with its own words needs no edge.
 - **Target size.** A control under 24 pixels tall or wide, in any of its variants.
-- **Role.** A component whose name says it is a control (`iconButton`, `textField`, or type first: `buttonBold`, `fieldPlain`) and has no `Role:` note. A group or a part of controls is not one (`checkboxStack`, `dropdownPickerRow`).
+- **Which components are controls.** Figma's `Role:` note says it first. Then the code, once the browser has measured it: a component that is itself a control there (Tab reaches it, or it has a control's role) is one, whatever its name. A measurement never rules one out: it may have tried a disabled variant, and a dialog's facts are its first button's. Otherwise its name says it:
+  - a control's name (`iconButton`, `textField`), or the type first (`buttonBold`, `fieldPlain`);
+  - the last part of a path (`nav/TabCompact` is a tab);
+  - a row of what opens to pick from is what is picked (`dropdownPickerRow` is an option, `menuRow` a menu item);
+  - a segmented control is a radio group;
+  - a group or a part of controls is not one (`checkboxStack`, `tabBar`).
+- **Role.** A control with no `Role:` note: the note says which role the code gives it.
 - **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
 - **Error.** An error state with no message, so the error is shown by colour alone.
 - **Reading order.** Words placed by hand in another layer order than they are seen in, so the code built from the layers reads in another order (WCAG 1.3.2). A frame in auto layout is always in order, artwork is never read, and labels that share no row or column (round a chart) have no order to keep.
