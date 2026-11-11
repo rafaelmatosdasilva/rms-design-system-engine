@@ -726,7 +726,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   uses in Figma.
 - **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every change in one
   table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day and the time as the
-  reader's clock says it, on one line, its release under them), Source (Code, Figma, Intent layer, Contracts, Decisions, as its chips; a contract changed by a build Done by the engine; the kind of a decision
+  reader's clock says it, on one line, its release under them), Source (Code, Figma, Intent layer, Contracts, Decisions, as its chips; a contract changed by a build Done by the person who ran it (who started the pipeline, else the GitLab account of the token, which needs `read_user`, else their git name; a scheduled build, the schedule); the kind of a decision
   or note, Lesson or Comment, the first line of What), What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
   v2.1.0 on …" once a release holds it, nothing before), a row per component a read of Figma changed (what changed in it), a row per commit to the intent
   layer (what it says, what it Added apart from what it Changed, each a line of pages counted by kind, component pages, other pages named while

@@ -255,7 +255,7 @@ Each build of the style guide compares the contracts with the ones the last buil
 - **A component's contract:** a property, option, state, slot, event or token added or removed, a default changed. A change that breaks a product says so.
 - **A pattern's or a flow's:** a rule added or removed at its level, a component it uses added or removed.
 - **Only real changes.** A build that writes the same contracts again adds nothing, and the first build only records what it read.
-- **Done by the engine.** No person writes a contract: the build does, from your code and Figma, so its rows say so where others name a person.
+- **Done by the person who ran the build.** The build writes the contracts, and a person runs it: in a pipeline, whoever pushed or started it; on your computer, the GitLab account whose token the engine reads with, as your intent-layer commits are named (the token needs the `read_user` scope to say whose it is); only without it, your git name (`git config --global user.name`). A scheduled build names the schedule.
 
 ## Gather usage guidelines
 

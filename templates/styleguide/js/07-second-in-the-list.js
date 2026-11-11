@@ -458,8 +458,9 @@
         line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
     }); });
     // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
-    // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the engine:
-    // no person writes a contract, the build does, from the code and Figma (as a scheduled run says the schedule did it).
+    // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the person
+    // who ran the build that found it: no person writes a contract, so the one who ran the engine stands behind it (the
+    // owner's rule: every change has a person behind it); a scheduled build, the schedule, as a scheduled commit says.
     (DATA.contractChanges || []).forEach(function (b) {
       (b.changes || []).forEach(function (c) {
         var kind = c.kind === 'component' ? '' : c.kind === 'flow' ? 'Flow ' : 'Pattern ';
@@ -467,7 +468,7 @@
         var items = (c.items || []).map(function (x) { return line(esc(capital(x.what) + ' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
-          ['Done by the engine'], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
       });
     });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };

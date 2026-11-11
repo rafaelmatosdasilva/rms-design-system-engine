@@ -1853,8 +1853,9 @@ test('History says the other pages a change touched on one line, Also changed, i
   assert.doesNotMatch(src, /Not in the guide yet/);
 });
 
-test('History: a contract change is done by the engine, under Contracts, as every row says who did it', () => {
+test('History: a contract change is done by the person who ran the build, under Contracts, as every row names a person', () => {
   const src = readFileSync(new URL('../templates/styleguide/js/07-second-in-the-list.js', import.meta.url), 'utf8');
-  assert.match(src, /\['Done by the engine'\], known \? pillsHTML\(\[c\.name\]\)/, 'never an empty Done by');
+  assert.match(src, /b\.by \? \['Done by ' \+ b\.by\] : b\.run \? \['Done by the ' \+ b\.run\] : \[\], known/, 'the person, never the engine');
+  assert.doesNotMatch(src, /Done by the engine/);
   assert.match(src, /contracts: 'Contracts'/, 'its source as its chip says it');
 });
