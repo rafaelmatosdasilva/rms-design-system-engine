@@ -155,10 +155,10 @@
   // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
   function doneCards(sec, cards) {
     if (!cards) return;
-    // On one row up to three, wider than a third each never; more wrap, three a row: a card narrower than that has no room
-    // for its ring and its areas side by side, and its number spills over the ring. Two a row at the least, so one card is
-    // still half the width.
-    var n = Math.min(3, (cards.match(/class="sg-health-tile /g) || []).length);
+    // On one row up to four, the Documentation page's four sources together (the owner's, 11 November 2026); more wrap,
+    // four a row. A card too narrow for its ring and its areas side by side puts the areas under the ring
+    // (.sg-cx-score-body wraps). Two a row at the least, so one card is still half the width.
+    var n = Math.min(4, (cards.match(/class="sg-health-tile /g) || []).length);
     var html = '<div class="sg-health-box"><div class="sg-health-tiles sg-cx-scores" style="--sg-cx-cards:' + Math.max(2, n) + '">' + cards + '</div></div>';
     var fb = sec.querySelector(':scope > .sg-todo-head');
     if (fb) fb.insertAdjacentHTML('beforebegin', html); else (sec.querySelector(':scope > h2') || sec).insertAdjacentHTML('afterend', html);
@@ -447,10 +447,12 @@
   // The top of the menu: the project's own logo (styleguide.logo), when it gives one, in place of the system's name,
   // which is then said to a screen reader only; it follows the page's light and dark.
   //
-  // With no logo of its own — every guide that is not a client's — the default takes its place: the system's name in
-  // short, as large as the Status page's own numbers, over what the guide is. No version beside it: a version read from
+  // With no logo of its own — every guide that is not a client's — the default takes its place: RMS DS, the engine's own
+  // mark, whatever the system is called (the owner's, 11 November 2026), its name in full on hover and to a screen
+  // reader, in the style of the Status page's own numbers, over what the guide is. No version beside it: a version read from
   // the code says nothing about the Figma file the same guide shows, so one number over both would be a claim the guide
   // cannot make. The changelog still carries it, per component and per release.
+  var DEFAULT_MARK = 'RMS DS';
   var lhead = document.querySelector('.sg-sidebar-header'), lfirst = lhead && lhead.querySelector('#sg-title');
   if (lhead && DATA.logo && DATA.logo.svg) {
     Array.prototype.forEach.call(lhead.querySelectorAll('p'), function (p) { p.classList.add('sg-hidden-text'); });
@@ -459,15 +461,10 @@
     lhead.insertBefore(la, lhead.firstChild); lfirst = la;
   } else if (lfirst) {
     lfirst.classList.add('sg-wordmark');
-    lfirst.textContent = shortName(DATA.title || 'Design system');
-    lfirst.setAttribute('title', DATA.title || 'Design system');   // the name in full, on hover
+    var full = DATA.title || 'Design system';
+    lfirst.innerHTML = '<span aria-hidden="true">' + esc(DEFAULT_MARK) + '</span><span class="sg-hidden-text">' + esc(full) + '</span>';
+    lfirst.setAttribute('title', full);   // the system's own name, on hover
     fitOneLine(lfirst);
-  }
-  // The name in short, for the wordmark: a trailing "design system" becomes DS, and a name that does not say it gets DS
-  // added, so the mark always ends in DS. "RMS Design System" is RMS DS; "Acme Kit" is Acme Kit DS.
-  function shortName(name) {
-    var s = String(name).trim().replace(/\s+/g, ' ').replace(/[\s·|-]*design\s*system\s*$/i, '').trim();
-    return /(^|\s)ds$/i.test(s) ? s : (s ? s + ' DS' : 'DS');
   }
   // The wordmark on one line, whatever the name's length: it starts at the big number's size and drops to the width the
   // menu gives it. Measured again once the page's own font is in, and on every resize (the menu is narrower on a phone).
