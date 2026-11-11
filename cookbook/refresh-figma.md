@@ -1234,6 +1234,10 @@ async function skeletonOf(root, names = {}) {
       ...(rx.length ? { reactions: rx } : {}),
       ...(fx ? { effects: fx } : {}),
       ...(Object.keys(tf).length ? { text: tf } : {}),
+      // A layer that paints an image: its alt text is a note for the code (the design check asks for one).
+      ...((prop(n, 'fills') || []).some((p) => p && p.type === 'IMAGE' && p.visible !== false) ? { img: true } : {}),
+      // A text layer Figma names after its words (autoRename): nobody named it.
+      ...(t === 'TEXT' && prop(n, 'autoRename') === true ? { auto: true } : {}),
     };
     if (t === 'INSTANCE') {
       const c = await compOf(n), cp = prop(n, 'componentProperties') || {}, given = {};

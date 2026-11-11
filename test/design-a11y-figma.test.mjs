@@ -3,7 +3,7 @@
 // needed; and every gap handed to the design team's to do list in Figma (figma-edits.mjs designA11yEdits).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf, readingOrderFindings, edgeFindings } from '../lib/design-a11y.mjs';
+import { designA11yFindings, designContrastFindings, designA11yGaps, designA11yBlock, designA11ySheetLines, nameRole, systemSurfaces, wcagOf, readingOrderFindings, edgeFindings, adviceFindings } from '../lib/design-a11y.mjs';
 import { designA11yEdits, applyScript, editLines } from '../lib/figma-edits.mjs';
 
 // Acme, an invented system: a light and a dark mode.
@@ -99,8 +99,10 @@ test('every gap reaches the design team\'s to do list in Figma: its own frame on
   const structure = { iconButton: { h: 20, colors: {}, drawnOn: [{ fg: 'text/muted/color', on: 'surface' }] } };
   const gaps = designA11yGaps({ props, structure, vars: VARS, cfg: {} });
   // cardTile's pair is the system's own (its names pair them), drawn by no component read here.
-  assert.deepEqual(gaps.map((g) => `${g.kind} ${g.component}`), ['norole iconButton', 'nofocus iconButton', 'small iconButton', 'noname iconButton', 'contrast null', 'contrast iconButton']);
+  assert.deepEqual(gaps.filter((g) => !g.advice).map((g) => `${g.kind} ${g.component}`), ['norole iconButton', 'nofocus iconButton', 'small iconButton', 'noname iconButton', 'contrast null', 'contrast iconButton']);
+  assert.deepEqual(gaps.filter((g) => g.advice).map((g) => `${g.kind} ${g.component}`), ['states iconButton', 'a11ynote iconButton'], 'advice, apart');
   const block = designA11yBlock(gaps).join('\n');
+  assert.match(block, /\n {3}Advice, not a WCAG failure \(what the code needs to be told\):\n {3}• a control with no hover, pressed, disabled or error state: iconButton/);
   assert.match(block, /^♿ Accessibility in the Figma file: 6 things the design owes/);
   assert.match(block, /• iconButton: text\/muted\/color on surface\/raised\/color is \d\.\d+:1 in every mode/);
   assert.match(block, /\n {3}• cardTile\/text\/color on cardTile\/background\/color is 4\.48:1 in light, under 4\.5:1/);
@@ -109,6 +111,8 @@ test('every gap reaches the design team\'s to do list in Figma: its own frame on
   assert.deepEqual(designA11yEdits([]), [], 'nothing owed, no frame');
   const edits = designA11yEdits(gaps, wcagOf);
   assert.equal(edits[0].frame, 'Accessibility the design owes');
+  assert.equal(edits[1].frame, 'Advice for the Figma file', 'advice in a frame of its own');
+  assert.ok(edits[1].items.every((i) => i.wcag === null));
   assert.deepEqual(edits[0].items.map((i) => i.wcag), ['WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 2.4.7 Focus Visible (AA)', 'WCAG 2.5.8 Target Size (Minimum) (AA)', 'WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 1.4.3 Contrast (Minimum) (AA)', 'WCAG 1.4.3 Contrast (Minimum) (AA)']);
   const lines = editLines(edits).join('\n');
   assert.match(lines, /Accessibility the design owes, listed in Figma on the page "Design system to do", frame "Accessibility the design owes" \(6 gaps in 1 component and the system's colours, read from Figma alone\)/);
@@ -197,4 +201,45 @@ test('a word that names only an input holds whatever role the code gives; one th
   const measured = { checkboxPlain: { role: 'button', focusable: true, own: true }, menuToggle: { role: 'button', focusable: true, own: true }, dropdownTagChip: { role: 'button', focusable: true, own: true },
     dropdownPlain: { role: null, focusable: false, own: true }, priceField: { role: 'textbox', focusable: false, own: true }, stepperSteps: { role: null, focusable: false, own: true } };
   assert.deepEqual(edgeFindings({}, structure, { vars: VARS, measured }).map((x) => x.component).sort(), ['checkboxPlain', 'dropdownPlain', 'priceField'], 'a field the code confirms holds; a stepper or a toggle the code does not confirm is not asked');
+});
+
+test('advice, apart from WCAG: an image with no note, a disabled variant that says nowhere why, a control with states missing, one with no accessibility note', () => {
+  const T = (n, extra = {}) => ({ t: 'TEXT', n, ...extra });
+  const skeleton = {
+    promoTile: { trees: [{ t: 'COMPONENT', n: 'x', c: [{ t: 'RECTANGLE', n: 'Photo', img: true }, { t: 'RECTANGLE', n: 'Logo', img: true }, { t: 'INSTANCE', n: 'Avatar', c: [{ t: 'RECTANGLE', n: 'Face', img: true }] }] }],
+      variants: [['state=default', 0]], looks: { 'state=default': { 1: { notes: ['accessibility'] } } } },
+    saveAction: { trees: [{ t: 'COMPONENT', n: 'x', c: [T('Label')] }, { t: 'COMPONENT', n: 'x', c: [T('Label'), T('Helper')] }],
+      variants: [['state=default', 0], ['state=disabled', 0], ['state=lockedDisabled', 0], ['state=disabledExplained', 1]], looks: { 'state=lockedDisabled': { '': { notes: ['note'] } } } },
+  };
+  const props = {
+    buttonPlain: { properties: { State: { type: 'VARIANT', variantOptions: ['Default', 'Hover', 'Pressed', 'Disabled'] } }, description: 'Keyboard: Enter and Space press it.' },
+    checkboxPlain: { properties: { State: { type: 'VARIANT', variantOptions: ['Default', 'Hover'] } }, annotations: [{ label: 'Role: checkbox' }] },
+    cardTile: { properties: {} },
+  };
+  const f = adviceFindings(props, skeleton);
+  const of = (kind) => f.filter((x) => x.kind === kind);
+  assert.ok(f.every((x) => x.advice), 'each marked advice');
+  assert.deepEqual(of('imagenote').map((x) => x.text), ['promoTile: an image has no note (Photo), so the code is never told what it says, or that it is decorative'], 'the noted logo is told; the avatar\'s face is its own component\'s');
+  assert.match(of('disablednote')[0].text, /^saveAction: its disabled variant says nowhere why it is disabled \(state=disabled\)$/, 'one with a note or a helper text says why');
+  assert.deepEqual(of('states').map((x) => [x.component, x.text.match(/no (.*) state/)[1]]), [['checkboxPlain', 'pressed, disabled, error']], 'a button with them all; a checkbox takes input, so an error state too; a card is no control');
+  assert.deepEqual(of('a11ynote').map((x) => x.component), [], 'a description that speaks of the keyboard, or a note, is enough');
+  assert.deepEqual(adviceFindings({ buttonBare: { properties: {} } }, {}).filter((x) => x.kind === 'a11ynote').map((x) => x.component), ['buttonBare']);
+});
+
+test('a component drawn hovered, pressed or disabled is something a person operates, whatever its name; a part named as one is not', () => {
+  const st = (...o) => ({ properties: { State: { type: 'VARIANT', variantOptions: ['Default', ...o] } } });
+  const f = designA11yFindings({ menuEntry: st('Hover', 'Pressed'), tileSelectable: st('Pressed'), rowBackground: st('Hover'), promoTile: st('Selected') }, {});
+  const comps = [...new Set(f.map((x) => x.component))].sort();
+  assert.deepEqual(comps, ['menuEntry', 'tileSelectable'], 'a background is a part; selected alone is a state, not a sign it is operated');
+  assert.match(f.find((x) => x.kind === 'norole' && x.component === 'menuEntry').text, /its hovered, pressed or disabled states say a person operates it/);
+  assert.ok(designA11yFindings({ choiceTile: st('Disabled') }, {}).some((x) => x.component === 'choiceTile'), 'only a control is disabled');
+  assert.deepEqual(['fieldSearchBar', 'columnSorting'].map(nameRole), ['searchbox', 'button']);
+});
+
+test('a component that holds a button is no button, a stepper needs the code to be a control, a spacer never is, and a list item drawn disabled is one', () => {
+  const st = (...o) => ({ properties: { State: { type: 'VARIANT', variantOptions: ['Default', ...o] } } });
+  const props = { dialogLink: st(), priceField: st(), stepperSteps: st(), 'grid/Cell/radio(spacer)': st(), choiceListItem: st('Disabled'), labelBackground: st('Disabled') };
+  const measured = { dialogLink: { role: 'button', focusable: true, own: false }, priceField: { role: 'textbox', focusable: false, own: false } };
+  const comps = [...new Set(designA11yFindings(props, {}, { measured }).map((x) => x.component))].sort();
+  assert.deepEqual(comps, ['choiceListItem', 'priceField'], 'a field\'s wrapper is the field it holds; a part drawn disabled is still a part');
 });

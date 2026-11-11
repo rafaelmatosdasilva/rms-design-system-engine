@@ -374,6 +374,13 @@
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
       if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
     });
+    // The comments left on a component in Figma (figma-comments.mjs): a thread a row, what it says, its replies, and
+    // whether it is resolved; who wrote it and who answered. No link to the file: only a Figma task carries one.
+    COMPONENTS.forEach(function (c) { (c.figmaComments || []).forEach(function (t) {
+      var said = esc('“' + t.text + '”') + ((t.replies || []).length ? ' ' + quiet(t.replies.length + ' repl' + (t.replies.length === 1 ? 'y' : 'ies')) : '') + ' ' + quiet(t.resolved ? 'Resolved' : 'Open');
+      var bys = [t.by].concat((t.replies || []).map(function (r) { return r.by; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
+      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at);
+    }); });
     // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
     // A change the engine sent in parts (GitLab refuses one commit that large: "… (part 2 of 3)") is one change: one row,
     // its pages and files together, each of its commits named.

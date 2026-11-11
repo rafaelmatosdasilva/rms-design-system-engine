@@ -52,7 +52,10 @@ test('the workflow is asked once a day, reads version tags and pull request labe
   assert.doesNotMatch(wf, /^(?!\s*#).*git describe/m, 'the nearest tag by ancestry is not the highest version');
   assert.match(wf, /gh pr view/);
   assert.match(wf, /release-version\.mjs/);
-  assert.match(wf, /--generate-notes/);
+  // The notes are still GitHub's own, generated from the merged pull requests and never written by hand - through
+  // the API now, so what a person must do can go above them (release-after.mjs).
+  assert.match(wf, /releases\/generate-notes/);
+  assert.match(wf, /--notes-file/);
   assert.doesNotMatch(wf, /git push origin main/);
 });
 
