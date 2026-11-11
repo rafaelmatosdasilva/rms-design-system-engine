@@ -98,3 +98,8 @@ test('pulling the engine runs the hook: a merge brought in by hand and the daily
   git(installed, 'pull', '-q', '--ff-only', 'origin', 'main');
   assert.equal(existsSync(join(installed, 'ran.txt')) && readFileSync(join(installed, 'ran.txt'), 'utf8'), '--rebuild', 'the pull ran the rebuild');
 });
+
+test('a scratch copy in the system\'s temporary folders is never kept, whatever this process\'s own one is', () => {
+  const file = join(makeFixture({}), 'pages.json');
+  for (const root of ['/tmp/a-session/preview/proj', '/private/tmp/a-session/preview/proj']) assert.equal(rememberPage(root, { env: {}, file }), false, root);
+});

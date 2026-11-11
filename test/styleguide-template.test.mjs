@@ -1721,8 +1721,8 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 5;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
-    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1));
+  const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
+    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1), {});
   const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f', by: 'Done by QA' }, comps: [
     { name: 'navTab', changed: ['property tileSlot added'] }, { name: 'buttonFloat', changed: ['property showLabel added', 'property labelContent added'] },

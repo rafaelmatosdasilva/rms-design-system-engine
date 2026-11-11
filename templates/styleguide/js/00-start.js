@@ -126,6 +126,40 @@
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // A share as the Status page draws it (06-health.css): its track, filled in the colour of how far along it is (done,
+  // to check, to fix), or the colour given. Nothing done: the empty track, no colour.
+  function healthBar(v, lv) { return '<span class="sg-health-bar" aria-hidden="true">' + (v > 0 ? '<span class="is-' + (lv || (v >= 90 ? 'done' : v >= 75 ? 'check' : 'fix')) + '" style="width:' + Number(v) + '%"></span>' : '') + '</span>'; }
+  // How far along a list is, as one card: a ring of all its items, each in the colour of its state (done, to check,
+  // to fix: the filters' own colours below it), the share done in its middle; and each area's bar beside it, weakest
+  // first, the same states in the same order. An area with nothing done still shows what is under way and what is
+  // missing, never an empty track. The Rules page and the Documentation page draw it alike, from this one function and
+  // one set of styles (sg-cx-score in 09-component-playground.css), so a change to it changes both.
+  // items: [{ area, state: 'done' | 'check' | 'fix' }].
+  var DONE_STATES = ['done', 'check', 'fix'];
+  function stateBar(n) { var t = n.done + n.check + n.fix; return '<span class="sg-health-bar" aria-hidden="true">' + DONE_STATES.map(function (k) { return n[k] ? '<span class="is-' + k + '" style="width:' + (n[k] / t * 100) + '%"></span>' : ''; }).join('') + '</span>'; }
+  function doneCard(title, items) {
+    if (!items.length) return '';
+    var R = 51.25, C = 2 * Math.PI * R, by = {}, order = [], all = { done: 0, check: 0, fix: 0 };
+    items.forEach(function (x) { if (!by[x.area]) { by[x.area] = { a: x.area, done: 0, check: 0, fix: 0 }; order.push(x.area); } by[x.area][x.state]++; all[x.state]++; });
+    var tot = function (n) { return n.done + n.check + n.fix; };
+    var areas = order.map(function (k) { return by[k]; }).sort(function (x, y) { return x.done / tot(x) - y.done / tot(y) || tot(y) - tot(x); });
+    var t = tot(all), pct = Math.round(all.done / t * 100), at = 0;
+    // A gap between two states, as the bars have (their 2px at the ring's default size); none when there is one state.
+    var GAP = DONE_STATES.filter(function (k) { return all[k]; }).length > 1 ? 1.5 : 0;
+    var arcs = DONE_STATES.map(function (k) { if (!all[k]) return ''; var len = C * all[k] / t, draw = Math.max(0.5, len - GAP), a = '<circle class="sg-cx-ring-' + k + '" cx="54" cy="54" r="' + R + '" stroke-dasharray="' + draw.toFixed(2) + ' ' + (C - draw).toFixed(2) + '" stroke-dashoffset="' + (-(at + GAP / 2)).toFixed(2) + '"/>'; at += len; return a; }).join('');
+    var ring = '<span class="sg-cx-ring"><svg viewBox="0 0 108 108" aria-hidden="true"><circle class="sg-cx-ring-track" cx="54" cy="54" r="' + R + '"/>' + arcs
+      + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(pct + '%') + '</span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
+    return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p></div>'
+      + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div></div>';
+  }
+  // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
+  function doneCards(sec, cards) {
+    if (!cards) return;
+    var n = (cards.match(/class="sg-health-tile /g) || []).length;   // all on one row: two a row at the least, so one card is still half the width
+    var html = '<div class="sg-health-box"><div class="sg-health-tiles sg-cx-scores" style="--sg-cx-cards:' + Math.max(2, n) + '">' + cards + '</div></div>';
+    var fb = sec.querySelector(':scope > .sg-todo-head');
+    if (fb) fb.insertAdjacentHTML('beforebegin', html); else (sec.querySelector(':scope > h2') || sec).insertAdjacentHTML('afterend', html);
+  }
   // A text's words, its tags taken out (sep in their place) until none is left, and any < or > a broken tag left
   // behind with them: for measuring a cell, a plain line or a copied task, never markup to put in the page.
   function plainText(html, sep) { var s = String(html == null ? '' : html), was; sep = sep == null ? ' ' : sep; do { was = s; s = s.replace(/<[^<>]*>/g, sep); } while (s !== was); return s.replace(/[<>]/g, ''); }

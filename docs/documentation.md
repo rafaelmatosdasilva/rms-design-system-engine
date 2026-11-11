@@ -237,9 +237,36 @@ jobs:
 
 Name your base branch where it says `main`. To post the report on the pull request, add a step that reads `.design-system-engine-out/contract-changes.md`.
 
+### Contracts for patterns and flows
+
+A component's contract says how to use one piece of code. A pattern (Save, Error, Empty) or a flow (Settings) is how several are put together, and that lived only as prose in the intent layer. Each one now gets a contract of its own, written from its page:
+
+- **The components it uses,** only names your system has, in their own spelling.
+- **Its rules, each at its level:** must or should.
+- **When to use it, when not, and the mistakes to avoid.**
+- **Where it came from:** the page it was read from. Edit the page, never the file.
+
+They are written beside the components' contracts, in `patterns/` and `flows/`, as `<page>.pattern.json`: never `.contract.json`, which every reader takes for a component's. A pattern your intent layer no longer has loses its file on the next run. Templates already have contracts of their own, from their code.
+
+### Contract changes in History
+
+Each build of the style guide compares the contracts with the ones the last build read, and the History page lists what changed under its own filter, Contracts:
+
+- **A component's contract:** a property, option, state, slot, event or token added or removed, a default changed. A change that breaks a product says so.
+- **A pattern's or a flow's:** a rule added or removed at its level, a component it uses added or removed.
+- **Only real changes.** A build that writes the same contracts again adds nothing, and the first build only records what it read.
+
 ## Gather usage guidelines
 
 The intent layer says why each component exists, when to use it and when not, and what was decided. It gathers from three places: your own pages wherever they live, Figma's descriptions and notes, and the comments your engineers wrote in the code. The engine writes what it is sure of; what needs judgement is a draft, and a person reviews and approves it.
+
+### How far along each source is
+
+Above the Documentation page's filters, a card for each source its pages come from, in the order of the Source filter: the intent layer, Figma, the contract, the code. A source no page comes from has no card, and no link at the page's top either.
+
+- **A ring of the pages that source documents,** each in the colour of its state there: complete, to review, missing. In its middle, the share complete.
+- **A bar per area** (Components, Templates, Patterns and the rest), the weakest first.
+- **Each source judged on its own part.** A component's documentation is a list of things, each with the place it belongs: its text in the intent layer, its properties in its contract, its tokens' descriptions in Figma. A page is complete in a source when everything that belongs there is written. A page with no such list (a template, a flow) keeps its own state.
 
 ### What the engine is sure of, it writes
 

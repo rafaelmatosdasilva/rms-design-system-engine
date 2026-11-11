@@ -244,6 +244,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-figma-s-version-history-the` | The 24 guide tasks on Haiku (engine 95fea56) | "Figma's version history: the file's pages, and its rate limit waited out or said" |
 | `2026-11-11-a-field-s-name-gives` | The 24 guide tasks on Haiku (engine a577057) | "A field's name gives way to the code only where the code holds a button and the name says no input outright" |
 | `2026-11-11-comments-left-in-figma-and` | The 24 guide tasks on Haiku (engine b5e80f5) | "Comments left in Figma, and four of the library's own conventions" |
+| `2026-11-11-history-tests-know-the-contracts` | The 24 guide tasks on Haiku (engine 2a3366a) | "A card per source on Rules and Documentation, and pattern contracts" |
 | `2026-11-11-the-style-guide-says-one` | The 24 guide tasks on Haiku (engine f815a8a) | "The style guide says one number, reads as text, and sorts every table" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

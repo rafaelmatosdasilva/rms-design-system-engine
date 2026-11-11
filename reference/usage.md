@@ -735,8 +735,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Source and Done by in one cell that stays in view
   under the head as they scroll. **Done by** names the person alone (who-did-it.mjs): one person under two names on the page (an account `qa.lead`
   and the `QA Lead` it signs as) by the name they sign with, a Windows sign-in without its domain. **Affects** shows five components, then "N more". An issue more
-  than one commit names says how many ("· 3 commits"), and a click shows those alone. Chips (All, Code, Figma, Intent layer, Decisions, each when it
-  has rows) filter it, each with its own address (`#history?show=decisions`). **Issues:** every one the message starts with (`#4521 - …`,
+  than one commit names says how many ("· 3 commits"), and a click shows those alone. Chips (All, Code, Figma, Intent layer, Contracts, Decisions, each when it
+  has rows) filter it, each with its own address (`#history?show=decisions`). **Contracts** (`contract-history.mjs`): what
+  changed in the contracts since the build before, kept in `contracts-history.json` in the engine's output; the first build only
+  records, a build that writes the same contracts adds nothing, a change that breaks a product says so. **Issues:** every one the message starts with (`#4521 - …`,
   `[#4521 #4522 - REL-12] …`, or the team's own pattern, `changelog.ticket`: `"#\\d+|REL-\\d+"`); else each one the
   merge or pull request it came by closes ("Closes #45" in its title or description), said `via !12`; else that request
   (`!12` on GitLab, `PR #70` elsewhere); "No issue" only for a commit made straight on the branch. A link pattern read
@@ -974,6 +976,9 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
   answers with no note saying which one won. Decisions
   only, no captured values, so it is safe to commit and applies in CI. Scaffolded once (empty bindings),
   then hand-owned; the generator never rewrites it.
+- **`contracts/patterns/`, `contracts/flows/`** — one `<page>.pattern.json` per pattern and flow of the intent layer
+  (`pattern-contract.mjs`): the components it uses, its rules at their level (must, should), when to use it and not, its
+  mistakes, the page it came from. Never `.contract.json`: every reader of the folder takes that for a component's.
 - **`contracts/`** (**local, gitignored**) — the generated CAPTURED views, refreshed every run:
   `tokens.json` (W3C DTCG: `$type`/`$value`, per-mode under `$extensions`, referenced by
   `{family.token}`), one **standard** `<name>.contract.json` each (`id`, `version`, `props[]` with
@@ -1388,9 +1393,11 @@ component, a property, an option, a layer in every variant (never inside an inst
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
 to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. The Rules
-page opens with the library's health (`library-score.mjs`): a score from the Figma rules the team keeps (each rule's
-share of components that follow it, averaged by kind, the kinds averaged), each kind's score, and the change since the
-last day the guide was built (`library-score.json` in the engine's output); a rule still to decide counts for nothing. A rule that
+page opens with a card a side, Figma and Code (`doneCard` in the template's `00-start.js`, the Status page's own card and
+bars): a ring of every rule in the colour of its state (done, to decide, to fix) with the share done in its middle, and a bar
+per area in the same colours, weakest first. The Documentation page draws the same card, one a source (intent layer, Figma,
+contract, code), each page judged on what belongs in that source (`docIssueRows`); a change to the card changes both. The
+library's score (`library-score.mjs`, `library-score.json` in the engine's output) is still kept, each area once. A rule that
 reads what the last capture does not keep (each layer's bindings, its opacity and border, a nested component's exposure,
 the designer's annotations; the skeleton snapshot's `_keeps`, `capture-waits.mjs`) finds nothing until Figma is read
 again: the summary's last line and the Rules page say which checks wait and that the request is "refresh the Figma

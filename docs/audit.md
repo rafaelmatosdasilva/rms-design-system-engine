@@ -113,10 +113,12 @@ Each is a decision for your team in Figma, and keeping it as it is, as a known e
 
 How your system is built, on both sides, is one page in the style guide's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
 
-- **The library's health in one number.** Above the table: a score from the rules your team keeps (the share of components that already follow each, averaged by kind), each kind's own score beside it, and the change since the last day the guide was built. A rule still to decide counts for nothing.
+- **How far along each side is.** Above the filters, a card for Figma and one for the code, the Status page's own cards:
+  - A ring of every rule in the colour of its state: done, to decide, to fix. In its middle, the share done.
+  - Beside it, a bar per area in the same colours, the weakest area first, so an area with nothing done still shows what is under way.
 - **One table, a row per rule.** Each row says its side (Figma or Code), how many follow it, and who owns it: Design, Engineering, or both. A rule nothing breaks says so.
 - **Sort it your way.** Every column head sorts by it, and again for the other way round.
-- **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Area and one for Side. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
+- **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Source and one for Area. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
 - **Checks that wait on Figma are named.** A new check that reads something your last Figma capture doesn't have yet finds nothing until Figma is read again. Rather than look like a clean library, the page says how many checks wait and what they read, with the request to refresh Figma ready to copy ([how to ask](features.md#set-up)). The summary of the rules says it too.
 - **One card for the decision.** A row opens in the side panel: what the engine suggests, every component or place it would change, and the approval under it, in one card to read top to bottom.
 - **Each change said once.** The components on the left, linked, and the changes they take on the right, one a line. Components that take the same changes share one entry. Labelled values, never a table or a box drawn like one.
