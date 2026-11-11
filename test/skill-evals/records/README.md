@@ -229,6 +229,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-10-variant-order-a-family-s` | The 24 guide tasks on Haiku (engine 1cd3159) | "Variant order, a family's fill, nested within reach" |
 | `2026-11-10-merge-branch-figma-batch-11` | The 24 guide tasks on Haiku (engine a4781c9) | "Annotations read by family" |
 | `2026-11-10-merge-branch-figma-batch-12` | The 24 guide tasks on Haiku (engine da5d214) | "The engine in Cursor and Codex" |
+| `2026-11-10-merge-branch-cursor-codex-guard` | The 24 guide tasks on Haiku (engine cdab86a) | "A check that waits on Figma says so" |
+| `2026-11-10-merge-branch-capture-waits-into` | The 24 guide tasks on Haiku (engine 6889d8a) | "A parent that cancels a nested state" |
 | `2026-11-10-a-preview-to-review-a-code` | The 24 guide tasks on Haiku (engine ecdb31c) | "A preview to review a code prototype in" |
 | `2026-11-10-a-preview-to-review-a-code-2` | The 24 guide tasks on Haiku (engine 253ac2c) | "A preview to review a code prototype in" |
 | `2026-11-10-a-preview-to-review-a-code-3` | The 24 guide tasks on Haiku (engine c53102b) | "A preview to review a code prototype in" |

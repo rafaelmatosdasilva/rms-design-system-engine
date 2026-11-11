@@ -1125,6 +1125,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   .pg-inspect-grid.pg-grid-2, .pg-examples { grid-template-columns: 1fr; }   /* Parity and Do and Don't in one column on a phone */
 }
 
+/* The checks that wait on a fresh read of Figma, above the Rules table (capture-waits.mjs). */
+.sg-cx-wait { padding: var(--sg-space-m); margin-bottom: var(--sg-space-l); }
+.sg-cx-wait > p { margin: 0 0 var(--sg-space-s); }
+
 /* Labelled values in a panel opened from a table's row (kvOne, kvList): never another table. */
 .sg-kv { display: grid; gap: var(--sg-space-s); margin: 0; padding: var(--sg-space-m); }
 .sg-kv > div { display: grid; grid-template-columns: minmax(7rem, 30%) 1fr; gap: var(--sg-space-m); align-items: baseline; }

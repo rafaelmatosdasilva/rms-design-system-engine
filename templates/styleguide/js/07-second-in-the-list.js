@@ -132,6 +132,13 @@
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
+    // The checks that wait on a fresh read of Figma: a check that finds nothing because the capture predates it must
+    // never read as a library with nothing wrong (capture-waits.mjs).
+    var WAIT = G.waiting || [];
+    if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
+        // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
+        + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
     sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
     tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
@@ -148,6 +155,8 @@
       Array.prototype.forEach.call(sec.querySelectorAll('.sg-cx-table th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
     sec.addEventListener('click', function (e) {
+      // The request to read Figma again, copied as a rule's decision is.
+      var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) { copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); return; }
       var th = e.target.closest('th[data-sort]'); if (th) { sortBy(th.getAttribute('data-sort')); return; }
       if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
     });
