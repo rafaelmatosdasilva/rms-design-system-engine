@@ -19,6 +19,9 @@ function fakeFigma() {
     if (u.pathname.endsWith('/versions')) {
       const page = u.searchParams.get('before') ? 1 : 0;
       body = { versions: V.slice(page * 4, page * 4 + 4), pagination: page ? {} : { next_page: `${u.origin}${u.pathname}?page_size=4&before=v5` } };
+    } else if (!u.searchParams.get('ids')) {
+      const v = u.searchParams.get('version'), n = v ? Number(v.slice(1)) : 8;
+      body = { document: { children: [{ id: '0:1', name: n >= 6 ? 'Components' : 'components' }, ...(n >= 5 ? [{ id: '0:2', name: 'Patterns' }] : [])] } };
     } else {
       const v = u.searchParams.get('version'), n = v ? Number(v.slice(1)) : 8;
       body = { nodes: { '1:2': { document: chipAt(n) } } };
@@ -61,7 +64,7 @@ test('the commands: the history between two days, with who saved it, and who bro
   const { fetchImpl } = fakeFigma();
   const props = { chipTag: { nodeId: '1:2' } };
   const h = await historyCommand({ fileKey: 'KEY', token: 'tok', props, names: ['chipTag'], from: '2026-11-04', fetchImpl });
-  assert.deepEqual(h.lines, ['Figma versions since 2026-11-04: 4, saved by Ada (2), Ben (1), Cy (1).', 'chipTag: description added; property Size added; layer State=Default/Badge added; layer State=Selected/Badge added']);
+  assert.deepEqual(h.lines, ['Figma versions since 2026-11-04: 4, saved by Ada (2), Ben (1), Cy (1).', 'Pages: page components renamed Components; page Patterns added', 'chipTag: description added; property Size added; layer State=Default/Badge added; layer State=Selected/Badge added']);
   const b = await blameCommand({ fileKey: 'KEY', token: 'tok', props, name: 'chipTag', property: 'Size', fetchImpl });
   assert.match(b.lines[0], /^chipTag: property Size came in with the version of 2026-11-05 by Cy/);
   assert.match((await historyCommand({ fileKey: 'KEY', token: null, props, names: ['chipTag'] })).error, /needs a token/);

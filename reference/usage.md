@@ -1346,13 +1346,18 @@ changed. With `FIGMA_TOKEN` set (the environment or `.env`), the engine reads th
   snapshot's `_editors`) and named on its row on History, beside whoever ran it. The first read has none to compare.
 - **`--figma-history <component…> [--from <version id | YYYY-MM-DD>] [--to <version id>]`.** What changed in each
   component between two versions (its properties, variants, layers, description and the values bound to variables),
-  with how many versions were saved between and by whom. With no `--from`, since the last read; `--to` is the file as
+  the file's pages added, removed or renamed, and how many versions were saved between and by whom. With no `--from`, since the last read; `--to` is the file as
   it is now unless named.
 - **`--figma-blame <component> --property <name> | --layer <name>`.** The version that brought in a property or a
   layer, with its day and author, found by a binary search over the versions (about log2 of them are read).
 
 A read through the session's Figma tool has no token: it names nobody, never a guess. Components are named as the
 props snapshot names them, which holds their node ids.
+
+Each component compared reads it twice, and the blame about log2 of the versions: calls Figma counts against the
+token's seat. A view or collaborator seat's token has a very low limit on them (a few a month); Figma then answers
+429, and the engine says the limit was reached rather than retrying for days. A token of a full or Dev seat is the
+one to use here.
 
 #### The construction grammar (`--query construction`, `--construction`, `--figma-fix`, `--construction-check`)
 
