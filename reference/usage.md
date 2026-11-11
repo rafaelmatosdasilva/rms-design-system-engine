@@ -1180,7 +1180,10 @@ the Code Connect `valueMap`; `inverted` when the code holds the opposite of the 
 each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
 keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
-on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`), and
+on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`; each part a
+person named in Figma paired with the class the component's own file puts on it, where one class is the part's name or
+ends in it after the component's prefix, `pairedBy: "name"`, `part-pairing.mjs`; the structure contract's `children`
+win, and `cssSelector: null` stays unpaired), and
 `source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
 file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
@@ -1276,7 +1279,10 @@ only while the snapshot still matches the code:
 dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
 `NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
-value, font against the first text element, background as "paints or not" (Figma often paints on a child
+value, each part paired with its class by name (`part-pairing.mjs`; captured as `part-0`, `part-1` with its Figma
+`name`) compared on its own element against the gap and padding Figma binds on the frame of that name, the difference
+carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
+background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
 runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
