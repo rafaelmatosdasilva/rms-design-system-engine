@@ -55,7 +55,14 @@
     var t = String(text || '');
     return new RegExp('(^|[^\\w-])' + c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)', 'i').test(t) ? esc(t.replace(/^\w/, function (k) { return k.toUpperCase(); })) : 'On <b>' + esc(c.name) + '</b>, ' + esc(t.replace(/^[A-Z](?=[a-z]*[\s,])/, function (k) { return k.toLowerCase(); }));
   }
-  function scOfLabel(label) { var m = /WCAG (\d+\.\d+\.\d+)/.exec(label || ''); return m ? m[1] : null; }
+  // A finding's criterion, from the label the engine wrote: its number, or - for what is looked at beyond A and AA
+  // (forced colours, reduced motion) - the name of its row, which carries no number on purpose.
+  function scOfLabel(label) {
+    var m = /WCAG (\d+\.\d+\.\d+)/.exec(label || '');
+    if (m) return m[1];
+    var b = /^(.+?): .*\(beyond WCAG 2\.2 at A and AA\)$/.exec(label || '');
+    return b ? b[1] : null;
+  }
   function a11yStaticItems(c) {
     var a = c.a11y || {}, ch = a.checked, ran = ch && !ch.notRead, items = [];
     // The tasks each finding kind owes, worked out by the engine (wcag21.mjs) and carried here: the page never works
@@ -90,11 +97,14 @@
   // words of each new check. The page runs the in-page checks itself (window.__wcag21, wcag-page.js) on every variant.
   var WCAG = DATA.wcag21 && DATA.wcag21.criteria ? DATA.wcag21 : null;
   var WCAG_SC = {};
-  if (WCAG) WCAG.criteria.forEach(function (k) { (k.kinds || []).forEach(function (kind) { if (!WCAG_SC[kind]) WCAG_SC[kind] = k.sc; }); });
+  if (WCAG) WCAG.criteria.concat(WCAG.beyond || []).forEach(function (k) { (k.kinds || []).forEach(function (kind) { if (!WCAG_SC[kind]) WCAG_SC[kind] = k.sc; }); });
   function wcagScOf(kind) { return WCAG_SC[kind] || ''; }
   function wcagLabelOf(sc) {
     var k = WCAG && WCAG.criteria.find(function (x) { return x.sc === sc; });
-    return k ? 'WCAG ' + k.sc + ' ' + k.name + ' (' + k.level + ')' : sc ? 'WCAG ' + sc : '';
+    if (k) return 'WCAG ' + k.sc + ' ' + k.name + ' (' + k.level + ')';
+    var b = WCAG && (WCAG.beyond || []).find(function (x) { return x.sc === sc; });
+    if (b) return b.sc + ': ' + b.name + ' (beyond WCAG 2.2 at A and AA)';
+    return sc ? 'WCAG ' + sc : '';
   }
   function wcagTitle(kind, n) {
     var g = WCAG && WCAG.guide[kind];
@@ -105,7 +115,8 @@
   // sc: { sc: n }, ran: { check: 1 }, tried: n }), or null before it ran (and on the page of every component).
   var WCAG_HOW = { auto: 'Tried in the browser on every variant', audit: 'Tried by the audit in a browser', static: 'Read in the code', person: 'A person checks', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_SRC = { auto: FROM_PAGE, audit: FROM_AUDIT, static: 'Read from the code', person: 'Checked by a person', page: 'Up to the page that uses it', media: 'Only for video and sound' };
-  var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap', '2.4.11': 'tabtrap', '2.5.8': 'targets' };
+  var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap', '2.4.11': 'tabtrap', '2.5.8': 'targets',
+    'Forced colours': 'forcedstate', 'Reduced motion': 'motion' };
 
   // A retired component still in use: one row for each product that still uses it, with its first places and
   // what replaces it; every place is in migrations.md beside the audit's other hand-back files.

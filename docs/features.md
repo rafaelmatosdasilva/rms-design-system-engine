@@ -120,7 +120,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
 - Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
-- Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
+- Tries what belongs to a page across your products' own pages: a title and a language, a page that works both ways up, a skip link, the same navigation and help in the same place, more than one way of finding a page, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
+- Walks a flow for real when you ask it to: each step filled in and sent, so a field asked twice is a finding and not a question. It never types a password or a card number, and stops before a step that pays, signs or deletes.
 - Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
 - Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
@@ -132,6 +133,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
+| `/rms-design-system-engine check the accessibility of our pages and flows` | What belongs to a page, tried across your product's own pages |
+| `/rms-design-system-engine walk our checkout flow and check nothing is asked twice` | The flow filled in and sent step by step, with what it asks for again |
 | `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
 
 ## Lint your codebase rules

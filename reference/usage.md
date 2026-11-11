@@ -855,7 +855,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
   (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
   focus, labels, errors) are left out. To fix first, then to check, then done; a AAA criterion a check stands for (a
-  comfortable target size, motion from interactions, a focus ring's thickness) comes last as advisory and is not counted. Above it a count of
+  comfortable target size, a focus ring's thickness) and what the checks look at beyond the standard at A and AA
+  (Forced colours, Reduced motion: each a row of its own, named in words and never as a criterion) come last as
+  advisory and are not counted. Above it a count of
   each status, and when the audit last ran (or that it has not), with what is excused (`behaviourExceptions`).
   Under each criterion: what the audit found on it that is about accessibility rather than Figma (a text's contrast
   in one variant and mode, `splitFindings`, with who acts and what to do); the last browser check's findings
@@ -2175,8 +2177,15 @@ whatever surface the project serves, in this order:
    whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
    product (`product` in `a11y.json`) and the style guide lists them on the Status page under Products, one row per
    product. `a11y.products: false` leaves them out.
-   The page criteria (2.4.2, 3.1.1, 2.4.1, 3.2.3, 3.2.4, 3.2.6, 3.3.7, 3.3.4) are tried on each such page whole and
+   The page criteria (1.3.4, 2.4.1, 2.4.2, 2.4.5, 3.1.1, 3.2.3, 3.2.4, 3.2.6, 3.3.4, 3.3.7) are tried on each such page whole and
    across the pages of one product (never two products'), each flow in `a11y.flows` read page by page in its order (`--reference config`).
+   1.3.4 is read from the page's own style sheets and inline scripts: a rule inside an `(orientation: …)` query that
+   hides the page or turns it on its side, words asking the reader to rotate the device, or `screen.orientation.lock()`.
+   A style sheet from another origin cannot be read, and the pass says how many were left. 2.4.5 counts the ways one
+   product offers of finding a page - its menu, a search, a sitemap, breadcrumbs, links between its pages - and needs
+   two; a product whose pages are all steps of one named flow is the process the criterion excepts, and passes with
+   that said. With `a11y.walkFlows: true` each flow is walked through (filled in and sent) and 3.3.7 is decided
+   instead of being left to a person (`--reference config`).
    **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
    page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
    linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates
@@ -2394,15 +2403,22 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
 - **A name that changes with content** ("3 items") is compared as written, so it is reported as a difference.
   Describe such names in prose instead.
-- **Reduced motion (2.3.3)** — under `prefers-reduced-motion: reduce`, anything that still transitions or
-  animates.
-- **Forced colours** — under `forced-colors: active` (Windows high contrast), a focus indicator that
-  disappears because it was only a shadow or a background, and an icon or a text the mode makes vanish
+- **Reduced motion** — under `prefers-reduced-motion: reduce`, anything that still transitions or
+  animates (`motion`). Its own row, beyond WCAG 2.2 at A and AA, advisory: the standard asks for this nowhere at
+  those levels, so no criterion is marked as failing for it.
+- **Forced colours** — its own row too, beside Reduced motion and on the same footing: high contrast mode is not
+  something WCAG 2.2 asks about at A or AA, so what it loses is advice and no criterion is signed by it (saying an
+  icon that vanishes there failed 1.4.11, and a focus ring 2.4.7, told a team an AA criterion was broken where the
+  standard asks for nothing). Under `forced-colors: active` (Windows high contrast), a focus indicator that
+  disappears because it was only a shadow or a background (`forcedfocus`), the edge of a field, checkbox, radio or
+  switch that read at rest and is gone there because it was a box-shadow or a background colour standing in for a
+  border (`forcedborder`; one already too faint at rest is 1.4.11's own finding and is not counted twice), and an
+  icon or a text the mode makes vanish
   (`forcedcontrast`: an icon drawn as a background colour, a CSS mask, takes the page's colour). A selected, checked,
   pressed or current item (`aria-selected`, `aria-checked`, `aria-pressed`, `aria-current`, or a state word in its
   class) that, in the mode, draws exactly what an item of the same kind beside it at rest draws (the colours the mode
   leaves, borders, outline, weight, decoration, opacity, and every part, a check mark or an icon) is a finding
-  (`forcedstate`, 1.4.11). A native checkbox or radio is drawn by the system, which keeps its state.
+  (`forcedstate`). A native checkbox or radio is drawn by the system, which keeps its state.
 - **Colour vision** — text that passes WCAG, read as people who do not see red, green or blue see it (the
   matrices Chrome's own vision simulator uses): one that falls below its ratio for one of them is an advisory
   (`cvdcontrast`, with the `vision` that loses it; red on black is the usual case). Two variants of one component

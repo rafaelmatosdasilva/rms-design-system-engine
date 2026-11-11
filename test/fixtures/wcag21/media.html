@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- A page that plays something, so the media branch of the WCAG checks runs: the criteria that only apply where a
+     component plays video or sound (1.2.1 to 1.2.5, 1.4.2) are never reached by a fixture with no media at all.
+     One video with no captions track and one with it; sound that starts by itself, and sound that waits to be
+     started. No media file is needed: the checks read the elements and their attributes, not their contents. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>A page that plays something</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; color: #111; background: #fff; margin: 16px; }
+    h1 { font-size: 20px; }
+    .player { display: block; width: 320px; height: 180px; background: #222; }
+    audio { display: block; width: 320px; height: 54px; }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <h1>A page that plays something</h1>
+
+    <section class="clip">
+      <h2>A clip with no captions</h2>
+      <video class="player" controls width="320" height="180"></video>
+    </section>
+
+    <section class="captioned">
+      <h2>The same clip, captioned</h2>
+      <video class="player" controls width="320" height="180">
+        <track kind="captions" srclang="en" label="English">
+      </video>
+    </section>
+
+    <section class="jingle">
+      <h2>Sound that starts by itself</h2>
+      <audio class="jingle-player" controls autoplay></audio>
+    </section>
+
+    <section class="podcast">
+      <h2>Sound that waits to be started</h2>
+      <audio class="podcast-player" controls></audio>
+    </section>
+  </main>
+</body>
+</html>
