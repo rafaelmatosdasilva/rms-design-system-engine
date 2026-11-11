@@ -8,6 +8,9 @@ import { AFTER, AFTER_LABELS, AFTER_KEYS, afterOf, afterFor, afterSection, notes
 
 const pr = (number, ...labels) => ({ number, labels });
 
+// A text matched as itself: every character a pattern reads, the backslash included (as duplication-check.mjs does).
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 test('a pull request says what to do once, as a label beside its release label', () => {
   assert.equal(afterOf(['release: minor', AFTER_LABELS.figma]).key, 'figma');
   assert.equal(afterOf([AFTER_LABELS.styleguide]).key, 'styleguide');
@@ -34,7 +37,7 @@ test('one entry a thing to do, naming every pull request that asks it', () => {
 test('a release that asks nothing says so, rather than leaving it to be worked out', () => {
   const quiet = afterSection([pr(1), pr(2)]);
   assert.match(quiet, new RegExp(`^${HEADING}`));
-  assert.match(quiet, new RegExp(NOTHING_LINE.replace(/[.:]/g, '\\$&')));
+  assert.match(quiet, new RegExp(escapeRe(NOTHING_LINE)));
   // Silence would read as nobody having written it down, which is the thing this replaces.
   assert.notEqual(quiet.trim(), HEADING);
 });
@@ -61,7 +64,7 @@ test('run from the command line it prints the section, and a broken argument is 
   const run = (arg) => execFileSync(process.execPath, ['lib/release-after.mjs', arg], { encoding: 'utf8' });
   assert.match(run(JSON.stringify([pr(2, AFTER_LABELS.figma)])), /Refresh Figma.*\(#2\)/);
   // The workflow builds that argument in shell: a release must not fail because the string came out wrong.
-  assert.match(run('not json at all'), new RegExp(NOTHING_LINE.replace(/[.:]/g, '\\$&')));
+  assert.match(run('not json at all'), new RegExp(escapeRe(NOTHING_LINE)));
   assert.match(execFileSync(process.execPath, ['lib/release-after.mjs'], { encoding: 'utf8' }), /What to do/);
 });
 
