@@ -59,9 +59,9 @@ test('a decision asked for in words goes to --decision with what was ruled out a
 
 test('History: one table of the code\'s changes, Figma\'s, the intent layer\'s and the decisions, each row tagged, a chip each type', async () => {
   const tpl = templateText();
-  for (const [chip, type] of [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer']]) assert.ok(tpl.includes(`'${chip}', '${type}'`), chip);
+  for (const [chip, type] of [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['contracts', 'Contracts']]) assert.ok(tpl.includes(`'${chip}', '${type}'`), chip);
   assert.match(tpl, /add\(d\.at, 'decisions', type,/, 'a decision, tagged as one');
   assert.match(tpl, /'<tr data-chip="' \+ x\.chip \+ '"'/, 'every row says its type for the chips');
-  assert.match(tpl, /\[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);
+  assert.match(tpl, /\[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['contracts', 'Contracts'\], \['decisions', 'Decisions'\]\]/);
   assert.doesNotMatch(tpl, /box\.innerHTML = order\.map/, 'one table, never a card per release');
 });

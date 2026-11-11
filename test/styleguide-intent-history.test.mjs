@@ -67,7 +67,7 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href="#c-button/documentation"]') !== null`), true, 'the component its page documents');
     // A chip of its own when History has another kind beside it (one kind alone needs none).
-    assert.match(templateText(), /var kinds = \[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);
+    assert.match(templateText(), /var kinds = \[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['contracts', 'Contracts'\], \['decisions', 'Decisions'\]\]/);
     assert.equal(await run(`document.querySelectorAll('#history .sg-chip').length`), 0, 'one kind alone: no chips');
     // The button's own History: the change to its page.
     await run(`location.hash = '#c-button/history'`);
