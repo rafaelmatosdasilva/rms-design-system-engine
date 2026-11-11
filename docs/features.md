@@ -284,7 +284,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.
 - A link keeps what you set, so it opens that exact variant.
-- Marked Early on each component's page while it is tuned.
 
 ## Turn Figma into code
 

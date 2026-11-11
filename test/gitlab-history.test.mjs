@@ -159,6 +159,28 @@ test('a release that could not be read is asked again on the next run, never lef
   assert.equal(missing(dir, req), null);
 });
 
+test('a commit read as in no release is asked again once a day, even while the mirror stays on one commit', async () => {
+  // A release is tagged after the code was taken more often than not: a hotfix merged, then tagged. Asked once and
+  // never again, its commits read as unreleased for good and the History page showed them with no release.
+  const gl = standIn();
+  const fetchImpl = async (url, init) => { const r = gl.answer(url, init.headers?.['PRIVATE-TOKEN'] ?? null); return { ok: r.status === 200, status: r.status, json: async () => r.body }; };
+  const env = { GITLAB_TOKEN: 'secret', GITLAB_HOST: 'code.acme.example' };
+  const dir = mirror('https://code.acme.example', 'code.acme.example');
+  const req = { paths: [{ path: 'src/theme.css' }] };
+  const t0 = Date.parse('2026-05-01T09:00:00Z');
+  await fillHistory(dir, req, { fetchImpl, env, now: t0 });
+  // As GitLab answered before B's release was tagged: in no release.
+  const h = readHistory(dir); h.refs[B] = { release: null, mr: '12' }; writeFileSync(join(dir, HISTORY_FILE), JSON.stringify(h));
+  assert.equal(missing(dir, req, readHistory(dir), t0 + 60 * 60 * 1000), null, 'within the day: nothing asked');
+  const later = t0 + 25 * 60 * 60 * 1000;
+  assert.deepEqual(missing(dir, req, readHistory(dir), later)?.paths.map((x) => x.path), ['src/theme.css'], 'a day on: asked again');
+  gl.calls.length = 0;
+  await fillHistory(dir, req, { fetchImpl, env, now: later });
+  assert.ok(gl.calls.some((c) => c.path === `/repository/commits/${B}/refs`), 'its release asked again');
+  assert.ok(!gl.calls.some((c) => c.path === `/repository/commits/${A}/refs`), 'never a commit whose release is known');
+  assert.equal(commitsOf(dir, ['src/theme.css']).find((r) => r.sha === B).release, 'v1.2.0', 'the release tagged since');
+});
+
 test('a record kept before releases were dated asks for the tags once, then never again', async () => {
   const gl = standIn();
   const fetchImpl = async (url, init) => { const r = gl.answer(url, init.headers?.['PRIVATE-TOKEN'] ?? null); return { ok: r.status === 200, status: r.status, json: async () => r.body }; };

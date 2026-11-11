@@ -80,15 +80,16 @@
   var PART_ROOT = {};
   COMPONENTS.forEach(function (c) { if (c.partOf && c.partOf.root) PART_ROOT[String(c.name).trim()] = c.partOf.root; });
   TODO.forEach(function (t) { var n = String(t.figmaOnly || t.pairing || '').trim(); if (n && n.indexOf('/') < 0 && !PARENT_NAME[bareName(n).toLowerCase()]) PARENT_NAME[bareName(n).toLowerCase()] = n; });
-  // A component listed in the menu: not a part (its page opens from its parent's), and, when the system is compared
-  // with Figma, one both sides have: one only the code has is flagged on Status, as one only Figma has, not listed.
-  // In the menu: the system's components, one each. A part opens from its parent; one only the code has, or one the code
-  // has only as a CSS class (no component yet), from its Status row.
-  function inMenu(c) { return !parentOf(c.name) && !(c.codeOnly && c.codeOnly.figma) && !cssOnly(c); }
+  // In the menu: one entry for each row the Status table has that the code builds, so the menu's count and the Code
+  // card's Built are one number, always. A part opens from its component (however deep it sits); one only the code has
+  // is listed like any other built component, since the card counts it built; one the code has only as a CSS class (no
+  // component yet) opens from its Status row, which says Missing for it.
+  function inMenu(c) { return !parentOf(c.name) && !cssOnly(c); }
   // A family with no page of its own (navigation: navigation/TabMobile, navigation/TabDesktop…) is one entry in the menu,
-  // as it is one row on Status, opening its first member; its members are not listed one by one.
+  // as it is one row on Status, opening its first member; its members are not listed one by one. Its name is the top of
+  // the part chain, as Status finds it (rootComponentOf).
   function menuFamily(c) {
-    var f = parentOf(c.name); if (!f || (c.codeOnly && c.codeOnly.figma)) return null;
+    var f = rootComponentOf(c.name); if (f === String(c.name).trim()) return null;
     return COMPONENTS.some(function (x) { return x.name === f; }) ? null : f;
   }
   // A component inside a bigger one: its parent is a component of its own name, so it is listed and counted with
@@ -97,6 +98,9 @@
   function partOfAnother(c) { var f = parentOf(c.name); return !!f && COMPONENTS.some(function (x) { return x.name === f; }); }
   function menuCount() { var fam = {}; COMPONENTS.forEach(function (c) { var f = menuFamily(c); if (f) fam[f] = 1; }); return COMPONENTS.filter(inMenu).length + Object.keys(fam).length; }
   function parentOf(n) { var x = String(n).trim(), i = x.indexOf('/'); if (PART_ROOT[x]) return PART_ROOT[x]; if (i <= 0) return null; var f = bareName(x.slice(0, i)); return PARENT_NAME[f.toLowerCase()] || f; }
+  // The component a part belongs to, however deep it sits: a part of a part (a cell's own piece) belongs to the
+  // component at the top, and that is the one row counting it. A family name no component carries is the top itself.
+  function rootComponentOf(n) { var seen = {}, at = String(n).trim(), up; while ((up = parentOf(at)) && !seen[up]) { seen[up] = 1; at = up; } return at; }   // rootOf is the Playground's, for markup: every name here is the one page's
   function familyKey(n) { return parentOf(n) || (String(n).trim() || '(no name)'); }
   // A component a Showroom screen found missing from the code (checked when the screen was built): Missing, whatever
   // file the pairing only suggests.

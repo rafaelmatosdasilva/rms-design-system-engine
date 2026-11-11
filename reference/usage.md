@@ -725,12 +725,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
 - **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every change in one
-  table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day, and the time as the
-  reader's clock says it), Type, What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
+  table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day and the time as the
+  reader's clock says it, on one line, its release under them), Source (Code, Figma, Intent layer, Contracts, Decisions, as its chips; a contract changed by a build Done by the engine; the kind of a decision
+  or note, Lesson or Comment, the first line of What), What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
   v2.1.0 on …" once a release holds it, nothing before), a row per component a read of Figma changed (what changed in it), a row per commit to the intent
-  layer (what it says, the pages it changed, its commit; a merge or a commit that changed no file is left out; a change the engine sent in parts, "…
-  (part 2 of 3)", is one row with each commit named), a row per decision (Decision, Lesson, Rule or Sign-off: what was ruled out, why) with the page it
-  is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Type and Done by in one cell that stays in view
+  layer (what it says, what it Added apart from what it Changed, each a line of pages counted by kind, component pages, other pages named while
+  five or fewer and token pages, every name behind Show all; its commit; a merge or a commit that changed no file is left out; a change the engine
+  sent in parts, "… (part 2 of 3)", is one row with each commit named), a row per decision (Decision, Lesson, Rule or Sign-off: what was ruled out, why) with the page it
+  is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Source and Done by in one cell that stays in view
   under the head as they scroll. **Done by** names the person alone (who-did-it.mjs): one person under two names on the page (an account `qa.lead`
   and the `QA Lead` it signs as) by the name they sign with, a Windows sign-in without its domain. **Affects** shows five components, then "N more". An issue more
   than one commit names says how many ("· 3 commits"), and a click shows those alone. Chips (All, Code, Figma, Intent layer, Contracts, Decisions, each when it
@@ -834,12 +836,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Parity. A component shown in an overlay is read with the overlay it opens in, its backdrop too; one that does not move
   says so.
 - **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Status page's Accessibility, in
-  the same card as the Playground's tables: Task nr (open rows only), Area (Accessibility, with the criterion and its
-  level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
-  panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
-  finding or duty on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what
-  passed and where), What to do (who acts above it; each finding's own fix, what a person checks, "On badge, its Label
-  part, a person checks that…", or what has still to run, else what the criterion asks) and Status (✕ To fix, ! To
+  the same card as the Playground's tables: Task nr (open rows only), WCAG (the criterion and its level; a click, a
+  key or the pointer resting on it opens what it means in plain words and how it is checked, the token panel's own
+  pop-up, Escape closing it), Who acts, Status and Last checked. The row's panel holds the rest: What to do (each
+  finding's own fix, what a person checks, "On badge, its Label part, a person checks that…", or what has still to
+  run, else what the criterion asks), what Figma's annotations state for it, and what was found (each finding or duty
+  on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what passed and where).
+  Above the table All, then Who acts, then a chip a status. Status (✕ To fix, ! To
   check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
   finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
   browser, the last audit or the audit's code capture, a person). A criterion only a person can judge (1.3.3, 1.4.5,
@@ -1500,7 +1503,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   `findings.json`) and a product's near copy of a component, to decide.
 
 A row opens in the side panel: its status, who fixes it, and one card holding what the engine suggests, every component
-or place it changes with its fix, and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
+or place it changes with its fix (labelled values: the components on the left, the changes they take on the right, one a
+line, components taking the same changes in one entry; never a table or a box drawn as one), and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
 layer; Fix all for a rule's renames). The code's change is asked for as a patch handed back, never written over the code
 people wrote. `styleguide.construction: "unlisted"` keeps
 the page out of the menu and the search, opened only by its link (`#rules`; `#construction`, the address it had, opens it still); `"off"` leaves it out.

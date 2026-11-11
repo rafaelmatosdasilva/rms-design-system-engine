@@ -350,7 +350,7 @@
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
         return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
-      }).map(function (o) { if (EARLY_AREAS[o.v]) o.early = true; return o; })) + '</div></div>' +
+      })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card' + (isBig(c) ? ' pg-preview-card--tall' : '') + '"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><div class="pg-actions"></div><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div><div class="pg-panel-grip" role="separator" aria-orientation="vertical" aria-label="Controls width" tabindex="0" title="Drag to resize the controls. Double-click to reset."></div></div><div class="pg-panel">' +
@@ -834,7 +834,7 @@
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
-      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility') + whoChipsHTML(a11yEl.rows) +
+      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility', whoChipsHTML(a11yEl.rows)) +
         // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
         (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA</span>' : '');
       var ch = c.a11y && c.a11y.checked;
