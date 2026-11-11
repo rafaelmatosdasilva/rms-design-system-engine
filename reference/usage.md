@@ -1402,8 +1402,20 @@ component and each prop; a Code Connect file for each component Figma has, mappi
 custom properties made for the component or the shared tokens (`own` or `shared`, the team's to say); how each state is
 written (a pseudo-class, a class, a data or an ARIA attribute); how a part's class and a variant's class are named; and a
 shadow, border colour, opacity, corner and text written with a token, the corners sharing one, and custom properties of
-its own for what may be overridden. Every id begins with `code-`, and the team answers it as it answers Figma's
-(`--construction code-<rule> yes|no`); a decided one a component breaks fails `--construction-check`. Beside the rules,
+its own for what may be overridden; and its words (Content, as on Figma's side): the words a text prop's default, a slot's
+fallback and its stories (`<Name>.stories.*` beside it) give it, in the case most components' are (`code-words-case`), and
+no words written straight into its markup, a text between tags or a literal `aria-label`, `title`, `placeholder` or `alt`
+(`code-words-through-props`, with file and line). Every id begins with `code-`, and the team answers it as it answers
+Figma's (`--construction code-<rule> yes|no`); a decided one a component breaks fails `--construction-check`. A rule the
+team already wrote into its linter is decided too (`lint-config.mjs`, `decidedIn` with the file, line and setting; the
+authored answer comes first): from `.stylelintrc*`, `stylelint.config.*`, `.eslintrc*`, `eslint.config.*` or
+`package.json`, `vue/prop-name-casing` decides a prop case it names, `react/boolean-prop-naming` the word a yes/no begins
+with, `vue/require-prop-comment` a comment on each prop, `vue/no-bare-strings-in-template` and `react/jsx-no-literals`
+words through props, `selector-class-pattern` a part's or a variant's class its pattern takes, `color-no-hex` and
+`color-named: never` colours with tokens, and `declaration-strict-value` each property it lists; a setting turned off, or
+one that says another way, decides nothing. What the team's own linter reports for each such setting is beside it
+(`reported`), run from the project's `node_modules/.bin` only and kept in the engine's output (`lint-reports.json`) until a
+file it read changes. Beside the rules,
 each component's `anatomy`: each state and how it is written (with file and line), its parts with element and class in
 markup order and whether each is optional, which prop puts which class on and what that class declares, each shadow's
 layers with the attributes they write and how it is turned off, borders, each corner's radius and whether one token holds

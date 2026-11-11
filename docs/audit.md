@@ -150,6 +150,14 @@ What it reads, as rules:
 - **Tokens.** Whether a component's styles use custom properties made for it (`--button-…`) or the shared tokens directly. Which way is your team's to say, so it waits for the answer.
 - **Its look.** A shadow, a border colour, an opacity, the corners and the text, each written with a token rather than by hand, and whether the corners share one radius token.
 - **Its own API.** Whether a component declares custom properties of its own for what may be overridden.
+- **Its words.** The words a component shows when given none (a text prop's default, a slot's fallback) and the words in its stories, in the case most components use. And no words written straight into its markup, such as `<span>Close</span>` or `alt="picture"`, which nobody using the component can change or translate.
+
+A rule your team already wrote into its linter counts as decided:
+
+- **Read from your configs.** Your stylelint and ESLint configs, such as `vue/prop-name-casing`, `selector-class-pattern`, `color-no-hex` or `declaration-strict-value`.
+- **Shown as your team's.** The rule's panel on the Rules page says where it was written (`eslint.config.js:72`) and how many findings your own linter reports for that setting, so there is one list, not two.
+- **Only when it agrees.** A setting decides a rule only when it says what the rule says. One that is turned off decides nothing.
+- **Your linter, run locally.** It runs from your project's own `node_modules` only, and is never installed for you.
 
 Beside the rules, each component's anatomy, read as deeply as Figma's:
 
