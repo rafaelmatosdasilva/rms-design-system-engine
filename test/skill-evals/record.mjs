@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const ENGINE = dirname(dirname(HERE));   // the engine's own folder: test/skill-evals is two levels in
 const SKIP = /(^|\/)(node_modules|\.cache|dist|build\/static|coverage)(\/|$)|(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?)$/;
 const MAX = 40 * 1024;
 
@@ -99,6 +100,15 @@ export function moreSteps(b, s) {
   return `Input moved but input a turn held (${k(per(b))} to ${k(per(s))}): the turns moved, ${b.turns.toFixed(1)} to ${s.turns.toFixed(1)}, and nothing a run reads grew${moved.length ? ` - most in ${moved.join(', ')}` : ''}.`;
 }
 
+// A path on this computer, written from a name of its own: a record never carries a person's folder. The home
+// folder is one root; the engine's own is the other, and it is not always under it - a worktree lives in a
+// temporary folder whose path still spells the person's name, flattened into one segment that `homedir()` never
+// matches. The engine is written out first, being the longer of the two where one holds the other.
+export function scrubPaths(text, { engine = ENGINE, home = homedir() } = {}) {
+  const roots = [[engine, '<engine>'], [home, '~']].filter(([r]) => r && r !== '/');
+  return roots.reduce((s, [r, as]) => s.split(r).join(as), String(text));
+}
+
 // The RESULTS.md entry for one recorded evaluation. `now` and `before` are { model: runStats } (before may be empty).
 export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, fileHashes = null, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {
   const k = (x) => `${Math.round(x / 1000)}k`, usd = (x) => `${x.toFixed(3)}`, t = (x) => (x ? x.toFixed(1) : '-');   // turns: an entry recorded before turns were kept has none
@@ -160,14 +170,10 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const rows = readFileSync(src.path, 'utf8').split('\n').filter(Boolean).map((l) => pruneRow(JSON.parse(l))).filter(Boolean);
     const dir = join(HERE, 'records', name, src.sub);
     mkdirSync(dir, { recursive: true });
-    // A path on this computer is written from ~ (a run names the engine where it lives): a record never carries a
-    // person's home folder.
-    const home = homedir();
-    writeFileSync(join(dir, basename(src.path)), rows.map((r) => JSON.stringify(r).split(home).join('~')).join('\n') + '\n');
+    writeFileSync(join(dir, basename(src.path)), rows.map((r) => scrubPaths(JSON.stringify(r))).join('\n') + '\n');
     console.log(`${join('records', name, src.sub, basename(src.path))}: ${rows.length} rows`);
   }
   if (ENTRY) {
-    const ENGINE = dirname(dirname(HERE));
     const { readFolder } = await import('./summarize.mjs');
     const { guideSetHash, guideFileHashes } = await import('../../lib/skill-files.mjs');
     const sidesOf = (dir) => Object.fromEntries(readFolder(dir).filter((x) => x.set === 'guide').map((x) => [x.model, runStats(x.rows)]));

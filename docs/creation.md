@@ -82,6 +82,38 @@ A rule counts as covering a behaviour when the component's own documentation des
 
 Said once per component and behaviour, never once per use. And when no documentation has been read at all, nothing is held to a rule — reporting every behaviour on every page because nothing was loaded would be worse than saying nothing.
 
+### What a template's body holds
+
+A template is the shell of a page; what goes inside it is the page. The check read whether a page **started** from a template and never read what the template was **filled with**.
+
+In one run the agent put radio buttons inside a filters panel. The team uses dropdowns — and nothing in the documentation says which control a filter takes, so the check had nothing to hold the page to and said nothing. The prototype reached review teaching a control nobody had chosen.
+
+Now the body is read against what the documentation says it holds:
+
+- **The documentation describes the body, and the page put something else in it.** Named as this prototype's choice, so a reviewer knows it was not decided.
+- **The documentation never says what the body holds.** Said once for the template, listing what went into it — not once for every component.
+
+```
+FiltersPanel's documentation says what its body holds and never names RadioGroup:
+it is this prototype's choice. Keep it and put the question to the team, or use
+what the documentation names
+```
+
+A **warning**, never an error. What the page does may well be right; what is wrong is that nobody decided it. Said once per template, with a long body counted rather than listed. With no documentation read at all, nothing is held to a body — a page questioned because nothing was loaded would be worse than silence.
+
+### A pointer nobody can follow is not documentation
+
+A page whose whole documentation reads *"See the Filters family spec"* — where there is no Filters spec — counts as **documented** to every check that asks. It is not: nobody can follow it.
+
+So a page whose documentation is only such a pointer becomes an open question instead, reaching whoever makes a page the same way the intent layer's own questions do:
+
+```
+Orders: its documentation is only a pointer to Filters, and there is no Filters
+to read: nothing says what this page is for or what goes on it. What should it say?
+```
+
+A page that says anything of its own is documented, however thin — only a pointer and nothing else counts as none.
+
 ### A gap reaches the team by itself
 
 A prototype finds what your system does not have — a component it lacks, an option, a token. Those used to sit in a file and a chat, and someone had to remember to carry them to the people who decide. On the run this came from, they were only written up after being asked for twice.
@@ -101,6 +133,23 @@ Now the check drafts them itself, on the page each one belongs to:
 **Nothing is sent until you ask.** The intent layer is your repository. The drafts are written locally and reach the team's Drafts to review with `--commit` — the same gate `--draft` has always used.
 
 Each line says what was needed, what the prototype did meanwhile, and which prototype asked, so whoever reads it can go and look.
+
+### A preview to review it in
+
+The route writes a prototype in your product's own code and checks it — and used to leave nowhere to look at it. On the run this came from, the agent built a viewer by hand, and reviewing the page in it is where most of what the check missed was found. Every team would otherwise build that same thing.
+
+```
+rms-design-system-engine --prototype prototypes/settings.vue --preview
+```
+
+It is **the page the check measured**, served by your project's own build — not a second rendering that might differ. Each gap is outlined where it sits and labelled with what is needed, so a need the system does not meet is visible rather than buried in a list:
+
+```
+Preview: http://localhost:5173/…
+   2 gaps are drawn on it where they sit: each is a need the system does not meet.
+```
+
+Only when you ask for it. A server nobody wants is a server nobody closes; Ctrl-C ends it.
 
 ### Icons are held to the ones your code has
 

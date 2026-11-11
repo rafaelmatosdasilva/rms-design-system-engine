@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../lib/cdp.mjs';
-import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget, tempDir } from './helpers.mjs';
+import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget, tempDir, tscBin } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -116,7 +116,7 @@ test('Figma prop types: one interface per component, states left out, names as t
   assert.equal(codePropName('x', 'Show Label#1:2', { aliases: { x: { 'Show Label': 'labelVisible' } } }), 'labelVisible');
 });
 
-const TSC = spawnSync('which', ['tsc'], { encoding: 'utf8' }).stdout.trim();
+const TSC = tscBin();
 test('Figma prop types: tsc accepts matching props and rejects drifted ones', { skip: TSC ? false : 'no tsc' }, async () => {
   const { propTypesDts } = await import('../lib/figma-props.mjs');
   const dir = tempDir('figma-props-');
