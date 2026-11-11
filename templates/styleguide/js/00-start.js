@@ -427,7 +427,7 @@
     fitOneLine(lfirst);
   }
   // The name in short, for the wordmark: a trailing "design system" becomes DS, and a name that does not say it gets DS
-  // added, so the mark always ends in DS. "RMS Design System" is RMS DS; "Acme Polaris" is Acme Polaris DS.
+  // added, so the mark always ends in DS. "RMS Design System" is RMS DS; "Acme Kit" is Acme Kit DS.
   function shortName(name) {
     var s = String(name).trim().replace(/\s+/g, ' ').replace(/[\s·|-]*design\s*system\s*$/i, '').trim();
     return /(^|\s)ds$/i.test(s) ? s : (s ? s + ' DS' : 'DS');
