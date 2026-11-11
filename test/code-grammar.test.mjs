@@ -2,9 +2,9 @@
 // its components follow (Q32's depth), and each component's anatomy read as deeply as Figma's (Q40's).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tempDir } from './helpers.mjs';
 import { codeGrammarOf, anatomyOf, shadowLayers, codeGrammarLines, codeGrammarFor } from '../lib/code-grammar.mjs';
 import { constructionView } from '../lib/construction-page.mjs';
 import { decidedRules } from '../lib/construction-grammar.mjs';
@@ -157,7 +157,7 @@ test('the code\'s rules on the Rules page are the code\'s, and the summary lines
 });
 
 test('read from a project with no code capture, from its component files', async () => {
-  const ROOT = mkdtempSync(join(tmpdir(), 'code-grammar-'));
+  const ROOT = tempDir('code-grammar-');
   try {
     mkdirSync(join(ROOT, 'src/components'), { recursive: true });
     for (const c of system()) writeFileSync(join(ROOT, 'src/components', c.file.split('/').pop()), c.text);
