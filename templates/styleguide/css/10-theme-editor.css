@@ -122,13 +122,11 @@
 }
 /* The specimen (36-theme-editor.js): a screen made of the system's own components, as its code renders them. Its layout
    takes the system's tokens through the properties set on .sg-spec (its accent, its card corner), never the guide's. */
-.sg-spec { --spec-accent: currentColor; --spec-accent-2: currentColor; --spec-r: 16px; --spec-line: color-mix(in srgb, currentColor 12%, transparent); --spec-soft: color-mix(in srgb, currentColor 4%, transparent); box-sizing: border-box; min-height: 100%; padding: 56px 64px 96px; display: flex; flex-direction: column; gap: 72px; }
+.sg-spec { --spec-accent: currentColor; --spec-accent-2: currentColor; --spec-r: 16px; --spec-line: color-mix(in srgb, currentColor 12%, transparent); --spec-soft: color-mix(in srgb, currentColor 4%, transparent); box-sizing: border-box; min-height: 100%; padding: 56px 64px 96px; display: flex; flex-direction: column; gap: 40px; }
 .sg-spec *, .sg-spec *::before, .sg-spec *::after { box-sizing: border-box; }
-.sg-spec-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "text art" "sw sw"; gap: 40px 56px; align-items: center; padding-bottom: 48px; border-bottom: 1px solid var(--spec-line); }
+.sg-spec-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "text art" "sw sw"; gap: 40px 56px; align-items: center; padding-bottom: 8px; }
 .sg-spec-hero-text { grid-area: text; display: flex; flex-direction: column; gap: 16px; }
-.sg-spec-kicker { margin: 0; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--spec-accent); font-weight: 600; }
 .sg-spec-title { margin: 0; font-size: 64px; line-height: 1.02; font-weight: 700; letter-spacing: -0.02em; }
-.sg-spec-lede { margin: 0; font-size: 18px; line-height: 1.5; opacity: 0.72; max-width: 32ch; }
 .sg-spec-hero-acts { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
 .sg-spec-hero-art { grid-area: art; position: relative; height: 260px; }
 .sg-spec-blob { position: absolute; border-radius: 50%; }
@@ -139,24 +137,10 @@
 .sg-spec-sw { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .sg-spec-dot { width: 44px; height: 44px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--spec-line); }
 .sg-spec-shape { width: 44px; height: 44px; border: 2px solid var(--spec-accent); background: var(--spec-soft); }
-.sg-spec-sec { display: flex; flex-direction: column; gap: 28px; }
-.sg-spec-head { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 20px; align-items: baseline; }
-.sg-spec-num { grid-row: span 2; font-size: 56px; line-height: 1; font-weight: 700; color: var(--spec-accent); font-variant-numeric: tabular-nums; }
-.sg-spec-h { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; }
-.sg-spec-says { margin: 4px 0 0; font-size: 15px; opacity: 0.66; }
-.sg-spec-buttons { display: flex; flex-direction: column; border-top: 1px solid var(--spec-line); }
-.sg-spec-row { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--spec-line); }
-.sg-spec-rowname { font-size: 14px; font-weight: 600; }
-.sg-spec-variants { display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: center; }
-.sg-spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-.sg-spec-grid.is-small { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-.sg-spec-grid.is-cards { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start; }
-.sg-spec-grid.is-wide { grid-template-columns: minmax(0, 1fr); }
-.sg-spec-grid.is-rest { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sg-spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
 .sg-spec-tile { margin: 0; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: var(--spec-r); background: var(--spec-soft); box-shadow: inset 0 0 0 1px var(--spec-line); min-width: 0; }
-.sg-spec-tile.is-wide { grid-column: 1 / -1; }
-.sg-spec-stage { position: relative; min-width: 0; max-width: 100%; }
-.sg-spec-tile > .sg-spec-stage { overflow: hidden; }
+.sg-spec-tile.is-buttons { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; }
+.sg-spec-tile.is-wide { grid-column: span 2; }
+.sg-spec-stage { position: relative; min-width: 0; max-width: 100%; overflow: hidden; }
 /* An overlay (a modal, a tooltip, a toast) stays in its tile: a transform makes the tile the box its fixed parts sit in. */
-.sg-spec-tile.is-overlay > .sg-spec-stage { transform: translateZ(0); height: 260px; overflow: hidden; }
-.sg-spec-cap { font-size: 12px; letter-spacing: 0.04em; opacity: 0.6; }
+.sg-spec-tile.is-overlay > .sg-spec-stage { transform: translateZ(0); height: 240px; }

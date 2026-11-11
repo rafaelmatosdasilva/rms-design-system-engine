@@ -170,20 +170,20 @@
     var byName = {}; (SG.components || []).forEach(function (c) { byName[c.name] = c; });
     var marks = function (name) { var c = byName[name]; return c ? codeMarkups(c) : []; };
     var placed = [];
-    var tile = function (name, cls) { var m = marks(name); if (!m.length) return ''; placed.push(name); return '<figure class="sg-spec-tile' + (cls ? ' ' + cls : '') + '"><div class="sg-spec-stage">' + stripIds(m[0]) + '</div><figcaption class="sg-spec-cap">' + esc(prettyName(name)) + '</figcaption></figure>'; };
-    var buttonRow = function (name) { var m = marks(name); if (!m.length) return ''; placed.push(name); return '<div class="sg-spec-row"><span class="sg-spec-rowname">' + esc(prettyName(name)) + '</span><div class="sg-spec-variants">' + m.slice(0, 4).map(function (x) { return '<div class="sg-spec-stage">' + stripIds(x) + '</div>'; }).join('') + '</div></div>'; };
-    var GRID = { forms: 'is-forms', choices: 'is-small', status: 'is-small', navigation: 'is-wide', surfaces: 'is-cards', data: 'is-wide', rest: 'is-rest' };
-    var n = 0, body = '';
-    (PLAN.sections || []).forEach(function (sec) {
-      var inner = sec.key === 'actions' ? '<div class="sg-spec-buttons">' + sec.components.map(buttonRow).join('') + '</div>'
-        : '<div class="sg-spec-grid ' + (GRID[sec.key] || '') + '">' + sec.components.map(function (c) { return tile(c, (sec.overlays || []).indexOf(c) >= 0 ? 'is-overlay' : /text ?area/i.test(c) ? 'is-wide' : ''); }).join('') + '</div>';
-      n++; body += '<section class="sg-spec-sec"><header class="sg-spec-head"><span class="sg-spec-num">' + (n < 10 ? '0' : '') + n + '</span><h2 class="sg-spec-h">' + esc(sec.title) + '</h2><p class="sg-spec-says">' + esc(sec.says) + '</p></header>' + inner + '</section>';
-    });
+    // One grid, no headings: each component a tile, its name only on hover. A button shows the variants its code renders;
+    // what reads in a row (navigation, tables, charts) and a text area take two columns; an overlay stays in its tile.
+    var tile = function (name, list, cls) { if (!list.length) return ''; placed.push(name); return '<figure class="sg-spec-tile' + (cls ? ' ' + cls : '') + '" title="' + esc(prettyName(name)) + '">' + list.map(function (m) { return '<div class="sg-spec-stage">' + stripIds(m) + '</div>'; }).join('') + '</figure>'; };
+    var body = '<div class="sg-spec-grid">' + (PLAN.sections || []).map(function (sec) {
+      return sec.components.map(function (c) {
+        var m = marks(c), wide = /^(navigation|data)$/.test(sec.key) || /text ?area/i.test(c);
+        return sec.key === 'actions' ? tile(c, m.slice(0, 4), 'is-buttons') : tile(c, m.slice(0, 1), (sec.overlays || []).indexOf(c) >= 0 ? 'is-overlay' : wide ? 'is-wide' : '');
+      }).join('');
+    }).join('') + '</div>';
     if (!placed.length) return null;
     var colourVar = function (t) { return t && t.v ? 'var(' + t.v + ')' : null; };
     var swatch = function (label, v) { return v ? '<div class="sg-spec-sw"><span class="sg-spec-dot" style="background:' + v + '"></span><span>' + esc(label) + '</span></div>' : ''; };
     var lead = ((PLAN.sections[0] || {}).key === 'actions' ? PLAN.sections[0].components : []).slice(0, 2);
-    var hero = '<section class="sg-spec-hero"><div class="sg-spec-hero-text"><p class="sg-spec-kicker">Specimen</p><p class="sg-spec-title">' + esc(SG.title || 'Your system') + '</p><p class="sg-spec-lede">Every component here is the one the code renders, in this theme.</p><div class="sg-spec-hero-acts">' + lead.map(function (x) { var m = marks(x); return m.length ? '<div class="sg-spec-stage">' + stripIds(m[0]) + '</div>' : ''; }).join('') + '</div></div>' +
+    var hero = '<section class="sg-spec-hero"><div class="sg-spec-hero-text"><p class="sg-spec-title">' + esc(SG.title || 'Your system') + '</p><div class="sg-spec-hero-acts">' + lead.map(function (x) { var m = marks(x); return m.length ? '<div class="sg-spec-stage">' + stripIds(m[0]) + '</div>' : ''; }).join('') + '</div></div>' +
       '<div class="sg-spec-hero-art" aria-hidden="true"><span class="sg-spec-blob is-a" style="background:' + (colourVar(PRIMARY) || 'currentColor') + '"></span><span class="sg-spec-blob is-b" style="background:' + (colourVar(SECONDARY) || 'currentColor') + '"></span><span class="sg-spec-glyph">Aa</span></div>' +
       '<div class="sg-spec-swatches">' + swatch('Primary', colourVar(PRIMARY)) + swatch('Secondary', colourVar(SECONDARY)) + swatch('Background', APP_BG ? 'var(' + APP_BG.v + ')' : null) +
       '<div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (BTN && BTN.v ? 'var(' + BTN.v + ')' : '8px') + '"></span><span>Button corner</span></div><div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (CARD && CARD.v ? 'var(' + CARD.v + ')' : '16px') + '"></span><span>Card corner</span></div></div></section>';
