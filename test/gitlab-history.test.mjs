@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, HISTORY_FILE } from '../lib/gitlab-history.mjs';
+import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, tokenOwner, HISTORY_FILE } from '../lib/gitlab-history.mjs';
 import { STATE_FILE } from '../lib/gitlab-source.mjs';
 import { codeReason, reasonLine } from '../lib/change-reason.mjs';
 import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../lib/component-changelog.mjs';
@@ -179,6 +179,23 @@ test('a commit read as in no release is asked again once a day, even while the m
   assert.ok(gl.calls.some((c) => c.path === `/repository/commits/${B}/refs`), 'its release asked again');
   assert.ok(!gl.calls.some((c) => c.path === `/repository/commits/${A}/refs`), 'never a commit whose release is known');
   assert.equal(commitsOf(dir, ['src/theme.css']).find((r) => r.sha === B).release, 'v1.2.0', 'the release tagged since');
+});
+
+test('whose token the engine reads GitLab with: asked once a day, kept, and never sent to a host it may not go to', async () => {
+  let asked = 0, sentTo = null;
+  const fetchImpl = async (url, init) => { asked++; sentTo = [url, init.headers?.['PRIVATE-TOKEN'] ?? null]; return { ok: true, status: 200, json: async () => ({ name: 'QA Lead', username: 'qa.lead' }) }; };
+  const env = { GITLAB_TOKEN: 'secret', GITLAB_HOST: 'code.acme.example' };
+  const dir = mirror('https://code.acme.example', 'code.acme.example');
+  const t0 = Date.parse('2026-05-01T09:00:00Z');
+  assert.equal(await tokenOwner(dir, { fetchImpl, env, now: t0 }), 'QA Lead');
+  assert.deepEqual(sentTo, ['https://code.acme.example/api/v4/user', 'secret'], 'one read-only request, to its own host');
+  assert.equal(await tokenOwner(dir, { fetchImpl, env, now: t0 + 60 * 60 * 1000 }), 'QA Lead', 'kept within the day');
+  assert.equal(asked, 1);
+  assert.equal(await tokenOwner(dir, { fetchImpl, env, offline: true, now: t0 + 3 * 24 * 60 * 60 * 1000 }), 'QA Lead', 'offline: the name kept');
+  assert.equal(asked, 1);
+  const other = mirror('https://code.acme.example', 'code.acme.example');
+  assert.equal(await tokenOwner(other, { fetchImpl, env: { GITLAB_TOKEN: 'secret', GITLAB_HOST: 'elsewhere.example' }, now: t0 }), null, 'a host the token may not go to is never asked');
+  assert.equal(asked, 1);
 });
 
 test('a record kept before releases were dated asks for the tags once, then never again', async () => {
