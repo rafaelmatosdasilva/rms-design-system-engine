@@ -1393,7 +1393,24 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. The Rules
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+
+The code is read the same way (`code-grammar.mjs`), from the system's own component files, and kept beside Figma's in
+`contracts/construction.json` (`code`): the framework, where a component file sits and how it is named; how each kind of
+prop (yes/no, options, text, number) and each option is named and the word a yes/no begins or ends with; a comment on each
+component and each prop; a Code Connect file for each component Figma has, mapping every Figma property to a prop or slot;
+custom properties made for the component or the shared tokens (`own` or `shared`, the team's to say); how each state is
+written (a pseudo-class, a class, a data or an ARIA attribute); how a part's class and a variant's class are named; and a
+shadow, border colour, opacity, corner and text written with a token, the corners sharing one, and custom properties of
+its own for what may be overridden. Every id begins with `code-`, and the team answers it as it answers Figma's
+(`--construction code-<rule> yes|no`); a decided one a component breaks fails `--construction-check`. Beside the rules,
+each component's `anatomy`: each state and how it is written (with file and line), its parts with element and class in
+markup order and whether each is optional, which prop puts which class on and what that class declares, each shadow's
+layers with the attributes they write and how it is turned off, borders, each corner's radius and whether one token holds
+them, opacity, flex-wrap with the row and column gap and the minimum width, whether it hugs or fills, each part's text,
+and the custom properties it declares and reads (its own API, safe to override) against those it inherits from the
+theme. It reads the code capture's API when there is one, else the component files (a Vue or Svelte file's own styles,
+the stylesheets a React file imports); nothing is written to the code. The Rules
 page opens with a card a side, Figma and Code (`doneCard` in the template's `00-start.js`, the Status page's own card and
 bars): a ring of every rule in the colour of its state (done, to decide, to fix) with the share done in its middle, and a bar
 per area in the same colours, weakest first. The Documentation page draws the same card, one a source (intent layer, Figma,
