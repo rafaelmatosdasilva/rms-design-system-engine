@@ -7,6 +7,7 @@ How the engine checks your Figma library, lints your code and compares Figma wit
 - [Check your Figma library](#check-your-figma-library)
 - [Lint your codebase](#lint-your-codebase)
 - [Compare Figma and code](#compare-figma-and-code)
+- [What a check actually is](#what-a-check-actually-is)
 
 ## Check your Figma library
 
@@ -437,3 +438,36 @@ Not every finding is right. A check that raises things it should not is the quie
 `rms-design-system-engine --wrong --match <words> --why "<what the check misread>"` records a finding of the last full audit as wrong, with why it is wrong, who said so and when, in `design-system-engine-wrong.json` (commit it); `--wrong` alone lists them and `--unwrong --match <words>` takes one back. A check called wrong more than once is named in every run afterwards, however few findings it raised that day, because the thing to fix is the check. Each finding marked wrong is also a case its check must pass: every full run says which it still raises, and which its check no longer raises, so you know when a fix took and the mark can go.
 
 **A marked finding is never hidden.** Silencing a line because someone once called it wrong would turn one person's judgement into everybody's blind spot, and a check that misreads one project may be right in the same words in another. The record exists to get the check fixed. It is also not the same as keeping a difference (`--keep`): keeping one says the engine was right and the team chose otherwise; marking one wrong says the engine was wrong.
+
+## What a check actually is
+
+Every check is tried against a fault on purpose: each one passes a clean project and names the mistake in a broken one. That proves a check *works*. It does not tell you what it **is** — and the same finding is advice on one project and a refused merge on the next.
+
+Thirteen checks change behaviour with a setting in `ds-config.json`, and the two kinds look identical from outside.
+
+**Advice until you ask for more.** Off unless you turn them on. The finding prints as `ℹ️` and the run still passes, so an agent may ignore it. Set the key to `true` to make it stop the merge:
+
+| Setting | What it decides |
+|---|---|
+| `coverageStrict` | a component no check models at all |
+| `deadCssStrict` | CSS no rule uses any more |
+| `fillCoverageStrict` | a background nothing asserts, so a missing fill would ship unseen |
+| `htmlCompositionStrict` | a sub-component Figma nests that the code does not use |
+| `htmlRealizationStrict` | a prop Figma has that the code does not realise |
+| `orphanUsedStrict` | a token bound in Figma that no CSS variable carries |
+| `reimplementationStrict` | a component built by hand where the system has one |
+| `renderedModeStrict` | a rendered assertion that covers some modes and not all |
+| `templateCompositionStrict` | a page missing a component its Figma template composes |
+| `versionLockStrict` | a product left on an older version of the system |
+| `screenElementStrict` | an element on a screen the code never builds |
+
+**Stops the merge until you ask for less.** On unless you turn them off. Set the key to `false` to make the finding advice:
+
+| Setting | What it decides |
+|---|---|
+| `renderedParityStrict` | what the browser draws against what the design says |
+| `screenComponentsStrict` | a designed screen built from something other than the system |
+
+Every other check always fails on its fault, and nothing in your configuration excuses it.
+
+**Why this is written down.** A check nobody tried against a fault is a promise, not a check — and a check whose strength nobody recorded is a promise of unknown size. Teams plan around what a gate will stop; the honest answer is sometimes "advice, until you ask for more". The table is read from the code itself, so a new setting cannot be added without appearing here.
