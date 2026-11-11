@@ -243,5 +243,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-empty-frames-and-figma-s` | The 24 guide tasks on Haiku (engine 9dd7442) | "Empty frames, and Figma's own version history" |
 | `2026-11-11-figma-s-version-history-the` | The 24 guide tasks on Haiku (engine 95fea56) | "Figma's version history: the file's pages, and its rate limit waited out or said" |
 | `2026-11-11-a-field-s-name-gives` | The 24 guide tasks on Haiku (engine a577057) | "A field's name gives way to the code only where the code holds a button and the name says no input outright" |
+| `2026-11-11-comments-left-in-figma-and` | The 24 guide tasks on Haiku (engine b5e80f5) | "Comments left in Figma, and four of the library's own conventions" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
