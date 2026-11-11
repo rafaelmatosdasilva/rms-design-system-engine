@@ -1149,7 +1149,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cx-ring svg > circle:not(.sg-cx-ring-track) { transform: rotate(-90deg); transform-origin: center; }
 .sg-cx-ring-done { stroke: var(--sg-positive); } .sg-cx-ring-check { stroke: var(--sg-warning-ink); } .sg-cx-ring-fix { stroke: var(--sg-negative); }
 .sg-cx-ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.sg-cx-ring-text .sg-health-num { font-size: var(--sg-title); line-height: normal; }   /* the page title's size, the step under the Status big number */
+.sg-cx-ring-text .sg-health-num { font-size: var(--sg-title); line-height: normal; column-gap: var(--sg-space-xxs); }   /* the page title's size, the step under the Status big number; its % small beside it, as the Status page sets a unit, so 100 fits the ring */
 .sg-cx-score-areas { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sg-space-xs) var(--sg-space-m); align-items: center; margin: 0; padding: 0; list-style: none; }
 .sg-cx-score-areas li { display: contents; }   /* every area's name and bar in the list's two columns, so the bars start and end together */
 .sg-cx-score-areas .sg-health-bar { height: calc(var(--sg-space-xs) * 1.5); }   /* as thin as the table's */
