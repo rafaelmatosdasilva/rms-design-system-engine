@@ -288,10 +288,18 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
   - the last part of a path (`nav/TabCompact` is a tab);
   - a row of what opens to pick from is what is picked (`dropdownPickerRow` is an option, `menuRow` a menu item);
   - a segmented control is a radio group;
-  - a group or a part of controls is not one (`checkboxStack`, `tabBar`).
+  - a group or a part of controls is not one (`checkboxStack`, `tabBar`), nor a spacer;
+  - a name that starts with a container and ends on a control names the container (`dialogLink` is a dialog);
+  - a word that names other things too (a stepper, a toggle, a field shown read-only) counts only when the code confirms it;
+  - last, its states: a component drawn hovered, pressed, focused or disabled is something a person operates, whatever its name (a menu entry, a card that opens), unless its name ends on a part (a row's background, a label).
 - **Role.** A control with no `Role:` note: the note says which role the code gives it.
 - **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
 - **Error.** An error state with no message, so the error is shown by colour alone.
+- **Advice, apart from WCAG's failures.** What the code needs to be told and Figma does not say, listed after the failures and on a frame of its own on the design team's to do page ("Advice for the Figma file"):
+  - an image with no note for its alt text, or to say it is decorative;
+  - a disabled variant that says nowhere why it is disabled (no note, no helper or tooltip text);
+  - a control with no hover, pressed or disabled state, and no error state for one that takes input;
+  - a control with no accessibility note at all, and nothing about it in its description.
 - **Reading order.** Words placed by hand in another layer order than they are seen in, so the code built from the layers reads in another order (WCAG 1.3.2). A frame in auto layout is always in order, artwork is never read, and labels that share no row or column (round a chart) have no order to keep.
 
 Each gap reaches the design team:
