@@ -694,7 +694,8 @@ async function deepFacts(node, set) {
 - `variantFillOpacity`: the same for each variant, when any is below 1, compared with the state the code
   capture produced for that variant.
 - `drawnOn`: each text and icon colour token of the component's own layers, with the fill token of the
-  layer right under it (`surface` when nothing in the component paints under it).
+  layer painted right under it, looked for inside the layers before it as well as on them (a button's fill
+  on the `Background` inside its state instance), and `surface` when nothing in the component paints under it.
 - `fills`: every fill token the component's own layers paint. The token contrast check pairs a text
   with the background Figma draws it on, and leaves out a pair the token names suggest when Figma paints
   that background in the same component but never under the text (a checkbox's selected text sits
@@ -749,13 +750,19 @@ async function paintFacts(set) {
         if (shape) fg = await tokenOf(stroked(shape) ? solid(shape, 'strokes') : solid(shape));
       }
       if (!fg) continue;
+      // What is painted under it: at each level up, the layers before it, each searched from its topmost layer down and
+      // inside an instance too (a button's fill on the Background inside its StateLayer), then the parent's own fill.
+      // A boolean operation paints with its own fill, never its shapes'.
+      const under = (s) => {
+        if (s.visible === false || prop(s, 'isMask') || s.type === 'TEXT' || isIcon(s)) return null;
+        const kids = s.type === 'BOOLEAN_OPERATION' ? [] : (prop(s, 'children') ?? []);
+        for (let k = kids.length - 1; k >= 0; k--) { const f = under(kids[k]); if (f) return f; }
+        return solid(s) && covers(s, n) ? s : null;
+      };
       let bg = null;
       for (let x = n; x !== v && !bg; x = x.parent) {
         const p = x.parent, i = p.children.indexOf(x);
-        for (let j = i - 1; j >= 0 && !bg; j--) {
-          const s = p.children[j];
-          if (s.visible !== false && !prop(s, 'isMask') && s.type !== 'TEXT' && !isIcon(s) && solid(s) && covers(s, n)) bg = s;
-        }
+        for (let j = i - 1; j >= 0 && !bg; j--) bg = under(p.children[j]);
         if (!bg && solid(p)) bg = p;
       }
       const on = bg ? ((await tokenOf(solid(bg))) ?? 'unbound') : 'surface';

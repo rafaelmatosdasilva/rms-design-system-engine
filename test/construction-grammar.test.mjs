@@ -40,6 +40,9 @@ test('names: the case each is written in, and Figma\'s own names for a layer nob
   assert.ok(isAutoNamed('Rectangle 3'));
   assert.ok(!isAutoNamed('Frame'));
   assert.ok(!isAutoNamed('Body'));
+  assert.ok(isAutoNamed('Union'), 'Figma names a boolean operation after the operation, with no number');
+  assert.ok(isAutoNamed('Subtract 2'));
+  assert.ok(!isAutoNamed('Group'), 'a bare Group or Vector comes from an imported drawing, not from a layer left unnamed');
   assert.deepEqual(wordsOf('showBadgeDot'), ['show', 'badge', 'dot']);
 });
 
@@ -67,6 +70,19 @@ test('layers, auto layout and variables: named layers, auto layout everywhere, t
   const colour = rule(g, 'colour-variables');
   assert.match(colour.says, /shared variables/);
   assert.deepEqual(colour.toFix, [{ component: 'Promo Banner', value: 'advanced/Promo Banner/background/color' }]);
+});
+
+test('layers-named reads every layer of every variant in the skeleton, never what is inside an instance', () => {
+  // Frame 1 binds nothing and has no gap or toggle of its own: only the skeleton has it. Its own icon's insides are the
+  // icon's to name, and the variant itself is named by its options.
+  const tree = (kids) => ({ t: 'COMPONENT', n: 'state=default', c: kids });
+  const skeleton = {
+    tabNav: { trees: [tree([{ t: 'FRAME', n: 'Content', c: [{ t: 'FRAME', n: 'Frame 1', c: [{ t: 'TEXT', n: 'Label' }] }, { t: 'INSTANCE', n: 'Icon', c: [{ t: 'VECTOR', n: 'Vector 7' }] }] }])] },
+    checkTick: { trees: [tree([{ t: 'FRAME', n: 'Box', c: [{ t: 'BOOLEAN_OPERATION', n: 'Union', c: [{ t: 'RECTANGLE', n: 'Rectangle 4' }] }] }])] },
+  };
+  const g = grammarOf({ props: { tabNav: { properties: {} }, checkTick: { properties: {} }, ...props }, structure, values, skeleton });
+  const named = rule(g, 'layers-named');
+  assert.deepEqual(named.toFix.filter((e) => e.component !== 'Promo Banner'), [{ component: 'checkTick', value: 'Union, Rectangle 4' }, { component: 'tabNav', value: 'Frame 1' }]);
 });
 
 test('fewer follow it: the team decides; a yes makes it one to fix, a no drops it', () => {

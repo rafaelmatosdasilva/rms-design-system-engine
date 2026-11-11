@@ -273,11 +273,13 @@ GitHub's runners already have Chrome. A pull request can read the caches its bas
 Some problems belong to the Figma file. They are found in Figma alone, before any code exists, and listed for whoever keeps it.
 
 - **Contrast.** Each text colour on each surface it is drawn on, in every mode: 4.5:1 for text, 3:1 for an icon or large text.
+- **What it is drawn on.** The fill painted right under the text, looked for inside the layers before it too, so a button's fill on the `Background` inside its state instance counts.
 - **Pairs the system makes.** A text colour is also measured on the background its name pairs it with, and on every surface when nothing is drawn under it.
+- **Not measured, said.** A text on nothing its own component paints, when no surface is known, is said to be unmeasured, never passed. `a11y.surfaces` in `ds-config.json` names the surfaces.
 - **Focus.** An interactive component with no focus state, so the code has to invent the focus ring.
 - **Focus ring.** A ring drawn in the focus state is held to 3:1 against every surface, in every mode.
 - **Target size.** A control under 24 pixels tall or wide, in any of its variants.
-- **Role.** A component whose name says it is a control (`iconButton`, `textField`) and has no `Role:` note.
+- **Role.** A component whose name says it is a control (`iconButton`, `textField`, or type first: `buttonBold`, `fieldPlain`) and has no `Role:` note. A group or a part of controls is not one (`checkboxStack`, `dropdownPickerRow`).
 - **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
 - **Error.** An error state with no message, so the error is shown by colour alone.
 
