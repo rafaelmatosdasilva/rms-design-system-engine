@@ -1,10 +1,74 @@
 # Creation
 
-How the engine builds prototypes with your real components. What each part promises, and what to ask for it, is on the [features page](features.md#creation). All pages: [technical documentation](README.md).
+How the engine makes new themes of your system, and builds prototypes with your real components. What each part promises, and what to ask for it, is on the [features page](features.md#creation). All pages: [technical documentation](README.md).
 
 **On this page**
 
+- [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
+
+## Design themes over your system
+
+The theme editor is part of every style guide the engine builds. It needs no setting and no extra install.
+
+### Where it opens
+
+- In a system with themes of its own, the Theme choice lists **Create new theme…** last. It unfolds into its four starts.
+- In a system with no themes, a **+** button beside the mode switches opens the same four starts.
+- Each theme you made is listed in the Theme choice too, with a pencil to edit it and a bin to delete it.
+
+### The four starts
+
+| Start | Today |
+|---|---|
+| From scratch | Works: the form below |
+| From a Figma file | Takes the file's link and keeps it as a draft; reading its variables comes next |
+| Upload tokens | Takes a JSON, CSS or .zip file and keeps it as a draft; reading it comes next |
+| From references | Takes pictures and keeps them as a draft; reading them comes next |
+
+### What the form sets
+
+The panel shows the form on the left and one of your Showroom's screens on the right, in a frame of its own. Only that frame takes the theme while you work, so the rest of the guide stays as your system draws it.
+
+- **Name** and **font family**: the families your system uses, common web fonts, or any other by name. A font your computer lacks is loaded from Google Fonts, so what you pick is what you see.
+- **Primary and secondary colours**, the **app background**, and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
+- **Button and card roundness**, **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
+
+Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
+
+### Light and dark
+
+- A colour is given in light. Its dark value is worked out the way your system moves its own: the same step of the scale, in the new hue.
+- A new colour's ramp keeps each step as light as the system's own step, with its colour strongest at its own lightness.
+- Every text and icon drawn on a colour is held to WCAG AA (4.5:1). When the worked-out colour falls short, the nearest shade that reads is taken instead.
+- You can set a dark value by hand. The reset button beside it goes back to the worked-out one.
+
+### One component's tokens
+
+Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, down to its icon or its text.
+
+- The form then shows only the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included.
+- Each token is a colour (light and dark), a size or a switch. A change there wins over the theme's wider settings.
+- **Done** brings the theme's own settings back.
+
+### Where a theme is kept
+
+| Place | What it holds |
+|---|---|
+| This browser | A working copy of each theme, and the one in use |
+| Your themes folder | One file per theme, `<name>.theme.json`, in a folder per system: `~/.claude/rms-design-system-engine-themes/<system>/` unless `styleguide.themes` names another |
+| The team's themes store | Every theme the team made, when `stores.themes` is set: each build sends yours that it lacks |
+
+- The first save asks for the folder once (Chrome writes into it from then on). Other browsers download the file, to be put there by hand.
+- The next build reads the folder back into the page. A newer file replaces the browser's copy, and a theme you deleted is not brought back.
+- The link names the theme in use (`?theme=coral-reef`), so a link opens the guide with it.
+
+### What it never does
+
+- It changes no code. A theme is tokens over your system, never a change to the system or to a product.
+- It is kept outside every project, so nothing you try lands in a repository by accident.
+
+The settings are in [the configuration reference](../reference/config.md).
 
 ## Prototype with your real components
 
