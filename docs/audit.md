@@ -4,11 +4,12 @@ How the engine checks your Figma library, lints your code and compares Figma wit
 
 **On this page**
 
-- [Check your Figma library](#check-your-figma-library)
-- [Lint your codebase](#lint-your-codebase)
-- [Compare Figma and code](#compare-figma-and-code)
+- [Check your Figma library](#check-your-figma-library-rules)
+- [Lint your codebase](#lint-your-codebase-rules)
+- [Compare Figma and code](#measure-figma-code-parity)
+- [What a check actually is](#what-a-check-actually-is)
 
-## Check your Figma library
+## Check your Figma library rules
 
 These read the Figma file for whoever keeps it, and never fail a run.
 
@@ -18,7 +19,7 @@ These read the Figma file for whoever keeps it, and never fail a run.
 
 ### The Figma file itself
 
-For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, a variant with no auto layout, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
+For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, an empty frame that draws nothing (a spacer is the auto layout's gap), a variant with no auto layout, a variant option named by its look (`Color=Blue` where a role belongs), a spacing or size token off the grid the library keeps (8px or 4px, mined from its own values), a mode spelled two ways across collections, a status colour family missing where the others are there, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
 
 Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
 
@@ -27,7 +28,7 @@ Code can only match what Figma states, so the summary says first when the file i
 
 ### How your system builds a component in Figma
 
-Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it), auto layout everywhere, whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library)).
+Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it, or a text layer Figma names after its words), auto layout everywhere (a variant's own frame, and each row of words or controls inside it placed by hand, such as a divider and its label set side by side; a chart, a map or an image's overlay is drawn freely on purpose and left out), whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library-rules)).
 
 Two more things it reads of every layer, which make a rule about *which* token possible rather than only about whether there is one:
 
@@ -121,12 +122,12 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 - **Each change said once.** Components that take the same change are listed under it together, as a list, not a table.
 - **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
-- **In the code.** What [Lint your codebase](#lint-your-codebase) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
+- **In the code.** What [Lint your codebase](#lint-your-codebase-rules) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
 - **The code is never changed for you.** A code fix is handed back as a patch to apply.
 
 To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all options](../reference/config.md)).
 
-## Lint your codebase
+## Lint your codebase rules
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
 
@@ -288,9 +289,9 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 - **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
 - `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
-## Compare Figma and code
+## Measure Figma-code parity
 
-Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Compare Figma and code](features.md#compare-figma-and-code) on the Commands page.
+Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Compare Figma and code](features.md#measure-figma-code-parity) on the Commands page.
 
 The engine reads what your design system defines in Figma, its tokens and each component's parts, states and options. Then it checks your code against it, value by value and in a real browser. It is not a screenshot comparison.
 
@@ -359,7 +360,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 
 ### Components
 
-- **What Figma does not publish is left out.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the style guide.
+- **What Figma does not publish is no component of yours, but its construction is checked.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the style guide. How it is built is still checked: its layers Figma named (`Frame 3`) and the values typed by hand in it are listed with the others, under its own name.
 - **No hand-built DS components.** A screen uses the real component, not a hand-styled copy.
   - A product's own version of a system component is listed too, as advice. It is found by what it draws (a class that loops the same animation as a component's part, `.spinner` beside the loader's `.loader-spinner`) or by its name (a class of its own that starts with a component's name and says nothing more, `loading-state`).
   - A class beside a system class on the same element dresses the component and is left alone.
@@ -413,7 +414,7 @@ It is written whether or not you have a style guide, and the summary of every ch
 
 ### Differences you keep on purpose
 
-Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#compare-figma-and-code) and give the reason.
+Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#measure-figma-code-parity) and give the reason.
 
 - It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
 - Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
@@ -437,3 +438,36 @@ Not every finding is right. A check that raises things it should not is the quie
 `rms-design-system-engine --wrong --match <words> --why "<what the check misread>"` records a finding of the last full audit as wrong, with why it is wrong, who said so and when, in `design-system-engine-wrong.json` (commit it); `--wrong` alone lists them and `--unwrong --match <words>` takes one back. A check called wrong more than once is named in every run afterwards, however few findings it raised that day, because the thing to fix is the check. Each finding marked wrong is also a case its check must pass: every full run says which it still raises, and which its check no longer raises, so you know when a fix took and the mark can go.
 
 **A marked finding is never hidden.** Silencing a line because someone once called it wrong would turn one person's judgement into everybody's blind spot, and a check that misreads one project may be right in the same words in another. The record exists to get the check fixed. It is also not the same as keeping a difference (`--keep`): keeping one says the engine was right and the team chose otherwise; marking one wrong says the engine was wrong.
+
+## What a check actually is
+
+Every check is tried against a fault on purpose: each one passes a clean project and names the mistake in a broken one. That proves a check *works*. It does not tell you what it **is** — and the same finding is advice on one project and a refused merge on the next.
+
+Thirteen checks change behaviour with a setting in `ds-config.json`, and the two kinds look identical from outside.
+
+**Advice until you ask for more.** Off unless you turn them on. The finding prints as `ℹ️` and the run still passes, so an agent may ignore it. Set the key to `true` to make it stop the merge:
+
+| Setting | What it decides |
+|---|---|
+| `coverageStrict` | a component no check models at all |
+| `deadCssStrict` | CSS no rule uses any more |
+| `fillCoverageStrict` | a background nothing asserts, so a missing fill would ship unseen |
+| `htmlCompositionStrict` | a sub-component Figma nests that the code does not use |
+| `htmlRealizationStrict` | a prop Figma has that the code does not realise |
+| `orphanUsedStrict` | a token bound in Figma that no CSS variable carries |
+| `reimplementationStrict` | a component built by hand where the system has one |
+| `renderedModeStrict` | a rendered assertion that covers some modes and not all |
+| `templateCompositionStrict` | a page missing a component its Figma template composes |
+| `versionLockStrict` | a product left on an older version of the system |
+| `screenElementStrict` | an element on a screen the code never builds |
+
+**Stops the merge until you ask for less.** On unless you turn them off. Set the key to `false` to make the finding advice:
+
+| Setting | What it decides |
+|---|---|
+| `renderedParityStrict` | what the browser draws against what the design says |
+| `screenComponentsStrict` | a designed screen built from something other than the system |
+
+Every other check always fails on its fault, and nothing in your configuration excuses it.
+
+**Why this is written down.** A check nobody tried against a fault is a promise, not a check — and a check whose strength nobody recorded is a promise of unknown size. Teams plan around what a gate will stop; the honest answer is sometimes "advice, until you ask for more". The table is read from the code itself, so a new setting cannot be added without appearing here.

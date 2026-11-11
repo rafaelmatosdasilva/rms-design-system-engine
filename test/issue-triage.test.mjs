@@ -14,7 +14,7 @@ const partOptions = (text) => {
 
 test('the parts are the features page\'s own, in its order', () => {
   const parts = featureParts();
-  assert.equal(parts[0], 'Check your Figma library');
+  assert.equal(parts[0], 'Check your Figma library rules');
   assert.ok(parts.includes('Publish a living style guide'));
   assert.ok(parts.length >= 10);
   assert.equal(new Set(parts).size, parts.length);
@@ -30,9 +30,9 @@ test('every form asks which part, with the features page\'s parts and nothing el
 });
 
 test('a new issue takes needs triage and its part; an edit only the part it now names; nothing twice', () => {
-  const body = `### ${PART_QUESTION}\n\nLint your codebase\n\n### What you ran\n\nrms-design-system-engine --audit`;
-  assert.deepEqual(labelsFor({ body, labels: [{ name: 'bug' }] }), ['needs triage', 'part: Lint your codebase']);
-  assert.deepEqual(labelsFor({ body, labels: ['part: Lint your codebase', 'confirmed'] }, { action: 'edited' }), []);
+  const body = `### ${PART_QUESTION}\n\nLint your codebase rules\n\n### What you ran\n\nrms-design-system-engine --audit`;
+  assert.deepEqual(labelsFor({ body, labels: [{ name: 'bug' }] }), ['needs triage', 'part: Lint your codebase rules']);
+  assert.deepEqual(labelsFor({ body, labels: ['part: Lint your codebase rules', 'confirmed'] }, { action: 'edited' }), []);
   assert.deepEqual(labelsFor({ body: `### ${PART_QUESTION}\n\nNot sure` }), ['needs triage'], 'Not sure has no label: triage sets it');
   assert.deepEqual(labelsFor({ body: `### ${PART_QUESTION}\n\nSomething made up` }), ['needs triage'], 'only a part the page has');
   assert.deepEqual(labelsFor({ body: 'written by hand' }), ['needs triage']);

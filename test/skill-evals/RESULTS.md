@@ -2,6 +2,96 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Comments left in Figma, and four of the library's own conventions (continuous evaluation)
+
+What changed since the entry below (engine a577057): Figma's version history: the file's pages, and its rate limit (#427); Advice for the Figma file, and controls known by their states; A text layer Figma names after its words is no name of its own; A field's name gives way to the code only where the code holds a button and the name says no input outright; Comments left in Figma, and four of the library's own conventions. The guide changed in `reference/usage.md`.
+
+Guide set measured: `bf6f6e91665a` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 50538fd2` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md b9a0ef09` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine b5e80f5 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.059 | 0.055 |
+| Input a run | 103k | 92k |
+| Turns a run | 3.6 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 103k, in 3.3 turns against 3.6. no task changed state, and no run moved: the same result. Input moved but input a turn held (28k to 28k): the turns moved, 3.6 to 3.3, and nothing a run reads grew - most in `new-ui-saved` 12.2 to 10.0, `refresh-no-figma` 2.0 to 1.0, `disabled-hover` 2.0 to 2.7. Records: `records/2026-11-11-comments-left-in-figma-and`.
+
+## 2026-11: A field's name gives way to the code only where the code holds a button and the name says no input outright (continuous evaluation)
+
+What changed since the entry below (engine 95fea56): Advice for the Figma file, and controls known by their states; A text layer Figma names after its words is no name of its own; A field's name gives way to the code only where the code holds a button and the name says no input outright. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `02dea300e54e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 50538fd2` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md d24c496f` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine a577057 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.059 | 0.059 |
+| Input a run | 102k | 103k |
+| Turns a run | 3.6 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 102k, in 3.6 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-a-field-s-name-gives`.
+
+## 2026-11: Figma's version history: the file's pages, and its rate limit waited out or said (continuous evaluation)
+
+What changed since the entry below (engine 9dd7442): What each check actually is, and where it can be gone around (#423); Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge (#424); Empty frames, and Figma's own version history (#425); A version covers 25 commits (#426); Figma's version history: the file's pages, and its rate limit waited out or said. The guide changed in `reference/usage.md`.
+
+Guide set measured: `ef6bb689461e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9222b0bd` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d2f30dfe` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md d24c496f` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 95fea56 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.059 |
+| Input a run | 100k | 102k |
+| Turns a run | 3.6 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 100k, in 3.6 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-figma-s-version-history-the`.
+
+## 2026-11: Empty frames, and Figma's own version history (continuous evaluation)
+
+What changed since the entry below (engine 84cc359): Empty frames, and Figma's own version history. The guide changed in `cookbook/full-audit.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `ee645de22dca` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9222b0bd` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d2f30dfe` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md b22bec7e` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 9dd7442 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 96k | 100k |
+| Turns a run | 3.4 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 96k, in 3.6 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-empty-frames-and-figma-s`.
+
+## 2026-11: Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge (continuous evaluation)
+
+What changed since the entry below (engine 40b1d33): Every refusal names the permission it lacks (#421); Reading order on each component, and the file check counts only what Figma draws (#422); Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `f62be0903f7e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 33217c48` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9222b0bd` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md ebee5c9c` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 56d11749` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 84cc359 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.057 |
+| Input a run | 98k | 96k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 98k, in 3.4 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-building-blocks-checked-controls-known`.
+
 ## 2026-11: Reading order, and only what Figma draws (continuous evaluation)
 
 What changed since the entry below (engine fe7e963): Q60 reading order in Figma and code; the file check skips hidden layers no property shows, a mask's paint and padding outside auto layout. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.

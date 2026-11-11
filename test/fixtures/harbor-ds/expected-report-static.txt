@@ -195,8 +195,9 @@
    rms-design-system-engine --census lists each one with the token to use, and keeps the count so it only falls.
 ⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.
 
-🧭 System health: 1 thing to keep the system healthy as it grows. Advisory.
+🧭 System health: 2 things to keep the system healthy as it grows. Advisory.
      11 of 11 semantic tokens have no description in Figma (action/primary/color, action/primary/text/color, radius/control, space/2, space/3, …): what a token is for is what an agent reads to pick it.
+     The system has error, success colours and no warning or info colour, so a product colours that state by hand: add it, or say in the intent layer what to use.
 
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  DSDS view → contracts/dsds: the 3 contracts in DSDS 0.23.0, for a team that documents its system in that format.
@@ -227,6 +228,9 @@
    • button, iconButton have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
    • button has no role note in Figma: its name says a button, and nothing tells the code which role to give it (WCAG 4.1.2): add the annotation "Role: button" (or the role it really has)
    • iconButton shows no words, and no note in Figma says what a screen reader calls it (WCAG 4.1.2): add an annotation with its name, written as aria-label: "<what it does>"
+   Advice, not a WCAG failure (what the code needs to be told):
+   • a control with no hover, pressed, disabled or error state: button, iconButton
+   • a control with no accessibility note: button
    rms-design-system-engine --figma-edits puts each on the design team's to do list in Figma, written only after a yes.
 
 🧩 Built around a component: 2 places where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.
