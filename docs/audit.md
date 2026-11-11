@@ -200,16 +200,19 @@ Advice on keeping the system healthy as it grows, never a failure.
 
 #### System health
 
-Advice on keeping the system healthy as it grows (`🧭 System health`), never a failure.
+Advice on keeping the system's own token layer healthy as it grows (`🧭 System health`), never a failure.
 
-- A colour mode set below a product's root, so part of the page draws in another mode.
-- A product that brings in two of the system's themes, one overriding the other by load order.
 - Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
-- A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
 - Two components whose own rules are nearly the same.
 - Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
 - Aliases to a removed token, with the commit that removed it.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+
+What a *product* does with the system is a product leaving it, so it is said under the drift check instead (`🪢 Drift from the system`), not here. Each part does what its line on the [features page](features.md) says:
+
+- A colour mode set below a product's root, so part of the page draws in another mode.
+- A product that brings in two of the system's themes, one overriding the other by load order.
+- A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
 - A class a product styles almost as one of the system's components, as a decision, never a drift.
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
