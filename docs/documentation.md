@@ -113,6 +113,7 @@ Each spec says only what the contract knows:
 
 - **Where Figma holds it.** Its page and node, and whether it is a set of variants or one component. The page comes from the Figma capture; a component captured before the engine read pages gets it on the next capture.
 - **Its anatomy.** The frame, the frames inside it that Figma lays out, the text layer each text property writes, the instance each swap swaps, and each slot.
+- **Each part's class in the code.** A part named in Figma (Label, Icon leading) is paired with the class the component's own file puts on it, when one class is that name (`.label`, `.btn__icon-leading`). A part with no such class, or two, stays unpaired rather than guessed.
 - **Its props.** Each with its type, its values and its default. A variant of False and True is a boolean. What the code calls the prop, and how it writes Figma's values, sits beside it.
 - **Its styles, as tokens.** The frame's padding, gap, corner radius, height and type style. Its fill and stroke in the default, and what each variant paints differently. A text colour goes on the text only when the component has one text property.
 

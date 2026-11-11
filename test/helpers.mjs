@@ -23,6 +23,17 @@ export function typescriptRoot(env = process.env) {
   return existsSync(join(tools, 'node_modules', 'typescript', 'package.json')) ? tools : process.cwd();
 }
 
+// The TypeScript compiler itself, from the same place: the test tools' own folder first, then the PATH. Read from
+// the PATH alone it was not found on the computer whose run is the gate, where the engine has no dependencies of its
+// own and nothing installs a tsc globally - so the one test that type-checks a generated Props type skipped there and
+// ran on GitHub, which is the half of a gate nobody notices. → the path to run, or null when there is none.
+export function tscBin(env = process.env) {
+  const own = join(typescriptRoot(env), 'node_modules', '.bin', 'tsc');
+  if (existsSync(own)) return own;
+  const found = spawnSync('which', ['tsc'], { encoding: 'utf8' }).stdout.trim();
+  return found || null;
+}
+
 // A time limit in a test is there to stop a hang, never to measure how fast this computer is. The full suite starts
 // many browser tests at once, so one that finishes in two minutes on its own can take far longer while the others
 // compete for the same cores: the limit is then reached by a busy machine and the run reads as a broken engine.
