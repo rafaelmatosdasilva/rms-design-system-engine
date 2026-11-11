@@ -1178,6 +1178,12 @@ async function skeletonOf(root, names = {}) {
     if (op < 1) lk.opacity = op;
     if (sk) lk.border = { w: num(prop(n, 'strokeWeight')) ?? ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].map((k) => num(prop(n, k)) || 0), align: prop(n, 'strokeAlign') };
     if (an.length) lk.notes = an;
+    // Where a layer that can be read (text, an instance, a frame; never artwork) sits when it is placed by hand (its parent
+    // has no auto layout, or it is placed absolutely), so the order it is seen in can be held against its layer order
+    // (reading order, WCAG 1.3.2). Auto layout draws in layer order. Beside the trees, as the bindings are.
+    const at = ['x', 'y', 'width', 'height'].map((k) => num(prop(n, k)));
+    if (depth > 0 && /^(TEXT|INSTANCE|FRAME|GROUP)$/.test(t) && (prop(n, 'layoutPositioning') === 'ABSOLUTE' || prop(n.parent, 'layoutMode') === 'NONE' || (n.parent && n.parent.type === 'GROUP')) && at.every((v) => v !== undefined) && at[2] > 0 && at[3] > 0)
+      lk.at = at.map(Math.round);
     if (Object.keys(lk).length) look[path] = lk;
     const o = {
       t, n: n.name, ...(depth > 0 ? { id: n.id } : {}),

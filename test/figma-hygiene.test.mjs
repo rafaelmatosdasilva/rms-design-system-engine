@@ -62,6 +62,23 @@ test('a boolean operation paints with its own fill and stroke: the shapes it mer
   assert.deepEqual(h.raw, [{ at: 'state=selected/Union', field: 'border', value: 2 }]);
 });
 
+test('only what is drawn counts: a layer hidden with no property, a mask\'s paint and padding outside auto layout never do', () => {
+  const comp = { type: 'COMPONENT', name: 'state=default', layoutMode: 'VERTICAL', children: [
+    // Hidden, and nothing can show it: never seen.
+    { type: 'RECTANGLE', name: 'Old border', visible: false, strokeWeight: 2, strokes: [solid(0.5, 0.5, 0.5)] },
+    // Hidden, but a boolean property shows it: seen whenever it is on.
+    { type: 'RECTANGLE', name: 'Badge', visible: false, componentPropertyReferences: { visible: 'showBadge#1:0' }, fills: [solid(1, 0, 0)] },
+    // A mask clips what is above it; its own colour is never painted.
+    { type: 'RECTANGLE', name: 'Mask', isMask: true, fills: [solid(1, 0, 0)], cornerRadius: 8 },
+    // Padding on a frame laid out by hand does nothing.
+    { type: 'FRAME', name: 'Loose', layoutMode: 'NONE', paddingTop: 8, paddingLeft: 8, children: [] },
+  ] };
+  assert.deepEqual(hygieneOf(comp, '').raw, [
+    { at: 'state=default/Badge', field: 'fill', value: '#ff0000' },
+    { at: 'state=default/Mask', field: 'radius', value: 8 },   // a mask's corners shape what it clips, so they are seen
+  ]);
+});
+
 test('Plugin API: style ids count as a style, a detached frame is listed', () => {
   const comp = { type: 'COMPONENT', name: 'Row', layoutMode: 'VERTICAL', detachedInfo: null, fillStyleId: 'S:9', fills: [solid(1, 1, 1)], children: [
     { type: 'FRAME', name: 'Lead', detachedInfo: { type: 'local', componentId: '1:2' }, fills: [], children: [] },
