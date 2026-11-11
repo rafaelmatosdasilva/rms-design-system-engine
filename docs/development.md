@@ -10,6 +10,7 @@ This page is for whoever is changing the engine itself: the maintainer, or anyon
 - [Run the tests](#run-the-tests)
 - [What a change needs](#what-a-change-needs)
 - [Release labels](#release-labels)
+- [What a release asks of you](#what-a-release-asks-of-you)
 
 ## Where things are
 
@@ -66,3 +67,18 @@ Every pull request carries exactly one, and it decides the version the release w
 | `release: major` | something that works differently for people already using the engine |
 
 A version is published once 50 merged changes are in no release yet, never on a date, and the biggest label in that group sets the step. So a label decides the step of the group a change lands in, not a release of its own, and a change can wait for the group to fill. People do not wait for it either way: an install follows the latest code once a day.
+
+## What a release asks of you
+
+A release used to list the changes it carried and never say whether you had to do anything about them. Most of the time you don't — your install follows the latest code once a day — but a few changes do want something, and they read exactly like the rest.
+
+So every pull request also carries one `after:` label, and the release's notes gather those at the top, before the list of changes:
+
+| Label | What the notes say |
+|---|---|
+| `after: nothing` | Nothing to do. Almost always the answer, and what a pull request with no `after:` label counts as. |
+| `after: refresh figma` | Refresh Figma, so the engine reads your library again. |
+| `after: run setup` | Run setup again, so your configuration takes what changed. |
+| `after: build the style guide` | Build the style guide again, so its pages show what changed. |
+
+Each line names the changes that ask it. A release that asks nothing says so in one line rather than staying silent — silence reads as nobody having written it down.
