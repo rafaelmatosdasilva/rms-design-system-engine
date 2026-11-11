@@ -1180,7 +1180,10 @@ the Code Connect `valueMap`; `inverted` when the code holds the opposite of the 
 each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
 keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
-on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`), and
+on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`; each part a
+person named in Figma paired with the class the component's own file puts on it, where one class is the part's name or
+ends in it after the component's prefix, `pairedBy: "name"`, `part-pairing.mjs`; the structure contract's `children`
+win, and `cssSelector: null` stays unpaired), and
 `source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
 file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
