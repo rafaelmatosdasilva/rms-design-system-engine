@@ -40,6 +40,19 @@ test('a caller names what it was reading, and a write says the permission a writ
   assert.match(refusal('gitlab', 404, { detail: 'on gitlab.example.com\nand more' }), /\(on gitlab\.example\.com\)/);
 });
 
+test('a call that sent no token is not told its token lacks a permission', () => {
+  // The words blamed a token that was never there, sending a person to check a setting they had not set. GitHub
+  // reads public repositories with no token at all, so this is the common case, not an edge.
+  const none = refusal('github', 404, { token: false });
+  assert.match(none, /no GITHUB_TOKEN was sent/);
+  assert.doesNotMatch(none, /the token in GITHUB_TOKEN cannot reach/);
+  assert.match(refusal('github', 403, { token: false }), /no GITHUB_TOKEN was sent, and this needs/);
+  // With one, it is the token that is short of something.
+  assert.match(refusal('github', 403), /the token in GITHUB_TOKEN needs/);
+  // 401 is only reachable with a token, so it reads the same either way.
+  assert.equal(refusal('github', 401, { token: false }), refusal('github', 401));
+});
+
 test('a status the table does not name is still said, never swallowed', () => {
   assert.equal(said('figma', 500), 'Figma answered 500');
   assert.equal(said('figma', 500, { what: 'the file' }), 'Figma answered 500 for the file');
