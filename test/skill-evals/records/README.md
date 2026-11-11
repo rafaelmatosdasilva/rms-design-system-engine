@@ -229,5 +229,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-10-variant-order-a-family-s` | The 24 guide tasks on Haiku (engine 1cd3159) | "Variant order, a family's fill, nested within reach" |
 | `2026-11-10-merge-branch-figma-batch-11` | The 24 guide tasks on Haiku (engine a4781c9) | "Annotations read by family" |
 | `2026-11-10-merge-branch-figma-batch-12` | The 24 guide tasks on Haiku (engine da5d214) | "The engine in Cursor and Codex" |
+| `2026-11-10-merge-branch-cursor-codex-guard` | The 24 guide tasks on Haiku (engine cdab86a) | "A check that waits on Figma says so" |
+| `2026-11-10-merge-branch-capture-waits-into` | The 24 guide tasks on Haiku (engine 6889d8a) | "A parent that cancels a nested state" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

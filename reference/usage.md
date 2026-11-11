@@ -1354,7 +1354,11 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. A rule that
+reads what the last capture does not keep (each layer's bindings, its opacity and border, a nested component's exposure,
+the designer's annotations; the skeleton snapshot's `_keeps`, `capture-waits.mjs`) finds nothing until Figma is read
+again: the summary's last line and the Rules page say which checks wait and that the request is "refresh the Figma
+data", so a capture that predates a check never reads as a library with nothing to fix.
 
 How each component is built inside comes from the skeleton the Figma capture reads (`figma-skeleton.snapshot.json`):
 every text layer with a text style, every shadow with an effect style, no layer hidden without a property to show it,
