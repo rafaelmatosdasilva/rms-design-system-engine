@@ -14,7 +14,7 @@ test('a score from the rules the team keeps, each kind averaged, the kinds avera
     // Still to decide, or reading nothing: counts for nothing.
     { area: 'layout', status: 'decide', follows: 0, of: 10 }, { area: 'variables', status: 'rule', follows: 0, of: 0 },
   ]);
-  assert.deepEqual(s, { score: 75, areas: [{ area: 'layout', score: 60, rules: 1 }, { area: 'naming', score: 90, rules: 2 }] });
+  assert.deepEqual(s, { score: 75, areas: [{ area: 'Structure', score: 60, rules: 1 }, { area: 'Naming', score: 90, rules: 2 }] }, 'each area once, as the Rules page names it');
   assert.equal(scoreOf([{ area: 'naming', status: 'decide', follows: 1, of: 2 }]), null, 'nothing kept, no score');
 });
 
@@ -36,7 +36,7 @@ test('a component the code builds that no product uses, when the catalog knows t
   assert.equal(needRules({ props }).some((x) => x.id === 'component-in-products'), false, 'no catalog, nothing said');
 });
 
-test('in Chrome: the Rules page opens with the library\'s health, each kind beside it', { timeout: 300000 }, async (t) => {
+test('in Chrome: the Rules page opens with a card a source: a ring of every state, each area\'s bar, above the filters', { timeout: 300000 }, async (t) => {
   const { cpSync } = await import('node:fs'), { spawnSync } = await import('node:child_process'), { dirname } = await import('node:path'), { fileURLToPath } = await import('node:url');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url))), dir = tempDir('sg-score-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'harbor-ds'), dir, { recursive: true });
@@ -51,13 +51,20 @@ test('in Chrome: the Rules page opens with the library\'s health, each kind besi
     const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
     const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out', 'styleguide', 'index.html')}#rules`);
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
-    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#rules .sg-cx-score')`, { attempts: 200 }), true, 'the score is on the Rules page');
+    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#rules .sg-cx-score')`, { attempts: 200 }), true, 'the cards are on the Rules page');
     const run = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true }, sessionId)).result.value;
-    const got = await run(`(() => { const s = document.querySelector('#rules .sg-cx-score'); return { head: s.querySelector('.sg-cx-score-head').textContent, kinds: s.querySelectorAll('.sg-cx-score-areas li').length, tables: s.querySelectorAll('table').length, beforeTable: !!s.parentNode.querySelector('.sg-cx-score ~ .pg-par-card .sg-cx-table') }; })()`);
-    assert.match(got.head, /^Library health \d+$/);
-    assert.ok(got.kinds >= 1, 'each kind of rule with its own score');
-    assert.equal(got.tables, 0, 'a list, never a table');
-    assert.equal(got.beforeTable, true, 'above the rules\' table');
+    const got = await run(`(() => { const cards = [...document.querySelectorAll('#rules .sg-cx-score')];
+      return { titles: cards.map((k) => k.querySelector('.sg-health-label').textContent), pct: cards.map((k) => k.querySelector('.sg-cx-ring .sg-health-num').textContent),
+        arcs: cards.map((k) => k.querySelectorAll('.sg-cx-ring svg circle:not(.sg-cx-ring-track)').length), areas: cards.map((k) => k.querySelectorAll('.sg-cx-score-areas li').length),
+        tables: cards.reduce((n, k) => n + k.querySelectorAll('table').length, 0),
+        aboveFilters: !!document.querySelector('#rules .sg-health-box + .sg-todo-head'), sameAsStatus: cards.every((k) => k.classList.contains('sg-health-tile')) }; })()`);
+    assert.ok(got.titles.length >= 1 && got.titles.every((x) => /^(Figma|Code)$/.test(x)), 'each card is titled by its source alone: ' + got.titles);
+    assert.ok(got.pct.every((x) => /^\d+%$/.test(x)), 'the share done in the ring');
+    assert.ok(got.arcs.every((n) => n >= 1), 'every state an arc');
+    assert.ok(got.areas.every((n) => n >= 1), 'each area its bar');
+    assert.equal(got.tables, 0, 'a card, never a table');
+    assert.equal(got.aboveFilters, true, 'above the filters');
+    assert.equal(got.sameAsStatus, true, 'the Status page\'s own card');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

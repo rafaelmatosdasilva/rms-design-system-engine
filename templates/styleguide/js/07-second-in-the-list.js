@@ -50,7 +50,8 @@
     var plural2 = function (n) { return n === 1 ? 'component' : 'components'; };
     var followHTML = function (r) {
       if (r.of == null) { var n = comps(r).length; return n ? n + ' ' + unit(r, n) + ' to change' : '<span class="pg-missing">Nothing breaks it</span>'; }
-      return r.follows + ' of ' + r.of + ' <span class="pg-par-val sg-cx-share">(' + Math.round(r.follows / (r.of || 1) * 100) + '%)</span>';
+      var p = Math.round(r.follows / (r.of || 1) * 100);
+      return '<span class="sg-cx-follow">' + r.follows + ' of ' + r.of + ' <span class="pg-par-val sg-cx-share">(' + p + '%)</span></span><span class="sg-cx-follow-bar">' + healthBar(p) + '</span>';   // how many and the share on one line, the bar under them
     };
     var cmd = 'rms-design-system-engine';
     // The one change for every component a rule has to fix, as it is copied into Claude Code: renames the engine writes,
@@ -136,19 +137,17 @@
     // never read as a library with nothing wrong (capture-waits.mjs).
     // The library's health: one number from the rules the team keeps, each kind's beside it, and the change since the
     // last day it was built (library-score.mjs). A list, as everything around the rules' table is.
-    if (G.score) {
-      var SC = G.score, delta = SC.previous ? SC.score - SC.previous.score : null;
-      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-score"><p class="sg-cx-score-head"><strong>' + esc('Library health ' + SC.score) + '</strong>'
-        + (delta == null ? '' : ' <span class="sg-cx-score-trend">' + esc((delta > 0 ? '+' : delta < 0 ? '−' : '±') + Math.abs(delta) + ' since ' + String(SC.previous.at).slice(0, 10)) + '</span>') + '</p>'
-        + '<ul class="sg-cx-score-areas">' + SC.areas.map(function (a) { return '<li><span>' + esc(AREA[a.area] || capital(a.area)) + '</span><strong>' + esc(String(a.score)) + '</strong></li>'; }).join('') + '</ul>'
-        + '<p class="sg-cx-score-note">' + esc('From the rules the team keeps: the share of components each already fits, averaged by kind. A rule still to decide counts for nothing.') + '</p></div>');
-    }
+    // One card a side (doneCard, 00-start.js): every rule in the colour of its state, the share done in the middle.
+    // Done is green, to decide amber and to fix red, as the filters' dots under them say.
+    var RULE_STATE = { rule: 'done', decide: 'check', fix: 'fix' };
+    var sideCard = function (side, name) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; })); };
+    var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
       sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
         // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
         + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
     tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
     // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still finds it.
@@ -174,7 +173,9 @@
     // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
     // and each says how many rows it would leave beside the others.
     var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
-    filterBar(sec, { total: rows.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: AREA_ORDER }, { key: 'source', label: 'Source' }] });
+    filterBar(sec, { total: rows.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'area', label: 'Area', order: AREA_ORDER }] });
+    // The health above the filters: it says where the system stands; the filters, under it, stay as the table scrolls.
+    doneCards(sec, cards);
   })();
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
@@ -429,6 +430,18 @@
         (d.author ? line(esc('Made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by) + '.')) : '') +
         line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
     }); });
+    // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
+    // on. One row a contract, the build's rows side by side; a change that breaks a product said so.
+    (DATA.contractChanges || []).forEach(function (b) {
+      (b.changes || []).forEach(function (c) {
+        var kind = c.kind === 'component' ? '' : c.kind === 'flow' ? 'Flow ' : 'Pattern ';
+        var head = c.change === 'added' ? 'Contract added' : c.change === 'removed' ? 'Contract removed' : 'Contract changed';
+        var items = (c.items || []).map(function (x) { return line(esc(capital(x.what) + ' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
+        var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
+        add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
+          [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+      });
+    });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
@@ -470,7 +483,7 @@
     var headH = function () { if (logHeadEl.offsetHeight) logTable.style.setProperty('--sg-log-head-h', logHeadEl.offsetHeight + 'px'); };
     headH(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(headH).observe(logHeadEl);
     // The code, Figma, the intent layer or the decisions: a chip for each type the page has, when it has two.
-    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
+    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['contracts', 'Contracts'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
     if (kinds.length > 1) pageBar(wn, { said: 'changes', chips: kinds });
     // A ticket's commits alone, said above the table with a way back to every row.
     var onlyBar = box.querySelector('.sg-log-only-bar');
@@ -1038,9 +1051,29 @@
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
     var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
-    filterBar(ilSec, { links: sourceLinks(ilSrc.url), total: rows.length, said: 'pages',
+    var srcWords = [], SRC_ORDER = ['Intent layer', 'Figma', 'Contract', 'Code'];
+    rows.forEach(function (p) { ilSourceWords(p).forEach(function (w) { if (srcWords.indexOf(w) < 0) srcWords.push(w); }); });
+    srcWords.sort(function (x, y) { var i = SRC_ORDER.indexOf(x), j = SRC_ORDER.indexOf(y); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j) || x.localeCompare(y); });
+    filterBar(ilSec, { links: sourceLinks(ilSrc.url, srcWords), total: rows.length, said: 'pages',
       chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
-      cols: [{ key: 'status' }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'source', label: 'Source', multi: true, order: ['Intent layer', 'Figma', 'Code'] }, { key: 'waits', label: 'Waiting on' }] });
+      cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
+    // How far along the documentation is, as the Rules page shows its rules (doneCard, 00-start.js): a card a source,
+    // as Rules has one for Figma and one for the code. Each counts the pages that source documents: the share with
+    // nothing left to do, and each area's, above the filters.
+    // Done green, to review amber, missing or to remove red, as the filters' dots under them say.
+    var DOC_STATE = { keep: 'done', review: 'check', write: 'fix', remove: 'fix' };
+    // A page's state in one source, not the page's as a whole: a component's documentation is a list of things, each
+    // written in a source or to be written there (docIssueRows, 08-each-kind-once.js). In a source, its page is done
+    // when every one of them there is done; missing when one there is still to write; to check otherwise. A page with no
+    // such list (a template, a flow), or none in that source, keeps the page's own state.
+    var srcState = function (p, w) {
+      var c = docComp(p), list = [];
+      try { if (c) list = docIssueRows(c).filter(function (r) { return srcNames(r.src || []).indexOf(w) >= 0; }); } catch (e) { list = []; }
+      if (!list.length) return DOC_STATE[statusOf(p)] || 'fix';
+      if (list.some(function (r) { return r.st === 'todo'; })) return 'fix';
+      return list.some(isOpen) ? 'check' : 'done';
+    };
+    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; })); }).join(''));
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
