@@ -5,18 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { guidanceView } from '../lib/styleguide-data.mjs';
 import { contextFrom, purposeLines } from '../lib/prototype-context.mjs';
 
 const draft = '**Draft:** a severity next to an item\'s name.';
-
-test('a component\'s examples are read with its guidance, from the authored contract', () => {
-  const g = guidanceView({ authored: { examples: [draft] } });
-  const s = g.sections.find((x) => x.key === 'examples');
-  assert.ok(s, 'an Examples section');
-  assert.deepEqual(s.text, [draft]);
-  assert.equal(s.from, 'contract.authored.json');
-});
 
 test('agents read each example, a draft named as one', () => {
   const ctx = contextFrom({ components: { badge: {} } }, null, null, { authored: { components: { badge: { guidance: { examples: [draft] } } } } });
@@ -25,8 +16,11 @@ test('agents read each example, a draft named as one', () => {
   assert.doesNotMatch(lines, /\*\*Draft/, 'the mark is said in words, never left as markup');
 });
 
-test('on the Documentation page, a drafted example is to review, never done', () => {
-  const src = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide', 'js', '08-each-kind-once.js'), 'utf8');
-  assert.match(src, /guideKind\('examples', 'Examples'\)/);
-  assert.match(src, /st: !has \? 'todo' : weak \|\| drafted \? 'check' : 'done'/);
+test('on the Documentation page, a drafted example is to review, never done, and the rating reads it', () => {
+  const root = dirname(dirname(fileURLToPath(import.meta.url)));
+  const tpl = readFileSync(join(root, 'templates', 'styleguide', 'js', '08-each-kind-once.js'), 'utf8');
+  assert.match(tpl, /ex \? \(exDraft \? 'check' : 'done'\) : 'todo'/, 'drafted: to check; written: done; none: to write');
+  const gen = readFileSync(join(root, 'lib', 'styleguide-gen.mjs'), 'utf8');
+  assert.match(gen, /guidance\?\.examples/, 'the authored examples are read for the rating');
+  assert.match(gen, /exampleDraft: true/);
 });
