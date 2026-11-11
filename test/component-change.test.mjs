@@ -76,12 +76,13 @@ test('after Figma is read again: the real difference, and where it is not what t
   // The read after: the skeleton as given, and the values capture's paths with the label's name as it is then.
   const as = (fn) => { const s = JSON.parse(JSON.stringify(skeleton)); fn(s.chipFilter.trees[0].c[0].c); const label = s.chipFilter.trees[0].c[0].c[1].n; const v = JSON.parse(JSON.stringify(values).replaceAll('Content/Label', `Content/${label}`)); return modelOf('chipFilter', { ...captures, skeleton: s, values: v }); };
   // Made as said: the label renamed (the same node), the new instance read with its own node id.
-  const ok = realOf(ch, as((c) => { c[1].n = 'Text'; c.push({ t: 'INSTANCE', n: 'trailing', id: '2:7', of: { name: 'icon' } }); }));
+  // The new layer is named in the system's own case, as the change writes it: its layers are Title Case (Content, Label).
+  const ok = realOf(ch, as((c) => { c[1].n = 'Text'; c.push({ t: 'INSTANCE', n: 'Trailing', id: '2:7', of: { name: 'icon' } }); }));
   assert.deepEqual(ok.mismatch, []);
   assert.deepEqual(ok.real.skeleton.map((x) => x.change), ['renamed', 'added']);
   assert.match(realLines(ok, 'chipFilter').join('\n'), /✅ It is what the change said\./);
   // Made otherwise: the label left as it was, and a layer nobody asked for.
-  const off = realOf(ch, as((c) => { c.push({ t: 'INSTANCE', n: 'trailing', id: '2:7', of: { name: 'icon' } }, { t: 'FRAME', n: 'Extra', id: '2:8' }); }));
+  const off = realOf(ch, as((c) => { c.push({ t: 'INSTANCE', n: 'Trailing', id: '2:7', of: { name: 'icon' } }, { t: 'FRAME', n: 'Extra', id: '2:8' }); }));
   assert.deepEqual(off.mismatch.map((x) => `${x.change} ${x.what}`), ['renamed layer', 'added frame Content/Extra']);
   assert.match(realLines(off, 'chipFilter').join('\n'), /⚠️ {2}Not what the change said \(2\)/);
 });
