@@ -343,7 +343,8 @@
   }
   // What a table would say, inside a panel that opens from a table's row: labelled values, never another table (the
   // owner's rule). kvOne: one item, each label over its value; kvList: several, each its own block. An empty value is left out.
-  function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + esc(p[0]) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
+  // A label is words, escaped; { html } when it is markup the page made itself (the components a change is for, linked).
+  function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + (p[0] && typeof p[0] === 'object' ? p[0].html : esc(p[0])) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
   function kvList(items, cls) { return '<ul class="sg-kv-list' + (cls ? ' ' + cls : '') + '">' + items.map(function (pairs) { return '<li>' + kvOne(pairs) + '</li>'; }).join('') + '</ul>'; }
   // The components that use a token: each its name (its page when it has one) and where it is, in Figma and in the code.
   function usersTable(names) {
@@ -440,26 +441,42 @@
   window.addEventListener('hashchange', function () { closeToken(false); });
   function linkVars(text) { return esc(text).replace(/(^|[^\w-])(--[\w-]+)/g, function (m, pre, v) { return pre + usesLink(v); }); }
   if (DATA.title) { document.getElementById('sg-title').textContent = DATA.title; document.title = DATA.title + ' · Living style guide'; }
-  // The system's logo at the top of the menu, in place of its name (still said to a screen reader); it follows the
-  // page's light and dark.
-  // The top of the menu: the system's name (or the project's own logo, styleguide.logo, when it gives one, the name then
-  // said to a screen reader only), and beside it the system's version.
+  // The top of the menu: the project's own logo (styleguide.logo), when it gives one, in place of the system's name,
+  // which is then said to a screen reader only; it follows the page's light and dark.
+  //
+  // With no logo of its own — every guide that is not a client's — the default takes its place: the system's name in
+  // short, as large as the Status page's own numbers, over what the guide is. No version beside it: a version read from
+  // the code says nothing about the Figma file the same guide shows, so one number over both would be a claim the guide
+  // cannot make. The changelog still carries it, per component and per release.
   var lhead = document.querySelector('.sg-sidebar-header'), lfirst = lhead && lhead.querySelector('#sg-title');
   if (lhead && DATA.logo && DATA.logo.svg) {
     Array.prototype.forEach.call(lhead.querySelectorAll('p'), function (p) { p.classList.add('sg-hidden-text'); });
     var la = document.createElement('a'); la.className = 'sg-logo'; la.href = '#status'; la.setAttribute('aria-label', (DATA.title || 'Design system') + ', status');
     la.innerHTML = DATA.logo.svg; var lsvg = la.querySelector('svg'); if (lsvg) { lsvg.setAttribute('aria-hidden', 'true'); lsvg.setAttribute('focusable', 'false'); }
     lhead.insertBefore(la, lhead.firstChild); lfirst = la;
+  } else if (lfirst) {
+    lfirst.classList.add('sg-wordmark');
+    lfirst.textContent = shortName(DATA.title || 'Design system');
+    lfirst.setAttribute('title', DATA.title || 'Design system');   // the name in full, on hover
+    fitOneLine(lfirst);
   }
-  // Its version: the newest release its changelog has (styleguide.version, when set), so it moves on with each release;
-  // a click opens the changelog.
-  var newest = DATA.version || null;
-  if (!newest) (DATA.components || []).forEach(function (k) { (k.changelog || []).forEach(function (r) { if (r.release && (!newest || versionAfter(r.release, newest))) newest = r.release; }); });
-  if (lfirst && newest) {
-    var row = document.createElement('div'); row.className = 'sg-logo-row'; lhead.insertBefore(row, lfirst); row.appendChild(lfirst);
-    var vtag = document.createElement('a'); vtag.className = 'sg-logo-version'; vtag.href = '#history'; vtag.setAttribute('aria-label', 'Version ' + newest + ', changelog');
-    vtag.innerHTML = '<span class="sg-status">' + esc(/^v/i.test(newest) ? newest : 'v' + newest) + '</span>';   // the page's tag, inside a plain link
-    row.appendChild(vtag);
+  // The name in short, for the wordmark: a trailing "design system" becomes DS, and a name that does not say it gets DS
+  // added, so the mark always ends in DS. "RMS Design System" is RMS DS; "Acme Kit" is Acme Kit DS.
+  function shortName(name) {
+    var s = String(name).trim().replace(/\s+/g, ' ').replace(/[\s·|-]*design\s*system\s*$/i, '').trim();
+    return /(^|\s)ds$/i.test(s) ? s : (s ? s + ' DS' : 'DS');
+  }
+  // The wordmark on one line, whatever the name's length: it starts at the big number's size and drops to the width the
+  // menu gives it. Measured again once the page's own font is in, and on every resize (the menu is narrower on a phone).
+  function fitOneLine(el) {
+    var set = function () {
+      el.style.removeProperty('--sg-wordmark-fit');
+      var room = el.clientWidth, drawn = el.scrollWidth;
+      if (room > 0 && drawn > room) el.style.setProperty('--sg-wordmark-fit', String(Math.floor(room / drawn * 1000) / 1000));
+    };
+    set();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
+    addEventListener('resize', set);
   }
   // Whether release a is later than release b (v2.10.01 after v2.9.3): their numbers compared one by one.
   // The releases of a changelog in order: what is not released yet first, then the newest version (v2.12.00 before

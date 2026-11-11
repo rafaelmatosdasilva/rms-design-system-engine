@@ -32,10 +32,11 @@
     fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
       return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + (x.signedOff ? '<br><span class="pg-dim">' + esc('signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '') + '</td></tr>';
     }).join('');
-    // Each change to the intent layer on a page that documents it: what changed and the commit that made it.
+    // Each change to the intent layer on a page that documents it: what changed, the commit that made it, and who made it,
+    // as every other change on the page says who did it.
     var lay = (DATA.intentChanges || []).filter(function (x) { return (x.components || []).indexOf(c.name) >= 0; }).map(function (x) {
       var sha = !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>';
-      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc((x.pages.length === 1 ? 'Its page changed: ' : 'Its page and ' + (x.pages.length - 1) + ' more changed: ') + x.pages.join(', ') + '.') + ' ' + day(x.at || '') + '</td></tr>';
+      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc((x.pages.length === 1 ? 'Its page changed: ' : 'Its page and ' + (x.pages.length - 1) + ' more changed: ') + x.pages.join(', ') + '.') + ' ' + day(x.at || '') + (x.by ? ' <span class="pg-log-date">' + esc(x.by) + '</span>' : '') + '</td></tr>';
     }).join('');
     // The comments left on it in Figma (figma-comments.mjs), each thread with its replies, open or resolved.
     var cm = (c.figmaComments || []).map(function (t) {
@@ -157,8 +158,6 @@
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  // An area still in early development says so on its tab (the features page: Try components in a playground).
-  var EARLY_AREAS = { play: true };
   var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['parts', 'Parts'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }

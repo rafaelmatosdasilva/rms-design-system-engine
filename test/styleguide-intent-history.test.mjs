@@ -56,12 +56,12 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#history tr[data-chip="intent"]')`, { attempts: 200 }), true, 'History has its rows');
-    // One table, a row each: its date and time, its type, what it did, who did it, what it affects.
-    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log thead th')].map((th) => th.textContent)`), ['Date', 'Type', 'What', 'Affects', 'Done by']);
+    // One table, a row each: its date and time, its source, what it did, what it affects, who did it.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log thead th')].map((th) => th.textContent)`), ['Date', 'Source', 'What', 'Affects', 'Done by']);
     const rows = await run(`[...document.querySelectorAll('#history tr[data-chip="intent"]')].map((tr) => [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()))`);
     assert.equal(rows.length, 2);
     assert.match(rows[0][0], /^2026-10-3[01] \d\d:\d\d$/, 'its day and time, as the reader\'s clock says it');
-    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Not in the guide yet: Saving Committed in c2d4e6f8', 'button', 'Quokka · pushed by Wombat']);
+    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Also changed: 1 page (Saving) Committed in c2d4e6f8', 'button', 'Quokka · pushed by Wombat']);
     assert.deepEqual(rows[1].slice(1), ['Intent layer', '1 file changed, none of them a page Committed in b0b1b2b3', 'No component', '']);
     assert.equal(await run(`document.querySelectorAll('#history .pg-par-card').length`), 1, 'one table, never a card per change, in the card every table of the guide has');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
@@ -118,7 +118,7 @@ test('the code on History: a row each commit, the issues it names, how many comm
     assert.equal(await run(`!!document.querySelector('#history .sg-log-release .sg-status')`), true, 'the page\'s own version tag, as beside the system\'s name');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="code"] .sg-log-what').innerText.indexOf('Released in')`), -1, 'no longer a line of its own in What');
     // Sorted by Date, newest first, as the page opens; only the columns rows of one moment share can sort.
-    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log th[data-sort]')].map((th) => th.getAttribute('data-sort'))`), ['Date', 'Type', 'Done by'], 'never What or Affects, which are one row\'s own');
+    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log th[data-sort]')].map((th) => th.getAttribute('data-sort'))`), ['Date', 'Source', 'Done by'], 'never What or Affects, which are one row\'s own');
     assert.equal(await run(`document.querySelector('#history th[data-sort="Date"]').getAttribute('aria-sort')`), 'descending', 'newest first as it opens, and the head says so');
     await run(`document.querySelector('#history th[data-sort="Date"] .sg-mx-sort').click()`);
     assert.equal(await run(`document.querySelector('#history th[data-sort="Date"]').getAttribute('aria-sort')`), 'ascending');

@@ -365,8 +365,8 @@ test('in the browser: no script error, a control changes the real component, the
     // number, the criterion, the status with when and where it was read, and the arrow that opens the row; what the
     // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
     // it and when the audit last ran. Only what applies. No separate table of sources.
-    assert.match(a11y, /Task nr.*What to do.*Who acts.*WCAG.*Status/, 'the task first, then the person who does it');
-    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found/, 'what the Figma notes say and what was found: in the row\'s panel only');
+    assert.match(a11y, /Task nr.*WCAG.*Who acts.*Status.*Last checked/, 'the task, its criterion, the person who does it, its status and when it was checked');
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what to do, what the Figma notes say and what was found: in the row\'s panel only');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
@@ -551,7 +551,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
     // kind here, written or not, what is to write first; the Status page lists the same rows, only those not written yet.
     // Where it is used is its own area, never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|Source|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Type|Source|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
     // A link in a table to another page of the guide is a link pill, its words then its arrow (a template rule); one out of
     // the guide stays an underlined link.
     assert.equal(await run(`[...document.querySelectorAll('.sg-section:not([hidden]) table a[href^="#"]')].filter((a) => !a.closest('thead, .sg-tip, .pg-preview, .pg-frame, .pg-variants, .pg-anat-wrap, .sg-showroom, .sg-thumb') && !a.classList.contains('sg-mx-go') && !(a.classList.contains('sg-link-pill') && a.querySelector('svg'))).length`), 0, 'every link in a table is a link pill');
@@ -1259,8 +1259,8 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /var logHead = \['Date', 'Type', 'What', 'Affects', 'Done by'\]\.map/, 'when, its type, what was done or decided, what it affects, then who did it, each column named');
-  assert.match(tpl, /var LOG_SORT = \{ 'Date': [^}]+\}, 'Type': [^}]+\}, 'Done by': [^}]+\} \};/, 'the three columns rows of one moment share are the ones that sort, never What or Affects');
+  assert.match(tpl, /var logHead = \['Date', 'Source', 'What', 'Affects', 'Done by'\]\.map/, 'when, where it comes from, what was done or decided, what it affects, then who did it, each column named');
+  assert.match(tpl, /var LOG_SORT = \{ 'Date': [^}]+\}, 'Source': [^}]+\}, 'Done by': [^}]+\} \};/, 'the three columns rows of one moment share are the ones that sort, never What or Affects');
   assert.match(tpl, /aria-sort="' \+ \(name === 'Date' \? 'descending' : 'none'\)/, 'newest first as the page opens, and the head says which column it is sorted by');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
@@ -1739,7 +1739,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
     ['figma', 'Figma', 'showLabel added; labelContent added Saved in 9878c3f'],
     ['figma', 'Figma', 'tileSlot added Saved in 9878c3f'],
     ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
-    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Not in the guide yet: Saving Committed in eea0cd0e'],
+    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Also changed: 1 page (Saving) Committed in eea0cd0e'],
     ['decisions', 'Decision', 'No large tile Answered'],
     ['code', 'Code', '#11 · 2 commits REV-1 the tile'],
   ], 'newest first, whatever the type: an issue a count of its commits; a read of Figma a row a component it changed, the new ones named once');
@@ -1753,7 +1753,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   assert.equal(text(fns.dateCell('2026-10-25', null)), '2026-10-25', 'no release, no tag');
   // A page named unlike the component it documents (Table Body Cell Tooltip, table/Cell/tooltip) is under Affects only.
   const named = run([{ k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', pages: ['Table Body Cell Tooltip', 'Saving'], components: ['table/Cell/tooltip'], alone: ['Saving'], files: 2 } }]);
-  assert.equal(text(named.ROWS[0].what), '2 pages changed Not in the guide yet: Saving Committed in eea0cd0e', 'only the page that documents no component is named in What');
+  assert.equal(text(named.ROWS[0].what), '2 pages changed Also changed: 1 page (Saving) Committed in eea0cd0e', 'only the page that documents no component is named in What');
   assert.deepEqual(fns.ROWS.filter((x) => x.chip === 'figma').map((x) => [...x.affects.matchAll(/href="#([^"]+)"/g)].map((m) => m[1])), [['c-buttonFloat/history'], ['c-navTab/history'], ['c-cardRow/history', 'c-chipRow/history']], 'the components only under Affects, as pills');
   assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
   assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
@@ -1827,9 +1827,34 @@ test('Figma beside the code is off unless the project asks for it (styleguide.fi
   assert.match(gen, /const variantImages = cfg\.styleguide\?\.figmaCompare === true \? await inTurn\(/, 'no variant image is read without it, so the page has no Figma button');
 });
 
-test('a part still in early development says so on its tab: the Playground, Early', () => {
+test('no tab carries a stage badge: the stage of a part is the features page\'s to say, not the guide\'s (the owner\'s, 11 November 2026)', () => {
   const tpl = templateText();
-  assert.match(tpl, /var EARLY_AREAS = \{ play: true \};/);
-  assert.match(tpl, /\.map\(function \(o\) \{ if \(EARLY_AREAS\[o\.v\]\) o\.early = true; return o; \}\)\)/, 'the area tabs carry it');
-  assert.match(tpl, /if \(o\.early\) text \+= '<span class="sg-early"><span class="sg-hidden-text">, <\/span>Early<span class="sg-hidden-text"> development<\/span><\/span>';/, 'said in a word, the whole stage for a screen reader');
+  assert.doesNotMatch(tpl, /EARLY_AREAS|sg-early|o\.early/);
+});
+
+test('History says the other pages a change touched on one line, Also changed, in counts by kind, every name one click away', () => {
+  const src = readFileSync(new URL('../templates/styleguide/js/07-second-in-the-list.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('var NOT_YET_NAMED'), src.indexOf('    layers.forEach(function (x) {'));
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const notYet = new Function('esc', 'plural', body + '\nreturn pagesSaid;')(esc, plural);
+  const tokens = Array.from({ length: 1212 }, (_, i) => `--advanced-thing-${i}-color`);
+  const shown = (html) => html.replace(/<span class="pg-par-val sg-log-list" hidden>[\s\S]*?<\/span>/, '');
+  const many = notYet(['Spacing', 'Consult Template', 'Operation Template', ...tokens]);
+  assert.match(shown(many), /3 pages \(Spacing, Consult Template, Operation Template\) and 1212 token pages/);
+  assert.doesNotMatch(shown(many), /--advanced/, 'no token named in the row until asked for');
+  assert.match(many, /data-list-more>Show all<\/button><span class="pg-par-val sg-log-list" hidden>Spacing, Consult Template/, 'every name one click away');
+  assert.equal(notYet(['Spacing']), '<span class="sg-log-also">1 page (Spacing)</span>', 'a few pages named, nothing to open');
+  assert.match(src, /line\(quiet\('Also changed: '\) \+ pagesSaid\(others\)\)/, 'one line, its label first');
+  // Known which pages it made: Added and Changed apart, its components' pages counted.
+  assert.match(notYet(['cardTile', 'Spacing'], ['cardTile']), /1 component page and 1 page \(Spacing\)/);
+  assert.match(src, /line\(quiet\('Added: '\) \+ pagesSaid\(made, comps\)\)/);
+  assert.match(src, /line\(quiet\('Changed: '\) \+ pagesSaid\(edited, comps\)\)/);
+  assert.doesNotMatch(src, /Not in the guide yet/);
+});
+
+test('History: a contract change is done by the engine, under Contracts, as every row says who did it', () => {
+  const src = readFileSync(new URL('../templates/styleguide/js/07-second-in-the-list.js', import.meta.url), 'utf8');
+  assert.match(src, /\['Done by the engine'\], known \? pillsHTML\(\[c\.name\]\)/, 'never an empty Done by');
+  assert.match(src, /contracts: 'Contracts'/, 'its source as its chip says it');
 });

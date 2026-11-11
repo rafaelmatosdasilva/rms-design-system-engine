@@ -22,6 +22,11 @@ test('what each panel opened from a row draws holds no table', () => {
   assert.equal(/<table/.test(between(JS('11-brand-kit.js'), "var m = document.getElementById('sg-tk-panel');", 'm._from = from || null;')), false, 'a token\'s panel');
   assert.equal(/<table/.test(between(JS('00-start.js'), 'function usersTable(names) {', '\n  }')), false, 'the components that use a token');
   assert.match(templateText(), /function kvList\(items, cls\)/, 'one helper for every list of labelled values');
+  // Nor a box drawn as a table inside a panel's card: a border all round, a head, lines between rows. The tag is not
+  // what makes a table; what it looks like does (the Rules panel drew one from plain boxes, 11 November 2026).
+  const css = readFileSync(join(ENGINE, 'templates', 'styleguide', 'css', '09-component-playground.css'), 'utf8');
+  const boxes = css.split('\n').filter((l) => /^\.sg-row-detail-body [^{]*\{[^}]*\bborder:\s*var\(--sg-line\)/.test(l));
+  assert.deepEqual(boxes, [], 'no box with a border all round inside a panel card');
 });
 
 test('in Chrome: a token\'s panel and an issue\'s panel hold labelled values and no table', { timeout: budget(300000) }, async (t) => {

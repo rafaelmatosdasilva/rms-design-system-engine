@@ -11,7 +11,6 @@
       if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
       if (o.count != null) text += countHTML(o.count);   // its number in the segments' badge
       if (o.state) text += stateMark(o.state);   // its area's state, the Status row's dot
-      if (o.early) text += '<span class="sg-early"><span class="sg-hidden-text">, </span>Early<span class="sg-hidden-text"> development</span></span>';   // a part still being tuned
       return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (TABS ? '' : ' role="tab"') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '">' + text + '</' + tag + '>';
     }).join('') + (TABS ? TABS.close : '</div>');
   }

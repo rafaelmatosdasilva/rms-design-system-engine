@@ -113,6 +113,15 @@ A full build tries every component's accessibility in a browser, so it takes min
 | Components | One page for each component, in areas you switch between |
 | Templates | Each page template, what it is made of and the frame it comes from, when you list templates |
 
+What every page shares:
+
+- **The top of the menu.** Your logo, when `styleguide.logo` names one. With none, the system's name in short ("RMS Design System" is RMS DS) over "Living control center". No version: a version read from the code says nothing about the Figma file the same guide shows.
+- **One count for the components.** The menu's Components number is the Code card's Built number. The menu lists every component the Status table counts as built, a part inside its component however deep it sits, and a component only the code has too.
+- **Every table sorts.** Click a column's name to sort by it, and again for the other way round.
+- **Filters in one order.** All first, then the filters (Who acts), then the statuses, all as far apart as each other.
+- **Column widths by what they hold.** Each column has its share of the table, so leaving one out never squeezes the rest. A column with nothing in any row is left out (Motion's What to do when nothing is to do).
+- **A row's panel reads as text.** Every line in one colour and weight, and never a table or a box drawn like one: what a table would say is said as labelled values.
+
 ### Status
 
 One page for how the system stands and what is left. It is second in the list, under the index.
@@ -143,13 +152,13 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
-| Accessibility | One table by WCAG 2.2 criterion, with what Figma states, what was found, what to do and who acts |
+| Accessibility | One table by WCAG 2.2 criterion: its task number, the criterion, who acts, its status and when it was last checked. What to do, what Figma states and what was found are in the row's panel |
 | Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when |
+| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when. A change to its page in the intent layer (its contract) names who made it too |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 
@@ -307,7 +316,7 @@ One row for each component, with one word per state. The cards above the table a
   - **Code** counts the rows themselves: built, unsure or missing.
   - **Accessibility** counts WCAG 2.2 AA criteria over the whole system. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it.
   - **Documentation** counts what people write. Its page existing and its properties, which the engine writes itself, are not counted.
-- **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts.
+- **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts. A part of a part counts in the row of the component at the top, never in a row of its own.
 - **Opening a component.** A row, or its arrow, opens the component's page in a panel from the right, with its tabs. A Parity, Accessibility or Documentation cell with something left opens that area, filtered to what is to fix or decide.
 - **N/A and Untested.** N/A has no dot and no arrow, since there is nothing to open. N/A and Untested carry an i that says why. A component only one side has says what to do in an i on the side that lacks it.
 - **Sorting.** Every column sorts both ways, Parity first.
@@ -316,7 +325,7 @@ One row for each component, with one word per state. The cards above the table a
 
 ## Try components in a playground
 
-Early development. Each component's page opens on its Playground: the component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch. Its tab is marked Early while its controls are tuned to each component.
+Early development. Each component's page opens on its Playground: the component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch.
 
 - **Inspect.** Outlines each part, padding and gap. Click one to see what it is and its value (`chip padding left · --padding-s · 8px`), and click inside to go one level deeper.
 - **Figma beside the code.** Off unless `styleguide.figmaCompare` is `true` in `ds-config.json`. Then a Figma button shows Figma's image of the variant you set, beside the component or over it with a slider. The images come from `.design-system-engine-refs/` or, with `FIGMA_TOKEN` in `.env`, straight from Figma.
