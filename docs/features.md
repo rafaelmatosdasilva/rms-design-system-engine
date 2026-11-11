@@ -32,7 +32,7 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Design themes over your system](#design-themes-over-your-system) | A new theme of your system's own tokens, its colours, type, corners and spacing set over a live screen in light and dark, each component's tokens a click away. | Early development |
+| [Design themes over your system](#design-themes-over-your-system) | A new theme of your system's own tokens, its colours, type, corners and spacing set over a live screen in light and dark, each component's tokens a click away. | Coming soon |
 | [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | Coming soon |
 | [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | Coming soon |
 | [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | Coming soon |
@@ -288,7 +288,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 ## Design themes over your system
 
-**Early development** · **Why it matters:** A team can see its system as a new brand, or a product's own theme, before anyone writes a token.
+**Coming soon** · **Why it matters:** A team can see its system as a new brand, or a product's own theme, before anyone writes a token.
 
 *Today: a theme starts from scratch. Starting from a Figma file, a file of tokens or pictures is on its menu, and comes next.*
 

@@ -35,7 +35,7 @@ See what is ready at work in the [live style guide](https://rafaelmatosdasilva.g
 
 | Creation | | |
 |:---|---|:---:|
-| [Design themes over your system](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#design-themes-over-your-system) | A new theme of your system's own tokens, its colours, type, corners and spacing set over a live screen in light and dark, each component's tokens a click away. | 🟡 |
+| [Design themes over your system](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#design-themes-over-your-system) | A new theme of your system's own tokens, its colours, type, corners and spacing set over a live screen in light and dark, each component's tokens a click away. | ⚪ |
 | [Turn Figma into code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | ⚪ |
 | [Turn code into Figma](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | ⚪ |
 | [Generate in Figma from a prompt](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | ⚪ |
