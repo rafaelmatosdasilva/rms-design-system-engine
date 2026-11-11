@@ -458,7 +458,8 @@
         line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
     }); });
     // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
-    // on. One row a contract, the build's rows side by side; a change that breaks a product said so.
+    // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the engine:
+    // no person writes a contract, the build does, from the code and Figma (as a scheduled run says the schedule did it).
     (DATA.contractChanges || []).forEach(function (b) {
       (b.changes || []).forEach(function (c) {
         var kind = c.kind === 'component' ? '' : c.kind === 'flow' ? 'Flow ' : 'Pattern ';
@@ -466,7 +467,7 @@
         var items = (c.items || []).map(function (x) { return line(esc(capital(x.what) + ' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
-          [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+          ['Done by the engine'], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
       });
     });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
@@ -477,9 +478,9 @@
     // The columns in the words the other tables use (the owner's, 11 November 2026): Source, as the Documentation table
     // names where a thing comes from (Code, Figma, Intent layer, Decisions, the chips above), never Type, which names a
     // kind of task. What kind of decision or note a row is (a Lesson, a Comment) leads its What.
-    var SOURCE_OF = { code: 'Code', figma: 'Figma', intent: 'Intent layer', decisions: 'Decisions' };
+    var SOURCE_OF = { code: 'Code', figma: 'Figma', intent: 'Intent layer', contracts: 'Contracts', decisions: 'Decisions' };
     var sourceOf = function (x) { return SOURCE_OF[x.chip] || x.type; };
-    var kindOf = function (x) { var s = sourceOf(x); return x.type === s ? '' : x.type === 'Figma comment' ? 'Comment' : x.type; };
+    var kindOf = function (x) { var s = sourceOf(x); return x.type === s || x.type + 's' === s ? '' : x.type === 'Figma comment' ? 'Comment' : x.type; };   // a Contract under Contracts says nothing more
     var LOG_SORT = { 'Date': function (x) { return stamp(x.at); }, 'Source': function (x) { return sourceOf(x); }, 'Done by': function (x) { return (x.bys || []).join(' '); } };
     var logHead = ['Date', 'Source', 'What', 'Affects', 'Done by'].map(function (name) {
       return LOG_SORT[name] ? '<th scope="col" data-sort="' + esc(name) + '" aria-sort="' + (name === 'Date' ? 'descending' : 'none') + '"><button type="button" class="sg-mx-sort">' + esc(name) + MX_TRI + '</button></th>'

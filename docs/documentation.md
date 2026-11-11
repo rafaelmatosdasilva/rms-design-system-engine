@@ -255,6 +255,7 @@ Each build of the style guide compares the contracts with the ones the last buil
 - **A component's contract:** a property, option, state, slot, event or token added or removed, a default changed. A change that breaks a product says so.
 - **A pattern's or a flow's:** a rule added or removed at its level, a component it uses added or removed.
 - **Only real changes.** A build that writes the same contracts again adds nothing, and the first build only records what it read.
+- **Done by the engine.** No person writes a contract: the build does, from your code and Figma, so its rows say so where others name a person.
 
 ## Gather usage guidelines
 
@@ -343,7 +344,7 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](features.md#gather-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
+The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Contracts, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 
 - **An intent layer change** is a row of its own: what it added apart from what it changed, each on one line, the commit that made it, and the components those pages document. Pages are counted by kind (component pages, other pages named while they are few, token pages), every name a click away (Show all). The engine keeps the last 50 changes it read, in the layer's snapshot.
 - **What kind of row it is** (a Decision, a Lesson, a Comment) is the first line of What.
