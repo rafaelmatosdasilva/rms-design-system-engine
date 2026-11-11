@@ -128,7 +128,7 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 - **Each change said once.** The components on the left, linked, and the changes they take on the right, one a line. Components that take the same changes share one entry. Labelled values, never a table or a box drawn like one.
 - **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
-- **In the code.** What [Lint your codebase](#lint-your-codebase-rules) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
+- **In the code.** [How your code builds a component](#how-your-system-builds-a-component-in-the-code), and what [Lint your codebase](#lint-your-codebase-rules) finds: values written by hand, aliases to deleted tokens, invented variables, hand-built components and near copies in your products.
 - **The code is never changed for you.** A code fix is handed back as a patch to apply.
 
 To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all options](../reference/config.md)).
@@ -137,7 +137,36 @@ To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all 
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
 
-What it finds is shown as rules too. Each check's findings become rows on the style guide's Construction page, beside Figma's, so both sides of how your system is built read as one list.
+What it finds is shown as rules too. Each check's findings become rows on the style guide's Rules page, beside Figma's, so both sides of how your system is built read as one list.
+
+### How your system builds a component in the code
+
+Every run reads your system's own component files the way it reads Figma, and writes down how they are written. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. The rules sit on the Rules page under Code, beside Figma's, and in `contracts/construction.json`.
+
+What it reads, as rules:
+
+- **The framework and the files.** What a component is written in (a Vue file, a React one), where its file sits (`src/components/<family>/`) and how the file is named.
+- **The props.** How each kind of prop is named (a yes/no, a choice of options, a text, a number), the word a yes/no begins or ends with (`is…`, `show…`), and how an option is written (`in-progress` or `inProgress`).
+- **What says what it is for.** A comment on each component and on each prop.
+- **The way to Figma.** Each component Figma has, joined to it by a Code Connect file, and each Figma property mapped to a prop or a slot.
+- **States.** How each state is written, state by state: a pseudo-class (`:disabled`), a class (`.is-disabled`), a data attribute or an ARIA attribute.
+- **Class names.** How a part's class is named (`button__label`, `button-label` or `label`), and a variant's (`button--large`).
+- **Tokens.** Whether a component's styles use custom properties made for it (`--button-…`) or the shared tokens directly. Which way is your team's to say, so it waits for the answer.
+- **Its look.** A shadow, a border colour, an opacity, the corners and the text, each written with a token rather than by hand, and whether the corners share one radius token.
+- **Its own API.** Whether a component declares custom properties of its own for what may be overridden.
+
+Beside the rules, each component's anatomy, read as deeply as Figma's:
+
+- **Each state** and how it is written, with its file and line.
+- **Its parts** with their element and class, in the order the markup writes them, and whether each is shown only on a condition.
+- **Which prop changes what.** The class a prop puts on, and every declaration that class sets, on the component or on a part.
+- **Each shadow** with the attributes it writes (offsets, blur, spread, colour, inset) and how it is turned off. A shadow with four attributes in Figma and three in the CSS is then a difference that can be named.
+- **Borders, the radius of each corner and opacity**, with the token each uses.
+- **How it wraps and sizes.** `flex-wrap`, the row gap against the column gap, the minimum width, and whether it hugs its content or fills its space.
+- **The text each part sets.**
+- **What only the code has.** The custom properties it declares and reads (its own API, safe to override), and those it reads from the theme.
+
+It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
 
 ### In your tokens and themes
 
