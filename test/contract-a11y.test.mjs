@@ -112,13 +112,13 @@ test('page: each control as the browser gives it to a screen reader', { skip: HA
       const out = {}; for (const id of 'abcdegh') out[id] = window.__wcag21.facts(document.getElementById(id));
       box.remove(); return out;
     })()`);
-    assert.deepEqual(got.a, { role: 'button', name: 'content', states: [], focusable: true, keys: ['Enter', 'Space'] });
-    assert.deepEqual(got.b, { role: 'button', name: 'content', states: ['aria-pressed', 'disabled'], focusable: false, keys: [] }, 'disabled: Tab passes it by');
-    assert.deepEqual(got.c, { role: 'link', name: 'content', states: [], focusable: true, keys: ['Enter'] });
+    assert.deepEqual(got.a, { role: 'button', name: 'content', states: [], focusable: true, keys: ['Enter', 'Space'], own: true });
+    assert.deepEqual(got.b, { role: 'button', name: 'content', states: ['aria-pressed', 'disabled'], focusable: false, keys: [], own: true }, 'disabled: Tab passes it by');
+    assert.deepEqual(got.c, { role: 'link', name: 'content', states: [], focusable: true, keys: ['Enter'], own: true });
     assert.equal(got.d.name, 'aria-label');
-    assert.deepEqual(got.e, { role: 'textbox', name: 'label', states: ['required'], focusable: true, keys: [] }, 'a field inside its root, named by its label');
-    assert.deepEqual(got.g, { role: null, name: null, states: [], focusable: false, keys: [] });
-    assert.deepEqual(got.h, { role: 'switch', name: 'content', states: ['aria-checked'], focusable: true, keys: [] }, 'no native keys for a role a script gives');
+    assert.deepEqual(got.e, { role: 'textbox', name: 'label', states: ['required'], focusable: true, keys: [], own: false }, 'a field inside its root, named by its label: the root is not the control');
+    assert.deepEqual(got.g, { role: null, name: null, states: [], focusable: false, keys: [], own: false });
+    assert.deepEqual(got.h, { role: 'switch', name: 'content', states: ['aria-checked'], focusable: true, keys: [], own: true }, 'no native keys for a role a script gives');
   });
 });
 
@@ -179,4 +179,13 @@ test('code: a JSX or TSX component gives its element, its role and its ARIA from
   // Its root another component: no element of its own is said. The team's word still is.
   assert.equal(accessibilityOf('export function AcmeWrap() { return <Button>Go</Button>; }'), null);
   assert.deepEqual(accessibilityOf('export function AcmeWrap() { return <Button>Go</Button>; }', { authored: { element: 'a' } }), { element: { value: 'a', from: 'authored' } });
+});
+
+test('the facts file says whether the control read is the component itself; results saved before it was said leave it out', () => {
+  const f = (own) => ({ f: { role: 'button', name: 'content', states: [], focusable: true, keys: ['Enter'], ...(own === undefined ? {} : { own }) }, when: [{ size: 's' }] });
+  const c = factsFile({ default: { chipX: { live: { facts: [f(true)] } }, dialogX: { live: { facts: [f(false)] } }, oldX: { live: { facts: [f(undefined)] } } } }).components;
+  assert.equal(c.chipX.own, true);
+  assert.equal(c.dialogX.own, false, 'a dialog\'s control is its first button');
+  assert.ok(!('own' in c.oldX), 'not said, not guessed');
+  assert.ok(!('own' in measuredFacts({ facts: [f(true)] })), 'the contract keeps the facts it always kept');
 });

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine } from '../lib/figma-hygiene.mjs';
+import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine, withBlocks } from '../lib/figma-hygiene.mjs';
 import { byNodeId } from '../lib/figma-fetch.mjs';
 import { burndown } from '../lib/run-diff.mjs';
 
@@ -245,4 +245,14 @@ test('is the Figma file reliable enough to compare, from the share of values bou
   // Records from before the counts, and a scoped run's other components, are not counted.
   assert.equal(reliability({ old: { hygiene: { raw: [], rawCount: 3, noAutoLayout: [], description: true } } }), null);
   assert.equal(reliability({ chip: rec(10, 6, 2, 0), card: rec(10, 0, 2, 0) }, { only: ['card'] }).level, 'reliable');
+});
+
+test('a building block\'s file check joins the lists, and only them: its values never move the score or the trust', () => {
+  const values = { chip: { hygiene: { raw: [], rawCount: 0, values: 4, noAutoLayout: [], variants: 1, description: true } } };
+  const blockHygiene = { raw: [{ at: 'Default/Fill', field: 'fill', value: '#ff0000' }], rawCount: 1, values: 1, noAutoLayout: [], variants: 1, description: false };
+  const merged = withBlocks(values, { chip: {}, _blocks: { '.rowShade': { trees: [], hygiene: blockHygiene }, '.unread': { trees: [] } } });
+  assert.deepEqual(Object.keys(merged), ['chip', '.rowShade'], 'a block with no file check adds nothing');
+  assert.ok(hygieneFindings(merged).some((f) => f.component === '.rowShade'), 'its typed value is listed');
+  assert.equal(withBlocks(values, null), values, 'no skeleton, no change');
+  assert.equal(withBlocks(values, { chip: {} }), values, 'no blocks, no change');
 });
