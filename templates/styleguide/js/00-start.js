@@ -137,7 +137,10 @@
   // items: [{ area, state: 'done' | 'check' | 'fix' }].
   var DONE_STATES = ['done', 'check', 'fix'];
   function stateBar(n) { var t = n.done + n.check + n.fix; return '<span class="sg-health-bar" aria-hidden="true">' + DONE_STATES.map(function (k) { return n[k] ? '<span class="is-' + k + '" style="width:' + (n[k] / t * 100) + '%"></span>' : ''; }).join('') + '</span>'; }
-  function doneCard(title, items) {
+  // score: how closely the rules the team keeps are followed (library-score.mjs), with the last day's beside it. The
+  // ring says how many rules are done; this says how much of the system follows them, which is another thing, so it is
+  // labelled and said once under the areas, never a second number in the ring.
+  function doneCard(title, items, score) {
     if (!items.length) return '';
     var R = 51.25, C = 2 * Math.PI * R, by = {}, order = [], all = { done: 0, check: 0, fix: 0 };
     items.forEach(function (x) { if (!by[x.area]) { by[x.area] = { a: x.area, done: 0, check: 0, fix: 0 }; order.push(x.area); } by[x.area][x.state]++; all[x.state]++; });
@@ -150,7 +153,16 @@
     var ring = '<span class="sg-cx-ring"><svg viewBox="0 0 108 108" aria-hidden="true"><circle class="sg-cx-ring-track" cx="54" cy="54" r="' + R + '"/>' + arcs
       + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(String(pct)) + '<small>%</small></span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
     return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p></div>'
-      + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div></div>';
+      + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div>' + followLine(score) + '</div>';
+  }
+  // How closely the rules are followed, and the change since the last day the page was built. Nothing is said until
+  // there is a rule to follow, and no change is said on the first build that scored.
+  function followLine(score) {
+    if (!score || score.score == null) return '';
+    var was = score.previous && score.previous.score != null ? score.previous.score : null;
+    var d = was == null ? null : score.score - was;
+    var move = d == null || d === 0 ? '' : ' · ' + (d > 0 ? '+' : '\u2212') + Math.abs(d) + ' since ' + String(score.previous.at).slice(0, 10);
+    return '<p class="sg-health-sub sg-cx-follow-line">' + esc('Followed by ' + score.score + '% of what the rules read' + move) + '</p>';
   }
   // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
   function doneCards(sec, cards) {

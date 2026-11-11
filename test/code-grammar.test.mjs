@@ -258,3 +258,24 @@ test('a component with no element of its own is said, never dropped quietly', ()
   assert.deepEqual(g.code.notRead.map((x) => x.component), ['acmeCell']);
   assert.match(g.code.notRead[0].why, /renders another component|no class of its own/);
 });
+
+test('the code is scored the way the Figma library is, and keeps a trend of its own', async () => {
+  const { scoreOf, withHistory, scoreFile } = await import('../lib/library-score.mjs');
+  const rules = [
+    { side: 'code', area: 'naming', status: 'rule', follows: 10, of: 10 },
+    { side: 'code', area: 'variables', status: 'fix', follows: 8, of: 10 },
+    { side: 'code', area: 'documentation', status: 'decide', follows: 1, of: 10 },
+  ];
+  const s = scoreOf(rules);
+  // A rule still to decide counts for nothing, as on Figma's side.
+  assert.deepEqual(s.areas.map((a) => [a.area, a.score]), [['Tokens', 80], ['Naming', 100]]);
+  assert.equal(s.score, 90);
+  // Each side keeps its own history, so the code's trend is the code's.
+  assert.notEqual(scoreFile('/out', 'code'), scoreFile('/out', 'figma'));
+  const dir = tempDir('code-score-');
+  const file = scoreFile(dir, 'code');
+  withHistory(file, '2026-11-10T09:00:00.000Z', { score: 88, areas: [] });
+  const now = withHistory(file, '2026-11-11T09:00:00.000Z', s);
+  assert.equal(now.previous.score, 88);
+  assert.equal(now.score, 90);
+});
