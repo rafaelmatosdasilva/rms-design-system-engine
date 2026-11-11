@@ -19,7 +19,7 @@ See what is ready at work in the [live style guide](https://rafaelmatosdasilva.g
 |:---|---|:---:|
 | [Check your Figma library rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | 🟢 |
 | [Measure Figma-code parity](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | 🟢 |
-| [Test accessibility](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, tested in a real browser. | 🟡 |
+| [Test accessibility](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | 🟡 |
 | [Lint your codebase rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | ⚪ |
 
 | Documentation | | |
