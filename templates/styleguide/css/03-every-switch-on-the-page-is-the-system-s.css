@@ -40,7 +40,6 @@
 .sg-tabs::after { content: ''; flex: 1 1 auto; box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */   /* the line goes on after the last tab, to the row's end */
 .sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: calc(var(--sg-space-s) * 2) var(--sg-cell-x); border-radius: var(--sg-radius-s) var(--sg-radius-s) 0 0; font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
 .sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
-.sg-early { display: inline-block; margin-left: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); color: var(--sg-muted); }   /* a part still in early development, said on its tab */
 .sg-tab { box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */
 .sg-tab:hover { background: var(--sg-hover-fill); }   /* under the pointer, the shared hover: a button of its own */
 .sg-tab { position: relative; }

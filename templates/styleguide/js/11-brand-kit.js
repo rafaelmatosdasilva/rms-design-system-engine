@@ -1165,7 +1165,7 @@
           '<text x="100" y="' + BASE + '" class="sg-bk-tm-aa" style="font-size:' + Math.round(fNow) + 'px;' + (famCss ? 'font-family:' + esc(famCss) + ';' : '') + 'font-weight:var(--tm-w, ' + disp.w + ');letter-spacing:' + disp.ls + 'em">Aa</text></svg>' + wChips + '</div>';
         // The system talking about itself, one line a size, largest first: its own counts, family and sizes, so no row
         // claims a role (a size is a heading in one product and a number in another); one line each, cut where the tile ends.
-        var nComp = typeof COMPONENTS !== 'undefined' ? menuCount() : 0,   // as the menu counts them: no parts (a family once), none only the code has
+        var nComp = typeof COMPONENTS !== 'undefined' ? menuCount() : 0,   // as the menu counts them: no parts (a family once), the same number as the Code card's Built
           nCol = Object.keys(colls).length;
         var nTok = typeof tkRows !== 'undefined' && tkRows ? tkRows.length : BK_ALL.length;   // as the Tokens page counts them: every collection
         var SAYS = ['100% system', nTok.toLocaleString('en') + ' tokens', plural(nCol, 'collection', 'collections') + (nComp ? ', ' + plural(nComp, 'component', 'components') : ''),

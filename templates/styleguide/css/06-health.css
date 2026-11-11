@@ -59,10 +59,10 @@
    sort and filter marks are: every page that filters a table uses it. */
 .sg-none { margin: 0; padding: calc(var(--sg-space-xxl) + var(--sg-space-l)) var(--sg-cell-x); text-align: center; color: var(--sg-muted); font-size: var(--sg-s); line-height: var(--sg-lh); }
 .sg-none > strong { display: block; margin-bottom: var(--sg-space-xs); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
-th[data-sort] .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }   /* a column head sorts by it, on any table that sorts */
-th[data-sort] .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
+th:is([data-sort], [data-sort-col]) .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }   /* a column head sorts by it, on every table (data-sort-col: the page's one sorter) */
+th:is([data-sort], [data-sort-col]) .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
 .sg-mx-tri { flex: none; width: calc(0.6em + var(--sg-space-xs)); height: calc(0.6em + var(--sg-space-xs)); opacity: 0; transition: opacity var(--sg-fast), transform var(--sg-fast); }   /* the sorted column: a triangle, down or up */
-th[data-sort] .sg-mx-sort:hover .sg-mx-tri { opacity: 0.5; }
+th:is([data-sort], [data-sort-col]) .sg-mx-sort:hover .sg-mx-tri { opacity: 0.5; }
 th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-sort { color: var(--sg-text); }
 th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-tri { opacity: 1; }
 th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }

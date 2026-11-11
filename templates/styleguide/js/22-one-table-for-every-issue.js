@@ -39,7 +39,7 @@
     // Figma and the code: the name and its value under it, to compare; a finding written out in full is the row panel's.
     figma: function (r) { return '<td>' + clip(firstLine(r.figma)) + '</td>'; },
     // When it was last updated, in a column of its own: short, the full date and time on hover.
-    updated: function (r) { return '<td class="pg-at-cell">' + (r.at ? '<span class="pg-at-date" title="' + esc(when(r.at)) + '">' + esc(whenShort(r.at)) + '</span>' : '') + '</td>'; },
+    updated: function (r) { return '<td class="pg-at-cell"' + (r.at ? ' data-at="' + esc(r.at) + '"' : '') + '>' + (r.at ? '<span class="pg-at-date" title="' + esc(when(r.at)) + '">' + esc(whenShort(r.at)) + '</span>' : '') + '</td>'; },
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
     code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
@@ -56,26 +56,25 @@
       // How it was checked, its date left to the Last checked column (one date per row, never two).
       // Then, open, how long it has been open: what is stuck apart from what is new.
       var one = [r.area === 'Documentation' ? (r.st === 'done' ? '' : r.rel || '') : statusLine(r), openFor(r)].filter(Boolean).join(' \u00b7 ');
-      return '<td' + (openDays(r) ? ' data-open-days="' + openDays(r) + '"' : '') + '>' + statusHTML(r.st, '', r.area) + (one ? '<span class="pg-par-val sg-one-line" title="' + esc(one) + '">' + esc(one) + '</span>' : '') + '</td>';
+      return '<td data-sort-value="' + ({ todo: 1, check: 2, done: 3 }[r.st] || 4) + '"' + (openDays(r) ? ' data-open-days="' + openDays(r) + '"' : '') + '>' + statusHTML(r.st, '', r.area) + (one ? '<span class="pg-par-val sg-one-line" title="' + esc(one) + '">' + esc(one) + '</span>' : '') + '</td>';
     }
   };
   var ISSUE_COLS = {
     Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
-    Accessibility: [['Task nr', 'no'], ['What to do', 'todo'], ['Who acts', 'whoCell'], ['WCAG', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['Status', 'status'], ['Last checked', 'updated']],
+    Accessibility: [['Task nr', 'no'], ['WCAG', 'kind'], ['Who acts', 'whoCell'], ['What to do', 'todo'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['Status', 'status'], ['Last checked', 'updated']],
     Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
-    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Documentation: [['Task nr', 'no'], ['Type', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
-    Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']]
+    Page: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']]
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
-  // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
-  // room for the criterion and Figma's states; Documentation's table is its task, kind, status and when it was checked,
-  // what is written and what to do read in its panel.
-  // Accessibility keeps what it found for the panel, but never its task: two tasks of one criterion differ only by
-  // their words, so a table without them would show the same row twice.
-  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['figma', 'code'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
+  // What a table leaves to its row's panel: Accessibility's table is its task, criterion, who acts, status and when it
+  // was checked, what to do and what was found read in full in its panel (the owner's choice, 11 November 2026);
+  // Documentation's table is its task, kind, status and when it was checked, what is written and what to do read in
+  // its panel.
+  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['todo', 'figma', 'code'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
@@ -213,16 +212,39 @@
     });
     markTaskCols(root);
   }
-  // A table where nothing is open (everything done or not needed) has no Task nr column: there is no task in it.
+  // A table where nothing is open (everything done or not needed) has no Task nr column: there is no task in it. Nor any
+  // other column with nothing in any row (what to do on a table where nothing is to do): its share goes to the rest.
   function markTaskCols(root) {
     Array.prototype.forEach.call(root.querySelectorAll('table.sg-issues'), function (t) {
       var cells = t.querySelectorAll('td.sg-todo-no');
       t.classList.toggle('sg-no-tasks', !!cells.length && !Array.prototype.some.call(cells, function (k) { return k.textContent.trim(); }));
+      markEmptyCols(t);
     });
+  }
+  function markEmptyCols(t) {
+    var heads = t.tHead && t.tHead.rows[0] ? Array.prototype.slice.call(t.tHead.rows[0].cells) : [], rows = t.tBodies[0] ? Array.prototype.slice.call(t.tBodies[0].rows) : [];
+    Array.prototype.forEach.call(t.querySelectorAll('[data-empty-col]'), function (n) { n.removeAttribute('data-empty-col'); });
+    if (!rows.length) return;   // nothing drawn yet: nothing is known to be empty
+    heads.forEach(function (th, i) {
+      if (!/\bsg-col-/.test(th.className) || th.classList.contains('sg-col-no')) return;   // the arrow's column; Task nr has its own rule
+      var empty = rows.every(function (tr) { var td = tr.cells[i]; return !td || (!td.textContent.trim() && !td.querySelector('img, svg, video, canvas')); });
+      if (!empty) return;
+      th.setAttribute('data-empty-col', '');
+      rows.forEach(function (tr) { if (tr.cells[i]) tr.cells[i].setAttribute('data-empty-col', ''); });
+    });
+  }
+  // The column a table is read for takes the width the others leave: what to do, what is written, or where; with none of
+  // those (Parity, whose what to do is in the panel), Figma and the code, side by side as wide as each other; else the
+  // row's own name (Accessibility's criterion). Every other column has its share, by what it holds (the CSS).
+  function restCols(cols) {
+    var keys = cols.map(function (c) { return c[1]; }), has = function (k) { return keys.indexOf(k) >= 0; };
+    var read = ['todo', 'written', 'where'].filter(has);
+    return read.length ? read : has('figma') && has('code') ? ['figma', 'code'] : ['kind'];
   }
   function issueTableHTML(rows, bodyCls, head, area) {
     var cols = tableColsOf(area || ((rows || [])[0] || {}).area);
-    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + (area === 'Accessibility' ? ' sg-issues--a11y' : '') + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
+    var rest = restCols(cols), kindOf = area || ((rows || [])[0] || {}).area || '';
+    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + (area === 'Accessibility' ? ' sg-issues--a11y' : '') + (kindOf ? ' sg-issues--' + esc(String(kindOf).toLowerCase()) : '') + '"><thead><tr>' + cols.map(function (col) { return '<th class="sg-col-' + col[1] + (rest.indexOf(col[1]) >= 0 ? ' sg-col-rest' : '') + (col[1] === 'no' ? ' sg-todo-no-head' : '') + '">' + esc(col[0]) + '</th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
   }
   // A count of each status above a table, as the Status page counts them.
   function statusSum(rows) {
@@ -232,16 +254,20 @@
   }
   // The chips: All, then each status there is, its dot, its name and its count in the segments' badge; a click shows
   // only those rows (filterChips).
-  function chipsHTML(n, area) {
+  // lead: a filter (Who acts) inside the same group, after All and before every status, as every page orders its chips
+  // (All, then the filters, then the rest), and as far from the next chip as the chips are from each other (the
+  // owner's rule, 11 November 2026).
+  function chipsHTML(n, area, lead) {
+    lead = lead || '';
     var sts = ['todo', 'check', 'done', 'kept', 'skip'].filter(function (k) { return n[k]; }), all = sts.reduce(function (t, k) { return t + n[k]; }, 0);
     if (!all) return '';
     var chip = function (k, label, count) { return '<button type="button" class="sg-chip" data-st="' + k + '" aria-pressed="' + (k === 'all') + '">' + (k === 'all' ? '' : '<span class="pg-par-status pg-par--' + STATUS[k][2] + '"><span class="pg-par-sign" aria-hidden="true"></span></span>') + esc(label) + countHTML(count) + '</button>'; };
     // One status only: nothing to filter, so the chip alone, shown chosen (it is all there is) and not a button, so it
     // cannot be unchosen (no All beside it).
-    if (sts.length === 1) return '<span class="sg-chips"><span class="sg-chip sg-chip--only"><span class="pg-par-status pg-par--' + STATUS[sts[0]][2] + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' + esc(rowWord(sts[0], area)) + countHTML(all) + '</span></span>';
-    return '<span class="sg-chips" role="group" aria-label="Show">' + chip('all', 'All', all) + sts.map(function (k) { return chip(k, rowWord(k, area), n[k]); }).join('') + '</span>';
+    if (sts.length === 1) return '<span class="sg-chips">' + lead + '<span class="sg-chip sg-chip--only"><span class="pg-par-status pg-par--' + STATUS[sts[0]][2] + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' + esc(rowWord(sts[0], area)) + countHTML(all) + '</span></span>';
+    return '<span class="sg-chips" role="group" aria-label="Show">' + chip('all', 'All', all) + lead + sts.map(function (k) { return chip(k, rowWord(k, area), n[k]); }).join('') + '</span>';
   }
-  // ── Who acts, as a filter beside the status chips ────────────────────────────────────────────────────────────────
+  // ── Who acts, as a filter before the status chips ────────────────────────────────────────────────────────────────
   // An accessibility table says the person on every row, so a team can show its own work and nobody has to read the
   // rest. Several at once, because one criterion often owes work to more than one of them. The shape is the Status
   // page's own filter (a chip that opens a listbox, each choice with how many rows it has), and it combines with the
@@ -303,7 +329,7 @@
   function applyChip(b) {
     var group = b.closest('.sg-chips'), scope = group.closest('.pg-par, .sg-todo') || group.parentElement, st = b.dataset.st;
     scope._chip = st;
-    Array.prototype.forEach.call(group.querySelectorAll('.sg-chip'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    Array.prototype.forEach.call(group.querySelectorAll('.sg-chip[data-st]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });   // the status chips only: a filter in the same group (Who acts) keeps its own
     Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) { tr.classList.toggle('sg-st-off', st !== 'all' && tr.dataset.status !== st); });
     Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.hidden; })); });
     Array.prototype.forEach.call(scope.querySelectorAll('.sg-who-dd'), function (dd) { applyWho(dd); });   // the two filters agree on what is shown

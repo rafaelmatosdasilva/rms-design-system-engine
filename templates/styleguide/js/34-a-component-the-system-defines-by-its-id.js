@@ -26,7 +26,7 @@
       return cardEl;
     };
     BUILDERS[cid(c.name)]._c = c;   // drawn once its part is here (needPart)
-    if (inMenu(c)) navLink(cid(c.name), c.name);   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
+    if (inMenu(c)) navLink(cid(c.name), c.name);   // a part has its page, opened from its parent's Parts; one only the CSS has, its page from Status
     else { var fam = menuFamily(c); if (fam && !MENU_FAMS[fam]) { MENU_FAMS[fam] = 1; navLink(cid(FAM_FIRST[fam] || c.name), fam); } }
     if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
@@ -568,6 +568,3 @@
     },
     on: function (type, fn) { document.addEventListener(type, fn); }
   };
-  route();
-  document.documentElement.classList.add('sg-ready');   // drawn: the page shows, never its empty shell first
-})();

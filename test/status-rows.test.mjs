@@ -38,6 +38,7 @@ test('the Status table gives each component one row: a part counts inside it how
       component('tableCellMark', { partOf: { root: 'table/Cell', by: 'name and nesting' } }),   // a part of that part
       component('nav/Primary'),                                                 // a family no component carries
       component('nav/Secondary'),
+      component('Base', { codeOnly: { file: 'src/Base.vue', figma: true } }),     // only the code has it: built, so listed and counted
     ],
   });
   const c = await launchChrome(chromePath);
@@ -49,10 +50,16 @@ test('the Status table gives each component one row: a part counts inside it how
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     await waitForTrue(send, sessionId, `document.querySelectorAll('#status .sg-matrix tr.sg-mx-row').length > 0`);
     const names = await run(`[...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].map((tr) => tr.dataset.name)`);
-    assert.deepEqual(names.slice().sort(), ['chip', 'nav', 'table'], 'one row a component: no row for a part, and the family once');
+    assert.deepEqual(names.slice().sort(), ['Base', 'chip', 'nav', 'table'], 'one row a component: no row for a part, and the family once');
     // The cards count the rows the table shows, so a part counted in its component's row is never counted twice.
     const done = await run(`[...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent.replace(/\\s+/g, ' ').trim())`);
-    for (const line of done) assert.match(line, /of 3 complete$/, 'every card counts the rows the table has');
+    for (const line of done) assert.match(line, /of 4 complete$/, 'every card counts the rows the table has');
+    // The menu lists what the Code card counts as built: the same number on both, the same components in both.
+    const menu = await run(`(() => { const lab = document.querySelector('.sg-nav-label[data-group="Components"]'); const out = []; for (let n = lab.nextElementSibling; n && !n.classList.contains('sg-nav-label'); n = n.nextElementSibling) for (const a of n.matches('a') ? [n] : n.querySelectorAll('a')) out.push(a.textContent.trim()); return { label: lab.textContent.replace(/\\s+/g, ' ').trim(), names: out }; })()`);
+    const built = await run(`[...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.dataset.stCode === 'Built').map((tr) => tr.dataset.name)`);
+    assert.deepEqual(menu.names.slice().sort(), built.slice().sort(), 'the menu lists every component the Code card counts as built, and nothing else');
+    assert.match(menu.label, new RegExp('\\b' + built.length + '\\b'), 'the menu says the number the Code card says');
+    assert.ok(done.some((line) => line.startsWith(built.length + ' of ')), 'the Code card says that many built');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

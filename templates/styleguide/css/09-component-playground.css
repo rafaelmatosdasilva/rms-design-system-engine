@@ -216,20 +216,20 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 /* One table for every issue, on the Status page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
 .sg-issues { table-layout: fixed; }
-/* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
-.sg-issues th:nth-child(1) { width: 7%; }
-.sg-cols-7 th:nth-child(2) { width: 9%; } .sg-cols-7 th:nth-child(3) { width: 16%; } .sg-cols-7 th:nth-child(4) { width: 16%; } .sg-cols-7 th:nth-child(6) { width: 13%; } .sg-cols-7 th:nth-child(7) { width: 10%; }   /* Figma and the code side by side, as wide as each other */
-.sg-cols-6 th:nth-child(2) { width: 12%; } .sg-cols-6 th:nth-child(4) { width: 26%; } .sg-cols-6 th:nth-child(5) { width: 14%; } .sg-cols-6 th:nth-child(6) { width: 11%; }
-.sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
-/* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
-   its own narrow column at the end, as every table whose rows open something has. */
-/* Accessibility: the criterion takes the room (it is what a row is about); its status and when, a share each. */
-.sg-issues--a11y.sg-cols-4 th:nth-child(3) { width: 26%; } .sg-issues--a11y.sg-cols-4 th:nth-child(4) { width: 14%; }
-/* Accessibility with who acts: every column but what to do is given its width, so what to do keeps the rest - without
-   this the eight share the room evenly and the one sentence a person reads wraps to five lines. */
-.sg-issues--a11y.sg-cols-8 th:nth-child(3) { width: 11%; } .sg-issues--a11y.sg-cols-8 th:nth-child(4) { width: 14%; }
-.sg-issues--a11y.sg-cols-8 th:nth-child(5) { width: 12%; } .sg-issues--a11y.sg-cols-8 th:nth-child(6) { width: 12%; }
-.sg-issues--a11y.sg-cols-8 th:nth-child(7) { width: 11%; } .sg-issues--a11y.sg-cols-8 th:nth-child(8) { width: 9%; }
+/* Each column its share of the table by what it holds, never by where it stands, so a column a table leaves out (no
+   task open, nothing to do in any row) takes its share with it and the others keep theirs. The column a table is read
+   for (.sg-col-rest: what to do, what is written, where; else Figma and the code; else the criterion) has none and takes
+   what the others leave. With nothing left over, every share grows by the same factor, so the table stays balanced. */
+.sg-issues .sg-col-no { width: 7%; }
+.sg-issues .sg-col-kind { width: 18%; }
+.sg-issues--motion .sg-col-kind { width: 26%; }   /* what happens: when it plays, what moves and on which part */
+.sg-issues :is(.sg-col-figma, .sg-col-code) { width: 20%; }
+.sg-issues .sg-col-whoCell { width: 20%; }
+.sg-issues .sg-col-source { width: 16%; }
+.sg-issues .sg-col-status { width: 17%; }
+.sg-issues .sg-col-updated { width: 12%; }
+.sg-issues .sg-col-rest { width: auto; }
+.sg-issues [data-empty-col] { display: none; }   /* a column with nothing in any row */
 .sg-issues .sg-one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* a status's word and one line under it, never more */
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
@@ -949,7 +949,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 /* One style in every panel: running text muted; what names something (a title, a label, a table's heading, a link, a
    code name, a status) in the text colour. A line's leading title is a step larger (below). */
-.sg-row-detail-body :is(strong, b, th, a, code, .sg-il-head, .sg-il-label, .pg-par-status, .sg-todo-who, .sg-uses-link) { color: var(--sg-text); }
+.sg-row-detail-body :is(strong, b, th, a, code, .sg-il-head, .sg-il-label, .pg-par-status, .sg-uses-link) { color: var(--sg-text); }
+.sg-row-detail-body .sg-todo-who { display: inline; margin: 0; font-weight: inherit; color: inherit; }   /* who acts is running text in a panel, as what to do is: one colour, one weight */
 /* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
    finding a paragraph of its own (its sign, a table's mark, left to the table). */
 .sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
@@ -971,15 +972,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
-.sg-row-detail-body .sg-cx-draft { margin-top: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius-s); overflow: clip; }   /* what a construction rule's suggestion changes, in the card that suggests it */
-.sg-row-detail-body .sg-cx-draft-head { margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-tint); color: var(--sg-text); font-size: var(--sg-s); font-weight: var(--sg-heading-weight); }
-.sg-row-detail-body :is(.sg-cx-draft, .sg-il-line) + .sg-decide-grid { margin-top: var(--sg-space-xl); }   /* the decision under the draft it is for */
-.sg-row-detail-body .sg-cx-group { padding: var(--sg-space-s) var(--sg-space-m); }   /* one change, said once, above the components that take it */
-.sg-row-detail-body .sg-cx-group + .sg-cx-group { border-top: var(--sg-line); }
-.sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: var(--sg-space-s) 0 0; padding: 0; list-style: none; }
-.sg-row-detail-body .sg-cx-ways { margin: 0; padding: 0; list-style: none; }   /* each way a family is built, and how many are built so */
-.sg-row-detail-body .sg-cx-ways li { display: flex; justify-content: space-between; gap: var(--sg-space-m); padding: var(--sg-space-s) var(--sg-space-m); }
-.sg-row-detail-body .sg-cx-ways li + li { border-top: var(--sg-line); }
+.sg-row-detail-body :is(.sg-cx-changes, .sg-il-line) + .sg-decide-grid { margin-top: var(--sg-space-xl); }   /* the decision under the draft it is for */
+.sg-row-detail-body .sg-cx-changes { margin-top: var(--sg-space-xl); }   /* what a suggestion changes, under it: a label, then each change beside what takes it, as labelled values (never a box drawn as a table) */
+.sg-row-detail-body .sg-cx-changes > .sg-il-label { margin-top: 0; }
+.sg-row-detail-body .sg-cx-kv { padding: 0; margin-top: var(--sg-space-s); gap: var(--sg-space-m); }
+.sg-row-detail-body .sg-cx-kv dt { font-size: inherit; }
+.sg-row-detail-body .sg-cx-say { display: block; }   /* each change on its own line, never run together */
+.sg-row-detail-body .sg-cx-kv dt .sg-cx-pills { flex-direction: column; align-items: flex-start; }   /* the components an entry is for, one under another */
+.sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: 0; padding: 0; list-style: none; }
 .sg-row-detail-body .sg-cx-figma { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }   /* a component opened in Figma, with Figma's mark */
 .sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
@@ -1033,12 +1033,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
    pg-par-table): its head sticks with the card's corners, its top line and the gap above it, as the Status page's. */
 .sg-log-release { display: inline-block; text-decoration: none; }   /* the release a change shipped in, under the day it was made: the page's own version tag, a link to the tag where the code's host gives one */
 .sg-log-release:hover .sg-status { background: color-mix(in srgb, var(--sg-muted) 24%, transparent); }
-.pg-par-table.sg-log td { vertical-align: top; }   /* every cell from its top: a row's date, its type, what it did and who line up */
+.pg-par-table.sg-log td { vertical-align: top; }   /* every cell from its top: a row's date, its source, what it did and who line up */
 .pg-par-table.sg-log tr.sg-log-more > td:first-child { padding-left: var(--sg-space-m); }   /* a row under a shared date starts with What and ends with Affects: their own columns' padding, not the table's first and last */
 .pg-par-table.sg-log tr.sg-log-more > td:last-child { padding-right: var(--sg-space-m); }
 .pg-par-table.sg-log td > .sg-log-stick { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--sg-log-head-h, 0px)); }   /* a date, type and person shared by rows of one moment stay in view under the head while those rows scroll */
-.pg-par-table.sg-log :is(th, td):nth-child(1) { width: 7.5em; min-width: 0; white-space: nowrap; }   /* its day, its time under it */
-.pg-par-table.sg-log :is(th, td):nth-child(2) { width: 9em; min-width: 0; white-space: nowrap; }   /* its type on one line: Intent layer, Sign-off */
+.sg-log-list { display: block; margin-top: var(--sg-space-xs); }   /* every name of what is not in the guide yet, shown when asked for (Show all) */
+.sg-log-list[hidden] { display: none; }   /* until then: the line's own display (.pg-par-val) never shows it */
+.pg-par-table.sg-log :is(th, td):nth-child(1) { width: 9.5em; min-width: 0; white-space: nowrap; }   /* its day and time on one line, its release under them */
+.pg-par-table.sg-log :is(th, td):nth-child(2) { width: 9em; min-width: 0; white-space: nowrap; }   /* its source on one line: Intent layer, Decisions */
 .pg-par-table.sg-log :is(th, td):nth-child(4) { width: 22%; word-break: normal; }   /* Affects */
 .pg-par-table.sg-log :is(th, td):nth-child(5) { width: 14%; }   /* Done by: the names alone, one a line */
 .pg-par-table.sg-log tr.sg-log-more > td:nth-child(n) { width: auto; white-space: normal; }   /* a row under a shared date: its columns are What and Affects */
