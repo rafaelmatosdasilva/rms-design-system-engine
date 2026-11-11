@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { codeGrammarOf, anatomyOf, shadowLayers, codeGrammarLines, codeGrammarFor } from '../lib/code-grammar.mjs';
+import { codeGrammarOf, anatomyOf, shadowLayers, codeGrammarLines, codeGrammarFor, cssInJs, namesTextStyle, resolveSass, sassVars } from '../lib/code-grammar.mjs';
 import { constructionView } from '../lib/construction-page.mjs';
 import { decidedRules } from '../lib/construction-grammar.mjs';
 
@@ -174,6 +174,110 @@ test('read from a project with no code capture, from its component files', async
 test('nothing to read is no grammar, never an error', () => {
   assert.deepEqual(codeGrammarOf({}).code.rules, []);
   assert.equal(anatomyOf({ text: '' }), null);
+});
+
+// A system that writes its text, spacing and values the way Sass, a mixin or JavaScript does is read as using the
+// system, not as writing by hand. Every reading names the real line it came from; nothing is guessed.
+const TYPO = { 's/strong': { size: 14, weight: 700 }, 'xs/regular': { size: 12, weight: 400 }, 'm/regular': { size: 16, weight: 400 } };
+
+test('a text style pulled in by a mixin is the system\'s text style, read under the rule it sits in', () => {
+  const text = `<template><div class="acme-note"><h3 class="title">t</h3><p class="body">b</p></div></template>
+<style lang="scss">
+.acme-note {
+  padding: var(--space-m);
+  .title { @include S-Strong; color: var(--text-color); }
+  .body { @extend %XS-Regular; }
+}
+</style>`;
+  const a = anatomyOf({ file: 'Note.vue', text, styles: [{ file: 'Note.vue', text }], root: 'acme-note', textStyles: TYPO });
+  const styled = a.text.filter((t) => t.style);
+  assert.deepEqual(styled.map((t) => [t.part, t.value, t.style]), [['title', 'S-Strong', 's/strong'], ['body', 'XS-Regular', 'xs/regular']]);
+  // Each names the line it was read from, so a person can check it in the file.
+  assert.ok(styled.every((t) => /^Note\.vue:\d+$/.test(t.at)));
+  assert.ok(styled.every((t) => t.token));
+  // A name that is no text style of the system is never paired with one.
+  const none = anatomyOf({ file: 'N.vue', text: text.replace('S-Strong', 'scrollbarStyles'), styles: [{ file: 'N.vue', text: text.replace('S-Strong', 'scrollbarStyles') }], root: 'acme-note', textStyles: TYPO });
+  assert.deepEqual(none.text.filter((t) => t.style).map((t) => t.value), ['XS-Regular']);
+});
+
+test('a value written with a Sass variable is read through it, and one that cannot be resolved is left out', () => {
+  const text = `<template><div class="acme-box"></div></template>
+<style lang="scss">
+$box-pad: var(--space-m);
+$ring: 0 1px 2px var(--shadow-color);
+.acme-box { padding: $box-pad; box-shadow: $ring; gap: $unknown-gap; }
+</style>`;
+  const a = anatomyOf({ file: 'Box.vue', text, styles: [{ file: 'Box.vue', text }], root: 'acme-box' });
+  const pad = a.spacing.find((x) => x.prop === 'padding');
+  assert.equal(pad.token, true, 'padding: $box-pad resolves to a token');
+  assert.equal(a.shadows[0].layers[0].token, true, 'the shadow resolves to a token');
+  // The gap names a variable this reading cannot resolve: it is marked unread and no rule counts it either way.
+  const gap = a.spacing.find((x) => x.prop === 'gap');
+  assert.equal(gap.read, false);
+  const g = codeGrammarOf({ components: [...system(), { name: 'acmeBox', file: 'src/components/boxes/Box.vue', text, styles: [{ file: 'Box.vue', text }], root: 'acme-box', api: api({}) }] });
+  const sp = g.code.rules.find((r) => r.id === 'code-spacing-token');
+  assert.ok(!sp.toFix.some((t) => t.component === 'acmeBox'), 'a value that could not be read is never reported as written by hand');
+});
+
+test('padding, gaps and margins are read against the system\'s spacing tokens', () => {
+  const byHand = { ...comp('acmeSlab', 'src/components/slabs/Slab.vue', 'acme-slab', { style: '.acme-slab { gap: 8px; margin: 4px; }' }) };
+  const g = codeGrammarOf({ components: [...system(), byHand] });
+  const sp = g.code.rules.find((r) => r.id === 'code-spacing-token');
+  assert.match(sp.says, /padding, gaps and margins/);
+  assert.deepEqual(sp.toFix.map((t) => t.component), ['acmeSlab']);
+  assert.match(sp.toFix[0].value, /gap: 8px|margin: 4px/);
+});
+
+test('a component that writes its styles in JavaScript is read as one', () => {
+  const text = `import styled from 'styled-components';
+const Card = styled.div\`
+  display: inline-flex;
+  gap: var(--space-s);
+  border-radius: var(--radius-m);
+  box-shadow: 0 1px 2px #0003;
+  &:hover { background: var(--surface-hover); }
+\`;
+export default function AcmeCard() { return <Card><span className="acme-card__label">x</span></Card>; }
+`;
+  const styles = [cssInJs('Card.jsx', text)];
+  assert.deepEqual(styles[0].roots, ['Card']);
+  const a = anatomyOf({ file: 'Card.jsx', text, styles, root: 'Card' });
+  assert.deepEqual(a.states.map((s) => [s.state, s.how]), [['hover', 'pseudo-class']]);
+  assert.equal(a.shadows[0].layers[0].token, false, 'the shadow is written by hand');
+  assert.deepEqual(a.radius.tokens, ['--radius-m']);
+  assert.equal(a.sizing, 'hug');
+  // An interpolation cannot be read, so it is blanked and the line numbers still point at the real file.
+  const withExpr = cssInJs('C.jsx', 'const B = styled.button`\n  color: ${(p) => p.c};\n  gap: var(--space-s);\n`;');
+  assert.ok(!/\$\{/.test(withExpr.text));
+});
+
+test('a component with no element of its own is said, never dropped quietly', () => {
+  const pass = { name: 'acmeCell', file: 'src/components/cells/Cell.vue', text: '<template><acme-button v-bind="x"/></template>', styles: [], root: null, api: api({}) };
+  const g = codeGrammarOf({ components: [...system(), pass] });
+  assert.ok(!g.code.anatomy.acmeCell);
+  assert.deepEqual(g.code.notRead.map((x) => x.component), ['acmeCell']);
+  assert.match(g.code.notRead[0].why, /renders another component|no class of its own/);
+});
+
+test('the code is scored the way the Figma library is, and keeps a trend of its own', async () => {
+  const { scoreOf, withHistory, scoreFile } = await import('../lib/library-score.mjs');
+  const rules = [
+    { side: 'code', area: 'naming', status: 'rule', follows: 10, of: 10 },
+    { side: 'code', area: 'variables', status: 'fix', follows: 8, of: 10 },
+    { side: 'code', area: 'documentation', status: 'decide', follows: 1, of: 10 },
+  ];
+  const s = scoreOf(rules);
+  // A rule still to decide counts for nothing, as on Figma's side.
+  assert.deepEqual(s.areas.map((a) => [a.area, a.score]), [['Tokens', 80], ['Naming', 100]]);
+  assert.equal(s.score, 90);
+  // Each side keeps its own history, so the code's trend is the code's.
+  assert.notEqual(scoreFile('/out', 'code'), scoreFile('/out', 'figma'));
+  const dir = tempDir('code-score-');
+  const file = scoreFile(dir, 'code');
+  withHistory(file, '2026-11-10T09:00:00.000Z', { score: 88, areas: [] });
+  const now = withHistory(file, '2026-11-11T09:00:00.000Z', s);
+  assert.equal(now.previous.score, 88);
+  assert.equal(now.score, 90);
 });
 
 test('a class name goes into a regular expression escaped whole, never its hyphens alone', () => {
