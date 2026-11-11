@@ -8,7 +8,11 @@
 (function () {
   var SG = window.SG; if (!SG || !SG.themeBar) return;
   var DATA_EL = document.getElementById('sg-theme-editor-data'), EDITOR = (function () { try { return JSON.parse((DATA_EL && DATA_EL.textContent) || '{}') || {}; } catch (e) { return {}; } })();
-  var esc = SG.esc, T = SG.tokens || {}, KEY = 'sg-theme-draft';
+  // What this browser keeps is kept per system: every style guide opened from disk shares one storage, so a theme made
+  // on one guide never shows on another's Theme list. (What the keys held before, for every system at once, is left as
+  // it was and read by none.)
+  var PER = ':' + ((EDITOR.system || 'system'));
+  var esc = SG.esc, T = SG.tokens || {}, KEY = 'sg-theme-draft' + PER;
   // Every variable of the system, each with its CSS variable: its own, else its Figma name as the system writes it
   // (a/b/c → --a-b-c; a switch has none in the page's data). A copy: the page's own data is left as it is.
   var VARS = (SG.allVars || []).map(function (v) { return Object.assign({}, v, { var: v.var || '--' + String(v.figma).split('/').join('-').replace(/\s+/g, '') }); });
@@ -1121,7 +1125,7 @@
 
   // Saved themes: kept in this browser, each listed in the guide's Theme choice after the file's own; chosen, it is the
   // theme it is based on with its changes over it, everywhere the guide draws the system.
-  var SAVED_KEY = 'sg-ts-themes', ACTIVE_KEY = 'sg-ts-active';
+  var SAVED_KEY = 'sg-ts-themes' + PER, ACTIVE_KEY = 'sg-ts-active' + PER;
   // The link names the theme in use beside its base (?brand=retail&theme=ocean), so it opens the same page.
   var slugOf = function (t) { return String(t.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || t.id; };
   var themeParam = function (t) { try { var u = new URL(location.href); if (t) u.searchParams.set('theme', slugOf(t)); else u.searchParams.delete('theme'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) { /* a page opened as a file */ } };
@@ -1129,7 +1133,7 @@
   // Themes are kept as files in a themes folder of their own, apart from the engine and from the system's project: one
   // file each in its <system>/ subfolder, which the build puts into the page. This browser keeps a working copy: a file newer than it
   // replaces it, and a theme deleted here is not brought back by its file.
-  var GONE_KEY = 'sg-ts-deleted', FILES = (EDITOR.files || []).filter(function (t) { return t && t.id && t.name; });
+  var GONE_KEY = 'sg-ts-deleted' + PER, FILES = (EDITOR.files || []).filter(function (t) { return t && t.id && t.name; });
   var SYS = EDITOR.system || 'system', HOME = EDITOR.folder || '';   // the themes folder, as the setup writes it (styleguide.themes)
   var gone = function () { try { return JSON.parse(localStorage.getItem(GONE_KEY) || '[]'); } catch (e) { return []; } };
   (function () {
