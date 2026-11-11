@@ -98,8 +98,12 @@
     var mk = function (key, kind, written, st, todo) { return Object.assign({ key: c.name + '\u0000doc:' + key, kind: kind, written: written, st: st, todo: st === 'done' ? '' : esc(todo), who: st === 'done' ? '' : WHO.person }, base); };
     var rows = [];
     var ex = !!(a.pieces || {}).example;
-    if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
-      'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
+    // An example drafted for it (contract.authored.json, **Draft:**, as the engine drafts the products' own first use) is
+    // written but not the team's word: to review until a person approves it.
+    var exDraft = ex && !!a.exampleDraft;
+    if (c.agentRating) rows.push(mk('example', 'Example', ex ? (exDraft ? '<p>An example of it in use is drafted, to approve.</p>' : '<p>An example of it in use is written.</p>') : '<p class="pg-missing">No example yet.</p>', ex ? (exDraft ? 'check' : 'done') : 'todo',
+      exDraft ? 'Read the drafted example in contract.authored.json, under its guidance: keep it by taking off its Draft: mark, or write your own.' : 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
+    if (exDraft) rows[rows.length - 1].src = ['Its contract (contract.authored.json)'];
     // Still to write: a ready example from its own import and props, to start from.
     if (rows.length && !ex) { var exHow = 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE(); rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), exHow); rows[rows.length - 1].notes = docNotes('Example', c); rows[rows.length - 1].how = exHow; }
     // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
