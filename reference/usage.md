@@ -1351,7 +1351,9 @@ changed. With `FIGMA_TOKEN` set (the environment or `.env`), the engine reads th
 - **`--figma-blame <component> --property <name> | --layer <name>`.** The version that brought in a property or a
   layer, with its day and author, found by a binary search over the versions (about log2 of them are read).
 
-A read through the session's Figma tool has no token: it names nobody, never a guess. Components are named as the
+The token needs the scopes File content (read) and File versions (read); with File comments (read) too, each read
+also keeps the comments left in the file (`figma-comments.snapshot.json`, beside the variables snapshot), and History
+shows each thread pinned on a component. A read through the session's Figma tool has no token: it names nobody, never a guess. Components are named as the
 props snapshot names them, which holds their node ids.
 
 Each component compared reads it twice, and the blame about log2 of the versions: calls Figma counts against the
