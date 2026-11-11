@@ -153,8 +153,8 @@
         ['Mode', function (x) { return esc(x.mode || ''); }], ['Measured', function (x) { return x.measured ? esc(x.measured) + (x.needs ? '<span class="pg-par-val">needs ' + esc(x.needs) + '</span>' : '') : ''; }],
         ['In the code', function (x) { return x.where ? '<code>' + esc(x.where) + '</code>' : ''; }]];
       var used = COLS.filter(function (cc) { return hits.some(function (x) { return cc[1](x); }); });
-      var tbl = '<div class="pg-par-scroll"><table class="pg-par-table sg-affects"><thead><tr>' + used.map(function (cc) { return '<th>' + esc(cc[0]) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-        hits.map(function (x) { return '<tr>' + used.map(function (cc) { return '<td>' + cc[1](x) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+      // A list: the panel opens from a row of an issue table.
+      var tbl = kvList(hits.map(function (x) { return used.map(function (cc) { return [cc[0], cc[1](x)]; }); }), 'sg-affects');
       body = '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects</div>' + tbl + '</div>' + body;
     }
     var det = m.querySelector('.sg-row-detail');

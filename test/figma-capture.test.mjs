@@ -320,3 +320,16 @@ test('figma-cli: a long read is given its own timeout and room for a large answe
   assert.deepEqual(opts.map((o) => o.timeout), [120000, 600000]);
   assert.ok(opts.every((o) => o.maxBuffer >= 1e8), 'an examples or brands answer is larger than the default buffer');
 });
+
+// Safe Mode's plugin can answer a call it dropped with a line of its own and exit 0, most often right after figma-cli's
+// snapshot. That answer is asked once more after a pause; two in a row end the capture with what figma-cli printed.
+test('a dropped answer through figma-cli is asked once more; two in a row say what figma-cli printed', async () => {
+  const f = largeVarsFile(), root = project(), dir = join(root, 'cap');
+  const real = async (code) => JSON.stringify(await new AsyncFunction('figma', code)(asLargeFigma(f)));
+  let dropped = 0;
+  const once = async (code) => (dropped++ === 0 ? 'Plugin not ready, try again\n' : real(code));
+  const r = await captureWithFigmaCli(root, cfg, { run: once, dir, pause: async () => {} });
+  assert.equal(r.ok, true, 'the second asking read the checksums, and the capture went on');
+  await assert.rejects(captureWithFigmaCli(project(), cfg, { run: async () => 'Plugin not ready, try again\n', dir: join(project(), 'cap'), pause: async () => {} }),
+    /figma-cli did not return the checksums \(is Figma Desktop open on the design system's file\?\), twice: Plugin not ready, try again/);
+});

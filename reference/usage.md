@@ -163,6 +163,7 @@ rms-design-system-engine --figma-a11y                    # write the read-only s
 rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's hooks (done by --init): pre-commit and pre-push check the change; post-commit, post-merge and post-rewrite build the local style guide again, quickly, where one was built (--git-rebuild); --remove-hooks takes them out
+rms-design-system-engine --install-hooks --tool cursor,codex  # the same guard in Cursor's and Codex's own hooks (.cursor/hooks.json, .codex/hooks.json); a project with a .cursor or .codex folder gets them with every --install-hooks
 rms-design-system-engine --git-check commit|push         # what git's hooks run: only for what the change uses; commit warns and exits 0, push exits 1 while a finding is left
 rms-design-system-engine --git-rebuild commit|merge|rewrite  # what git's post-commit, post-merge and post-rewrite run: the local style guide built again quickly, in a process of its own, where a page was built; never on CI or with "hooks": false; always exits 0
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
@@ -1353,7 +1354,11 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. A rule that
+reads what the last capture does not keep (each layer's bindings, its opacity and border, a nested component's exposure,
+the designer's annotations; the skeleton snapshot's `_keeps`, `capture-waits.mjs`) finds nothing until Figma is read
+again: the summary's last line and the Rules page say which checks wait and that the request is "refresh the Figma
+data", so a capture that predates a check never reads as a library with nothing to fix.
 
 How each component is built inside comes from the skeleton the Figma capture reads (`figma-skeleton.snapshot.json`):
 every text layer with a text style, every shadow with an effect style, no layer hidden without a property to show it,
