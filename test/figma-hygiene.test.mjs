@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine } from '../lib/figma-hygiene.mjs';
+import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine, withBlocks } from '../lib/figma-hygiene.mjs';
 import { byNodeId } from '../lib/figma-fetch.mjs';
 import { burndown } from '../lib/run-diff.mjs';
 
@@ -47,6 +47,36 @@ test('REST: a value with no variable or style is raw; styles, bound variables, a
   assert.equal(h.description, false);
   assert.equal('detached' in h, false);           // REST has no detached flag: not captured, never "none"
   assert.equal(hygieneOf(restSet, 'A filter chip.').description, true);
+});
+
+test('a boolean operation paints with its own fill and stroke: the shapes it merges are never counted', () => {
+  // A check mark built as a Union of two strokes, as a checkbox draws it: Figma paints the Union, never the rectangles.
+  const box = { type: 'COMPONENT', name: 'state=selected', children: [
+    { type: 'BOOLEAN_OPERATION', name: 'Union', strokeWeight: 2, strokes: [solid(1, 1, 1)], fills: [solid(1, 1, 1)], children: [
+      { type: 'RECTANGLE', name: 'Tick', strokeWeight: 2, strokes: [solid(0.2, 0.2, 0.2)], cornerRadius: 1, opacity: 0.5 },
+      { type: 'VECTOR', name: 'Path 5', strokeWeight: 2, strokes: [solid(0.2, 0.2, 0.2)] },
+    ] },
+  ] };
+  const h = hygieneOf(box, '');
+  // The Union's own border is a value it draws; its fill is artwork, as a vector's is. Nothing from inside it.
+  assert.deepEqual(h.raw, [{ at: 'state=selected/Union', field: 'border', value: 2 }]);
+});
+
+test('only what is drawn counts: a layer hidden with no property, a mask\'s paint and padding outside auto layout never do', () => {
+  const comp = { type: 'COMPONENT', name: 'state=default', layoutMode: 'VERTICAL', children: [
+    // Hidden, and nothing can show it: never seen.
+    { type: 'RECTANGLE', name: 'Old border', visible: false, strokeWeight: 2, strokes: [solid(0.5, 0.5, 0.5)] },
+    // Hidden, but a boolean property shows it: seen whenever it is on.
+    { type: 'RECTANGLE', name: 'Badge', visible: false, componentPropertyReferences: { visible: 'showBadge#1:0' }, fills: [solid(1, 0, 0)] },
+    // A mask clips what is above it; its own colour is never painted.
+    { type: 'RECTANGLE', name: 'Mask', isMask: true, fills: [solid(1, 0, 0)], cornerRadius: 8 },
+    // Padding on a frame laid out by hand does nothing.
+    { type: 'FRAME', name: 'Loose', layoutMode: 'NONE', paddingTop: 8, paddingLeft: 8, children: [] },
+  ] };
+  assert.deepEqual(hygieneOf(comp, '').raw, [
+    { at: 'state=default/Badge', field: 'fill', value: '#ff0000' },
+    { at: 'state=default/Mask', field: 'radius', value: 8 },   // a mask's corners shape what it clips, so they are seen
+  ]);
 });
 
 test('Plugin API: style ids count as a style, a detached frame is listed', () => {
@@ -215,4 +245,14 @@ test('is the Figma file reliable enough to compare, from the share of values bou
   // Records from before the counts, and a scoped run's other components, are not counted.
   assert.equal(reliability({ old: { hygiene: { raw: [], rawCount: 3, noAutoLayout: [], description: true } } }), null);
   assert.equal(reliability({ chip: rec(10, 6, 2, 0), card: rec(10, 0, 2, 0) }, { only: ['card'] }).level, 'reliable');
+});
+
+test('a building block\'s file check joins the lists, and only them: its values never move the score or the trust', () => {
+  const values = { chip: { hygiene: { raw: [], rawCount: 0, values: 4, noAutoLayout: [], variants: 1, description: true } } };
+  const blockHygiene = { raw: [{ at: 'Default/Fill', field: 'fill', value: '#ff0000' }], rawCount: 1, values: 1, noAutoLayout: [], variants: 1, description: false };
+  const merged = withBlocks(values, { chip: {}, _blocks: { '.rowShade': { trees: [], hygiene: blockHygiene }, '.unread': { trees: [] } } });
+  assert.deepEqual(Object.keys(merged), ['chip', '.rowShade'], 'a block with no file check adds nothing');
+  assert.ok(hygieneFindings(merged).some((f) => f.component === '.rowShade'), 'its typed value is listed');
+  assert.equal(withBlocks(values, null), values, 'no skeleton, no change');
+  assert.equal(withBlocks(values, { chip: {} }), values, 'no blocks, no change');
 });

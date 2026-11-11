@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf } from '../lib/construction-grammar.mjs';
+import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf, rowsByHand } from '../lib/construction-grammar.mjs';
 
 // Four components that agree, and one (Promo Banner) that breaks most of it.
 const props = {
@@ -38,8 +38,12 @@ test('names: the case each is written in, and Figma\'s own names for a layer nob
   assert.ok(!caseFits('Has Image', 'camelCase'));
   assert.ok(isAutoNamed('Frame 235'));
   assert.ok(isAutoNamed('Rectangle 3'));
-  assert.ok(!isAutoNamed('Frame'));
+  assert.ok(isAutoNamed('Frame'), 'Figma names a frame "Frame" as readily as "Frame 2"');
   assert.ok(!isAutoNamed('Body'));
+  assert.ok(isAutoNamed('Union'), 'Figma names a boolean operation after the operation, with no number');
+  assert.ok(isAutoNamed('Subtract 2'));
+  assert.ok(isAutoNamed('Group') && isAutoNamed('Vector') && isAutoNamed('Arrow'), 'with no number, still Figma\'s name');
+  assert.ok(!isAutoNamed('Text') && isAutoNamed('Text 3'), 'a text layer is named after its words: "Text" alone is somebody\'s choice');
   assert.deepEqual(wordsOf('showBadgeDot'), ['show', 'badge', 'dot']);
 });
 
@@ -67,6 +71,27 @@ test('layers, auto layout and variables: named layers, auto layout everywhere, t
   const colour = rule(g, 'colour-variables');
   assert.match(colour.says, /shared variables/);
   assert.deepEqual(colour.toFix, [{ component: 'Promo Banner', value: 'advanced/Promo Banner/background/color' }]);
+});
+
+test('layers-named reads every layer of every variant in the skeleton, never what is inside an instance', () => {
+  // Frame 1 binds nothing and has no gap or toggle of its own: only the skeleton has it. Its own icon's insides are the
+  // icon's to name, and the variant itself is named by its options.
+  const tree = (kids) => ({ t: 'COMPONENT', n: 'state=default', c: kids });
+  const skeleton = {
+    tabNav: { trees: [tree([{ t: 'FRAME', n: 'Content', c: [{ t: 'FRAME', n: 'Frame 1', c: [{ t: 'TEXT', n: 'Label' }] }, { t: 'INSTANCE', n: 'Icon', c: [{ t: 'VECTOR', n: 'Vector 7' }] }] }])] },
+    checkTick: { trees: [tree([{ t: 'FRAME', n: 'Box', c: [{ t: 'BOOLEAN_OPERATION', n: 'Union', c: [{ t: 'RECTANGLE', n: 'Rectangle 4' }] }] }])] },
+  };
+  const g = grammarOf({ props: { tabNav: { properties: {} }, checkTick: { properties: {} }, ...props }, structure, values, skeleton });
+  const named = rule(g, 'layers-named');
+  assert.deepEqual(named.toFix.filter((e) => e.component !== 'Promo Banner'), [{ component: 'checkTick', value: 'Union, Rectangle 4' }, { component: 'tabNav', value: 'Frame 1' }]);
+});
+
+test('layers-named reads the building blocks too: a component the library does not publish is still built by someone', () => {
+  const tree = (kids) => ({ t: 'COMPONENT', n: 'Default', c: kids });
+  const skeleton = { _blocks: { '.rowShade': { trees: [tree([{ t: 'FRAME', n: 'Frame 3', c: [{ t: 'TEXT', n: 'Label' }] }])] }, '_base': { trees: [tree([{ t: 'FRAME', n: 'Body' }])] } } };
+  const g = grammarOf({ props, structure, values, skeleton });
+  const named = rule(g, 'layers-named');
+  assert.deepEqual(named.toFix.filter((e) => e.component.startsWith('.') || e.component.startsWith('_')), [{ component: '.rowShade', value: 'Frame 3' }], 'a block named well is not listed');
 });
 
 test('fewer follow it: the team decides; a yes makes it one to fix, a no drops it', () => {
@@ -257,4 +282,31 @@ test('bindings against the token layers: no base token, one radius a family, a s
   assert.deepEqual(rule('own-tokens-used').toFix, [{ where: 'button/unused', value: 'nothing binds it or points at it' }]);
   // Without the tokens, none of these four: the first three binding rules stand alone.
   assert.equal(grammarOf({ props: {}, skeleton }).figma.rules.some((r) => ['no-base-tokens', 'family-radius', 'shared-tokens-shared', 'own-tokens-used'].includes(r.id)), false);
+});
+
+test('a row of content inside a variant placed by hand is to lay out with auto layout; a drawing, an overlay and an instance\'s insides are not', () => {
+  const T = (n, extra = {}) => ({ t: 'TEXT', n, ...extra }), I = (n) => ({ t: 'INSTANCE', n, c: [{ t: 'FRAME', n: 'inside', c: [T('a'), T('b')] }] });
+  const tree = { t: 'COMPONENT', n: 'state=open', layout: { dir: 'HORIZONTAL' }, c: [{ t: 'FRAME', n: 'Content', layout: { dir: 'VERTICAL' }, c: [
+    { t: 'GROUP', n: 'step2', c: [I('Divider'), I('stepLabel')] },                                   // 0.0: a divider and its label side by side
+    { t: 'FRAME', n: 'Stack', c: [T('Title'), T('Meta')] },                                         // 0.1: one under the other
+    { t: 'FRAME', n: 'Chart', c: [{ t: 'VECTOR', n: 'slice' }, T('Share')] },                        // 0.2: artwork in it
+    { t: 'FRAME', n: 'Pins', c: [I('pin'), I('pin')] },                                             // 0.3: scattered
+    { t: 'FRAME', n: 'Overlay', c: [I('photo'), T('Caption')] },                                    // 0.4: one on top of the other
+    { t: 'FRAME', n: 'Hidden row', hidden: true, c: [T('x'), T('y')] },
+    I('Nested'),
+  ] }] };
+  const at = (x, y, w, h) => ({ at: [x, y, w, h] });
+  const looks = { 'state=open': {
+    '0.0.0': at(0, 0, 16, 16), '0.0.1': at(20, 0, 32, 16),
+    '0.1.0': at(0, 0, 100, 20), '0.1.1': at(0, 24, 100, 16),
+    '0.2.0': at(0, 0, 50, 50), '0.2.1': at(60, 0, 40, 16),
+    '0.3.0': at(0, 0, 10, 10), '0.3.1': at(80, 60, 10, 10),
+    '0.4.0': at(0, 0, 200, 100), '0.4.1': at(10, 80, 100, 16),
+    '0.5.0': at(0, 0, 10, 10), '0.5.1': at(20, 0, 10, 10),
+  } };
+  const sk = { trees: [tree], variants: [['state=open', 0], ['state=closed', 0]], looks: { ...looks, 'state=closed': looks['state=open'] } };
+  assert.deepEqual(rowsByHand(sk), ['Content/step2', 'Content/Stack'], 'each row once, whichever variants have it');
+  assert.deepEqual(rowsByHand({ trees: [tree], variants: [['state=open', 0]] }), [], 'no places recorded (an older capture): nothing said');
+  const g = grammarOf({ props, structure: { ...structure, crumbTrail: { layout: 'HORIZONTAL' } }, values, skeleton: { crumbTrail: sk } });
+  assert.deepEqual(rule(g, 'auto-layout').toFix.find((e) => e.component === 'crumbTrail'), { component: 'crumbTrail', value: 'Content/step2, Content/Stack' });
 });

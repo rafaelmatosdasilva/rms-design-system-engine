@@ -237,5 +237,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-10-a-preview-to-review-a-code` | The 24 guide tasks on Haiku (engine ecdb31c) | "A preview to review a code prototype in" |
 | `2026-11-10-a-preview-to-review-a-code-2` | The 24 guide tasks on Haiku (engine 253ac2c) | "A preview to review a code prototype in" |
 | `2026-11-10-a-preview-to-review-a-code-3` | The 24 guide tasks on Haiku (engine c53102b) | "A preview to review a code prototype in" |
+| `2026-11-11-the-figma-file-read-as` | The 24 guide tasks on Haiku (engine fe7e963) | "The Figma file read as Figma draws it" |
+| `2026-11-11-the-file-check-counts-only` | The 24 guide tasks on Haiku (engine 40b1d33) | "Reading order, and only what Figma draws" |
+| `2026-11-11-building-blocks-checked-controls-known` | The 24 guide tasks on Haiku (engine 84cc359) | "Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

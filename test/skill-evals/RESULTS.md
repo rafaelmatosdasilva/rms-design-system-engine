@@ -2,6 +2,59 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge (continuous evaluation)
+
+What changed since the entry below (engine 40b1d33): Every refusal names the permission it lacks (#421); Reading order on each component, and the file check counts only what Figma draws (#422); Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `f62be0903f7e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 33217c48` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9222b0bd` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md ebee5c9c` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 56d11749` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 84cc359 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.057 |
+| Input a run | 98k | 96k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 98k, in 3.4 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-building-blocks-checked-controls-known`.
+
+## 2026-11: Reading order, and only what Figma draws (continuous evaluation)
+
+What changed since the entry below (engine fe7e963): Q60 reading order in Figma and code; the file check skips hidden layers no property shows, a mask's paint and padding outside auto layout. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f9d134522e4c` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 33217c48` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 58e34847` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md bd2e771f` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 56d11749` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 40b1d33 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.058 |
+| Input a run | 99k | 98k |
+| Turns a run | 3.5 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 99k, in 3.4 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-the-file-check-counts-only`.
+
+## 2026-11: The Figma file read as Figma draws it (continuous evaluation)
+
+What changed since the entry below (engine 53c56b9): E85 E88 E89 E91: layer names from the skeleton, a boolean operation's shapes left out, a backdrop inside the layer before, type-first controls. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `06bf7a264ecc` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 2b3decb5` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md b788efcb` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md e4317c9e` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md b7b3c8c4` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine fe7e963 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.058 |
+| Input a run | 101k | 99k |
+| Turns a run | 3.5 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 101k, in 3.5 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-the-figma-file-read-as`.
 ## 2026-11: A difference names its part (continuous evaluation)
 
 What changed since the entry below (engine 69b68f8): Each paired part measured on its own element and compared with the Figma frame of its name; a difference names the part and its line. The guide changed in `reference/usage.md`.

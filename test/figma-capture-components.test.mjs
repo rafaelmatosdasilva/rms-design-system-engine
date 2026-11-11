@@ -249,7 +249,7 @@ test('components: no capture script the engine writes switches Figma\'s page; ea
   // Run in a file that throws on a page switch: nothing is switched, every page read is loaded.
   const f = makeFile(2), run = runIn(f);
   const a = await run(componentsScript('sums'));
-  assert.equal(a.sums.length, 4);
+  assert.equal(a.sums.length, 6, "the sets, the card and the two building blocks");
   assert.deepEqual(f.loaded, ['0:1']);
 });
 
@@ -264,7 +264,7 @@ test('components: every answer fits the Figma tool, each component is checked ag
   for (const s of sizes) assert.ok(s <= ANSWER, `${s} bytes fit one answer`);
   const c = readComponents(dir);
   assert.equal(c.complete, true);
-  assert.equal(c.entries.length, 33, 'the sets and the card; the private ones left out, a status mark in front or not');
+  assert.equal(c.entries.length, 35, 'the sets, the card and the two building blocks, read so their construction is checked, a status mark in front or not');
   assert.deepEqual(c.todo, []);
   const slices = readdirSync(dir).map((x) => json(dir, x)).filter((a) => a.slice != null);
   assert.ok(slices.length > 1 && slices.every((a) => a.slices === slices.length && Object.keys(a.sums)[0] === '700:0'), `the chart is read in ${slices.length} slices`);
@@ -302,8 +302,8 @@ test('components: the import writes the five files, keeps what the capture does 
   save(dir, sums.save, await runIn(f)(sums.script));
   let r = await importComponents(root, cfg, { dir });
   assert.equal(r.ok, false);
-  assert.equal(r.todo.length, 32);
-  assert.match(importLines(r, 'cap').join('\n'), new RegExp(`^32 of 32 components still to read\\.\nNEXT: run rms-design-system-engine --capture-script components next, run the script it writes unchanged with the Figma tool \\(use_figma\\), save its answer as it came to cap/components-${r.pass}-0\\.json`));
+  assert.equal(r.todo.length, 34);
+  assert.match(importLines(r, 'cap').join('\n'), new RegExp(`^34 of 34 components still to read\\.\nNEXT: run rms-design-system-engine --capture-script components next, run the script it writes unchanged with the Figma tool \\(use_figma\\), save its answer as it came to cap/components-${r.pass}-0\\.json`));
   await readAll(dir, runIn(f));
   r = await importComponents(root, cfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
@@ -321,7 +321,11 @@ test('components: the import writes the five files, keeps what the capture does 
   assert.equal(b1.page, 'Components');
   assert.deepEqual(sk.card.trees[0].c.map((x) => x.t), ['FRAME', 'SLOT', 'GROUP']);
   const said = importLines(r, 'cap').join('\n');
-  assert.match(said, /^✓ Figma's components read in \d+ checked chunks?: 32 components with 89 variants, the props of 32, the raw values of 32, the states of 32 and how 32 are built → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json, component-values\.snapshot\.json, component-state-tokens\.json, component-state-bindings\.json, src\/figma-skeleton\.snapshot\.json\nTaken out, no longer in Figma: removedOne\.\n⚠️ {2}Not read in Figma, kept as it was: button3 \(structure: the layer tree could not be read\)\.$/);
+  assert.match(said, /^✓ Figma's components read in \d+ checked chunks?: 32 components with 89 variants, the props of 32, the raw values of 32, the states of 32 and how 32 are built → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json, component-values\.snapshot\.json, component-state-tokens\.json, component-state-bindings\.json, src\/figma-skeleton\.snapshot\.json\nTaken out, no longer in Figma: removedOne\.\n⚠️ {2}Not read in Figma, kept as it was: button3 \(structure: the layer tree could not be read\)\.\nBuilding blocks, not published in Figma's library \(a name that starts with \. or _\): no page and no code of their own, but how they are built is checked: _private, 🟡 \.tableRow \(deprecated\)\.$/);
+  // A building block is kept apart: its layers and its file check under _blocks, in none of the system's own files.
+  assert.deepEqual(Object.keys(sk._blocks).sort(), ['_private', '🟡 .tableRow (deprecated)']);
+  assert.ok(sk._blocks._private.hygiene && Array.isArray(sk._blocks._private.trees), 'its layer tree and its file check');
+  assert.ok(!('_private' in sk) && !('_private' in json(root, 'src/figma-structure.snapshot.json').components), 'no component of the system');
   for (const p of files) { const s = json(root, p); assert.ok(s._built?.at && s._updated, `${p} stamped`); }
   const s = json(root, 'src/figma-structure.snapshot.json');
   const b = s.components.button1;
@@ -438,8 +442,8 @@ test('components: kept by component id, so a component added mid-capture shifts 
   // The checksums in pages of one component each (as when Figma is slow): every page continues where the last stopped.
   for (let first = true; ; first = false) { const call = componentsCall(dir, 'sums', { cfg, fresh: first, time: 0 }), a = await runIn(f)(call.script); save(dir, call.save, a); if (a.after == null) break; }
   const c = readComponents(dir);
-  assert.equal(c.pages, 32);
-  assert.equal(c.entries.length, 32);
+  assert.equal(c.pages, 34);
+  assert.equal(c.entries.length, 34);
   // A designer adds a component after the checksums: the reads still read the ones the checksums name, and the import
   // says so.
   f.page.children.push(buttonSet(99)); f.page.children.at(-1).parent = f.page;
@@ -486,7 +490,7 @@ test('components: the commands write each script and import the answers saved', 
   save(out, 'components-sums.json', await run(readFileSync(join(out, 'components-sums.js'), 'utf8')));
   r = cli('--capture-import');
   assert.equal(r.status, 1);
-  assert.match(r.stdout, /6 of 6 components still to read\./);
+  assert.match(r.stdout, /8 of 8 components still to read\./);
   const pass = readComponents(out).pass;
   assert.match(r.stdout, new RegExp(`--capture-script components next, .*save its answer as it came to \\.design-system-engine-out/figma-capture/components-${pass}-0\\.json`));
   r = cli('--capture-script', 'components', 'next');

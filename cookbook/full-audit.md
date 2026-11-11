@@ -416,6 +416,10 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     }
     const detachedInfo = get(n, 'detachedInfo');
     if (detachedInfo !== undefined) { detached = detached || []; if (detachedInfo) detached.push(at); }
+    // A layer hidden with no property to show it is never drawn: none of its values is one anyone sees. One a boolean
+    // property shows is drawn whenever it is on, so it counts. A mask's own paint never shows either.
+    if (get(n, 'visible') === false && !(get(n, 'componentPropertyReferences') || {}).visible) return;
+    const mask = get(n, 'isMask') === true;
     const fillScope = n.type === 'TEXT' ? 'TEXT_FILL' : /^(FRAME|COMPONENT|SECTION)$/.test(n.type) ? 'FRAME_FILL' : 'SHAPE_FILL';
     const bvs = get(n, 'boundVariables') || {};
     for (const [k, v] of Object.entries(bvs)) {
@@ -441,13 +445,13 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     }
     // A border's thickness and a layer's opacity, each a value a variable can hold.
     const weight = get(n, 'strokeWeight');
-    if (paintsOf(n, 'strokes').some((p) => p && p.visible !== false) && num(weight)) {
+    if (!mask && paintsOf(n, 'strokes').some((p) => p && p.visible !== false) && num(weight)) {
       out.values++;
       if (!bound(n, 'strokeWeight') && !['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].some((k) => bound(n, k))) raw(at, 'border', weight);
     }
     const opacity = get(n, 'opacity');
     if (typeof opacity === 'number' && opacity < 1) { out.values++; if (!bound(n, 'opacity')) raw(at, 'opacity', Math.round(opacity * 100) / 100); }
-    if (!artwork.test(n.type)) {
+    if (!artwork.test(n.type) && !mask) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
         paintsOf(n, list).forEach((p, i) => {
           if (!p || p.type !== 'SOLID' || p.visible === false || !p.color) return;
@@ -463,11 +467,12 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     const radius = num(cornerRadius) ? cornerRadius : Math.max(0, ...radii.filter(num));
     if (radius > 0) out.values++;
     if (radius > 0 && !bound(n, 'cornerRadius') && !corners.some((k) => bound(n, k))) raw(at, 'radius', radius);
-    if (sides.some(([k]) => num(get(n, k)))) out.values++;
-    const loose = sides.filter(([k]) => num(get(n, k)) && !bound(n, k)).map(([k, w]) => `${w} ${get(n, k)}`);
-    if (loose.length) raw(at, 'padding', loose.join(', '));
+    // Padding and a gap only do something in auto layout: on a frame laid out by hand they are never drawn.
     const layoutMode = get(n, 'layoutMode'), gap = get(n, 'itemSpacing');
     const auto = layoutMode && layoutMode !== 'NONE';
+    if (auto && sides.some(([k]) => num(get(n, k)))) out.values++;
+    const loose = auto ? sides.filter(([k]) => num(get(n, k)) && !bound(n, k)).map(([k, w]) => `${w} ${get(n, k)}`) : [];
+    if (loose.length) raw(at, 'padding', loose.join(', '));
     if (auto && num(gap) && kids(n).length > 1) out.values++;
     if (auto && num(gap) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', gap);
     if (n.type === 'TEXT') out.values++;
@@ -480,7 +485,8 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       const loose = [['lineHeight', 'line height'], ['letterSpacing', 'letter spacing'], ['fontFamily', 'font family'], ['fontWeight', 'font weight']].filter(([k]) => !bound(n, k)).map(([, w]) => w);
       if (loose.length) raw(at, 'text', loose.join(', '));
     }
-    for (const c of kids(n)) walk(c, `${at}/${c.name}`);
+    // A boolean operation paints with its own fill and stroke: the shapes it merges are never drawn as themselves.
+    if (n.type !== 'BOOLEAN_OPERATION') for (const c of kids(n)) walk(c, `${at}/${c.name}`);
   };
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {

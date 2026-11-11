@@ -694,7 +694,12 @@ async function deepFacts(node, set) {
 - `variantFillOpacity`: the same for each variant, when any is below 1, compared with the state the code
   capture produced for that variant.
 - `drawnOn`: each text and icon colour token of the component's own layers, with the fill token of the
-  layer right under it (`surface` when nothing in the component paints under it).
+  layer painted right under it, looked for inside the layers before it as well as on them (a button's fill
+  on the `Background` inside its state instance), and `surface` when nothing in the component paints under it.
+- `edges`: in each variant not disabled, each layer that can show where a control is: neither text, artwork nor
+  an icon, 12 by 12 or more, with a fill or a border, nested parts included. Each with its fill and border colours,
+  what is painted under it (`surface` when nothing is) and its opacity below 1. The design check holds a field's,
+  a checkbox's or a switch's best edge to 3:1 (WCAG 1.4.11).
 - `fills`: every fill token the component's own layers paint. The token contrast check pairs a text
   with the background Figma draws it on, and leaves out a pair the token names suggest when Figma paints
   that background in the same component but never under the text (a checkbox's selected text sits
@@ -719,7 +724,8 @@ async function paintFacts(set) {
     return l ? r2((solid(l).opacity ?? 1) * l.opacity) : null;
   };
   const out = {};
-  const disabled = (name) => /(^|,\s*)(state=disabled|disabled=true)(\s*,|$)/i.test(name);
+  // Shown disabled: a state whose value ends in "disabled", or disabled=true. WCAG asks nothing of it.
+  const disabled = (name) => /(^|,\s*)(state=[a-z]*disabled|disabled=true)(\s*,|$)/i.test(name);
   const op = fillOpacity(restingVariant(set));
   if (op != null && op < 1) out.fillOpacity = op;
   const perVariant = {};
@@ -729,6 +735,24 @@ async function paintFacts(set) {
   // ('surface' when nothing in the component paints under it, 'unbound' for a colour with no variable).
   const box = (n) => n.absoluteBoundingBox;
   const covers = (a, b) => { const A = box(a), B = box(b); if (!A || !B) return false; const x = B.x + B.width / 2, y = B.y + B.height / 2; return x >= A.x && x <= A.x + A.width && y >= A.y && y <= A.y + A.height; };
+  // What is painted under a layer n of variant v: at each level up, the layers before it, each searched from its topmost
+  // layer down and inside an instance too (a button's fill on the Background inside its StateLayer), then the parent's
+  // own fill. A boolean operation paints with its own fill, never its shapes'. null when nothing is.
+  const under = (s, n) => {
+    if (s.visible === false || prop(s, 'isMask') || s.type === 'TEXT' || isIcon(s)) return null;
+    const kids = s.type === 'BOOLEAN_OPERATION' ? [] : (prop(s, 'children') ?? []);
+    for (let k = kids.length - 1; k >= 0; k--) { const f = under(kids[k], n); if (f) return f; }
+    return solid(s) && covers(s, n) ? s : null;
+  };
+  const below = (n, v) => {
+    let bg = null;
+    for (let x = n; x !== v && !bg; x = x.parent) {
+      const p = x.parent, i = p.children.indexOf(x);
+      for (let j = i - 1; j >= 0 && !bg; j--) bg = under(p.children[j], n);
+      if (!bg && solid(p)) bg = p;
+    }
+    return bg;
+  };
   const seen = new Set(), drawnOn = [], fills = new Set();
   for (const v of variants) {
     if (disabled(v.name)) continue;
@@ -749,22 +773,37 @@ async function paintFacts(set) {
         if (shape) fg = await tokenOf(stroked(shape) ? solid(shape, 'strokes') : solid(shape));
       }
       if (!fg) continue;
-      let bg = null;
-      for (let x = n; x !== v && !bg; x = x.parent) {
-        const p = x.parent, i = p.children.indexOf(x);
-        for (let j = i - 1; j >= 0 && !bg; j--) {
-          const s = p.children[j];
-          if (s.visible !== false && !prop(s, 'isMask') && s.type !== 'TEXT' && !isIcon(s) && solid(s) && covers(s, n)) bg = s;
-        }
-        if (!bg && solid(p)) bg = p;
-      }
-      const on = bg ? ((await tokenOf(solid(bg))) ?? 'unbound') : 'surface';
+      const bg = below(n, v), on = bg ? ((await tokenOf(solid(bg))) ?? 'unbound') : 'surface';
       const k = `${fg}|${on}`;
       if (!seen.has(k)) { seen.add(k); drawnOn.push({ fg, on, icon: n.type !== 'TEXT' }); }
     }
   }
   if (drawnOn.length) out.drawnOn = drawnOn;
   if (fills.size) out.fills = [...fills];
+  // edges: what shows where a control is (WCAG 1.4.11), for a component whose name says it takes input (a field, a
+  // dropdown, a checkbox, a radio, a switch, a slider): in each variant not disabled, each drawn layer that is neither
+  // text, artwork nor an icon, 12 by 12 or more, with a fill or a border, nested parts included (a checkbox's box inside
+  // its own instance). Each as { fill, stroke, on, o }: a colour token (or #hex with no variable), what is painted under
+  // it (as for drawnOn) and its opacity when under 1. Variants with the same edges share one entry, named by the first:
+  // [{ variant, n, list }].
+  if (/input|field|text ?area|search|select|drop ?down|combo|check|radio|switch|toggle|slider|stepper|otp|password|picker/i.test(set.name)) {
+    const art = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON|TEXT)$/, groups = {};
+    const hex = async (p) => p && ((await tokenOf(p)) ?? '#' + ['r', 'g', 'b'].map((k) => Math.round(p.color[k] * 255).toString(16).padStart(2, '0')).join(''));
+    for (const v of variants) {
+      if (disabled(v.name)) continue;
+      const list = new Set();
+      for (const l of [v, ...v.findAll((x) => !art.test(x.type) && !isIcon(x))]) {
+        const b = box(l), f = solid(l), sw = prop(l, 'strokeWeight'), st = sw !== 0 && solid(l, 'strokes');
+        let x = l; while (x && x !== v && !isIcon(x.parent) && x.parent.type !== 'BOOLEAN_OPERATION') x = x.parent;
+        if (!b || b.width < 12 || b.height < 12 || x !== v || !shown(l, v) || prop(l, 'isMask') || (!f && !st)) continue;
+        const o = r2((f || st).opacity * (prop(l, 'opacity') ?? 1)), bg = below(l, v);
+        list.add(JSON.stringify({ fill: await hex(f) || undefined, stroke: await hex(st) || undefined, on: bg ? await hex(solid(bg)) : 'surface', o: o < 1 ? o : undefined }));
+      }
+      const k = [...list].join();
+      if (k) groups[k] ? groups[k].n++ : (groups[k] = { variant: v.name, n: 1, list: [...list].map((e) => JSON.parse(e)) });
+    }
+    if (Object.keys(groups).length) out.edges = Object.values(groups);
+  }
   return out;
 }
 // entry = { …, ...(await paintFacts(componentSet)) }
@@ -1171,6 +1210,12 @@ async function skeletonOf(root, names = {}) {
     if (op < 1) lk.opacity = op;
     if (sk) lk.border = { w: num(prop(n, 'strokeWeight')) ?? ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].map((k) => num(prop(n, k)) || 0), align: prop(n, 'strokeAlign') };
     if (an.length) lk.notes = an;
+    // Where a layer that can be read (text, an instance, a frame; never artwork) sits when it is placed by hand (its parent
+    // has no auto layout, or it is placed absolutely), so the order it is seen in can be held against its layer order
+    // (reading order, WCAG 1.3.2). Auto layout draws in layer order. Beside the trees, as the bindings are.
+    const at = ['x', 'y', 'width', 'height'].map((k) => num(prop(n, k)));
+    if (depth > 0 && /^(TEXT|INSTANCE|FRAME|GROUP)$/.test(t) && (prop(n, 'layoutPositioning') === 'ABSOLUTE' || prop(n.parent, 'layoutMode') === 'NONE' || (n.parent && n.parent.type === 'GROUP')) && at.every((v) => v !== undefined) && at[2] > 0 && at[3] > 0)
+      lk.at = at.map(Math.round);
     if (Object.keys(lk).length) look[path] = lk;
     const o = {
       t, n: n.name, ...(depth > 0 ? { id: n.id } : {}),

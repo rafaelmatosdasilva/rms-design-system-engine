@@ -410,3 +410,23 @@ A project that says never gets the list of Figma changes and no script to run. A
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
 
 Put tokens in a `.env` in the folder you run the engine from.
+
+### When a host refuses
+
+A refusal used to say only that something failed, and one status code has several different fixes behind it. Each one now names the permission that is missing and where it is given:
+
+| Host | What the token needs | Where you add it |
+|---|---|---|
+| Figma | `file_content:read` (and `file_dev_resources:read` for Code Connect) | figma.com → Settings → Security → Personal access tokens |
+| GitHub | Read access to the repository (Contents: Read) | github.com → Settings → Developer settings → Personal access tokens |
+| GitLab | The `read_api` scope | your GitLab → Preferences → Access tokens |
+| Notion | Read content, **and the page shared with the integration** | notion.so/profile/integrations → your integration → Capabilities |
+| Confluence | Read permission for the space | id.atlassian.com → Security → API tokens |
+
+Three things look alike and are not, so each is said apart:
+
+- **401** — the token is wrong, expired or revoked. Reissue it.
+- **403** — the token is fine; it lacks the permission, or the thing was never shared with it. Notion's most common cause is the second: an integration cannot see a page until someone adds it under **Connections**.
+- **404** — the link may be wrong, *or* it is private and your token cannot reach it. A private page with no access looks exactly like one that does not exist, so both are named rather than sending you to check a link that was right.
+
+The token itself is never printed.
