@@ -201,6 +201,9 @@
    • button, iconButton have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
    • button has no role note in Figma: its name says a button, and nothing tells the code which role to give it (WCAG 4.1.2): add the annotation "Role: button" (or the role it really has)
    • iconButton shows no words, and no note in Figma says what a screen reader calls it (WCAG 4.1.2): add an annotation with its name, written as aria-label: "<what it does>"
+   Advice, not a WCAG failure (what the code needs to be told):
+   • a control with no hover, pressed, disabled or error state: button, iconButton
+   • a control with no accessibility note: button
    rms-design-system-engine --figma-edits puts each on the design team's to do list in Figma, written only after a yes.
 
 🎯 Tailwind classes against Figma: 1 measure in 2 components differs from what Figma states. Advisory.
