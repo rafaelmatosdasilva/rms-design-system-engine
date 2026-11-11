@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge (continuous evaluation)
+
+What changed since the entry below (engine 40b1d33): Every refusal names the permission it lacks (#421); Reading order on each component, and the file check counts only what Figma draws (#422); Building blocks checked, controls known by more than their name, rows placed by hand, and a control's edge. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `f62be0903f7e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 33217c48` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9222b0bd` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md ebee5c9c` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 56d11749` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 84cc359 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.057 |
+| Input a run | 98k | 96k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 98k, in 3.4 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-building-blocks-checked-controls-known`.
+
 ## 2026-11: Reading order, and only what Figma draws (continuous evaluation)
 
 What changed since the entry below (engine fe7e963): Q60 reading order in Figma and code; the file check skips hidden layers no property shows, a mask's paint and padding outside auto layout. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
