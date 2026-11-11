@@ -49,6 +49,19 @@ test('REST: a value with no variable or style is raw; styles, bound variables, a
   assert.equal(hygieneOf(restSet, 'A filter chip.').description, true);
 });
 
+test('a boolean operation paints with its own fill and stroke: the shapes it merges are never counted', () => {
+  // A check mark built as a Union of two strokes, as a checkbox draws it: Figma paints the Union, never the rectangles.
+  const box = { type: 'COMPONENT', name: 'state=selected', children: [
+    { type: 'BOOLEAN_OPERATION', name: 'Union', strokeWeight: 2, strokes: [solid(1, 1, 1)], fills: [solid(1, 1, 1)], children: [
+      { type: 'RECTANGLE', name: 'Tick', strokeWeight: 2, strokes: [solid(0.2, 0.2, 0.2)], cornerRadius: 1, opacity: 0.5 },
+      { type: 'VECTOR', name: 'Path 5', strokeWeight: 2, strokes: [solid(0.2, 0.2, 0.2)] },
+    ] },
+  ] };
+  const h = hygieneOf(box, '');
+  // The Union's own border is a value it draws; its fill is artwork, as a vector's is. Nothing from inside it.
+  assert.deepEqual(h.raw, [{ at: 'state=selected/Union', field: 'border', value: 2 }]);
+});
+
 test('Plugin API: style ids count as a style, a detached frame is listed', () => {
   const comp = { type: 'COMPONENT', name: 'Row', layoutMode: 'VERTICAL', detachedInfo: null, fillStyleId: 'S:9', fills: [solid(1, 1, 1)], children: [
     { type: 'FRAME', name: 'Lead', detachedInfo: { type: 'local', componentId: '1:2' }, fills: [], children: [] },

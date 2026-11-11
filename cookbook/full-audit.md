@@ -480,7 +480,8 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       const loose = [['lineHeight', 'line height'], ['letterSpacing', 'letter spacing'], ['fontFamily', 'font family'], ['fontWeight', 'font weight']].filter(([k]) => !bound(n, k)).map(([, w]) => w);
       if (loose.length) raw(at, 'text', loose.join(', '));
     }
-    for (const c of kids(n)) walk(c, `${at}/${c.name}`);
+    // A boolean operation paints with its own fill and stroke: the shapes it merges are never drawn as themselves.
+    if (n.type !== 'BOOLEAN_OPERATION') for (const c of kids(n)) walk(c, `${at}/${c.name}`);
   };
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {

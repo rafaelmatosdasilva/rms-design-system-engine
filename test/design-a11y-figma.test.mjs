@@ -18,6 +18,9 @@ const VARS = { color: {
 
 test('the role a name says, and the surfaces the system defines', () => {
   assert.deepEqual(['iconButton', 'Text field', 'menuItem', 'checkbox', 'buttonGroup', 'fieldLabel', 'cardTile', 'Tab bar'].map(nameRole), ['button', 'textbox', 'menuitem', 'checkbox', null, null, null, null]);
+  // A system that names the type first: the kind after it does not hide the control. A group, a part or a row of them is not one.
+  assert.deepEqual(['buttonBold', 'tabUnderline', 'fieldPlain', 'checkboxRound', 'iconButtonGhost', 'stepperCompact'].map(nameRole), ['button', 'tab', 'textbox', 'checkbox', 'button', 'spinbutton']);
+  assert.deepEqual(['checkboxStack', 'linkListLabel', 'dropdownPickerRow', 'tabBar', 'cardOffer'].map(nameRole), [null, null, null, null, null]);
   assert.deepEqual(systemSurfaces(VARS).light.map((s) => s.token), ['surface/page/color', 'surface/raised/color']);
   assert.deepEqual(systemSurfaces(VARS, ['cardTile/background']).dark.map((s) => s.token), ['cardTile/background/color'], 'a11y.surfaces names them');
 });
