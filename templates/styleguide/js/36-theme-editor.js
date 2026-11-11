@@ -152,6 +152,46 @@
     ['references', 'From references', ICON('<rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1.2"/><path d="M14 10.5l-3.5-3.5L4 13"/>')]
   ];
   var START_SAYS = { figma: 'Read the variables of another Figma file and match them to these tokens.', file: 'Bring tokens as JSON (DTCG or a theme), CSS variables, or a .zip of them.', scratch: 'Set the colours, the type, the corners and the spacing yourself.', references: 'Upload pictures (screens, moodboards) to build a theme from them.' };
+
+  // The specimen: a screen of the system's own components, so every system has one to preview, Showroom or not. What it
+  // places is planned by the build (specimen.mjs) and held to the guardrail every composition is (the catalog's check):
+  // the page only draws it, each tile the component as its code renders it, never a drawing.
+  var PLAN = EDITOR.specimen || null;
+  var codeMarkups = function (c) {
+    var r = (c.renders || []).map(function (x) { return x && x.markup; }).filter(Boolean);
+    if (!r.length && c.markup) r = [c.markup].concat(c.markups || []);
+    var seen = {}; return r.filter(function (m) { if (seen[m]) return false; seen[m] = 1; return true; });
+  };
+  var specText = (function () { var v = VARS.filter(function (x) { return x.var && /(text|content|foreground)[^/]*\/?(primary|default|main)?[^/]*colou?r?$/i.test(x.figma) && !/(button|disabled|inverse|on[A-Z]|link|placeholder)/i.test(x.figma) && hexOf(x.values && x.values[0]); }).sort(function (a, b) { return a.figma.length - b.figma.length; })[0]; return v ? v.var : null; })();
+  var prettyName = function (n) { return String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_/]+/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); }); };
+  var stripIds = function (m) { return String(m).replace(/\s(id|for|aria-controls|aria-labelledby|aria-describedby)="[^"]*"/g, ''); };
+  var specimen = function () {
+    if (!PLAN || !(PLAN.sections || []).length) return null;
+    var byName = {}; (SG.components || []).forEach(function (c) { byName[c.name] = c; });
+    var marks = function (name) { var c = byName[name]; return c ? codeMarkups(c) : []; };
+    var placed = [];
+    var tile = function (name, cls) { var m = marks(name); if (!m.length) return ''; placed.push(name); return '<figure class="sg-spec-tile' + (cls ? ' ' + cls : '') + '"><div class="sg-spec-stage">' + stripIds(m[0]) + '</div><figcaption class="sg-spec-cap">' + esc(prettyName(name)) + '</figcaption></figure>'; };
+    var buttonRow = function (name) { var m = marks(name); if (!m.length) return ''; placed.push(name); return '<div class="sg-spec-row"><span class="sg-spec-rowname">' + esc(prettyName(name)) + '</span><div class="sg-spec-variants">' + m.slice(0, 4).map(function (x) { return '<div class="sg-spec-stage">' + stripIds(x) + '</div>'; }).join('') + '</div></div>'; };
+    var GRID = { forms: 'is-forms', choices: 'is-small', status: 'is-small', navigation: 'is-wide', surfaces: 'is-cards', data: 'is-wide', rest: 'is-rest' };
+    var n = 0, body = '';
+    (PLAN.sections || []).forEach(function (sec) {
+      var inner = sec.key === 'actions' ? '<div class="sg-spec-buttons">' + sec.components.map(buttonRow).join('') + '</div>'
+        : '<div class="sg-spec-grid ' + (GRID[sec.key] || '') + '">' + sec.components.map(function (c) { return tile(c, (sec.overlays || []).indexOf(c) >= 0 ? 'is-overlay' : /text ?area/i.test(c) ? 'is-wide' : ''); }).join('') + '</div>';
+      n++; body += '<section class="sg-spec-sec"><header class="sg-spec-head"><span class="sg-spec-num">' + (n < 10 ? '0' : '') + n + '</span><h2 class="sg-spec-h">' + esc(sec.title) + '</h2><p class="sg-spec-says">' + esc(sec.says) + '</p></header>' + inner + '</section>';
+    });
+    if (!placed.length) return null;
+    var colourVar = function (t) { return t && t.v ? 'var(' + t.v + ')' : null; };
+    var swatch = function (label, v) { return v ? '<div class="sg-spec-sw"><span class="sg-spec-dot" style="background:' + v + '"></span><span>' + esc(label) + '</span></div>' : ''; };
+    var lead = ((PLAN.sections[0] || {}).key === 'actions' ? PLAN.sections[0].components : []).slice(0, 2);
+    var hero = '<section class="sg-spec-hero"><div class="sg-spec-hero-text"><p class="sg-spec-kicker">Specimen</p><p class="sg-spec-title">' + esc(SG.title || 'Your system') + '</p><p class="sg-spec-lede">Every component here is the one the code renders, in this theme.</p><div class="sg-spec-hero-acts">' + lead.map(function (x) { var m = marks(x); return m.length ? '<div class="sg-spec-stage">' + stripIds(m[0]) + '</div>' : ''; }).join('') + '</div></div>' +
+      '<div class="sg-spec-hero-art" aria-hidden="true"><span class="sg-spec-blob is-a" style="background:' + (colourVar(PRIMARY) || 'currentColor') + '"></span><span class="sg-spec-blob is-b" style="background:' + (colourVar(SECONDARY) || 'currentColor') + '"></span><span class="sg-spec-glyph">Aa</span></div>' +
+      '<div class="sg-spec-swatches">' + swatch('Primary', colourVar(PRIMARY)) + swatch('Secondary', colourVar(SECONDARY)) + swatch('Background', APP_BG ? 'var(' + APP_BG.v + ')' : null) +
+      '<div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (BTN && BTN.v ? 'var(' + BTN.v + ')' : '8px') + '"></span><span>Button corner</span></div><div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (CARD && CARD.v ? 'var(' + CARD.v + ')' : '16px') + '"></span><span>Card corner</span></div></div></section>';
+    return { key: 'sg-specimen', title: 'Specimen · every component', size: [1280, 900], flow: true, uses: placed,
+      markup: '<div class="sg-spec" style="' + (PRIMARY && PRIMARY.v ? '--spec-accent:var(' + PRIMARY.v + ');' : '') + (SECONDARY && SECONDARY.v ? '--spec-accent-2:var(' + SECONDARY.v + ');' : '') + (CARD && CARD.v ? '--spec-r:var(' + CARD.v + ');' : '') + (APP_BG ? 'background:var(' + APP_BG.v + ');' : '') + (specText ? 'color:var(' + specText + ');' : '') + (T.typeFamily && T.typeFamily.var ? 'font-family:var(' + T.typeFamily.var + '), inherit;' : '') + '">' + hero + body + '</div>' };
+  };
+  SG.specimen = function () { previewScreens(); return SPECIMEN || null; };   // for the check and its tests
+  var SPECIMEN = null, previewScreens = function () { if (SPECIMEN === null) SPECIMEN = specimen() || false; return (SPECIMEN ? [SPECIMEN] : []).concat((SG.screens || []).filter(function (s) { return s.markup; })); };
   var startName = function (k) { return (STARTS.filter(function (x) { return x[0] === k; })[0] || STARTS[2])[1]; };
   // A new theme starts from the theme the guide shows (its own brand, under a saved theme the brand that one is based on).
   var baseTheme = document.documentElement.getAttribute('data-brand') || '';
@@ -460,7 +500,7 @@
 
   var body = function () {
     var famIdx = families.map(function (f) { return f.toLowerCase(); }).indexOf(String(brief.fontFamily || '').toLowerCase()), famKnown = famIdx >= 0; if (famKnown) brief.fontFamily = families[famIdx];
-    var screens = (SG.screens || []).filter(function (s) { return s.markup; });
+    var screens = previewScreens();
     var screenKey = (screens.filter(function (s) { return s.key === draft.screen; })[0] || screens[0] || {}).key;
     var form = '<div class="sg-ts">' +
       '<div class="pg-inspect sg-token-card" data-pane="figma"' + (source === 'figma' ? '' : ' hidden') + '><div class="pg-controls">' +
@@ -553,13 +593,13 @@
       // is narrower), so it fills the stage's width and the panel's height.
       var k = Math.max(0.2, Math.min(1, w / size[0])), lw = Math.round(w / k), lh = Math.round((h > 160 ? h : size[1] * k) / k);
       frame.style.width = lw + 'px'; frame.style.height = lh + 'px'; frame.style.transform = 'scale(' + k + ')';
-      if (screenEl) { screenEl.style.width = lw + 'px'; screenEl.style.height = lh + 'px'; }
+      if (screenEl) { screenEl.style.width = lw + 'px'; if (screenEl._flow) { screenEl.style.height = 'auto'; screenEl.style.minHeight = lh + 'px'; } else screenEl.style.height = lh + 'px'; }
       box.style.width = Math.floor(lw * k) + 'px'; box.style.height = Math.floor(lh * k) + 'px'; box.style.marginInline = 'auto';
     };
     window.addEventListener('resize', function () { fit(); });
     var draw = function (key) {
       if (!box) return;
-      var s = (SG.screens || []).filter(function (x) { return x.key === key; })[0]; if (!s) return;
+      var s = previewScreens().filter(function (x) { return x.key === key; })[0]; if (!s) return;
       box.setAttribute('data-screen', key); size = [(s.size && s.size[0]) || 1280, (s.size && s.size[1]) || 800];
       box.innerHTML = ''; frame = document.createElement('iframe'); frame.className = 'sg-ts-frame'; frame.title = 'Preview: ' + (s.title || s.key); frame.tabIndex = -1; box.appendChild(frame);
       fdoc = frame.contentDocument; fdoc.open(); fdoc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); fdoc.close();
@@ -571,6 +611,7 @@
       fdoc.body.style.margin = '0'; fdoc.body.style.background = 'transparent';
       screenEl = fdoc.createElement('div'); screenEl.id = 'ts-screen'; screenEl.className = 'sg-showroom sg-showroom-screen'; screenEl.setAttribute('aria-hidden', 'true');
       screenEl.style.cssText = 'position: relative; width: ' + size[0] + 'px; height: ' + size[1] + 'px;';
+      screenEl._flow = !!s.flow;   // the specimen runs as long as the system has components: the frame scrolls it
       screenEl.innerHTML = s.markup;
       // The screen's own other modes (its breakpoint, its language), as the Showroom sets them.
       var named = Object.keys(s.modes || {}).map(function (k) { return String(s.modes[k]).toLowerCase(); });
