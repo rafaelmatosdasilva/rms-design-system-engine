@@ -175,3 +175,13 @@ test('nothing to read is no grammar, never an error', () => {
   assert.deepEqual(codeGrammarOf({}).code.rules, []);
   assert.equal(anatomyOf({ text: '' }), null);
 });
+
+test('a class name goes into a regular expression escaped whole, never its hyphens alone', () => {
+  // A class is read out of markup, so it may hold any character. One holding a regular expression's own ("card.v2+")
+  // must match itself and nothing else, and must never throw.
+  const text = `<template><div class="acme-grid" :class="{ 'acme-grid.v2+': wide }"><span class="acme-grid__cell"></span></div></template>
+<style>.acme-grid {} .acme-grid\\.v2\\+ { padding: 0; } .acme-grid__cell {}</style>`;
+  const a = anatomyOf({ file: 'Grid.vue', text, styles: [{ file: 'Grid.vue', text }], root: 'acme-grid', props: ['wide'] });
+  assert.ok(a, 'a class holding regular-expression characters is read, never thrown on');
+  assert.deepEqual(a.parts.map((p) => p.class), ['acme-grid__cell']);
+});
