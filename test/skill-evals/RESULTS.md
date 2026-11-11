@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The code grammar's test makes its folder through tempDir (continuous evaluation)
+
+What changed since the entry below (engine db66ce8): A component's examples reach its Documentation and the agents, a draft to review (#437); The code's construction rules, read as deeply as Figma's; Each component's way of writing a state, said with its example; The code grammar's test makes its folder through tempDir. The guide changed in `cookbook/ask-the-system.md`, `reference/usage.md`.
+
+Guide set measured: `e76542030d26` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 0a3bfe5b` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md cce5cafc` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 8f8f3b6 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.056 | 0.057 |
+| Input a run | 94k | 100k |
+| Turns a run | 3.4 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 94k, in 3.6 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-11-the-code-grammar-s-test`.
+
 ## 2026-11: A component's examples are read, with main merged in (continuous evaluation)
 
 What changed since the entry below (engine 531ed97): Main merged in: the reference names a component's examples, with main's History and source-card changes. The guide changed in `reference/usage.md`.
