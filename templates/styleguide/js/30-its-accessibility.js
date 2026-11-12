@@ -143,29 +143,6 @@
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });
   }
-  // The Figma review's findings (the Rules page, DATA.construction): each rule of the Figma file a component breaks, as
-  // a task on that component beside its others, with the fix the Rules page gives it, waiting on whoever keeps the Figma
-  // file; a rule still to decide waits on the team, who says first whether it is the rule. The code's rules are handed
-  // back as patches and stay on the Rules page.
-  var RULES_BY = (function () {
-    var by = {}, G = (typeof DATA !== 'undefined' && DATA.construction) || null;
-    ((G && G.rules) || []).forEach(function (r) {
-      if ((r.side || 'figma') !== 'figma' || r.status === 'rule') return;
-      (r.toFix || []).forEach(function (t) { if (t.component) (by[t.component] = by[t.component] || []).push({ r: r, t: t }); });
-    });
-    return by;
-  })();
-  function rulesRows(c) {
-    var seen = {};
-    return (RULES_BY[c.name] || []).filter(function (x) { var k = x.r.id + '\u0000' + (x.t.value || ''); if (seen[k]) return false; seen[k] = 1; return true; }).map(function (x) {
-      var say = (x.t.fix && x.t.fix.say) || x.t.value || '', decide = x.r.status === 'decide';
-      return { key: c.name + '\u0000rule:' + x.r.id + ':' + (x.t.value || ''), area: 'Rules', kind: 'Figma rule', figma: esc(x.r.says), code: '',
-        where: esc(c.name) + (x.t.value ? '<span class="pg-par-val">' + esc(x.t.value) + '</span>' : ''),
-        todo: esc(decide ? 'Decide whether "' + x.r.says + '" is the rule' + (say ? '; if it is: ' + say : '') + '.' : (say || 'Follow the rule') + '.').replace(/\.\.$/, '.'),
-        who: decide ? WHO.both : WHO.designer, st: decide ? 'check' : 'todo', rel: '', at: DATA.builtAt || null,
-        scope: { scope: 'shared', reason: 'Shared: the component in the Figma library, so every screen that places it takes the change.' } };
-    });
-  }
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
@@ -195,7 +172,6 @@
       copyRows(c).forEach(function (r) { rows.push(r); });
       motionIssueRows(c).filter(isOpen).forEach(function (r) { rows.push(r); });
       docRows(c).forEach(function (r) { rows.push(r); });
-      rulesRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });
     });
     // Each kind on its own, in its own table: Parity, Accessibility, Documentation and the rest, each by component, the

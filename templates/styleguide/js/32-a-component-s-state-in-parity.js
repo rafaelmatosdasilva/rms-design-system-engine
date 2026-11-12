@@ -215,7 +215,7 @@
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   // Accessibility last: what a browser still has to try is numbered after the rest, so no other number moves.
   // What the page itself stands in for (a control the system lacks) comes last, as the Style guide's own.
-  var TODO_KINDS = ['Parity', 'Rules', 'Motion', 'Documentation', 'Migration', 'Products', 'System', 'Accessibility', 'Style guide'];
+  var TODO_KINDS = ['Parity', 'Motion', 'Documentation', 'Migration', 'Products', 'System', 'Accessibility', 'Style guide'];
   // The tabs in the cards' order (Parity, Accessibility, Documentation), then the rest; the numbering keeps its own.
   var TAB_ORDER = ['Parity', 'Accessibility', 'Documentation', 'Motion', 'Migration', 'Products', 'System', 'Style guide'];
   // The Status page's table: which area it is sorted by (#status/parity), and which chip is chosen.
