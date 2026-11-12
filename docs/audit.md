@@ -176,6 +176,8 @@ Beside the rules, each component's anatomy, read as deeply as Figma's:
 
 It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
 
+**In CI.** Beside those errors, a rule nobody has decided yet that components already break is a **warning**: said, never a failure, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data for a job that posts it. The step to copy is in [the CI recipe](../cookbook/ci-and-hooks.md).
+
 ### Classes nothing styles, and styles nothing uses
 
 The checks above read what your styles *do* with the system's values, so they see a colour written by hand and miss the debt that has no styles at all. This reads your two lists of classes against each other, in both directions:
