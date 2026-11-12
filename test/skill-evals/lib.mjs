@@ -60,6 +60,19 @@ export function withKeyFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE |
   try { key = readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).find(Boolean) ?? ''; } catch { /* no file: the plan's login */ }
   return key ? { ...env, ANTHROPIC_API_KEY: key } : env;
 }
+// The plan's login, kept the same way. A run gets a fresh HOME, so on macOS - whose login lives in the keychain -
+// it has none, and `claude setup-token` prints a long-lived one to carry in CLAUDE_CODE_OAUTH_TOKEN. Held only in
+// the shell that started a run, that is a token re-exported in every new tab, and the sign-in done again whenever
+// somebody forgets: this reads it from a file beside the API key, so it is set up once and never again.
+export const TOKEN_FILE = join(homedir(), '.config', 'rms-engine', 'oauth-token');
+export function withTokenFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_TOKEN_FILE || TOKEN_FILE) {
+  if (env.ANTHROPIC_API_KEY || env.CLAUDE_CODE_OAUTH_TOKEN) return env;
+  let token = '';
+  try { token = readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#')) ?? ''; } catch { /* no file: whatever login the run inherits */ }
+  return token ? { ...env, CLAUDE_CODE_OAUTH_TOKEN: token } : env;
+}
+// Both, in the order the runner prefers them: an API key wins, because a run on one must never be billed to the plan.
+export const withCredentials = (env = process.env) => withTokenFile(withKeyFile(env));
 // The SDK, installed for the evaluation only (npm ci --prefix test/.eval-tools): the engine itself has no dependencies.
 const SDK = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
 // The CLI that runs each task, found once on this machine - where it is installed, not only on the PATH, the way
@@ -273,7 +286,7 @@ export async function runClaude({ cwd, home, path, prompt, model, resume = null,
   // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
   // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-  const base = withKeyFile(process.env);
+  const base = withCredentials(process.env);
   const env = childEnv(base, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
   const { events, err, timedOut } = runnerOf(base) === 'sdk'
     ? await viaSdk(prompt, sdkOptions({ model, maxTurns, budget, resume, route, cwd, env }), timeoutMs)
