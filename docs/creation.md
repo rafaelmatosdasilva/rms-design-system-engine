@@ -224,6 +224,35 @@ Two more limits worth knowing:
 
 - **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
 - **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+### The shapes a flow comes in
+
+Ask for a multi-step operation — sign in, a one-time code, a confirmation, a success page — and the engine used to check only that the pages linked. It knew nothing of the shapes, so a code step with no way to ask for another code passed, and so did a journey that quietly stopped halfway.
+
+Four shapes are read from the pages themselves — their name, their title, the words on their parts — and each owes something:
+
+| The page looks like | and owes |
+|---|---|
+| A sign-in step | a way out for somebody who cannot get in |
+| A one-time code step | a way to ask for another code, and a way back to change where it was sent |
+| A destructive step | a way out that is not the destructive one |
+| A success page | a way on to whatever comes after it |
+
+```
+⚠️  "code" is a one-time code step and is missing a way to ask for another code:
+    a person who needs it here has nowhere to go. Add it from the system, or say
+    why this flow does not need it
+```
+
+**It also settles a question nothing else could answer.** `--prototype --flow` names the pages a journey ends on and has to leave it open — *"the end of a flow, or a page that needs a way on"*. A shape decides it:
+
+```
+⚠️  the journey ends on "code", which is a one-time code step and not an ending:
+    the page after it was never drawn
+```
+
+A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
+
+Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
 
 ### A behaviour has to rest on a rule
 
