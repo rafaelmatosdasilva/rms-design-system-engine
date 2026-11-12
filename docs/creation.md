@@ -184,6 +184,75 @@ Three things it deliberately stays quiet about:
 - **One page.** One page is not a flow, and saying so would be noise.
 - **A page your own written flow already names.** The step that fails to link to it says the same thing; one mistake should not read as two.
 - **A page that is reached and stops.** `--prototype --flow` already names it under `ends:`, beside the start and the links, which reads better than the same fact alone in a list of faults.
+### A page's own navigation
+
+The flow check reads what leads from page to page. It knew nothing of what moves *inside* one — so ask for "a page with a tab for each section of the account" and the page comes back with a tab strip, four tabs, one panel, and every check calls it whole. In a user test the second tab does nothing, and the person running the test finds it rather than the engine.
+
+A composition already says how something moves inside a page: a part carries `opens` with the id of the part a click shows. So the reading is narrow:
+
+```
+⚠️  "account" has TabStrip (3 choices) and nothing on the page opens anything: in a
+    user test the second choice does nothing. Give each choice "opens" with the id of
+    the part it shows, or say the page is one view and the choices lead elsewhere
+```
+
+Tabs, segmented controls, steppers, side rails, accordions and pagination all count. **One choice is not navigation** and says nothing.
+
+**What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
+
+### What a prototype still owes a developer
+
+Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.
+
+At the end of a run, the engine says what is left:
+
+```
+🤝 BEFORE A DEVELOPER TAKES "Orders" FORWARD  4 of 4 thing(s) the product does,
+   that this page does not yet:
+   • a route — the product declares its pages with a router (src/router), and nothing
+     here registers this page: a developer has to wire it before anyone can reach it
+   • its data from the store — the product keeps state in a store (src/stores), and
+     this page carries its own: the numbers on screen are the ones somebody typed
+   • its words as translations — the product has translated words (src/locales), and
+     the words here are written into the page: they would ship in one language
+   • a test — the product has tests, and this page has none
+```
+
+**Every convention is read from your product, never assumed.** No router in your dependencies and nothing asks for a route. No translations and nobody mentions hardcoded words. A list of good practice your project never adopted would be noise — and worse, it would read as your team's own rules.
+
+Two more limits worth knowing:
+
+- **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
+- **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+### The shapes a flow comes in
+
+Ask for a multi-step operation — sign in, a one-time code, a confirmation, a success page — and the engine used to check only that the pages linked. It knew nothing of the shapes, so a code step with no way to ask for another code passed, and so did a journey that quietly stopped halfway.
+
+Four shapes are read from the pages themselves — their name, their title, the words on their parts — and each owes something:
+
+| The page looks like | and owes |
+|---|---|
+| A sign-in step | a way out for somebody who cannot get in |
+| A one-time code step | a way to ask for another code, and a way back to change where it was sent |
+| A destructive step | a way out that is not the destructive one |
+| A success page | a way on to whatever comes after it |
+
+```
+⚠️  "code" is a one-time code step and is missing a way to ask for another code:
+    a person who needs it here has nowhere to go. Add it from the system, or say
+    why this flow does not need it
+```
+
+**It also settles a question nothing else could answer.** `--prototype --flow` names the pages a journey ends on and has to leave it open — *"the end of a flow, or a page that needs a way on"*. A shape decides it:
+
+```
+⚠️  the journey ends on "code", which is a one-time code step and not an ending:
+    the page after it was never drawn
+```
+
+A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
+
+Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
 
 ### A behaviour has to rest on a rule
 

@@ -26,7 +26,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | Feature | What it does | Status |
 |---|---|---|
 | [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | Ready to use |
-| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it. | Early development |
+| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | Early development |
 
 ### Creation
 
