@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## A `.env` said just before is still setup, not a request for a token
+
+**Found** 12 November 2026, measuring the same accessibility batch a third time, on top of main. **Fixed in** `test/skill-evals/rules.mjs` (`asksForToken`).
+
+**Evidence.** 78 of 79 runs passed; the one failure was `visual-howto` #0, on the global rule "never asks for a token in chat". Its answer was the right one: Figma's images come *"from `.design-system-engine-refs/components/<name>.png` … or the Figma REST API with `FIGMA_TOKEN` in `.env`"*, and its next sentence said they are *"fetched live from Figma if you provide a `FIGMA_TOKEN`"*. Nothing asked for the token in the chat; the reply that followed said *"add `FIGMA_TOKEN` to your project's `.env` file"*.
+
+**Guess ruled out.** Not the batch, which touched nothing about tokens or Figma's images; `visual-howto` passed every run of the two measurements before it. Not a model getting worse at the rule: the rule already read "provide a token" next to a `.env` as setting the project up, and was looking for that `.env` only in the sentences after.
+
+**What changed.** The rule looks at the three sentences before as well. *Paste*, *share*, *send* and *tell* stay a request whatever surrounds them, and both kinds are cases in the rule's own test, the run's sentence among them. The saved runs were scored again with no model tokens: exactly that one changed verdict, and the entry records 79/79 with no rule broken.
+
+**What it settles.** A broken rule is the most serious thing an evaluation can report, which is why it is read first and taken at its word last. Twice in one batch the scorer, not the agent, was what failed.
+
+---
+
 ## "Lacks a green" is the gap said, and the scorer did not know it
 
 **Found** 12 November 2026, measuring a batch of accessibility changes (a hand check said to be a person's word, the judgement calls pre-sorted, which browser answered each criterion). **Fixed in** `test/skill-evals/tasks.mjs` (`NO_GREEN`).
