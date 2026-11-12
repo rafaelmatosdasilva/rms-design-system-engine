@@ -436,7 +436,7 @@
     if (CARD && b.cardRadius !== CARD.px) radiusFor(CARD, /card/i, b.cardRadius);
     if (BORDER && b.borderWidth != null && b.borderWidth !== BORDER.px) set[BORDER.v] = b.borderWidth + 'px';
     // Spacing: every gap, padding and margin of the system scaled alike, from the size the screen shows it at.
-    if (b.spacing && b.spacing !== 100) SPACES.forEach(function (v) { var x = SPACE_NOW[v.var]; if (x) set[v.var] = (Math.round(x.n * b.spacing / 100 * 2) / 2) + x.unit; });
+    if (b.spacing && b.spacing !== 100) SPACES.forEach(function (v) { var x = SPACE_NOW[v.var]; if (x) set[v.var] = Math.round(x.n * b.spacing / 100) + x.unit; });
     // One blur for every shadow: the system's blur and each shadow's own.
     if (BLUR && b.shadowBlur != null && b.shadowBlur !== BLUR.px) VARS.forEach(function (v) { if (v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma)) set[v.var] = b.shadowBlur + 'px'; });
     if (T.typeFamily && T.typeFamily.var && b.fontFamily && b.fontFamily.toLowerCase() !== String(live.font || start.fontFamily).toLowerCase()) set[T.typeFamily.var] = '"' + b.fontFamily.replace(/"/g, '') + '", system-ui, sans-serif';
@@ -612,7 +612,7 @@
         STOPS.map(function (st) { return row(st.label, st.id, colour(st.id, (brief.grad || {})[st.v] || st.hex, ((brief.dark || {}).grad || {})[st.v])); }).join('') +
         row('Button roundness', 'ts-btn-r', slider('ts-btn-r', brief.buttonRadius, 'Button roundness')) +
         row('Card roundness', 'ts-card-r', slider('ts-card-r', brief.cardRadius, 'Card roundness')) +
-        (SPACES.length ? row('Spacing', 'ts-space', slider('ts-space', brief.spacing || 100, 'Spacing', 200, 5, '%', 50)) : '') +
+        (SPACES.length ? row('Spacing', 'ts-space', slider('ts-space', brief.spacing || 100, 'Spacing', 200, 5, '%', 50) + '<details class="sg-ts-affects" id="ts-space-affects"><summary></summary><ul class="sg-ts-affects-list"></ul></details>') : '') +
         (BORDER ? row('Border thickness', 'ts-border', slider('ts-border', brief.borderWidth, 'Border thickness', 8, 1)) : '') +
         '<div class="pg-ctl"><span class="sg-mode-label" id="ts-shadows-label">Shadows</span><div class="sg-ts-field">' + toggle(' data-sw="shadows" aria-labelledby="ts-shadows-label"', brief.shadows !== false) + '</div></div>' +
         (BLUR ? row('Shadow blur', 'ts-blur', slider('ts-blur', brief.shadowBlur, 'Shadow blur', 40, 1)) : '') +
@@ -875,9 +875,10 @@
     };
     // The theme's own settings, each shown only when the screen draws with its token: one nothing on the screen uses
     // (a menu's gradient on screens with no menu) is left out, so every setting shown changes something you see.
+    var USED = {};   // the tokens the screen on show draws with (hideUnused)
     var hideUnused = function () {
       if (!screenEl || !fdoc) return;
-      var used = usedOnScreen(), any = function (vs) { return vs.some(function (v) { return v && used[v]; }); };
+      var used = USED = usedOnScreen(), any = function (vs) { return vs.some(function (v) { return v && used[v]; }); };
       var rowOf = function (id) { var x = $(id) || root.querySelector('[data-sw="' + id + '"]'); return x && x.closest('.pg-ctl'); };
       var set = [['ts-primary', [PRIMARY && PRIMARY.v]], ['ts-secondary', [SECONDARY && SECONDARY.v]], ['ts-bg', [APP_BG && APP_BG.v]], ['ts-btn-r', [BTN && BTN.v].concat(BTN ? followers(BTN.v).map(function (v) { return v.var; }) : [])], ['ts-card-r', [CARD && CARD.v].concat(CARD ? followers(CARD.v).map(function (v) { return v.var; }) : [])], ['ts-space', SPACES.map(function (v) { return v.var; })], ['ts-border', [BORDER && BORDER.v]], ['ts-blur', VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; })], ['shadows', SHADOW_ALL.concat(SHADOW_COLOURS.map(function (v) { return v.var; }), VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; }))], ['ts-shc', SHADOW_COLOURS.map(function (v) { return v.var; })]];   // the switch has no CSS of its own: shown with the shadows it turns on
       STOPS.forEach(function (st) { set.push([st.id, [st.v]]); });
@@ -1140,6 +1141,13 @@
       q.addEventListener('input', function () { var t = q.value.toLowerCase(); Array.prototype.forEach.call(box.querySelectorAll('.sg-ts-lib-item'), function (it) { it.hidden = t && it.textContent.toLowerCase().indexOf(t) < 0; }); });
       q.focus();
     };
+    root.addEventListener('mouseover', function (e) {
+      var li = e.target.closest && e.target.closest('.sg-ts-affects [data-hit]'); if (!fdoc) return;
+      Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-tok-hit'), function (x) { x.classList.remove('ts-tok-hit'); });
+      if (!li) return;
+      var v = li.getAttribute('data-hit');
+      tokRules().forEach(function (r) { if (!r.decls.some(function (d) { return d.vars.indexOf(v) >= 0 && !/^--/.test(d.prop); })) return; r.sels.forEach(function (x) { try { Array.prototype.forEach.call(screenEl.querySelectorAll(x.s), function (el) { el.classList.add('ts-tok-hit'); }); } catch (er) { /* a selector this browser does not read */ } }); });
+    });
     pickCard.addEventListener('input', function (e) {
       e.stopPropagation();
       var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v && k !== 'radius') return;
@@ -1214,6 +1222,15 @@
       });
       (function () { var f = $('ts-shc-d-hex'), pk = $('ts-shc-d'); if (!f || !SHADOW_COLOURS[0] || f.dataset.hand === '1') return; var d = tokenDark({ v: SHADOW_COLOURS[0].var }, b.shadowColour); if (document.activeElement !== f) f.value = d; pk.value = hex6(d); })();
       STOPS.forEach(function (st) { var f = $(st.id + '-d-hex'), pick = $(st.id + '-d'), hex = (b.grad || {})[st.v]; if (!f || !hex || f.dataset.hand === '1') return; var d = tokenDark(st, hex); if (document.activeElement !== f) f.value = d; pick.value = hex6(d); });
+      // What the spacing percentage changes, token by token: each spacing token the screens draw with, its size now and at
+      // the percentage chosen, so a general change is never blind.
+      var aff = $('ts-space-affects');
+      if (aff) {
+        var pct = b.spacing || 100, list = SPACES.filter(function (v) { return USED[v.var] && SPACE_NOW[v.var]; });
+        var moved = list.filter(function (v) { var x = SPACE_NOW[v.var]; return Math.round(x.n * pct / 100) !== x.n; }).length;
+        aff.querySelector('summary').textContent = list.length + ' spacing token' + (list.length === 1 ? '' : 's') + ' on these screens' + (pct !== 100 ? ', ' + moved + ' changed' : '');
+        aff.querySelector('.sg-ts-affects-list').innerHTML = list.map(function (v) { var x = SPACE_NOW[v.var], to = Math.round(x.n * pct / 100); return '<li data-hit="' + esc(v.var) + '"><span class="sg-ts-affects-name">' + esc(v.figma) + '</span><span class="sg-ts-affects-val">' + x.n + 'px' + (to !== x.n ? ' → <b>' + to + 'px</b>' : '') + '</span></li>'; }).join('');
+      }
       // A component picked shows its tokens as they are now: drawn again, unless one of its own fields is being typed in.
       if (picked && !pickCard.contains(document.activeElement)) pick(picked, true);
       else if (picked) refreshLinked();   // the card is in use: only the linked tokens' values follow, its fields stay as typed

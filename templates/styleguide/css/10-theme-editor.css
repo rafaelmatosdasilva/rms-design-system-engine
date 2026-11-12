@@ -265,3 +265,11 @@
 button.sg-ts-alias-chip { background: none; font: inherit; font-size: var(--sg-s); cursor: pointer; }
 button.sg-ts-alias-chip:hover { background: var(--sg-hover-fill); }
 .sg-ts-tok-field > .sg-ts-relink, .sg-ts-tok-field > .sg-ts-lib-btn { flex: none; }
+/* What the spacing percentage changes: each spacing token on the screens, its size now and at the percentage chosen. */
+.sg-ts-affects { margin-top: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-ts-affects > summary { cursor: pointer; }
+.sg-ts-affects-list { margin: var(--sg-space-xs) 0 0; padding: 0; list-style: none; max-height: 14rem; overflow: auto; }
+.sg-ts-affects-list > li { display: flex; justify-content: space-between; gap: var(--sg-space-m); padding: var(--sg-space-xxs) 0; border-bottom: var(--sg-line); }
+.sg-ts-affects-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-ts-affects-val { flex: none; font-variant-numeric: tabular-nums; }
+.sg-ts-affects-val b { color: var(--sg-text); font-weight: var(--sg-text-weight); }
