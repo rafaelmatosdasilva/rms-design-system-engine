@@ -56,3 +56,12 @@ test('an inside stroke drawn as an inset ring counts as a stroke on all four sid
   const none = runGate('structure-check.mjs', files('.chip { padding: var(--padding-s) var(--padding-m); gap: var(--gap-s); box-shadow: 0 1px 2px #0003; }', { 'structure-contract.mjs': strokeContract }));
   assert.match(none.out, /chip\/stroke-sides: CSS missing "border:" shorthand/, 'a drop shadow is no stroke');
 });
+
+test('a sub-frame that differs is said with the file and line of the rule that sets it', () => {
+  const childContract = contract.replace("gapVar: 'gap/s' } };", "gapVar: 'gap/s', children: [{ name: 'Content', cssSelector: '.chip__content', gapVar: 'gap/s', paddingVar: { lr: 'padding/m' } }] } };");
+  const css = '.chip { padding: var(--padding-s) var(--padding-m); gap: var(--gap-s); }\n/* the content */\n.chip__content {\n  display: flex;\n  gap: 2px;\n}\n';
+  const r = runGate('structure-check.mjs', files(css, { 'structure-contract.mjs': childContract,
+    's.json': { components: { chip: { paddingVar: { tb: 'padding/s', lr: 'padding/m' }, gapVar: 'gap/s', childFrameGaps: [{ name: 'Content', gapVar: 'gap/s' }], childFramePadding: [{ name: 'Content', paddingVar: { lr: 'padding/m' } }] } } } }));
+  assert.match(r.out, /chip\/Content\/gap: "\(not set\)" ≠ var\(--gap-s\) \[gap\/s\]  \(theme\.css:6\)/, r.out);
+  assert.match(r.out, /chip\/Content\/padding-lr: padding missing var\(--padding-m\) \[padding\/m\] - got: \(not set\)  \(theme\.css:4\)/, 'a rule that sets no padding points at the rule');
+});
