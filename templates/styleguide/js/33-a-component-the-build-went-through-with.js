@@ -349,10 +349,12 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || ruleRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
+        // Rules, the Figma review's findings on it (ruleRows): to fix while one is, else to decide.
+        if (a[0] === 'rules') { var rr = ruleRows(c); return { v: a[0], label: a[1], state: rr.some(function (r) { return r.st === 'todo'; }) ? { cls: 'differs', say: 'Fix' } : { cls: 'figma', say: 'Decide' } }; }
         // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
@@ -388,6 +390,8 @@
       (builtUses(c).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +
       ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
+      // Rules: the Figma review's findings on it, each a task for whoever keeps the Figma file, linking its node there.
+      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(ruleRows(c)) + '</div>' + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';

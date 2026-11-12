@@ -64,3 +64,54 @@ test('the Status table gives each component one row: a part counts inside it how
     close();
   } finally { c.kill(); }
 });
+
+test('the Figma review\'s findings are tasks in each component\'s Rules area: its fix, a link to its node in Figma', { timeout: budget(90000) }, async () => {
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
+  const chromePath = findChrome({ playwright: true });
+  assert.ok(chromePath, 'Chrome is needed for this test');
+  const url = 'https://www.figma.com/design/AbCd1234?node-id=1-2';
+  const file = pageOf({
+    title: 'Fixture',
+    components: [component('chip'), component('tag')],
+    construction: {
+      figmaUrls: { chip: url },
+      rules: [
+        { id: 'text-content', area: 'Properties', side: 'figma', who: 'figma', says: 'A text property ends with "Content"', status: 'fix', follows: 1, of: 2,
+          toFix: [{ component: 'chip', fix: { say: 'Rename the property Label to labelContent' } }, { component: 'chip', fix: { say: 'Rename the property Hint to hintContent' } }] },
+        { id: 'code-only', area: 'Code', side: 'code', who: 'code', says: 'A code rule', status: 'fix', follows: 0, of: 1, toFix: [{ component: 'tag', fix: { say: 'Not a Figma task' } }] },
+      ],
+    },
+  });
+  const c = await launchChrome(chromePath);
+  try {
+    const { send, on, close } = await connectCDP(c.wsUrl);
+    const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
+    // Each component's own page has a Rules area with its Figma findings, a task each (the owner's choice, 12 November 2026).
+    const { sessionId } = await openPage(send, `file://${file}#c-chip`);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    await waitForTrue(send, sessionId, `!!document.querySelector('#c-chip .pg-areas [data-v="rules"]')`, { attempts: 200 });
+    await run(`document.querySelector('#c-chip .pg-areas [data-v="rules"]').click()`);
+    // The table says the rule, its status and when; its fix, who acts and its node in Figma are in the row's panel.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="rules"] thead th')].map((th) => th.textContent.trim()).filter(Boolean)`), ['Task nr', 'Rule', 'Status', 'Last checked', 'Open']);
+    const tr = await run(`(() => { const tr = [...document.querySelectorAll('#c-chip [data-area="rules"] tr.sg-row-open')].find((x) => /Content/.test(x.textContent)); return tr ? { area: tr.dataset.area, status: tr.dataset.status, fixInTable: /labelContent/.test(tr.textContent) } : null; })()`);
+    assert.deepEqual(tr, { area: 'Rules', status: 'todo', fixInTable: false });
+    assert.equal(await run(`document.querySelectorAll('#c-chip [data-area="rules"] tbody tr.sg-row-open').length`), 1, 'one row a rule, however many fixes it has');
+    await run(`[...document.querySelectorAll('#c-chip [data-area="rules"] tr.sg-row-open')].find((x) => /Content/.test(x.textContent)).click()`);
+    await waitForTrue(send, sessionId, `(() => { const p = document.getElementById('sg-row-panel'); return !!p && !p.hidden && /labelContent/.test(p.textContent) && /hintContent/.test(p.textContent); })()`, { attempts: 50 });
+    assert.equal(await run(`document.querySelectorAll('#sg-row-panel a.sg-cx-figma').length`), 1, 'its node in Figma once, below its fixes');
+    const row = await run(`(() => { const a = document.querySelector('#sg-row-panel a.sg-cx-figma'); return { href: a && a.getAttribute('href'), target: a && a.target, mark: !!(a && a.querySelector('svg')) }; })()`);
+    assert.deepEqual(row, { href: url, target: '_blank', mark: true }, 'its panel: the fix, and its node in Figma with Figma\'s mark');
+    await run(`document.querySelector('#sg-row-panel [data-panel-close]').click()`);
+    assert.equal(await run(`!!document.querySelector('#c-tag .pg-areas [data-v="rules"]')`), false, 'a code rule is not a Figma task: no Rules area for it');
+    // Its own address, as every area has: the page writes it, and a link to it opens the Rules area straight away.
+    await waitForTrue(send, sessionId, `location.hash === '#c-chip/rules'`, { attempts: 50 });
+    assert.equal(await run('location.hash'), '#c-chip/rules', 'the address names the area');
+    await run(`location.hash = '#status'`);
+    await waitForTrue(send, sessionId, `!document.getElementById('c-chip') || document.getElementById('c-chip').hidden`, { attempts: 50 });
+    await run(`location.hash = '#c-chip/rules'`);
+    assert.equal(await waitForTrue(send, sessionId, `(() => { const a = document.querySelector('#c-chip [data-area="rules"]'); return !!a && !a.hidden; })()`, { attempts: 100 }), true, 'a link straight to the Rules area opens it');
+    assert.deepEqual(errors, []);
+    close();
+  } finally { c.kill(); }
+});

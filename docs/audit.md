@@ -466,6 +466,15 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 - **Motion.** Movement values match Figma, when your design defines them.
 - **Shadows.** They match Figma, when your design defines them.
 
+### How a component is built
+
+The value checks compare what a component draws. Two things about how it is built are read on both sides and compared too, component by component:
+
+- **Its corners.** Figma binds all four to one variable while the code sets each corner on its own, or the other way round.
+- **Its parts.** Figma always shows a part that the code renders on a condition (`v-if`, `&&`, `{#if}`, or inside an element that has one). Or Figma shows it by a property (its visibility wired to a yes/no) while the code always renders it.
+
+Each difference names the component, the part and the line of its file, and shows in that component's Parity area as a decision: which side is right is the team's to say. Advice, never a failure. Only what both sides say is compared: a part the pairing cannot match to a class is left alone, never guessed.
+
 ### In the browser
 
 - **Renders correctly in a browser.** Checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup, the rule's `probe`.

@@ -143,6 +143,36 @@
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });
   }
+  // The Figma review's findings (the Rules page's Figma rules, construction-page.mjs) as tasks on the component each
+  // names, beside its other tasks: a rule to fix is to fix, one to decide is to check, and each waits on whoever keeps
+  // the Figma file. A Figma task links the component's node in the Figma file, with Figma's mark (CLAUDE.md).
+  var RULE_TASKS = (function () {
+    var by = {}, G = DATA.construction;
+    if (!G) return by;
+    (G.rules || []).forEach(function (r) {
+      if (r.side !== 'figma' || (r.status !== 'fix' && r.status !== 'decide')) return;
+      (r.toFix || []).forEach(function (t) { if (t.component) (by[t.component] = by[t.component] || []).push({ r: r, t: t }); });
+    });
+    return by;
+  })();
+  function ruleRows(c) {
+    var urls = (DATA.construction && DATA.construction.figmaUrls) || {}, u = urls[c.name];
+    var node = u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c.name + ' in Figma') + '">' + FIGMA_SVG + esc(c.name) + '</a>' : esc(c.name);
+    // One row a rule, however many places of the component it finds: each fix a line of its panel, the node in Figma once
+    // below them, since it is the same for all (the owner's, 12 November 2026).
+    var by = {}, order = [];
+    (RULE_TASKS[c.name] || []).forEach(function (x) {
+      var say = (x.t.fix && x.t.fix.say) || x.t.value || '';
+      if (!by[x.r.id]) { by[x.r.id] = { r: x.r, says: [] }; order.push(x.r.id); }
+      if (say && by[x.r.id].says.indexOf(say) < 0) by[x.r.id].says.push(say);
+    });
+    return order.map(function (id) {
+      var g = by[id], says = g.says.length ? g.says : [g.r.says];
+      return { key: c.name + '\u0000rule:' + id, area: 'Rules', kind: g.r.says, figma: node, code: '',
+        todo: says.map(function (x) { return '<span class="pg-par-val">' + esc(x) + '</span>'; }).join('') + '<span class="pg-par-val">' + node + '</span>', who: WHO.designer,
+        st: g.r.status === 'fix' ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
+    });
+  }
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
@@ -170,6 +200,7 @@
       } catch (e) { /* its accessibility is read on its own page */ }
       migrationRows(c).forEach(function (r) { rows.push(r); });
       copyRows(c).forEach(function (r) { rows.push(r); });
+      ruleRows(c).forEach(function (r) { rows.push(r); });
       motionIssueRows(c).filter(isOpen).forEach(function (r) { rows.push(r); });
       docRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });

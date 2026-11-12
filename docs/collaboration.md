@@ -151,7 +151,8 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Playground | The component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch. Below it, the tokens behind what is drawn and the code to copy |
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
-| Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
+| Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared, and how it is built (its corners, each part shown always or on a condition) |
+| Rules | Only when the Figma review finds something on it: each construction rule it breaks, as a task with its fix for whoever keeps the Figma file, linked to its node in Figma |
 | Accessibility | One table by WCAG 2.2 criterion: its task number, the criterion, who acts, its status and when it was last checked. What to do, what Figma states and what was found are in the row's panel |
 | Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
 | Motion | Everything that moves in it, the code's timing beside Figma's |

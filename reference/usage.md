@@ -628,7 +628,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   rules use, then one that names the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
-- **A component's page in areas**: Playground (with its specs), Variants, Documentation, Accessibility, Parity and Used in, one at a time on
+- **A component's page in areas**: Playground (with its specs), Variants, Documentation, Accessibility, Parity, Rules (only where the Figma review
+  finds a construction rule it breaks: each a task with its fix for whoever keeps the Figma file, linked to its node in Figma, `ruleRows`) and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
@@ -765,7 +766,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
-- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
+- **Parity** (`parityView`, `parityRows`), with how it is built held against Figma's (`anatomy-parity.mjs`, the audit's
+  `anatomy.json`: its corners, one variable for all four against one custom property, and each paired part shown always
+  against on a condition, its own or its parent's; a decision each, with the part and its file's line): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
   slot the contract gives a part of its own is paired with that part (`.modal-slot`); every slot is marked in the
   Playground as the area it takes, dashed and named Slot inside, in place of the placeholder its markup holds
   (`drawSlots`): its own part (`.pg-slot-area`, at least 40 by 96 pixels so an empty one is seen), or, for a slot whose
