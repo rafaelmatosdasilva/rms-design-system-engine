@@ -80,7 +80,10 @@ test('two variants that differ only by a red against a green read as one to peop
   assert.equal(cvdVariantFindings([{ name: 'badge', variants: [v('a', 'rgb(67, 160, 71)'), { ...v('b', 'rgb(229, 57, 53)'), shape: 'SPAN;other' }] }]).length, 0, 'an icon or a word apart: not colour alone');
   assert.ok(colourDistance({ r: 67, g: 160, b: 71 }, { r: 229, g: 57, b: 53 }) > 100);
   assert.equal(severityOf('cvdvariant'), 'advisory');
-  assert.deepEqual([A11Y_WCAG.cvdvariant, A11Y_WCAG.forcedstate], ['1.4.1', '1.4.11']);
+  // Colour alone is 1.4.1, an AA criterion. A state lost in high contrast mode is not: that mode is nothing WCAG 2.2
+  // asks about at A or AA, so it is its own row (wcag21.mjs BEYOND_AA), advisory.
+  assert.deepEqual([A11Y_WCAG.cvdvariant, A11Y_WCAG.forcedstate], ['1.4.1', 'Forced colours']);
+  assert.equal(severityOf('forcedstate'), 'advisory');
 });
 
 test('in the browser: red and green variants, and a selected tab drawn only by its background in high-contrast mode', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
@@ -103,6 +106,10 @@ test('in the browser: red and green variants, and a selected tab drawn only by i
   const all = JSON.stringify(d.issues.map((i) => [i.issue, i.selector]));
   assert.deepEqual(of('cvdvariant'), ['badge: badge--success and badge--error differ only by colour, and look alike to people who do not see green (deuteranopia)'], all);
   assert.deepEqual(of('forcedstate'), ['button.tab "One" (selected)'], all);
+  // It says which row it belongs to, and names no criterion at all.
+  const state = d.issues.find((i) => i.issue === 'forcedstate');
+  assert.equal(state.beyond, 'Forced colours');
+  assert.equal(state.wcag, undefined, all);
 });
 
 test('what a screen reader says when a press shows a toast; one put in no live region is said unheard', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {

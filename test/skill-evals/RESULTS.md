@@ -19,6 +19,23 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 97k, in 3.7 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-two-severities-for-the-construction`.
+## 2026-11: Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA (continuous evaluation)
+
+Measured on the merge of main into the batch (engine df790fa), so the guide set recorded is the one that ships. What changed since the entry below (engine dc9f336): Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA; The theme editor previews a specimen of the system's own components, checked so nothing is invented (#443); Measured: 79/79, no rule broken; the high-contrast edge case scoped to its controls; The code's words read as Figma's are, and the team's own linters read as decided rules (#445); The composition path measured at more runs, on a model above Haiku (#444); Several directions for one request, each one the system's own (#447). The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `65a79aaf869d` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md f43bf9be` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine df790fa | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.057 |
+| Input a run | 97k | 99k |
+| Turns a run | 3.6 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 97k, in 3.5 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-merge-main-the-batch-is`.
 
 ## 2026-11: The code's words read as Figma's are, and the team's own linters read as decided rules (continuous evaluation)
 
