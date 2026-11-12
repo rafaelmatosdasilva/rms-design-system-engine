@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { codeGrammarOf, anatomyOf, shadowLayers, codeGrammarLines, codeGrammarFor, cssInJs, namesTextStyle, resolveSass, sassVars } from '../lib/code-grammar.mjs';
+import { codeGrammarOf, anatomyOf, shadowLayers, codeGrammarLines, codeGrammarFor, cssInJs, namesTextStyle, resolveSass, sassVars, wordsShown, wordsFromProps } from '../lib/code-grammar.mjs';
 import { constructionView } from '../lib/construction-page.mjs';
 import { decidedRules } from '../lib/construction-grammar.mjs';
 
@@ -288,4 +288,33 @@ test('a class name goes into a regular expression escaped whole, never its hyphe
   const a = anatomyOf({ file: 'Grid.vue', text, styles: [{ file: 'Grid.vue', text }], root: 'acme-grid', props: ['wide'] });
   assert.ok(a, 'a class holding regular-expression characters is read, never thrown on');
   assert.deepEqual(a.parts.map((p) => p.class), ['acme-grid__cell']);
+});
+
+test('the words a component shows: from a prop or a slot, never written into its markup', () => {
+  const written = `<template><div class="acme-empty"><h3 class="title">No results found</h3><p>{{ message }}</p><button @click="go(a > b)">Try again</button></div></template>
+<script>export default { props: { message: { type: String, default: 'Nothing here yet' } } };</script>`;
+  const w = wordsShown('Empty.vue', written);
+  // An interpolation is the prop's words, and a ">" inside a handler is not the end of a tag.
+  assert.deepEqual(w.map((x) => x.words), ['No results found', 'Try again']);
+  assert.ok(w.every((x) => /^Empty\.vue:\d+$/.test(x.at)));
+  assert.deepEqual(wordsFromProps({ props: { message: { type: 'String', default: 'Nothing here yet' } } }), [{ prop: 'message', words: 'Nothing here yet' }]);
+  // An option is a name, never words the component shows.
+  assert.deepEqual(wordsFromProps({ props: { size: { type: 'String', default: 'large', options: ['small', 'large'] } } }), []);
+  const g = codeGrammarOf({ components: [...system(), { name: 'acmeEmpty', file: 'src/components/empty/Empty.vue', text: written, styles: [], root: 'acme-empty', api: api({ message: { type: 'string', description: 'What to say.' } }) }] });
+  const r = g.code.rules.find((x) => x.id === 'code-words-from-props');
+  assert.equal(r.area, 'content');
+  assert.deepEqual(r.toFix.map((t) => t.component), ['acmeEmpty']);
+  assert.match(r.toFix[0].value, /No results found/);
+  // Every component with markup is read, so a component that writes no words is what following the rule looks like.
+  assert.equal(r.of, 5);
+});
+
+test('a rule the team wrote into its own linter is the team\'s, and is never asked again', () => {
+  const plain = codeGrammarOf({ components: system() }).code.rules.find((r) => r.id === 'code-boolean-prop-case');
+  assert.equal(plain.by, 'majority');
+  const decided = codeGrammarOf({ components: system() }, { answers: { 'code-boolean-prop-case': true }, decidedIn: { 'code-boolean-prop-case': 'eslint.config.js (vue/prop-name-casing)' } });
+  const r = decided.code.rules.find((x) => x.id === 'code-boolean-prop-case');
+  assert.equal(r.by, 'team');
+  assert.equal(r.decidedIn, 'eslint.config.js (vue/prop-name-casing)');
+  assert.ok(!decided.questions.some((q) => q.id === 'code-boolean-prop-case'), 'it is no longer a question');
 });

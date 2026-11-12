@@ -154,6 +154,9 @@ What it reads, as rules:
 - **Tokens.** Whether a component's styles use custom properties made for it (`--button-…`) or the shared tokens directly. Which way is your team's to say, so it waits for the answer.
 - **Its look.** A shadow, a border colour, an opacity, the corners and the text, each written with a token rather than by hand, and whether the corners share one radius token.
 - **Its own API.** Whether a component declares custom properties of its own for what may be overridden.
+- **Its words.** Whether the words a component shows come from a prop or a slot rather than being written into its markup, and the case your defaults are written in. Words written into the markup cannot be changed or translated by whoever uses the component.
+
+**What your own linters already decided.** A rule you wrote into your ESLint or stylelint config is a decision you have already made, so the engine counts it as yours instead of asking again, and says where it was written (`eslint.config.js (vue/prop-name-casing)`). It reads the usual config files, and a config written as JavaScript is read as text, never run. Only settings that say the same thing as a rule the engine mines are read; nothing else in your config is interpreted, and the engine never writes one.
 
 Beside the rules, each component's anatomy, read as deeply as Figma's:
 
@@ -165,6 +168,8 @@ Beside the rules, each component's anatomy, read as deeply as Figma's:
 - **How it wraps and sizes.** `flex-wrap`, the row gap against the column gap, the minimum width, and whether it hugs its content or fills its space.
 - **The text each part sets.**
 - **What only the code has.** The custom properties it declares and reads (its own API, safe to override), and those it reads from the theme.
+
+**In CI.** `--construction-check` exits 1 when a component breaks a rule your team decided. A rule nobody has decided yet that components already break is a warning: said, never a failure, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data for a job that posts it. The step to copy is in [the CI recipe](../cookbook/ci-and-hooks.md).
 
 It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
 
