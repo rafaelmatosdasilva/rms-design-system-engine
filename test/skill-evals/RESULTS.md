@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion (continuous evaluation)
+
+Measured on the merge of main (#452) into the batch (engine 802d734), so the guide set recorded is the one that ships. What changed since the entry below (engine 0ebb6b5): A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion; The rows beyond A and AA keep what they depend on; The evaluation reads "lacks a green" as the gap said, as it reads "no green"; Measured: 79/79, no rule broken, no task changed state; What a run says about the browsers is the same on every machine; a row panel closed the page's own way; Two severities for the construction check, and the same as data (#452); The demo's golden report says what a run answers about browsers. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `8c40cb7c3903` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 561ed94d` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md de8874ab` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 802d734 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.056 |
+| Input a run | 96k | 99k |
+| Turns a run | 3.5 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 96k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-merge-main-the-batch-is-2`.
+
 ## 2026-11: Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci (continuous evaluation)
 
 What changed since the entry below (engine fd52a2f): Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA (#448); Figma's anatomy held against the code's, part by part (#450). The guide changed in `reference/config.md`, `reference/usage.md`.
