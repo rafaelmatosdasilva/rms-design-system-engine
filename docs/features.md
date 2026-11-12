@@ -248,6 +248,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes each component's accessibility spec into Figma.
 - Pins accessibility problems on the layers of your designed screens.
 - Links each component to its code file in Dev Mode.
+- Writes what your team approved each token and component is for into its Figma description, never over one a designer wrote.
 - Shows you every change first. Nothing changes until you say yes.
 
 ## Publish a living style guide

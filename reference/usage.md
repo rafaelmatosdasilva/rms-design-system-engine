@@ -2057,6 +2057,23 @@ border or corner, a typed number, a text with no style, a shape and a component 
 the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
 in `prototypes/` is kept unless `--force`.
 
+#### --figma-descriptions (what each token and component is for, written into Figma)
+
+`rms-design-system-engine --figma-descriptions` writes what the intent layer holds approved for each token and
+component into Figma's own description, where a designer reading the file finds it (`figma-descriptions.mjs`). Only
+the team's approved lines are written (an entity's purpose), never a draft, and nothing is written at the point of
+writing. A line that is the same sentence on many pages of its kind with only the name changed is left out and
+listed: it is judged as the layer's reading judges it (`lineShape` in `doc-source-dsds.mjs`), but without the
+exception that keeps a token's templated line for the agents, since a designer learns nothing from it. A token is
+found in Figma by the system's naming (`tokenToVar`), a component by the intent layer's own pairing
+(`matchComponents`); one that pairs with nothing is said. A description Figma already holds is never written over:
+one that says the same is left, one that says something else is listed in `handback/figma-descriptions.json` for a
+person to decide. The script checks each one again in the file, so one a designer typed after the list was made is
+left too. It is written as the hand-back script (`handback/figma-apply.js`), run with the Figma tool only once the
+person says yes, each value it replaces recorded for the way back (`variableDescription`, `description` in
+`figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run
+saying which part comes next.
+
 #### --figma-edits (Figma brought in line with the code, once the person says yes)
 
 `rms-design-system-engine --figma-edits` lists what the code already states that Figma does not, as edits the engine
