@@ -1046,10 +1046,12 @@
       var st = styleOf(el); if (!st) return '<p class="sg-ts-tok-group">Text style</p><p class="sg-ts-hint sg-ts-pick-empty">Not one of the system\'s text styles.</p>';
       var field = function (p, label) {
         if (!p || !p.var) return '';
-        var bps = Object.keys(p.modes || {}); if (!bps.length) bps = [''];
+        // Only the breakpoints the screens on show are at (phones: Phone), so what is changed is what is seen.
+        var onShow = {}; (SG.screens || []).forEach(function (sc) { Object.keys(sc.modes || {}).forEach(function (k) { onShow[String(sc.modes[k]).toLowerCase()] = 1; }); });
+        var bps = Object.keys(p.modes || {}), seen = bps.filter(function (bp) { return onShow[bp.toLowerCase()]; }); if (seen.length) bps = seen; if (!bps.length) bps = [''];
         return '<div class="pg-ctl sg-ts-tok" data-hit="' + esc(p.var) + '"><span class="sg-mode-label">' + esc(label) + '</span><div class="sg-ts-field sg-ts-tok-field sg-ts-bps">' + bps.map(function (bp) {
           var over = (tokOver.bp[p.var] || {})[bp], now = over != null ? over : (bp ? p.modes[bp] : p.value);
-          return '<label class="sg-ts-num sg-input sg-ts-tok-num sg-ts-bp"><input type="number" class="sg-ts-hex" data-kind="bp" data-var="' + esc(p.var) + '" data-bp="' + esc(bp) + '" step="1" min="0" value="' + esc(parseFloat(now) || 0) + '" aria-label="' + esc(label + (bp ? ' at ' + bp : '') + ' in px') + '"><span class="sg-ts-mode-tag" aria-hidden="true">' + esc(bp ? bp.charAt(0).toUpperCase() + bp.slice(1) : 'px') + '</span><button type="button" class="sg-ts-auto" data-bp-reset="' + esc(p.var) + '" data-bp="' + esc(bp) + '" title="Back to the style\'s own" aria-label="' + esc(label + (bp ? ' at ' + bp : '')) + ' back to the style\'s own"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button></label>';
+          return '<label class="sg-ts-num sg-input sg-ts-tok-num sg-ts-bp"><input type="number" class="sg-ts-hex" data-kind="bp" data-var="' + esc(p.var) + '" data-bp="' + esc(bp) + '" step="1" min="0" value="' + esc(parseFloat(now) || 0) + '" aria-label="' + esc(label + (bp ? ' at ' + bp : '') + ' in px') + '"><span class="sg-ts-mode-tag" aria-hidden="true">' + esc(bp ? bp.charAt(0).toUpperCase() + bp.slice(1) : 'All breakpoints') + '</span><button type="button" class="sg-ts-auto" data-bp-reset="' + esc(p.var) + '" data-bp="' + esc(bp) + '" title="Back to the style\'s own" aria-label="' + esc(label + (bp ? ' at ' + bp : '')) + ' back to the style\'s own"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button></label>';
         }).join('') + '</div></div>';
       };
       return '<p class="sg-ts-tok-group">Text style · ' + esc(st.scale) + '</p>' + field(st.size, 'Size') + field(st.lh, 'Line height');
