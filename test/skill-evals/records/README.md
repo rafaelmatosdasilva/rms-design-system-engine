@@ -264,5 +264,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci" |
 | `2026-11-12-a-description-a-designer-wrote` | The 24 guide tasks on Haiku (engine d20790c) | "A description a designer wrote is put to the person, with both texts" |
 | `2026-11-12-layout-faults` | The 24 guide tasks on Haiku (engine 3f231b9) | "Layout faults, construction check annotations and the skill file" |
+| `2026-11-12-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 7050066) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/written-back" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
