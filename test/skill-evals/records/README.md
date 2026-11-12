@@ -265,5 +265,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-code-into-figma` | The 24 guide tasks on Haiku (engine 84f012d) | "Code into Figma, templates as frames and code from a spec" |
 | `2026-11-12-layout-faults` | The 24 guide tasks on Haiku (engine 3f231b9) | "Layout faults, construction check annotations and the skill file" |
 | `2026-11-12-code-into-figma-on-main` | The 24 guide tasks on Haiku (engine 44b2c48) | "Code into Figma, on main with the layout faults" |
+| `2026-11-12-everything-the-system-holds` | The 24 guide tasks on Haiku (engine 7efa620) | "Everything the system holds, generated, and a kept benchmark for Figma builds" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
