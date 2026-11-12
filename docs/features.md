@@ -26,7 +26,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | Feature | What it does | Status |
 |---|---|---|
 | [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | Ready to use |
-| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it. | Early development |
+| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | Early development |
 
 ### Creation
 
@@ -248,9 +248,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes each component's accessibility spec into Figma.
 - Pins accessibility problems on the layers of your designed screens.
 - Links each component to its code file in Dev Mode.
-- Writes what your intent layer says each component and token is for as its description in Figma.
-- Draws a spec page beside each component: its parts, properties, sizes, tokens and role.
-- Writes a token value your code changed first back into its Figma variable.
+- Writes into each token's and component's Figma description what it is for and where to use it, so an agent reading Figma knows where it belongs; never over one a designer wrote.
+- Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
+- Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
 - Shows you every change first, and asks about each kind of change on its own. Nothing changes until you say yes.
 - Keeps a way back for every change, so you can take it back.
 
@@ -259,9 +259,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine bring Figma in line with the code` | Every change the code says Figma is missing, by kind, each kind asked on its own before anything is written |
-| `/rms-design-system-engine write the spec pages into Figma` | A spec page beside each component set, shown first and drawn once you say yes |
-| `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, where it has none |
-| `/rms-design-system-engine write the token values the code changed into Figma` | Each value before and after, written into its variable once you say yes; one both sides changed is left for you |
+| `/rms-design-system-engine write the spec pages into Figma` | Each component's spec drawn beside it, shown first and drawn once you say yes |
+| `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, never over one a designer wrote |
+| `/rms-design-system-engine write the token values the code changed into Figma` | Each value the code changed first, written into its variable once you say yes |
 | `/rms-design-system-engine pin the accessibility problems on the screens in Figma` | Each problem pinned on its layer, with a summary on each screen |
 | `/rms-design-system-engine take back the last change in Figma` | What the way back puts back, and once you say yes, the file as it was before |
 

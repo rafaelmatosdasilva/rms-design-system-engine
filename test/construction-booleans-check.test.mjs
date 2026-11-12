@@ -83,3 +83,34 @@ test('the layer order names only the few layers most components have, and holds 
   assert.equal(r.says, 'A component\'s layers come in one order: A, B, C, D, E, F', 'six at most, each where it sits on average');
   assert.deepEqual(r.toFix.map((x) => x.component), ['cardFour']);
 });
+
+// What a pipeline is told, in two severities (--construction-check): an error fails the run, a warning never does.
+test('an error is a rule the team decided and a component breaks; a warning is one nobody decided yet', async () => {
+  const { checkSeverities, checkEntry } = await import('../lib/construction-grammar.mjs');
+  const g = {
+    figma: { rules: [
+      { id: 'layers-named', by: 'team', status: 'fix', says: 'Every layer has a name', follows: 4, of: 5, toFix: [{ component: 'cardTile', value: 'Frame 12' }] },
+      { id: 'description', by: 'team', status: 'rule', says: 'Every component carries a description', follows: 5, of: 5, toFix: [] },
+      { id: 'auto-layout', by: 'majority', status: 'fix', says: 'Every component lays out with auto layout', follows: 4, of: 5, toFix: [{ component: 'chipFilter', value: 'its frame' }] },
+    ] },
+    code: { rules: [
+      { id: 'code-boolean-prop-case', by: 'team', status: 'fix', says: 'A yes/no prop is named in camelCase', follows: 4, of: 5, decidedIn: 'eslint.config.js (vue/prop-name-casing)', toFix: [{ component: 'acmeBadge', value: 'is_active' }] },
+      { id: 'code-shadow-token', by: 'majority', status: 'decide', says: 'A shadow is written with the system\'s token', follows: 2, of: 5, toFix: [{ component: 'acmeCard', value: '0 1px 2px #0003' }] },
+    ] },
+  };
+  const { errors, warnings } = checkSeverities(g);
+  // Both sides' decided rules fail; a decided rule nothing breaks is neither.
+  assert.deepEqual(errors.map((r) => r.id), ['layers-named', 'code-boolean-prop-case']);
+  assert.deepEqual(warnings.map((r) => r.id), ['auto-layout', 'code-shadow-token']);
+  // Each entry says which side it is, and where the team decided it when a lint config did.
+  const e = checkEntry(errors[1], 'error');
+  assert.equal(e.side, 'code');
+  assert.equal(e.severity, 'error');
+  assert.equal(e.decidedIn, 'eslint.config.js (vue/prop-name-casing)');
+  assert.deepEqual(e.breaks, [{ component: 'acmeBadge', value: 'is_active' }]);
+  assert.equal(checkEntry(errors[0], 'error').side, 'figma');
+  // A place with no component of its own (the code's own findings) keeps where it is instead.
+  assert.deepEqual(checkEntry({ id: 'code-class-used', toFix: [{ where: 'card.css:3', value: '.dead' }] }, 'warning').breaks, [{ where: 'card.css:3', value: '.dead' }]);
+  // Nothing read is nothing said, never a throw.
+  assert.deepEqual(checkSeverities({}), { errors: [], warnings: [] });
+});

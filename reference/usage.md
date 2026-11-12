@@ -1549,7 +1549,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
   over it or its opacity, as most components show theirs (`state-one-way`), the library's size scale - at each size
   option, the minimum height and the icon size most components have there (`size-scale-height`, `size-scale-icon`) - and two parts side by side spaced by the variable most
-  frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  frames holding them bind at the same size (`part-gap`); what the boxes say (`layout-faults.mjs`, `layout-faults`):
+  text over text or an icon, a text or an instance cut off by a frame that clips or outside one of a fixed size, each with
+  its layer and variant, always to fix (a fault is never put to the team), read from the places the capture keeps (a
+  box of a fixed size whose parts run beyond it, `looks[...].box`, and a layer placed by hand), and waiting on a capture
+  that keeps them (`boxes` in `_keeps`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
@@ -1568,7 +1572,14 @@ the page out of the menu and the search, opened only by its link (`#rules`; `#co
 A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
 `--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing is said until the team decided
-a rule.
+a rule. Beside those errors it says the **warnings**: a rule nobody has decided yet that components already break, said
+and never failing the run, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on
+both; `--json` writes the same as data (`errors`, `warnings`, `counts`, each rule with what breaks it and where the team
+decided it), for a job that posts it. `--github` prints each place that breaks a rule as an annotation a pull request
+shows (`annotationsOf`). The ready-made GitHub Action runs it in one line of a team's workflow (`uses:
+rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`, after `actions/checkout`;
+`working-directory` names the folder with `ds-config.json`); it runs the engine from its own checkout, installs nothing
+and changes nothing.
 
 #### A component built in Figma (`--spec`, `--figma-build`)
 
@@ -2068,6 +2079,58 @@ component) is read as layout and listed as a template or component the system co
 border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
 the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
 in `prototypes/` is kept unless `--force`.
+
+#### --figma-descriptions (what each token and component is for, written into Figma)
+
+`rms-design-system-engine --figma-descriptions` writes into Figma's own description of each token and component what
+it is for and where to use it, so an agent reading the file through a Figma tool knows where each one belongs
+(`figma-descriptions.mjs`). Every line is the team's approved words or a fact the engine read: for a token, what it is
+for and when to use it and not (the intent layer), which components use it (their contracts), what it points at (its
+alias) and its name in the code; for a component, what it is for, when to use it and not, what to use instead (its
+contract) and its file in the code. Never a draft, nothing written at the point of writing, no line that repeats one
+already said or only leads into a list, and no description for a token with nothing to say but its code name. A line that is the same sentence on many pages of its kind with only the name changed is left out and
+listed: it is judged as the layer's reading judges it (`lineShape` in `doc-source-dsds.mjs`), but without the
+exception that keeps a token's templated line for the agents, since a designer learns nothing from it. A token is
+found in Figma by the system's naming (`tokenToVar`), a component by the intent layer's own pairing
+(`matchComponents`); one that pairs with nothing is said. A description Figma already holds is never written over
+unasked: one that already holds every line is left; one that says something else is put to the person in the list
+under "For a person to decide", with both texts. Where the engine has only facts (no words of the team's), or Figma
+already holds the team's very sentence, the suggestion keeps the designer's words and adds the facts below them;
+otherwise it is the team's approved words instead of the designer's. `--replace <name …>` writes the ones the person
+chose, `--replace-all` every one, and only where Figma still holds exactly the text that was listed, so one a
+designer changed again since is left. The script checks each one again in the file, so one a designer typed after the list was made is
+left too. It is written as the hand-back script (`handback/figma-apply.js`), run with the Figma tool only once the
+person says yes, each value it replaces recorded for the way back (`variableDescription`, `description` in
+`figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run
+saying which part comes next.
+
+#### --figma-specs (each component's spec, drawn in Figma beside its component set)
+
+`rms-design-system-engine --figma-specs [component …]` draws each component's spec as a frame beside its component set,
+from its contract alone (`spec-frames.mjs`): the anatomy (an instance of the default variant with a numbered marker
+on each part, placed on the layer of the part's own name, the parts listed by number with their tokens), each property
+with its options and default, the states, every token it uses, its sizes per variant as Figma's capture has them, and
+its accessibility (element, role, what names it, its keys) as the code and the browser give it. A part with no layer
+of its name is listed with no marker, and said. Each frame keeps its contract's fingerprint: one drawn from the
+contract as it is now is left as it is, a stale one is drawn afresh. Written as the hand-back script, run only once the
+person says yes; the frames are the engine's own output, recorded for the way back. A system's specs go 40 a run
+(`--chunk 2`, …). Not yet: drawing them in the system's own documentation template when the file has one.
+
+#### --figma-tokens-back (a token the code changed first, written back to Figma's variables)
+
+`rms-design-system-engine --figma-tokens-back` writes back into Figma's variables a token the code changed first
+(`code-led-tokens.mjs`). A difference alone never says which side moved, so the engine reads the code as it was when
+Figma was last read: the theme stylesheet at that moment from git, else the code's values the engine kept at that read
+(`code-at-figma-read.json`, written each time Figma's variables are read). Per variable and mode: the code held then
+what Figma holds and has moved since → its value is written back; the two differed already when Figma was read →
+drift, listed in `handback/figma-tokens-back.json` and never written, since nobody can tell who is right; the past
+cannot be read → listed, never written, until the next Figma read keeps it. Two numbers that differ only by a unit
+(Figma writes `500px` for a font weight the code writes `500`) are the same value. A token the code added since Figma
+was read is made as a new variable, in the collection most of its layer's variables are in. A value that replaces an
+alias in Figma names the alias it breaks. Written as the hand-back script, run only once the person says yes: each
+value is read again in the file, and one changed in Figma since is a conflict, left for a person, never written over.
+Each value it replaces, and each variable it makes, is recorded for the way back (`variableValue`, `deleteVariable`).
+A long list goes 300 a run (`--chunk 2`, …).
 
 #### --figma-edits (Figma brought in line with the code, once the person says yes)
 

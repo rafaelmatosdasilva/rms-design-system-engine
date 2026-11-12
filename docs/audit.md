@@ -109,6 +109,7 @@ More readings of the library:
 - **Hover shown one way.** A button that shows its hover with an overlay layer when most change their own fill.
 - **A slot or a swap, consistently.** An `Icon` property that is a slot in one component and an instance swap in most.
 - **The gap between two parts.** An icon and a label spaced by `space/m` in one chip and by `space/xs` in most, at the same size.
+- **Nothing overlaps or spills.** A label drawn over its icon, a part cut off by a frame that clips, or one sitting outside its parent, named with its layer and variant. A fault is never a style, so it is always to fix. It needs a Figma read taken since this check came in.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.
@@ -125,6 +126,7 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 - **Filter by any column.** A chip for each status, with its colour, so what is to fix is one click away; beside them a list for Source and one for Area. Each says how many rules your other choices would leave, they combine, and Clear filters drops them.
 - **Checks that wait on Figma are named.** A new check that reads something your last Figma capture doesn't have yet finds nothing until Figma is read again. Rather than look like a clean library, the page says how many checks wait and what they read, with the request to refresh Figma ready to copy ([how to ask](features.md#set-up)). The summary of the rules says it too.
 - **One card for the decision.** A row opens in the side panel: what the engine suggests, every component or place it would change, and the approval under it, in one card to read top to bottom.
+- **In your pipeline.** A ready-made GitHub Action runs the check on every pull request: an error for a rule your team decided, which stops the merge, and a warning for every other rule a component does not follow. One line in your workflow adds it ([how](../cookbook/ci-and-hooks.md)).
 - **Each change said once.** The components on the left, linked, and the changes they take on the right, one a line. Components that take the same changes share one entry. Labelled values, never a table or a box drawn like one.
 - **Checked where it lives.** Each component a Figma rule changes opens in your Figma file, at its own node, marked with Figma's icon. A rule about the code links to the component's page instead.
 - **In Figma.** The rules above, what the file check finds (values with no token or style, detached instances, layers named unlike their component, variables used outside their scope), components of one type compared, and your tokens: named by role, described, layered where their value changes, and what each brand overrides.
@@ -175,6 +177,8 @@ Beside the rules, each component's anatomy, read as deeply as Figma's:
 - **What only the code has.** The custom properties it declares and reads (its own API, safe to override), and those it reads from the theme.
 
 It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
+
+**In CI.** Beside those errors, a rule nobody has decided yet that components already break is a **warning**: said, never a failure, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data for a job that posts it. The step to copy is in [the CI recipe](../cookbook/ci-and-hooks.md).
 
 ### Classes nothing styles, and styles nothing uses
 
@@ -513,6 +517,7 @@ This is not debt. Debt (`--baseline`) is a difference you will fix later. A kept
 - A check that had nothing to read shows **Not run** with the reason, never Pass.
 - What a check cannot see is listed as not comparable, with the reason, not as a difference.
 - Every check is tested with a mistake planted on purpose.
+- Every check that can be written another way is tested with legal work written that way too: a colour as `rgb()`, a hover guarded with `:not(:disabled)`, a transition in its longhands, a time in seconds, a shadow without its zeros. It must say the same as it does of the usual way. A check that refuses legal work is fixed, never the work.
 
 ### When a check is wrong
 

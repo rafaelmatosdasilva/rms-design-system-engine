@@ -36,6 +36,12 @@ The panel shows the form on the left and a preview on the right, in a frame of i
 
 Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
 
+- **Only what the screens use.** A setting is listed only when the screens on show draw with its token, so every setting changes something you see.
+- **Spacing says what it changes.** Under its percentage, a list of each spacing token the screens use, its size now and at the percentage chosen (`spacing/gap/l 16px → 20px`), in whole pixels. Hovering one outlines what draws with it.
+- **A shadow colour** for every shadow at once (the system gives each component its own), and the shadow settings locked while shadows are off.
+- **Undo and reset.** Each colour, and each slider's number, has a reset arrow back to where it started, shown only while the value differs from it, and **Reset changes**, in the panel's top bar, puts the whole editor back as it opened. It stays disabled until something changes, and asks before it resets.
+- **Number fields** have − and + on either side, and take whole pixels.
+
 ### The preview
 
 The preview opens on the **specimen**, a screen the engine builds from your own system, so every system has something to preview. Your Showroom's screens follow it in the same list.
@@ -43,7 +49,9 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 - **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
 - **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back.
+- **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview scrolls; hold the space bar, or the middle button, and drag to move it.
 - **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
+- **Screens side by side.** A page built for showing the editor can ask for its screens in a row, with no list to choose from (`row: true` in its data, as `enabled` is): phone screens shown together, centred, the panel's own background around them.
 
 ### Light and dark
 
@@ -54,14 +62,17 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 ### One component's tokens
 
-Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, layer by layer toward where you clicked (a table, its rows, a row, a cell, its text).
+Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a Showroom screen marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
 
-- **What you edit stays marked.** The picked part keeps its outline and a label with its name. The head of the card shows the path to it, each step a click back, and lists the components inside it, each a click away.
+- **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card shows the path to it, ending at the level picked, each step above it a click back to that level.
+- **Text of its own.** A text in no component is picked by its text style, named on hover.
 - **Only its own tokens.** The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
 - **Values as they are now.** Each token shows its value with the theme on it, in light and dark, and follows as you change the theme.
 - **Units from how a token is used.** A token its rules use as `calc(var(…) * 1%)` reads as a percentage, an opacity from 0 to 1 as a percentage, a size in pixels as px, and anything else as a plain number.
-- **Corner radius and text style.** A picked part shows its corner radius, and a text shows which of your text styles it is drawn in. Changing either changes that part in every copy of the component. A text style keeps changing per breakpoint as yours do, since it is set through the style's own variables.
-- **The app background.** Clicking where no component is picks the screen itself.
+- **Linked tokens, as Figma shows them.** A token that follows another shows that token's name in its field (a colour's with its swatch) instead of a value, and a button to detach it. Detached, it takes a value of its own, and a reset in its field links it again. A token linked to another of its own component (its corners on one radius) follows it as it changes.
+- **The system's colours.** A colour's chip, or the button beside a detached colour, opens every base, semantic and primitive colour of the system, searchable, each swatch as this theme draws it. The list opens over the panel, below its field or above it when there is more room, and only the list scrolls; a click outside it, or Escape, closes it. One chosen links the token to it, its dark value following that colour's own.
+- **Corner radius.** A picked part shows its corner radius; changing it changes that part in every copy of the component.
+- **Text style.** A text shows the text style it is drawn in, and that style's own size and line height at the breakpoints the screens on show are at (phones: Phone), its breakpoint named under each value. The values are the token's own breakpoint modes. A change is the style's token's, so every text in that style follows.
 - A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 
 ### Where a theme is kept
@@ -158,6 +169,101 @@ Two things it will not do:
 - **It never offers a panel, a drawer or a dialog as a way to build a page.** Those live *inside* a page. A shell is excluded by what its name says and by what your documentation says it is for.
 
 A shell your documentation says nothing about still appears, and says it has none — being undocumented is worth seeing, not worth hiding.
+
+### A prototype is the journey, not a screen
+
+You take a prototype to a user test, hand it to a development team and show it to a client. Isolated pages fail all three — so a folder of pages that do not link is a failure, not a partial success.
+
+The engine already knew which pages were joined and never said anything about the ones that were not. Now it does:
+
+```
+⚠️  3 prototypes and no link between any of them (orders, detail, settings): this is a
+    folder of pages, not a prototype. Give the part that leads on "goesTo": "<page>", so
+    it can be clicked through in a user test and handed on as one thing
+```
+
+And for a page left out of an otherwise joined-up prototype:
+
+```
+⚠️  nothing leads to "settings" and it leads nowhere: it is drawn beside the prototype
+    rather than in it. Give the part that reaches it "goesTo": "settings", or say it is
+    a page of its own
+```
+
+Three things it deliberately stays quiet about:
+
+- **One page.** One page is not a flow, and saying so would be noise.
+- **A page your own written flow already names.** The step that fails to link to it says the same thing; one mistake should not read as two.
+- **A page that is reached and stops.** `--prototype --flow` already names it under `ends:`, beside the start and the links, which reads better than the same fact alone in a list of faults.
+### A page's own navigation
+
+The flow check reads what leads from page to page. It knew nothing of what moves *inside* one — so ask for "a page with a tab for each section of the account" and the page comes back with a tab strip, four tabs, one panel, and every check calls it whole. In a user test the second tab does nothing, and the person running the test finds it rather than the engine.
+
+A composition already says how something moves inside a page: a part carries `opens` with the id of the part a click shows. So the reading is narrow:
+
+```
+⚠️  "account" has TabStrip (3 choices) and nothing on the page opens anything: in a
+    user test the second choice does nothing. Give each choice "opens" with the id of
+    the part it shows, or say the page is one view and the choices lead elsewhere
+```
+
+Tabs, segmented controls, steppers, side rails, accordions and pagination all count. **One choice is not navigation** and says nothing.
+
+**What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
+
+### What a prototype still owes a developer
+
+Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.
+
+At the end of a run, the engine says what is left:
+
+```
+🤝 BEFORE A DEVELOPER TAKES "Orders" FORWARD  4 of 4 thing(s) the product does,
+   that this page does not yet:
+   • a route — the product declares its pages with a router (src/router), and nothing
+     here registers this page: a developer has to wire it before anyone can reach it
+   • its data from the store — the product keeps state in a store (src/stores), and
+     this page carries its own: the numbers on screen are the ones somebody typed
+   • its words as translations — the product has translated words (src/locales), and
+     the words here are written into the page: they would ship in one language
+   • a test — the product has tests, and this page has none
+```
+
+**Every convention is read from your product, never assumed.** No router in your dependencies and nothing asks for a route. No translations and nobody mentions hardcoded words. A list of good practice your project never adopted would be noise — and worse, it would read as your team's own rules.
+
+Two more limits worth knowing:
+
+- **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
+- **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+### The shapes a flow comes in
+
+Ask for a multi-step operation — sign in, a one-time code, a confirmation, a success page — and the engine used to check only that the pages linked. It knew nothing of the shapes, so a code step with no way to ask for another code passed, and so did a journey that quietly stopped halfway.
+
+Four shapes are read from the pages themselves — their name, their title, the words on their parts — and each owes something:
+
+| The page looks like | and owes |
+|---|---|
+| A sign-in step | a way out for somebody who cannot get in |
+| A one-time code step | a way to ask for another code, and a way back to change where it was sent |
+| A destructive step | a way out that is not the destructive one |
+| A success page | a way on to whatever comes after it |
+
+```
+⚠️  "code" is a one-time code step and is missing a way to ask for another code:
+    a person who needs it here has nowhere to go. Add it from the system, or say
+    why this flow does not need it
+```
+
+**It also settles a question nothing else could answer.** `--prototype --flow` names the pages a journey ends on and has to leave it open — *"the end of a flow, or a page that needs a way on"*. A shape decides it:
+
+```
+⚠️  the journey ends on "code", which is a one-time code step and not an ending:
+    the page after it was never drawn
+```
+
+A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
+
+Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
 
 ### A behaviour has to rest on a rule
 
