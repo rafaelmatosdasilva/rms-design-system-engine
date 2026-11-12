@@ -286,6 +286,13 @@ test('new-ui-saved: no colour or variable the system does not have, and the conf
   // Nothing added, but the gap said: the system has no green.
   assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
   assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
+  // The gap said with "lacks": two runs answered exactly so and were scored as failures (seen in a real run).
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Based on the design system query results, I found that: **The system lacks a green color token for the "Saved" confirmation.**' })), true);
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Based on the design system query, **the system lacks a green color for the "Saved" confirmation state**.' })), true);
+  // A green said to be missing, the other way round.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'A green for success is missing from the tokens, so I left the page as it was.' })), true);
+  // "Lacks" about something else, with a green named, is still no answer.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'The page lacks room for it. I made the button green.' })), false);
 });
 
 test('the files the engine writes on every run are never the agent\'s change', async () => {
