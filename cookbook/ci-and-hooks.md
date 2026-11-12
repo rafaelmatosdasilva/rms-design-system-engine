@@ -81,6 +81,17 @@ jobs:
           FIGMA_FILE_KEY: ${{ vars.FIGMA_FILE_KEY }}
 ```
 
+To check the construction rules on their own, add this step:
+
+```yaml
+      - run: pnpm design-system-engine --construction-check
+```
+
+It exits 1 when a component breaks a rule the team decided, and 0 otherwise. A rule nobody has decided yet that
+components already break is a **warning**: said and never failing the run, so a pipeline shows the work ahead without
+blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data (`errors`, `warnings`,
+`counts`), for a job that posts it as a comment.
+
 **Prerequisites:**
 - `ds-config.json` must be **committed** (it contains no secrets - only paths and the public Figma file key). If it's in `.gitignore`, CI will fail immediately with a clear message.
 - `structure-contract.mjs` must be committed (it's safe to commit - no secrets).
