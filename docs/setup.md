@@ -411,6 +411,31 @@ A project that says never gets the list of Figma changes and no script to run. A
 
 Put tokens in a `.env` in the folder you run the engine from.
 
+### Looking without leaving anything behind
+
+Deciding whether to use the engine means running it on your own system to see what it says. That read used to put three files in your project's root before printing a word — the prop check's result, the parity check's result, the GitLab history — and clear two of them first. On a folder with no git behind it there is nothing to undo that with.
+
+```bash
+rms-design-system-engine --prototype --catalog --read-only
+```
+
+Every write **and every delete** inside your project is skipped, and the run says at the end what a full one would have written:
+
+```
+👁  READ ONLY  nothing was written into this project. A full run would have written 3 file(s):
+   component-prop-result.json
+   design-system-engine-check-result.json
+   .gitlab-history.json
+   Run it again without --read-only to let it write them.
+```
+
+Two details worth knowing:
+
+- **Deleting counts.** The audit clears its last results before the gates run. Skipping only the writes would have taken two of your files away and put nothing back — worse than the problem.
+- **Caches outside your project still work.** What is protected is your project, not the engine's own folder; a cache rebuilt on every look would make looking slow enough that nobody does it twice.
+
+It is a property of the run, not of the project, so it is a flag rather than a setting in `ds-config.json` — `writes` says what this project lets the engine change, and this says this particular run changes nothing whatever the project allows.
+
 ### When a host refuses
 
 A refusal used to say only that something failed, and one status code has several different fixes behind it. Each one now names the permission that is missing and where it is given:
