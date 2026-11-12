@@ -68,6 +68,10 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
   const built = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(built.status, 0, built.stdout + built.stderr);
   const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
+  // Coming soon: off on every page the engine builds, its New theme button nowhere; the demo turns it on in the data.
+  const built0 = readFileSync(page, 'utf8');
+  assert.match(built0, /<script type="application\/json" id="sg-theme-editor-data">\{"enabled":false,/, 'off as built');
+  writeFileSync(page, built0.replace('id="sg-theme-editor-data">{"enabled":false,', 'id="sg-theme-editor-data">{"enabled":true,'));
   const c = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);

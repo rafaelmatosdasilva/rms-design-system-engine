@@ -11,6 +11,7 @@
   // What this browser keeps is kept per system: every style guide opened from disk shares one storage, so a theme made
   // on one guide never shows on another's Theme list. (What the keys held before, for every system at once, is left as
   // it was and read by none.)
+  if (EDITOR.enabled !== true) return;   // Coming soon: on only where the page's data turns it on (the demo)
   var PER = ':' + ((EDITOR.system || 'system'));
   var esc = SG.esc, T = SG.tokens || {}, KEY = 'sg-theme-draft' + PER;
   // Every variable of the system, each with its CSS variable: its own, else its Figma name as the system writes it

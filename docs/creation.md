@@ -9,7 +9,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 ## Design themes over your system
 
-The theme editor is part of every style guide the engine builds. It needs no setting and no extra install.
+The theme editor is built into every style guide the engine builds, and needs no extra install. While it is Coming soon on the [features page](features.md#design-themes-over-your-system), a built page does not show it: its New theme button and Create new theme… stay hidden. A page built for showing it turns it on in the page's own data (`enabled: true` in the `sg-theme-editor-data` block).
 
 ### Where it opens
 
