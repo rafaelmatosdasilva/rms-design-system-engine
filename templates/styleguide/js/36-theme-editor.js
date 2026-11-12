@@ -161,7 +161,7 @@
   // is given in light; in dark, each token keeps the system's own dark lightness and takes the new hue, so the dark
   // values follow from the light ones as the system's do.
   var BY = {}, BYVAR = {}; VARS.forEach(function (v) { BY[v.figma] = v; if (v.var) BYVAR[v.var] = v; });
-  // Each component's own tokens (advanced/cardPrimary/background/color → cardPrimary), so a component picked in the
+  // Each component's own tokens (advanced/cardTile/background/color → cardTile), so a component picked in the
   // preview shows what it is made of.
   var normN = function (n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
   var COMP_TOK = {};
