@@ -517,6 +517,7 @@ This is not debt. Debt (`--baseline`) is a difference you will fix later. A kept
 - A check that had nothing to read shows **Not run** with the reason, never Pass.
 - What a check cannot see is listed as not comparable, with the reason, not as a difference.
 - Every check is tested with a mistake planted on purpose.
+- Every check that can be written another way is tested with legal work written that way too: a colour as `rgb()`, a hover guarded with `:not(:disabled)`, a transition in its longhands, a time in seconds, a shadow without its zeros. It must say the same as it does of the usual way. A check that refuses legal work is fixed, never the work.
 
 ### When a check is wrong
 

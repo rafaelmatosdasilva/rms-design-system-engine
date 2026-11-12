@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Code into Figma, on main with the layout faults (continuous evaluation)
+
+What changed since the entry below (engine 84f012d): Every check tried on legal work written another way, and the transition check fixed to pass it (#456); A page's own navigation, not only the links between pages (#457); The status alone in the intent layer table, the playground for QA, and a badge that reads "Tests passed" (#458); What a prototype still owes a developer (#459); The shapes a flow comes in, and what each one owes (#455); Theme editor: screens side by side, one number field, the system's colours, and a reset that asks (#461); Layout faults in Figma, the construction check on a pull request, and the skill file checked (#462); Code written from a spec that nothing in the spec can break out of. The guide changed in `cookbook/ci-and-hooks.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `0671230f7459` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 2e73538b` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 44b2c48 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.056 |
+| Input a run | 97k | 94k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 94k a run against 97k, in 3.4 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-code-into-figma-on-main`.
+
 ## 2026-11: Code into Figma, templates as frames and code from a spec (continuous evaluation)
 
 What changed since the entry below (engine 0ebb6b5): Two severities for the construction check, and the same as data (#452); A component only the code has, drawn into Figma from what the engine reads of it; Docs: turn code into Figma, its technical section and --spec-from-code; A spec written in code the way the system writes a component, handed back as a patch that adds it (--code-build); A prototype is the journey, not a screen (#454); A template or a pattern drawn as a Figma frame of the system's own components. The guide changed in `reference/usage.md`.
