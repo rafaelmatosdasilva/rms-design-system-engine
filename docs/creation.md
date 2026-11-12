@@ -7,6 +7,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
 - [Turn code into Figma](#turn-code-into-figma)
+- [Generate in code from a prompt](#generate-in-code-from-a-prompt)
 
 ## Design themes over your system
 
@@ -383,5 +384,33 @@ A component that exists only in your code, drawn into Figma from what the engine
 - **Make up a value.** A size written by hand, a part's text with no text style of your system's, or a nested component Figma doesn't have is a question for you, never a guess.
 - **Write without you.** It goes through the same path as a component described in words: the spec is checked against your system, held for someone to sign it off, and built in Figma only through the script you say yes to.
 
+### A template or a pattern too
+
+Give it a file instead of a component name, and it draws that page as a Figma frame made of your components.
+
+- **Its layout.** Each element that holds others becomes a frame, laid out in the direction its own style sets.
+- **Your components.** Each one the page uses becomes an instance of it, found through what the file itself imports.
+- **Its texts.** Each one is set in the text style its class uses.
+- **Its spacing.** Each gap, padding, background and corner is bound to the variable it is written with.
+- **A frame, not a component.** It takes no variants. A component the page uses that Figma doesn't have is a question.
+
 The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
+## Generate in code from a prompt
+
+The same spec Figma is built from, written as a component file the way your own components are.
+
+### What it follows
+
+- **Your construction rules.** Your framework, the folder and file name, how parts and options are named, and how props are written, all read from your own code.
+- **Your tokens.** Each value is the custom property your naming convention gives the variable.
+- **Your text styles.** Each text is set the way your components set it, with your mixin or your class.
+- **Your components.** A part that is another of your components is written as its own tag.
+
+### What it never does
+
+- **Change your code.** The file comes back as a patch for you to apply, never written straight into your project.
+- **Skip the check.** What it wrote is read back with the code's own reader and held against the spec, so the two start out matching.
+
+The full options are in [the reference](../reference/usage.md) (`--code-build`).
 

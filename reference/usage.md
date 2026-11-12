@@ -1619,6 +1619,25 @@ custom property, named as the Figma variable it stands for (the naming conventio
 value written by hand, a text with no text style, a nested component Figma lacks) is a question, and the new component
 is held for sign-off. Figma already having the component, or the code not having it, stops it with the one to use.
 
+Given a file instead (`--spec-from-code src/templates/Settings.vue`: a path, or a name ending in `.vue`, `.svelte`,
+`.jsx`, `.tsx` or `.html`), it draws a template or a pattern as a plain frame (`create { kind: "frame" }`, which takes no
+axes and is never combined as variants): an `addLayer` for each element in markup order, an element that holds others a
+frame in the direction its own rule lays it out, a tag the system has an instance of its Figma component, a text element
+a text in the text style its class sets, and a `bind` for each gap, padding, background and corner its rule writes with
+a custom property. A tag is the component the file itself imports it from (`import HeaderPage from '@/…/headers/Page'`
+is `<header-page>`), paired with Figma's the way the code reading pairs them, or the Figma component of its own name;
+one Figma lacks is a question. Its spec is named after the file (`settings`).
+
+**--code-build.** `--code-build <name>` writes the component a spec describes in code, the way the system writes one
+(`spec-to-code.mjs`): its framework (Vue or JSX), folder, file name case, part classes and prop case from the code's
+construction rules, an axis as a prop with its options, a property as a prop of its kind, a part as an element (another
+of the system's components its own tag, a text the prop that writes it, set in the text style the system sets it with:
+its mixin or its class), each bound variable the custom property the naming convention gives it. Nothing is written to
+the code: the file goes to `.design-system-engine-out/handback/code-build-<name>.patch`, a patch that adds it, which a
+person applies with `git apply`. It is read back with the code's own reader and held against the spec (every layer a
+part, every property a prop), and exits 1 when it falls short. A spec that still asks a question, or a file the code
+already has, stops it with the one to use.
+
 **--figma-build.** `--figma-build <name> [--signed-off "<who>"]` checks the spec again against the capture as it is now,
 and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the
 system and waits for a named person to sign it off; `--signed-off` records who and when in the spec. It then writes the

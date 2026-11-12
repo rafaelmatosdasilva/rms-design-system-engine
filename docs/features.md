@@ -326,6 +326,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Draws a component that exists only in code as a Figma component: its props as properties and variants, its tokens as variables, its parts as layers.
 - Starts from the components the style guide marks Only in the code.
+- Draws a template or a pattern too, as a frame made of the system's own components.
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.
 

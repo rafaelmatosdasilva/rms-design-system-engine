@@ -2,9 +2,9 @@
 // a spec is built from, checked against the system by the same path a spec from a description takes (figma-ops.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { opsFromCode, variablesByCss } from '../lib/code-to-figma.mjs';
+import { opsFromCode, opsFromMarkup, markupTree, variablesByCss } from '../lib/code-to-figma.mjs';
 import { anatomyOf } from '../lib/code-grammar.mjs';
-import { ground } from '../lib/figma-ops.mjs';
+import { ground, predict, opsScript } from '../lib/figma-ops.mjs';
 
 const vue = `<template>
   <div class="acme-pill" :class="['acme-pill--' + size]">
@@ -43,4 +43,47 @@ test('what the code cannot ground is a question of the spec, never a guess', () 
   const g2 = ground(unknown, { captures });
   assert.ok(g2.questions.some((q) => /no component acme-icon/.test(q.ask)), 'a nested component Figma does not have is asked');
   assert.ok(g2.questions.some((q) => /var\(--space-xs\) is a value|no variable var\(--space-xs\)/.test(q.ask)), 'a custom property no Figma variable stands for is asked');
+});
+
+const page = `<template>
+  <div class="acme-settings">
+    <acme-header class="acme-settings__header" title="Settings" />
+    <div class="acme-settings__body">
+      <h2 class="acme-settings__title">{{ heading }}</h2>
+      <AcmeField v-if="ready" />
+      <img src="x.png" />
+    </div>
+    <acme-toast />
+  </div>
+</template>`;
+
+test('a template drawn as a frame: nested frames, the system\'s components as instances, texts in their style', () => {
+  const tree = markupTree(page.match(/<template>([\s\S]*)<\/template>/)[1]);
+  assert.equal(tree.kids.length, 1);
+  assert.deepEqual(tree.kids[0].kids.map((k) => k.tag), ['acme-header', 'div', 'acme-toast'], 'a self-closing tag holds nothing');
+  const known = { 'acme-header': 'acmeHeader', AcmeField: 'acmeField' };
+  const ops = opsFromMarkup({ name: 'settings', markup: page, componentOf: (t) => known[t] ?? null,
+    textStyleOf: (c) => (c === 'acme-settings__title' ? 'heading/m' : null),
+    layoutOf: (c) => (c === 'acme-settings__body' ? { dir: 'HORIZONTAL' } : null),
+    bindsOf: (c) => (c === 'acme-settings' ? [{ field: 'gap', variable: 'space/l' }] : []) });
+  assert.deepEqual(ops[0], { op: 'create', name: 'settings', kind: 'frame', layout: { dir: 'VERTICAL' } });
+  assert.ok(ops.some((o) => o.op === 'bind' && o.layer === '' && o.variable === 'space/l'));
+  const layers = ops.filter((o) => o.op === 'addLayer').map((o) => [o.parent, o.layer.type, o.layer.name, o.layer.of ?? o.layer.style ?? o.layer.layout?.dir]);
+  assert.deepEqual(layers, [
+    ['', 'instance', 'acmeHeader', 'acmeHeader'],
+    ['', 'frame', 'Settings body', 'HORIZONTAL'],
+    ['Settings body', 'text', 'Settings title', 'heading/m'],
+    ['Settings body', 'instance', 'acmeField', 'acmeField'],
+    ['', 'instance', 'acme-toast', 'acme-toast'],
+  ]);
+  // The tag Figma does not have is asked; the frame takes no axes and is built as a frame, never a component set.
+  const g = ground(ops, { captures: { props: { acmeHeader: { properties: {} }, acmeField: { properties: {} } }, varNames: { 1: { name: 'space/l' } } } });
+  assert.ok(g.questions.some((q) => /acme-toast/.test(q.ask)), JSON.stringify(g.questions));
+  assert.ok(g.held.some((h) => /a new frame, settings, drawn from the code/.test(h.what)));
+  assert.equal(predict(null, ops).kind, 'frame');
+  const axed = ground([{ op: 'create', name: 'x', kind: 'frame', axes: [{ name: 'size', options: ['s'] }] }], { captures: { props: {} } });
+  assert.ok(axed.questions.some((q) => /takes no variant axes/.test(q.ask)));
+  const script = opsScript([{ op: 'create', name: 'settings', kind: 'frame', layout: { dir: 'VERTICAL' } }]);
+  assert.match(script, /createFrame/);
+  assert.match(script, /o\.kind !== 'frame' && [^\n]*combineAsVariants/, 'a frame is never combined as variants');
 });
