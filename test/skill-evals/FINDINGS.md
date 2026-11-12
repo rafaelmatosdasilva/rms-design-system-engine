@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## "Lacks a green" is the gap said, and the scorer did not know it
+
+**Found** 12 November 2026, measuring a batch of accessibility changes (a hand check said to be a person's word, the judgement calls pre-sorted, which browser answered each criterion). **Fixed in** `test/skill-evals/tasks.mjs` (`NO_GREEN`).
+
+**Evidence.** 77 of 79 runs passed; both failures were `new-ui-saved`, runs #0 and #3, on one check: "adds the confirmation, or says the system has no green for it". Their transcripts show the right answer, each after five or six queries of the engine: *"The system lacks a green color token for the 'Saved' confirmation"* and *"the system lacks a green color for the 'Saved' confirmation state"*, each naming the tokens there are and the experimental `tag` component that is not built. Nothing was added to the page, nothing off the system was invented, no rule was broken. The scorer read the gap only when it was said with *no*, *not* or *n't*.
+
+**Guess ruled out.** Not the batch's guide change. The guide files it touched are the configuration and usage references for accessibility (a model asked to pre-sort wordings, the browsers a criterion depends on, a hand check said to be testimony); `new-ui-saved` reads none of it, and both runs read only what `--query` returned. Not noise either: the same check, on the same two sentences, fails every time they are scored.
+
+**What changed.** `NO_GREEN` also reads *lacks*, *lacking*, *without*, *missing* (and *falta*, *sem*), and a green said to be missing the other way round. Both sentences, as the runs wrote them, are known-good cases in the scorer's own test, beside *"The page lacks room for it. I made the button green."*, which stays a fail. The saved runs were scored again with no model tokens (`rescore.mjs`): exactly those two changed verdict, and the entry records 79/79.
+
+**What it settles.** A failure that reads as the guide getting worse can be the scorer not knowing a plain way of saying the right thing. Reading the transcript first is what told the two apart.
+
+---
+
 ## On the composition side the agent does not fail; the engine does
 
 **Found** 12 November 2026, measuring the composition path on a model above Haiku. **Fixed in** `lib/prototype.mjs` (`fromScreens`) and `test/skill-evals/record.mjs` (`scrubPaths`).
