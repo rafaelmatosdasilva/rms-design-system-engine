@@ -255,6 +255,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 047ba3c) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into styleguide/source-cards-one-row" |
 | `2026-11-11-merge-origin-main-into-figma` | The 24 guide tasks on Haiku (engine 106e4e9) | "Each Figma part read in the code, and four checks of a component's words" |
 | `2026-11-11-merge-origin-main-into-figma-2` | The 24 guide tasks on Haiku (engine bd8cd70) | "Each Figma part read in the code, and four checks of a component's words, on the code's construction rules" |
+| `2026-11-12-merge-origin-main-into-code` | The 24 guide tasks on Haiku (engine dc9f336) | "The code's words read as Figma's are, and the team's own linters read as decided rules" |
 | `2026-11-12-the-composition-path-on-opus` | The 12 prototype tasks on a system built only in Figma, Opus, 5 runs each (engine e62df41) | "The composition path at more runs, on a model above Haiku" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

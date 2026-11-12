@@ -120,3 +120,53 @@
   #sg-theme-panel .sg-ts-preview { position: static; align-self: start; }
   #sg-theme-panel .sg-panel-body .pg-inspect-head.sg-ts-pick-head { top: 0; }
 }
+/* The specimen (36-theme-editor.js): a screen made of the system's own components, as its code renders them. Its layout
+   takes the system's tokens through the properties set on .sg-spec (its accent, its card corner), never the guide's. */
+.sg-spec { --spec-accent: currentColor; --spec-accent-2: currentColor; --spec-r: 16px; --spec-line: color-mix(in srgb, currentColor 12%, transparent); --spec-soft: color-mix(in srgb, currentColor 4%, transparent); box-sizing: border-box; min-height: 100%; padding: var(--sg-space-xxl) calc(var(--sg-space-xxl) * 2) calc(var(--sg-space-xxl) * 3); display: flex; flex-direction: column; gap: var(--sg-space-xxl); }
+.sg-spec *, .sg-spec *::before, .sg-spec *::after { box-sizing: border-box; }
+.sg-spec-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "text art" "sw sw"; gap: var(--sg-space-xxl) calc(var(--sg-space-xxl) * 1.5); align-items: center; padding-bottom: var(--sg-space-s); }
+.sg-spec-hero-text { grid-area: text; display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.sg-spec-title { margin: 0; font-size: calc(var(--sg-title) * 1.6); line-height: var(--sg-lh); font-weight: var(--sg-heading-weight); letter-spacing: -0.02em; }
+.sg-spec-hero-acts { display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: center; margin-top: var(--sg-space-s); }
+.sg-spec-hero-art { grid-area: art; position: relative; height: 260px; }
+.sg-spec-blob { position: absolute; border-radius: 50%; }
+.sg-spec-blob.is-a { width: 220px; height: 220px; right: 90px; top: 0; }
+.sg-spec-blob.is-b { width: 150px; height: 150px; right: 0; bottom: 0; }
+.sg-spec-glyph { position: absolute; left: 0; bottom: -10px; font-size: calc(var(--sg-title) * 4); line-height: var(--sg-lh); font-weight: var(--sg-heading-weight); letter-spacing: -0.04em; }
+.sg-spec-swatches { grid-area: sw; display: flex; flex-wrap: wrap; gap: var(--sg-space-xl); }
+.sg-spec-sw { display: flex; align-items: center; gap: var(--sg-space-m); font-size: var(--sg-m); }
+.sg-spec-dot { width: 44px; height: 44px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--spec-line); }
+.sg-spec-shape { width: 44px; height: 44px; border: 2px solid var(--spec-accent); background: var(--spec-soft); }
+.sg-spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-flow: row dense; gap: var(--sg-space-l); align-items: start; }
+.sg-spec-tile { margin: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); padding: var(--sg-space-xl); border-radius: var(--spec-r); background: var(--spec-soft); box-shadow: inset 0 0 0 1px var(--spec-line); min-width: 0; }
+.sg-spec-tile.is-buttons { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--sg-space-m); }
+.sg-spec-tile.is-wide { grid-column: span 2; }
+.sg-spec-stage { position: relative; min-width: 0; max-width: 100%; overflow: hidden; }
+/* An overlay (a modal, a tooltip, a toast) stays in its tile: a transform makes the tile the box its fixed parts sit in. */
+.sg-spec-tile.is-overlay > .sg-spec-stage { transform: translateZ(0); height: 240px; }
+/* The preview at full screen: the whole screen for the system, its head kept (the screen, the mode, the way back). */
+.sg-ts-full svg { width: 1rem; height: 1rem; }
+.sg-ts-preview:fullscreen { position: static; width: 100vw; height: 100vh; display: flex; flex-direction: column; border-radius: 0; background: var(--sg-bg); overflow: hidden; }
+.sg-ts-preview:fullscreen > .sg-ts-stage { flex: 1 1 auto; min-height: 0; padding: 0; }
+.sg-ts-preview:fullscreen .sg-ts-screen { border-radius: 0; }
+.sg-ts-preview:fullscreen::backdrop { background: var(--sg-bg); }
+.sg-ts-preview:fullscreen > .sg-ts-preview-head { position: static; top: auto; }   /* the page's sticky heads stop under its own bar, which full screen has not */
+/* The components inside the one picked, after its trail: each a click away. */
+.sg-ts-kids { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-xs); margin-left: var(--sg-space-m); padding-left: var(--sg-space-m); border-left: var(--sg-line); }
+.sg-ts-kids-label { color: var(--sg-muted); }
+.sg-ts-kid { padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sg-ts-kid:hover, .sg-ts-kid:focus-visible { color: var(--sg-accent); }
+/* A colour's hex in full, light and dark alike: each field as wide as seven characters and its tags, the pair one above
+   the other where the row is too narrow for both side by side. */
+.sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.sg-ts-colour .sg-ts-hex { min-width: 7.5ch; font-variant-numeric: tabular-nums; }
+/* A colour field: its swatch, then its hex with Light or Dark small under it, then its reset; the hex has the field's
+   whole width, so it is read and selected in full. */
+.sg-ts-colour.sg-input { display: grid; grid-template-columns: auto minmax(7.5ch, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--sg-space-s); row-gap: 0; align-items: center; height: auto; min-height: var(--sg-control-h); padding-block: var(--sg-space-xxs); }
+.sg-ts-colour input[type="color"] { grid-column: 1; grid-row: 1 / 3; }
+.sg-ts-colour .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; }
+.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; font-size: var(--sg-xs); line-height: var(--sg-lh); }
+.sg-ts-colour .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
+.sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
+/* A card's sticky head inside its round corners: the card clips what it holds (clip, not hidden, so the head still sticks). */
+.sg-ts .sg-token-card, .sg-ts-preview { overflow: clip; }

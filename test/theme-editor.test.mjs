@@ -68,6 +68,10 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
   const built = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(built.status, 0, built.stdout + built.stderr);
   const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
+  // Coming soon: off on every page the engine builds, its New theme button nowhere; the demo turns it on in the data.
+  const built0 = readFileSync(page, 'utf8');
+  assert.match(built0, /<script type="application\/json" id="sg-theme-editor-data">\{"enabled":false,/, 'off as built');
+  writeFileSync(page, built0.replace('id="sg-theme-editor-data">{"enabled":false,', 'id="sg-theme-editor-data">{"enabled":true,'));
   const c = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);
@@ -92,7 +96,7 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     const asked = await until(`(() => { const d = document.querySelector('dialog.sg-dialog[open]'); return d ? d.textContent : null; })()`);
     assert.ok(asked.includes(`${themes.replace(homedir(), '~')}/${sys}`), 'the folder named as the setup writes it: ' + asked);
     await run(`document.querySelector('dialog.sg-dialog[open] [data-no]').click()`);
-    const kept = JSON.parse(await until(`localStorage.getItem('sg-ts-themes')`, (v) => v && v.includes('Coral Reef')));
+    const kept = JSON.parse(await until(`localStorage.getItem('sg-ts-themes:' + '${sys}')`, (v) => v && v.includes('Coral Reef')));
     const made = kept.find((x) => x.name === 'Coral Reef');
     assert.ok(made && made.brief.primary === '#e11d48' && /data-ts-theme="/.test(made.css), 'kept with what was chosen, and its CSS worked out');
     assert.deepEqual(kept.map((x) => x.name), ['Harbour', 'Coral Reef'], 'beside the one from the folder');
