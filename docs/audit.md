@@ -403,6 +403,12 @@ The engine reads what your design system defines in Figma, its tokens and each c
   - Or, for a part that is another component (an icon), by that component's class, when the file puts it on one element only.
   - Its gap and padding are compared with the frame of that name in Figma, and its text with the text style Figma sets that layer in.
   - A difference names the part (`chip › Label font weight`) with the rule and the line that set it.
+- **How it is put together.** Figma's anatomy against the code's, part by part, each with the line to patch:
+  - a part Figma always shows that the code renders only on a condition, or one a Figma property shows that the code always renders;
+  - a part's text set by hand where Figma sets a text style;
+  - corners on one variable in Figma and several values in the code, or the other way round;
+  - a different number of shadow layers, and a frame that wraps on one side only.
+  Your parity score may fall at first: these differences were always there, and now they are seen.
 - **Sub-frames in the structure contract.** A frame the contract names whose gap or padding differs is said with the file and line of the rule that sets it.
 
 Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
