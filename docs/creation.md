@@ -135,6 +135,30 @@ Where the two disagree, the page check says so — naming both sides and the rul
 **A difference is a finding, not a gap.** A gap means your design system lacks something and the design team must decide — that list writes into Figma. A width the code and the design disagree about is neither: it is a fact about the code, reported where the other page findings are.
 
 **Every reading says how sure it is.** A value read from one source alone, or one your two readings disagreed on, is marked as such rather than printed as plain fact; a width the capture could not read is said out loud, because silence would read as "the code constrains nothing" — the opposite.
+### Several directions, not the first one that fits
+
+A request used to get one answer. The catalog named the components it touched, whoever read it picked a shell that fit, and a page got built. That is one direction out of several your system already supports — chosen by whoever read first, and invisible to everyone afterwards.
+
+So the directions are named before anything is written:
+
+```
+3 DIRECTIONS  each built on the system, to compare before one is chosen:
+   1. BoardPage — Records in columns by status, dragged between them. (the request names it)
+      built from: DataTable, Button
+   2. ListPage — A list of records starts here. (another shell the documentation offers)
+      built from: DataTable, Button
+   Build each as its own prototype and compare them; the components are the same, the shell is what differs.
+```
+
+Each direction starts from a shell your documentation actually describes, says what that shell is for in your documentation's own first sentence, and is built from the same components. **What differs is the shell, never whether the page is the system's.**
+
+Two things it will not do:
+
+- **It never invents a direction to reach a number.** A system with one documented shell gets one direction, and says so plainly: *"Another direction would be invented, not the system's."* Three made-up alternatives would be worse than the single honest answer they replaced, because each would read to a reviewer as something your team had decided.
+- **It never offers a panel, a drawer or a dialog as a way to build a page.** Those live *inside* a page. A shell is excluded by what its name says and by what your documentation says it is for.
+
+A shell your documentation says nothing about still appears, and says it has none — being undocumented is worth seeing, not worth hiding.
+
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
