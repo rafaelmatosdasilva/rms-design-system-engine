@@ -1548,7 +1548,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
   over it or its opacity, as most components show theirs (`state-one-way`), the library's size scale - at each size
   option, the minimum height and the icon size most components have there (`size-scale-height`, `size-scale-icon`) - and two parts side by side spaced by the variable most
-  frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  frames holding them bind at the same size (`part-gap`); what the boxes say (`layout-faults.mjs`, `layout-faults`):
+  text over text or an icon, a text or an instance cut off by a frame that clips or outside one of a fixed size, each with
+  its layer and variant, always to fix (a fault is never put to the team), read from the places the capture keeps (a
+  box of a fixed size whose parts run beyond it, `looks[...].box`, and a layer placed by hand), and waiting on a capture
+  that keeps them (`boxes` in `_keeps`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
@@ -1570,7 +1574,11 @@ beside its own rules): the run's summary has a **Construction** line with each d
 a rule. Beside those errors it says the **warnings**: a rule nobody has decided yet that components already break, said
 and never failing the run, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on
 both; `--json` writes the same as data (`errors`, `warnings`, `counts`, each rule with what breaks it and where the team
-decided it), for a job that posts it.
+decided it), for a job that posts it. `--github` prints each place that breaks a rule as an annotation a pull request
+shows (`annotationsOf`). The ready-made GitHub Action runs it in one line of a team's workflow (`uses:
+rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`, after `actions/checkout`;
+`working-directory` names the folder with `ds-config.json`); it runs the engine from its own checkout, installs nothing
+and changes nothing.
 
 #### A component built in Figma (`--spec`, `--figma-build`)
 
