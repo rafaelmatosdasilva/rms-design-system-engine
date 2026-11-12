@@ -200,6 +200,37 @@ Tabs, segmented controls, steppers, side rails, accordions and pagination all co
 
 **What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
 
+### Did what you asked for come out whole
+
+Everything else the engine checks about a prototype is structure — the components are the system's, the pages link, a shape owes what it owes, the page still owes a route. **All of it can hold while the thing is useless.** You asked for a way to approve an order, got a page where the approve button leads nowhere, and every check passes because nothing it measures is wrong.
+
+Whether a request came out whole is judgement, so a model is asked:
+
+```bash
+rms-design-system-engine --prototype --judge --for "a way to approve an order"
+```
+
+```
+⚖️  THE REQUEST, JUDGED  2 of 4 decision(s) break · $0.08:
+   ❌ Nothing drawn but dead: Approve on orders leads nowhere
+      check: click Approve and see that nothing follows
+   ⚠️  Fit to put in front of someone: the flow ends on the orders page
+      check: there is no confirmation after approving
+```
+
+Four decisions, fixed and named — a judgement nobody can repeat is an opinion:
+
+| | |
+|---|---|
+| **It does what was asked** | the flow carries out the thing the request describes, end to end |
+| **Nothing drawn but dead** | every control a person reaches for leads somewhere or changes something |
+| **What is missing is shown as missing** | a gap, not something faked to look finished |
+| **Fit to put in front of someone** | usable in a user test with nothing explained away |
+
+**It will not judge the pages against themselves.** With no `--for`, it refuses rather than marking its own work — what was asked and what was drawn are the two things being compared.
+
+Advisory, never a failure. Asked only when you ask, because it spends your model tokens. Kept by the pictures' hashes and the request's, so a flow that has not changed is never paid for twice. And every finding carries a **check** — one sentence you can verify on the pages yourself, so the model's word is never the last one.
+
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
