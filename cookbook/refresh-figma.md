@@ -1220,7 +1220,8 @@ async function skeletonOf(root, names = {}) {
     // off, whether it clips or not): where a text or an instance in it runs beyond it, the box's size is kept (box) and
     // that layer's place (at), so the fault can be named. A box whose parts fit keeps nothing more. Overlaps need no more
     // than the places already kept: auto layout lays its parts side by side, and a layer placed by hand keeps its place.
-    if (/FIXED/.test(prop(n, 'layoutSizingHorizontal') + prop(n, 'layoutSizingVertical'))) for (const k of prop(n, 'children') || [])
+    // A group is as large as what it holds, and its layers sit where its parent puts them: it holds nothing beyond it.
+    if (t !== 'GROUP' && /FIXED/.test(prop(n, 'layoutSizingHorizontal') + prop(n, 'layoutSizingVertical'))) for (const k of prop(n, 'children') || [])
       if (/^(TEXT|INSTANCE)$/.test(k.type) && k.visible !== false && (k.x < -.5 || k.y < -.5 || k.x + k.width > at[2] + .5 || k.y + k.height > at[3] + .5)) { lk.box = [at[2], at[3]].map(Math.round); B.add(k.id); }
     if (depth > 0 && /^(TEXT|INSTANCE|FRAME|GROUP)$/.test(t) && (prop(n, 'layoutPositioning') === 'ABSOLUTE' || prop(n.parent, 'layoutMode') === 'NONE' || (n.parent && n.parent.type === 'GROUP') || B.has(n.id)) && at.every((v) => v !== undefined) && at[2] > 0 && at[3] > 0)
       lk.at = at.map(Math.round);

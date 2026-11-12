@@ -38,3 +38,16 @@ test('a rule of the grammar, always to fix, said only once the capture keeps box
   assert.deepEqual(layoutRules({ skeleton: { a: { variants: [['x', 0]], trees: [{ c: [] }] } } }), []);
   assert.ok(captureWaits({ a: { trees: [{}] }, _keeps: ['binds', 'looks', 'exposed', 'notes'] }).some((w) => w.rules.includes('layout-faults')));
 });
+
+test('never a fault: a layer placed outside on purpose, a group\'s layers, a cover image a frame crops', () => {
+  const one = (c, looks, clip = false) => layoutFaults({ variants: [['state=default', 0]], trees: [{ t: 'COMPONENT', n: 'acmeTab', clip, c }], looks: { 'state=default': looks } });
+  // A tooltip placed by hand beside a tab that does not clip: where it was put on purpose.
+  assert.deepEqual(one([{ t: 'INSTANCE', n: 'tooltip', absolute: true }], { '': { box: [56, 56] }, 0: { at: [56, 8, 43, 40] } }), []);
+  // The same, cut off by a frame that clips: a fault however it was placed.
+  assert.equal(one([{ t: 'INSTANCE', n: 'tooltip', absolute: true }], { '': { box: [56, 56] }, 0: { at: [56, 8, 43, 40] } }, true)[0].kind, 'clipped');
+  // A group is as large as what it holds, its layers placed by its parent: nothing is beyond it.
+  assert.deepEqual(layoutFaults({ variants: [['x', 0]], trees: [{ t: 'COMPONENT', n: 'crumbs', c: [{ t: 'GROUP', n: 'level2', c: [{ t: 'INSTANCE', n: 'Divider' }] }] }], looks: { x: { 0: { box: [52, 16] }, '0.0': { at: [91, 0, 16, 16] } } } }), []);
+  // An image larger than its frame on every side, the frame clipping it: a cover, cropped on purpose.
+  assert.deepEqual(one([{ t: 'INSTANCE', n: 'Cover' }], { '': { box: [480, 225] }, 0: { at: [-38, -2, 544, 229] } }, true), []);
+  assert.deepEqual(one([{ t: 'FRAME', n: 'Photo', img: true }], { '': { box: [100, 100] }, 0: { at: [20, -10, 60, 40] } }, true), [], 'an image a frame crops');
+});
