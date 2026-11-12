@@ -13,9 +13,11 @@ import { readPage } from '../lib/styleguide-files.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
 // what to do), the panel closed again after. In the page, as a script expression.
-// Closed the way the page closes it (_shut), which also takes the panel out of the address: setting the flags by hand
-// left "?panel=" behind for a panel no longer open, and a redirect further down sometimes followed it.
-const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { if (m._shut) m._shut(); else { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } } return t; })(${trExpr})`;
+// Closed the way the page closes it (_shut), which also takes the panel out of the address - setting the flags by hand
+// left "?panel=" behind for a panel no longer open, and a redirect further down sometimes followed it - and then
+// hidden at once: _shut hides it on a 200ms timer, and until then its scrim lies over the page and takes the next
+// click (a busy runner throttles that timer, and a click on the anatomy view further down landed on the scrim).
+const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { if (m._shut) m._shut(); m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
 const ROWS_FULL = (sel) => `[...document.querySelectorAll('${sel} tr.sg-row-open')].map((tr) => ${ROW_FULL('tr')}).join(' | ')`;
 
 const propsSnap = {
