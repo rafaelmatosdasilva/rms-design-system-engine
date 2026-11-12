@@ -170,7 +170,7 @@ export function node(props, children = []) {
 export const frame = (props, children) => node({ type: 'FRAME', layoutMode: 'HORIZONTAL', paddingTop: 4, paddingRight: 12, paddingBottom: 4, paddingLeft: 12, itemSpacing: 4,
   cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomRightRadius: 8, bottomLeftRadius: 8, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'FIXED', minHeight: null, minWidth: null, maxWidth: null,
   primaryAxisAlignItems: 'CENTER', counterAxisAlignItems: 'CENTER', layoutWrap: 'NO_WRAP', strokeWeight: 1, strokeAlign: 'INSIDE', dashPattern: [], fillStyleId: '', strokeStyleId: '', detachedInfo: null, ...props }, children);
-export const label = (props = {}) => node({ type: 'TEXT', name: 'Label', width: 40, height: 20, x: 12, y: 6, fontSize: 14, fontName: { family: 'Inter', style: 'Medium' }, lineHeight: { unit: 'PIXELS', value: 20 },
+export const label = (props = {}) => node({ type: 'TEXT', name: 'Label', width: 40, height: 20, x: 24, y: 2, fontSize: 14, fontName: { family: 'Inter', style: 'Medium' }, lineHeight: { unit: 'PIXELS', value: 20 },
   letterSpacing: { unit: 'PERCENT', value: 0 }, textCase: 'ORIGINAL', textDecoration: 'NONE', textAlignHorizontal: 'LEFT', textStyleId: 'S:m', fills: [solid(rgb(1, 1, 1), 'v-text')], boundVariables: { fills: [bound('v-text')] }, ...props });
 export const icon = (props = {}) => node({ type: 'INSTANCE', name: 'Icon', width: 16, height: 16, x: 4, y: 8, ...props }, [node({ type: 'VECTOR', name: 'Vector', width: 16, height: 16, fills: [solid(rgb(1, 1, 1), 'v-text')] })]);
 
@@ -226,7 +226,7 @@ export function largeComponentsFile(seed = 11, count = 200) {
           annotations: j === 0 && rnd() < 0.3 ? [{ label: `The ${part} label names what it does.` }] : [] }),
         ...Array.from({ length: parts }, (_, k) => frame({ name: `${['Leading', 'Trailing', 'Indicator', 'Helper', 'Counter'][k]} part`, width: 8 + k * 4, height: 8, layoutMode: 'NONE', cornerRadius: 0, topLeftRadius: 0, topRightRadius: 0, bottomRightRadius: 0, bottomLeftRadius: 0,
           fills: [solid({ r: Math.fround(rnd()), g: Math.fround(rnd()), b: Math.fround(rnd()) }, k % 2 ? token(part, kind, 'icon', state) : null)] }, [])),
-        ...(nested ? [frame({ name: 'Content', layoutMode: 'VERTICAL', boundVariables: { itemSpacing: bound(sp[2]) }, width: 120, height: 40 }, [label({ name: 'Title', fills: [solid({ r: 0, g: 0, b: 0 }, fg)] }), label({ name: 'Supporting text', fontSize: 12, fills: [solid({ r: 0.3, g: 0.3, b: 0.3 }, token(part, kind, 'text-muted', state))] })])] : []),
+        ...(nested ? [frame({ name: 'Content', layoutMode: 'VERTICAL', boundVariables: { itemSpacing: bound(sp[2]) }, width: 120, height: 40 }, [label({ name: 'Title', x: 0, y: 0, fills: [solid({ r: 0, g: 0, b: 0 }, fg)] }), label({ name: 'Supporting text', x: 0, y: 20, fontSize: 12, fills: [solid({ r: 0.3, g: 0.3, b: 0.3 }, token(part, kind, 'text-muted', state))] })])] : []),
       ]);
     });
     const defs = Object.fromEntries([...axes.map(([ax, vals]) => [ax, { type: 'VARIANT', defaultValue: vals[0], variantOptions: vals }]),

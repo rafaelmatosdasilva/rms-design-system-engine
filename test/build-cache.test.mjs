@@ -36,3 +36,24 @@ test('the sources key moves with a component file or the build setup, never with
   writeFileSync(join(root, 'vite.config.js'), 'export default {}');
   assert.notEqual(sourcesKey(root), two, 'the build setup changed');
 });
+
+test('the sources key moves with a Showroom screen kept outside the project, as with one inside it', async () => {
+  const { sourcesKey } = await import('../lib/build-cache.mjs');
+  const { writeFileSync, mkdirSync, utimesSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const root = tempDir('bc-outside-'), screens = tempDir('bc-screens-');
+  writeFileSync(join(root, 'App.vue'), '<template><div/></template>');
+  mkdirSync(join(screens, 'stand-ins'), { recursive: true });
+  writeFileSync(join(screens, 'Home.vue'), '<template><p class="a">x</p></template>');
+  writeFileSync(join(screens, 'stand-ins', 'text.css'), '.a { color: red; }');
+  const cfg = { paths: { showroom: screens } };
+  const before = sourcesKey(root, cfg);
+  assert.equal(sourcesKey(root, cfg), before, 'the same while nothing changed');
+  writeFileSync(join(screens, 'Home.vue'), '<template><p class="a b">x</p></template>');
+  const later = new Date(Date.now() + 5000); utimesSync(join(screens, 'Home.vue'), later, later);
+  assert.notEqual(sourcesKey(root, cfg), before, 'a screen changed outside the project is drawn again');
+  const mid = sourcesKey(root, cfg);
+  writeFileSync(join(screens, 'stand-ins', 'text.css'), '.a { color: blue; font-size: 2em; }');
+  assert.notEqual(sourcesKey(root, cfg), mid, 'and so is one whose stand-in or stylesheet changed');
+  assert.equal(sourcesKey(root, {}), sourcesKey(root, {}), 'a project with its screens inside it keys as before');
+});

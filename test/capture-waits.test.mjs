@@ -18,21 +18,21 @@ const comp = (more = {}) => ({ trees: [{ c: [] }], variants: [['x', 0]], ...more
 test('what a capture does not keep, its checks wait on', () => {
   // An old capture: no bindings, no looks, nothing that says what it keeps.
   const old = captureWaits({ a: comp(), b: comp() });
-  assert.deepEqual(old.map((w) => w.field), ['binds', 'looks', 'exposed', 'notes']);
+  assert.deepEqual(old.map((w) => w.field), ['binds', 'looks', 'exposed', 'notes', 'boxes']);
   assert.ok(old[0].rules.includes('family-padding') && old[1].rules.includes('opacity-bound'));
   // One that kept bindings before _keeps was written: those checks run.
-  assert.deepEqual(captureWaits({ a: comp({ binds: { x: {} } }) }).map((w) => w.field), ['looks', 'exposed', 'notes']);
+  assert.deepEqual(captureWaits({ a: comp({ binds: { x: {} } }) }).map((w) => w.field), ['looks', 'exposed', 'notes', 'boxes']);
   // A capture that says what it keeps is taken at its word.
   assert.deepEqual(captureWaits({ _keeps: KEEPS, a: comp() }), []);
   // No skeleton at all is no capture to wait on.
   assert.deepEqual(captureWaits({}), []);
-  assert.match(waitLine(old), /^16 Figma checks wait on a fresh read of Figma, which the last capture predates \(what each layer binds; .*\): ask "\/rms-design-system-engine refresh the Figma data"\.$/);
+  assert.match(waitLine(old), /^17 Figma checks wait on a fresh read of Figma, which the last capture predates \(what each layer binds; .*\): ask "\/rms-design-system-engine refresh the Figma data"\.$/);
   assert.equal(waitLine([]), null);
 });
 
 test('in the grammar and its summary', () => {
   const g = grammarOf({ skeleton: { a: comp(), b: comp(), c: comp() } });
-  assert.equal(g.figma.waiting.length, 4);
+  assert.equal(g.figma.waiting.length, 5);
   assert.equal(grammarOf({ skeleton: { _keeps: KEEPS, a: comp() } }).figma.waiting, undefined);
 });
 
@@ -64,7 +64,7 @@ test('in Chrome: the Rules page says which checks wait, with the request to copy
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#rules .sg-cx-wait')`, { attempts: 200 }), true, 'the note is on the Rules page');
     const note = await run(`(() => { const n = document.querySelector('#rules .sg-cx-wait'); return { text: n.innerText.replace(/\\s+/g, ' ').trim(), before: n.nextElementSibling && n.nextElementSibling.querySelector('.sg-cx-table') !== null, copy: n.querySelector('[data-cx-copy]').getAttribute('data-cx-copy') }; })()`);
-    assert.match(note.text, /^16 Figma checks wait on a fresh read of Figma The last capture predates what they read: what each layer binds;/);
+    assert.match(note.text, /^17 Figma checks wait on a fresh read of Figma The last capture predates what they read: what each layer binds;/);
     assert.equal(note.before, true, 'above the rules\' table');
     assert.equal(note.copy, '/rms-design-system-engine refresh the Figma data');
     assert.deepEqual(errors, []);
