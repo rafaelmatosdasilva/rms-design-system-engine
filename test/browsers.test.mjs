@@ -5,7 +5,7 @@
 // of them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findFirefox, findWebKit, browsersHere, browserLines, triedIn, WHY_MISSING } from '../lib/browsers.mjs';
+import { findFirefox, findWebKit, browsersHere, browserLines, triedIn, WHY_MISSING, BROWSER_RUN_LINE } from '../lib/browsers.mjs';
 import { WCAG22, BEYOND_AA, browserOf } from '../lib/wcag21.mjs';
 import { templateText } from '../lib/styleguide-template.mjs';
 
@@ -25,16 +25,20 @@ test('every criterion says what it depends on, and the three kinds are what they
   assert.equal(BEYOND_AA.find((b) => b.sc === 'Reduced motion').browser, 'same');
 });
 
-test('what a row says about where it was tried, by what the criterion depends on', () => {
-  const none = { chrome: true, firefox: false, webkit: false };
-  assert.match(triedIn({ browser: 'same' }, none), /^Same in every browser/);
-  assert.match(triedIn({ browser: 'chrome' }, none), /^Chrome only: the other engines expose nothing/);
-  assert.match(triedIn({ browser: 'each' }, none), /Tried in Chrome\..*neither is set up here/);
-  // One of the two here: it is named, and the other is said to be unbuilt rather than missing.
-  assert.match(triedIn({ browser: 'each' }, { chrome: true, firefox: true, webkit: false }), /WebKit is not set up here, and the pass in the other is not built yet/);
-  assert.match(triedIn({ browser: 'each' }, { chrome: true, firefox: true, webkit: true }), /the passes in Firefox and WebKit are not built yet/);
+test('what a row says about where it was tried, by what the criterion depends on, the same on every machine', () => {
+  assert.match(triedIn({ browser: 'same' }), /^Same in every browser/);
+  assert.match(triedIn({ browser: 'chrome' }), /^Chrome only: the other engines expose nothing/);
+  assert.match(triedIn({ browser: 'each' }), /^Tried in Chrome\. This is one a browser decides, so Firefox and WebKit can differ: the passes in them are not built yet\.$/);
   // A criterion with nothing said about it is read as the same everywhere, never as tried in all of them.
-  assert.match(triedIn({}, none), /^Same in every browser/);
+  assert.match(triedIn({}), /^Same in every browser/);
+  // What is installed changes nothing a run answered, so it changes nothing the row says: one page built here and one
+  // built on another machine read the same.
+  assert.equal(triedIn({ browser: 'each' }, { firefox: true, webkit: true }), triedIn({ browser: 'each' }, { firefox: false, webkit: false }));
+});
+
+test('what a run says about the browsers is the same on every machine, with no path in it', () => {
+  assert.match(BROWSER_RUN_LINE, /answered for Chrome only: the passes in Firefox and WebKit are not built yet/);
+  assert.doesNotMatch(BROWSER_RUN_LINE, /\/|installed|\bhere\b/, 'nothing about this machine: a report is pasted and compared');
 });
 
 test('a browser that is not here is named as missing, never passed over', () => {

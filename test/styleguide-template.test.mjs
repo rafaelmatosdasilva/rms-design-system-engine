@@ -13,7 +13,9 @@ import { readPage } from '../lib/styleguide-files.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
 // what to do), the panel closed again after. In the page, as a script expression.
-const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
+// Closed the way the page closes it (_shut), which also takes the panel out of the address: setting the flags by hand
+// left "?panel=" behind for a panel no longer open, and a redirect further down sometimes followed it.
+const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { if (m._shut) m._shut(); else { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } } return t; })(${trExpr})`;
 const ROWS_FULL = (sel) => `[...document.querySelectorAll('${sel} tr.sg-row-open')].map((tr) => ${ROW_FULL('tr')}).join(' | ')`;
 
 const propsSnap = {
@@ -698,8 +700,14 @@ test('in the browser: no script error, a control changes the real component, the
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
     const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);
-    assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
-    assert.match(await rowOf('3.3.7'), /^check\|(?=.*Once someone has checked it, record it as checked and this row reads Done\..*Checked by QA on 2026-09-01, before chip changed\.)/s, 'what to do first, then its status');
+    // Done on a person's word, and said to be theirs: who, when, that they did not say what they checked with, and
+    // that the engine measured none of it.
+    // The row is opened once: each opening writes its panel into the address, and a second one left the page
+    // somewhere the address checks further down did not expect.
+    const said = await rowOf('1.3.3');
+    assert.match(said, /^done\|.*Said by QA on \d{4}-\d\d-\d\d, and they did not say what they checked with: their word, not a measurement the engine made\. No instruction relies only on shape/s);
+    assert.match(said, /A person's word \(QA, \d{4}-\d\d-\d\d\)/, 'read from their word, where every other row names its measurement');
+    assert.match(await rowOf('3.3.7'), /^check\|(?=.*Once someone has checked it, record it as checked and this row reads Done\..*Said by QA on 2026-09-01, and they did not say what they checked with, before chip changed - and their word, not a measurement\.)/s, 'what to do first, then its status');
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);
     // A system with no intent layer has a Documentation page too: one row a component, from Figma and the code, the File
     // column left out, a note no agent reads flagged Remove; an old link to Coverage, For agents or the Intent layer opens it.
@@ -717,12 +725,14 @@ test('in the browser: no script error, a control changes the real component, the
     if (/#history/.test(sysMenu)) assert.match(sysMenu, /#history$/, `the History last in the System group (${sysMenu})`);
     assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
     assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{4}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
+    // Each old address is followed until the page has moved it on, not for a fixed time: a busy machine took longer
+    // than 200ms to redirect, and the address read then was still the one the row opened above had left.
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
-      await run(`location.hash = '${old}'`); await new Promise((r) => setTimeout(r, 200));
-      assert.equal(await run(`location.hash`), '#documentation', `an old ${old} link`);
+      await run(`location.hash = '${old}'`);
+      assert.equal(await until(`location.hash`, (v) => v === '#documentation', `the old ${old} link`), '#documentation', `an old ${old} link`);
     }
-    await run(`location.hash = '#todo/accessibility'`); await new Promise((r) => setTimeout(r, 200));
-    assert.equal(await run(`location.hash`), '#status/accessibility', 'an old #todo link');
+    await run(`location.hash = '#todo/accessibility'`);
+    assert.equal(await until(`location.hash`, (v) => v === '#status/accessibility', 'the old #todo link'), '#status/accessibility', 'an old #todo link');
     assert.equal(await run(`document.querySelector('#status .sg-matrix th[data-sort="Accessibility"]').getAttribute('aria-sort')`), 'descending');
     assert.deepEqual(errors, []);
     // Served by a host that sends no cache header: the component panel (the page again, in a frame) takes the data the
