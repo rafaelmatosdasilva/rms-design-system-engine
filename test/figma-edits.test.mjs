@@ -84,7 +84,12 @@ test('guard: Figma is written only by the engine\'s script, and only after a yes
 });
 
 test('router: bringing Figma in line with the code goes to the engine\'s edits; a value to change in Figma stays the person\'s', () => {
-  for (const t of ['update Figma to match the code', 'update Figma so it states the roles the code has', 'add the roles in Figma', 'alinha o figma com o código', 'make figma match the code', 'pin the accessibility findings in Figma', 'add the accessibility specs to Figma', 'manda os problemas de acessibilidade pro Figma']) assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', ['rms-design-system-engine --figma-edits']], t);
+  // A request that names a kind of change gets only that kind: each is a yes of its own.
+  for (const [t, kinds] of [['update Figma to match the code', ''], ['update Figma so it states the roles the code has', ' roles'], ['add the roles in Figma', ' roles'], ['alinha o figma com o código', ''], ['make figma match the code', ''],
+    ['pin the accessibility findings in Figma', ' accessibility-review'], ['add the accessibility specs to Figma', ' accessibility-specs'], ['manda os problemas de acessibilidade pro Figma', ''],
+    ['write the spec pages into Figma', ' spec-pages'], ['put the intent layer descriptions in Figma', ' descriptions'], ['write the token values the code changed into Figma', ' tokens'], ['link each component to its code in Dev Mode', ' dev-mode']])
+    assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', [`rms-design-system-engine --figma-edits${kinds}`]], t);
+  for (const t of ['take back the last change in Figma', 'undo the last change in figma', 'desfaz a última mudança no Figma']) assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', ['rms-design-system-engine --figma-undo']], t);
   assert.equal(route('change the chip radius in Figma to 12px so it matches the code', {}).recipe, 'fix-a-difference');
   assert.notEqual(route('update the code to match Figma', {}).recipe, 'figma-edits', 'the code to Figma is the other way');
 });
@@ -97,7 +102,8 @@ test('the prototypes\' gaps become the design team\'s to do list in Figma: its o
   const lines = editLines(edits).join('\n');
   assert.match(lines, /to do list in Figma, page "Design system to do", frame "Gaps from prototypes" \(2 needs the system lacks, from 2 prototypes, the most needed first\)/);
   assert.match(lines, /• a toggle switch: component · meanwhile: chip · needed in 2 prototypes: notify, settings/);
-  assert.match(lines, /NEXT: show the person the 1 change and to do list above and ask/);
+  assert.match(lines, /NEXT: these are 2 kinds of change to the design file, and the person says yes to each on its own\. Ask about each, in words: roles \(role notes read from the code\); to-do \(the design team's to do page\)/);
+  assert.match(editLines(edits, { named: ['roles', 'to-do'] }).join('\n'), /NEXT: show the person the 1 change and to do list above and ask/, 'the kinds they said yes to, named: one script for them');
   const script = applyScript(edits);
   // A fake Figma: pages, frames and texts that keep what is set on them.
   const node = (type) => ({ type, name: '', children: [], x: 0, y: 0, appendChild(k) { this.children.push(k); k.parent = this; }, remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); } });
@@ -224,8 +230,18 @@ test('--figma-edits lists each edit on the demo design system, and the engine ne
   // What each edit is, named: the evaluation holds an agent to saying these, so the engine owes them.
   assert.match(out, /field: a textbox/);
   assert.match(out, /chip: Figma says togglebutton, the code renders a button/);
-  assert.match(out, /^NEXT: show the person the/m, 'with no answer recorded, the project is asked before Figma is changed');
+  assert.match(out, /^NEXT: these are \d+ kinds of change to the design file, and the person says yes to each on its own/m, 'with no answer recorded, each kind is asked on its own');
+  assert.equal(existsSync(join(dir, '.design-system-engine-out', 'handback', 'figma-apply.js')), false, 'no script until the kinds are named');
+  // The kinds the person said yes to, named: only those listed, and the script for them.
+  const one = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--figma-edits', 'accessibility-specs'], { cwd: dir, encoding: 'utf8', timeout: 100000, env: asPerson });
+  assert.match(one, /field: a textbox/);
+  assert.doesNotMatch(one, /Spec pages beside each component set|Dev Mode/, 'a kind not named is not in it');
+  assert.match(one, /chip: Figma says togglebutton/, 'a decision is listed whatever the kinds');
+  assert.match(one, /^NEXT: show the person the 3 accessibility specs above and ask/m);
   assert.equal(existsSync(join(dir, '.design-system-engine-out', 'handback', 'figma-apply.js')), true);
+  // A word that is no kind is said, with the kinds there are, and nothing is written.
+  let bad = ''; try { execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--figma-edits', 'colours'], { cwd: dir, encoding: 'utf8', timeout: 100000, env: asPerson, stdio: 'pipe' }); } catch (e) { bad = String(e.stderr); }
+  assert.match(bad, /No kind of change called colours\. The kinds: roles, accessibility-specs/);
 });
 
 test('a construction fix renames the component itself, or a layer in every variant but never inside an instance', async () => {
@@ -275,4 +291,23 @@ test('a name read from Figma is data in the script, never code: what could end a
   const script = applyScript([{ kind: 'role', nodeId: '1:2', component: hostile, label: `Role: button ${hostile}` }]);
   assert.ok(!/<\/?script/.test(script) && !script.includes(ls), 'no tag and no line separator in the script');
   assert.equal(JSON.parse(/const edits = (\[[\s\S]*?\]);\n/.exec(script)[1])[0].component, hostile, 'read back, the same name');
+});
+
+test('--figma-undo says what the way back puts back before it runs, and that it was taken back once it was', { timeout: budget(60000) }, async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname } = await import('node:path');
+  const { writeUndo } = await import('../lib/figma-undo.mjs');
+  const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+  const dir = tempDir('figma-undo-cli-');
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ figmaFileKey: 'K' }));
+  const run = () => execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--figma-undo'], { cwd: dir, encoding: 'utf8', timeout: 50000 });
+  assert.match(run(), /No way back is recorded/);
+  const hb = join(dir, '.design-system-engine-out', 'handback');
+  writeUndo(hb, [{ kind: 'description', id: '1:2', was: '', what: 'cardTile' }, { kind: 'varValue', id: 'v1', modeId: 'm1', was: { r: 0, g: 0, b: 0, a: 1 }, what: 'acme/fill [light]' }], { what: '--figma-edits' });
+  const out = run();
+  assert.match(out, /The way back from --figma-edits \(.*\), 2 steps, newest first:\n {3}• acme\/fill \[light\]: value put back\n {3}• cardTile: description put back/);
+  assert.match(out, /^NEXT: show the person what the way back puts back, as printed above, and ask; only when they say yes, run .*figma-undo\.js .*\(fileKey K\)/m);
+  writeFileSync(join(hb, 'figma-undone.json'), JSON.stringify({ at: '2026-11-12T10:00:00Z', refused: false }));
+  assert.match(run(), /was taken back already, 2026-11-12T10:00:00Z\. Nothing left to put back\./);
 });

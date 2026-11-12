@@ -81,6 +81,7 @@ rms-design-system-engine --lesson --edit <n> --why "<reason>"  # a line an agent
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --figma-change chip "add xl to size like l"  # a change to a component Figma has, only what changes, with its report (what changes, where it is used, what breaks); --change-report chip after, the read before beside the read after
+rms-design-system-engine --figma-undo                    # what the way back from the last Figma write puts back, shown before it runs; writes nothing
 rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --shared binds the shared variables; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
@@ -1647,6 +1648,20 @@ said), each opening its before and after in the side panel (what the change said
 again, where it is used, what it breaks and adds, who signed it off, the faults it already had); each component's History
 lists its changes, linked to that panel.
 
+**The way back from a Figma write.** Every script the engine writes for Figma (`--figma-edits`, `--figma-change`,
+`--spec`, `--figma-fix`) records, before each write, the value it replaces (`figma-undo.mjs`), and returns those steps
+with what it changed. Once it has run, the project's hooks write the way back beside the change:
+`handback/figma-undo.js`, and `figma-undo.json` with each step and whether every one can be put back, and say so. To
+take a change back, `--figma-undo` says what it puts back, step by step, newest first (and that it was taken back
+already, when it was); show the person that, and only when they say yes run `figma-undo.js` with `use_figma` exactly as
+written: it puts back each value, newest first, removes what the change made, and touches nothing else. A
+change with a step that has no way back (a node Figma gives as mixed) refuses and changes nothing, because a file put
+half back reads as a file put back: the file's version history is then the only way, and it drops everyone's work
+since. A frame the engine writes afresh on every run (a spec page, the to do page) is said, never refused on: running
+the hand-back again writes it again. After it ran, refresh the Figma snapshots and run `--change-report <component>`,
+which says whether the read after is the read before. The hooks let the way back through as they let the change: the
+engine's own script, unchanged, after a yes.
+
 #### A scheduled pipeline (`--ci-changed`)
 
 `rms-design-system-engine --ci-changed` says whether anything a build is made from moved since the last build, for a
@@ -2101,6 +2116,14 @@ as it is, keeps every annotation a person wrote, and returns `{ changed, skipped
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Missing components and layout are never written: they stay in `changes-in-Figma.md`.
+
+Each kind of change is a yes of its own: `roles`, `accessibility-specs`, `accessibility-review`, `renames`,
+`dev-mode`, `to-do`, `descriptions`, `spec-pages`, `tokens` (`EDIT_KINDS`). When a run lists more than one and the
+project asks before the design file is changed, no script is written: its `NEXT:` line names each kind, the person is
+asked about each, and `--figma-edits <kind…>` lists only those and writes the script for them. A decision is listed
+whatever the kinds; a word that is no kind is refused with the kinds there are; a script an earlier run left is taken
+away when a run writes none. A request that names a kind ("write the spec pages into Figma") starts with that kind
+alone (`figmaKindsSaid`).
 
 Three more edits write what the engine knows where designers read it (`figma-docs-edits.mjs`), after the same yes and
 each with its way back:

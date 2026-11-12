@@ -6,6 +6,7 @@ How the engine writes each component's contract and gathers the intent layer. Wh
 
 - [Write component specs](#write-component-specs)
 - [Gather usage guidelines](#gather-usage-guidelines)
+- [Annotate Figma from the code](#annotate-figma-from-the-code)
 
 ## Write component specs
 
@@ -412,3 +413,38 @@ Which token is for this? A token counts as answered when Figma's description, it
 ### Lists your intent layer copies
 
 A prop table copied from the code, a whole token family listed by name, or a catalog of components written out on a page is flagged, right today or not, because it goes stale and agents take it for the whole list. Each says which generated file to link to instead: the component's contract, the file its tokens come from, or the contracts. A table that says what each token is for, an order of components, or a few picked out with a rule is guidance and left alone.
+
+## Annotate Figma from the code
+
+The engine writes into your Figma file what it already knows from the code and the intent layer, so designers read it where they work. A Figma file is the whole design team's, so every write is careful: you see it first, you say yes to each kind on its own, and each one can be taken back.
+
+### What it writes
+
+- **Accessibility specs.** Each component's role, what names it, its states and its keys, as an annotation.
+- **Problems pinned on your screens.** Each accessibility problem on its layer, with a summary on each screen.
+- **Dev Mode links.** Each component linked to its code file, and each variable given its CSS name.
+- **Descriptions.** What the intent layer says each component and token is for. Only what the team wrote, never a draft.
+- **Spec pages.** A frame beside each component set: its parts numbered, its properties, each variant's sizes, spacing and tokens, and its role.
+- **Token values the code changed first.** Written into the variable, in that mode. A token only the code has is created beside the ones its name is closest to.
+- **The design team's to do page.** What the prototypes needed and the system lacks, and what the design owes for accessibility.
+
+### What it never writes
+
+- **Over what a person wrote.** A description Figma already has is kept. If it says something else, you see both.
+- **A token both sides changed.** That is a decision for a person, so it is listed and left.
+- **Over an alias.** A Figma value that points to another variable is never replaced by a raw value.
+- **A design decision.** A missing component, a screen's layout, or a role Figma and the code disagree on is listed for the team.
+
+### One kind at a time
+
+When a run finds several kinds of change, nothing is written yet. You are asked about each kind (roles, specs, descriptions, spec pages, tokens and the rest), and only the kinds you say yes to go into the script. Asking for one kind by name, such as the spec pages, starts with that kind alone.
+
+### Taking a change back
+
+- **Every write records what it replaced.** Once the change has run, the engine writes the way back beside it.
+- **You see it before it runs.** The engine lists what the way back puts back, step by step, and runs it only after you say yes.
+- **All or nothing.** If part of a change cannot be put back, the way back changes nothing and says why. A file put back halfway looks undone when it is not.
+- **Its own frames are written again.** A spec page or the to do page is simply drawn afresh on the next run.
+
+The full list of options is in the reference (`--reference usage`, *--figma-edits* and *The way back from a Figma write*).
+

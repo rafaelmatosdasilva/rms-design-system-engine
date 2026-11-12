@@ -248,7 +248,22 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes each component's accessibility spec into Figma.
 - Pins accessibility problems on the layers of your designed screens.
 - Links each component to its code file in Dev Mode.
-- Shows you every change first. Nothing changes until you say yes.
+- Writes what your intent layer says each component and token is for as its description in Figma.
+- Draws a spec page beside each component: its parts, properties, sizes, tokens and role.
+- Writes a token value your code changed first back into its Figma variable.
+- Shows you every change first, and asks about each kind of change on its own. Nothing changes until you say yes.
+- Keeps a way back for every change, so you can take it back.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine bring Figma in line with the code` | Every change the code says Figma is missing, by kind, each kind asked on its own before anything is written |
+| `/rms-design-system-engine write the spec pages into Figma` | A spec page beside each component set, shown first and drawn once you say yes |
+| `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, where it has none |
+| `/rms-design-system-engine write the token values the code changed into Figma` | Each value before and after, written into its variable once you say yes; one both sides changed is left for you |
+| `/rms-design-system-engine pin the accessibility problems on the screens in Figma` | Each problem pinned on its layer, with a summary on each screen |
+| `/rms-design-system-engine take back the last change in Figma` | What the way back puts back, and once you say yes, the file as it was before |
 
 ## Publish a living style guide
 

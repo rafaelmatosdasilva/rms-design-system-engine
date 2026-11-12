@@ -98,7 +98,7 @@ test('the run lists the specs and the review, and asks before either is written'
   assert.match(lines, /• Start: 3 to fix, pinned on 2 layers/);
   assert.match(lines, /• Export \(10:2\): 1 to fix, said in the screen's summary \(read the screens again with --figma-a11y/);
   assert.match(lines, /• Export \(10:3\): nothing to fix/);
-  assert.match(lines, /NEXT: show the person the 3 accessibility specs and accessibility review above and ask; only when they say yes/);
+  assert.match(lines, /NEXT: these are 2 kinds of change to the design file.*accessibility-specs \(each component's accessibility spec, as an annotation\); accessibility-review/);
 });
 
 test('an annotation the engine wrote is not listed as one no check reads', () => {
