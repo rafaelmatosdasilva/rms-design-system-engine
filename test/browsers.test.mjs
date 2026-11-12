@@ -60,5 +60,8 @@ test('a browser that is not here is named as missing, never passed over', () => 
 test('the style guide says where each criterion was tried, worked out once', () => {
   const page = templateText();
   assert.match(page, /WCAG\.tried\[r\.k\.browser \|\| 'same'\]/, 'the row reads the line for its kind');
+  // A row beyond A and AA carries it too: high contrast mode is the browser's own painting, and saying it was the
+  // same everywhere would be the opposite of true.
+  assert.match(page, /browser: b\.browser/, 'the rows beyond A and AA keep what they depend on');
   assert.doesNotMatch(page, /Firefox is not installed here/, 'the page never works the wording out itself');
 });

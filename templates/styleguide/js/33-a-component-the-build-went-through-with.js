@@ -98,7 +98,7 @@
     // in its own words, never a criterion (wcag21.mjs BEYOND_AA). They are the audit's: both are emulated through the
     // browser's protocol, which this page cannot do, so a row reads Run the audit until one has run.
     var crit = (WCAG ? WCAG.criteria.slice() : []);
-    if (WCAG && WCAG.beyond) WCAG.beyond.forEach(function (b) { crit.push({ sc: b.sc, name: b.name, level: '', how: b.how, kinds: b.kinds, says: b.says, extra: true, beyond: true }); });
+    if (WCAG && WCAG.beyond) WCAG.beyond.forEach(function (b) { crit.push({ sc: b.sc, name: b.name, level: '', how: b.how, kinds: b.kinds, says: b.says, browser: b.browser, extra: true, beyond: true }); });
     // A criterion the checks stand for beyond WCAG 2.2 A and AA (a AAA one: a focus ring's thickness, a comfortable target): listed when it has a
     // finding, named as its label names it.
     Object.keys(by).forEach(function (sc) {
