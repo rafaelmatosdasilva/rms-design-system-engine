@@ -184,6 +184,21 @@ Three things it deliberately stays quiet about:
 - **One page.** One page is not a flow, and saying so would be noise.
 - **A page your own written flow already names.** The step that fails to link to it says the same thing; one mistake should not read as two.
 - **A page that is reached and stops.** `--prototype --flow` already names it under `ends:`, beside the start and the links, which reads better than the same fact alone in a list of faults.
+### A page's own navigation
+
+The flow check reads what leads from page to page. It knew nothing of what moves *inside* one — so ask for "a page with a tab for each section of the account" and the page comes back with a tab strip, four tabs, one panel, and every check calls it whole. In a user test the second tab does nothing, and the person running the test finds it rather than the engine.
+
+A composition already says how something moves inside a page: a part carries `opens` with the id of the part a click shows. So the reading is narrow:
+
+```
+⚠️  "account" has TabStrip (3 choices) and nothing on the page opens anything: in a
+    user test the second choice does nothing. Give each choice "opens" with the id of
+    the part it shows, or say the page is one view and the choices lead elsewhere
+```
+
+Tabs, segmented controls, steppers, side rails, accordions and pagination all count. **One choice is not navigation** and says nothing.
+
+**What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
 
 ### A behaviour has to rest on a rule
 
