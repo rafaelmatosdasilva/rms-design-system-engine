@@ -112,20 +112,22 @@
         suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + unit(r, n) + ' that don\'t, so every one does.') + '</strong></p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
       }
-      // The draft: every component or place the suggestion changes, grouped by the change it takes, so a change several
-      // take is said once above them. A list, never a table: the draft sits in a row of the rules' own table. Only a
+      // The draft: every component or place the suggestion changes, as labelled values (kvOne): the components on the
+      // left, what they take on the right, one change a line. Components that take the same changes share one entry, so
+      // what they share is said once. Never a table and never a box drawn as one (a border, a head, lines between rows):
+      // the draft sits in a row of the rules' own table, in a card of its panel (the owner's choice, 11 November 2026). Only a
       // Figma task links to Figma, so the person can check there whether it holds and what it is about; any other opens
       // the component's page.
-      var sayOf = function (c) { return byC[c].map(function (t) { return (t.fix && t.fix.say) || t.value; }).join(' '); };
+      var saysOf = function (c) { return byC[c].map(function (t) { return (t.fix && t.fix.say) || t.value; }); };
       var groups = [], at = {};
-      cs.forEach(function (c) { var k = sayOf(c); if (!(k in at)) { at[k] = groups.length; groups.push({ say: k, cs: [] }); } groups[at[k]].cs.push(c); });
+      cs.forEach(function (c) { var says = saysOf(c), k = says.join('\u0000'); if (!(k in at)) { at[k] = groups.length; groups.push({ says: says, cs: [] }); } groups[at[k]].cs.push(c); });
       var pill = function (c) { var u = r.side === 'figma' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code>' + esc(c) + '</code>'; };
-      var list = n ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p>'
-        + groups.map(function (g) { return '<div class="sg-cx-group"><p class="sg-il-line">' + esc(g.say) + '</p><ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>' : '';
+      var list = n ? '<div class="sg-cx-changes"><p class="sg-il-label">' + esc((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')') + '</p>'
+        + kvOne(groups.map(function (g) { return [{ html: '<ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul>' }, g.says.map(function (x) { return '<span class="sg-cx-say">' + esc(x) + '</span>'; }).join('')]; }), 'sg-cx-kv') + '</div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
-      // A list, as the draft is: the panel opens from a row of the rules' table.
-      var ways = fam ? '<div class="sg-cx-draft"><p class="sg-cx-draft-head">' + esc('How the ' + fam.components + ' in the family are built') + '</p><ul class="sg-cx-ways">' + fam.shapes.map(function (x) { return '<li><span>' + esc(x[0]) + '</span><strong>' + esc(x[1] + (x[1] === 1 ? ' component' : ' components')) + '</strong></li>'; }).join('') + '</ul></div>' : '';
+      // Labelled values, as the draft is: the panel opens from a row of the rules' table.
+      var ways = fam ? '<div class="sg-cx-changes"><p class="sg-il-label">' + esc('How the ' + fam.components + ' in the family are built') + '</p>' + kvOne(fam.shapes.map(function (x) { return [x[0], esc(x[1] + (x[1] === 1 ? ' component' : ' components'))]; }), 'sg-cx-kv') + '</div>' : '';
       // What is suggested, what it changes and the decision are one card: the draft is read, then approved under it.
       var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
@@ -334,7 +336,8 @@
       var s = String(at || ''), t = Date.parse(s), tag = releaseTag(rel);
       if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + tag + '</td>';
       var d = new Date(t);
-      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())) + line(quiet(pad(d.getHours()) + ':' + pad(d.getMinutes()))) + tag + '</td>';
+      // The day and its time on one line, the release under them when there is one (the owner's, 11 November 2026).
+      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) + tag + '</td>';
     };
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
@@ -389,16 +392,33 @@
     order.forEach(function (g) {
       if (!g.layer) return;
       var x = g.layer, p = partOf(x), last = layers[layers.length - 1];
-      var one = { at: x.at, says: p ? p.base : x.says, by: x.by, pages: x.pages.slice(), components: x.components.slice(), alone: x.alone ? x.alone.slice() : null, files: x.files || 0, commits: x.to ? [{ to: x.to, url: x.url, k: p ? p.k : 0 }] : [], key: p ? p.base + '|' + (x.by || '') + '|' + p.n : null };
+      var one = { at: x.at, says: p ? p.base : x.says, by: x.by, pages: x.pages.slice(), components: x.components.slice(), alone: x.alone ? x.alone.slice() : null, added: Array.isArray(x.added) ? x.added.slice() : null, files: x.files || 0, commits: x.to ? [{ to: x.to, url: x.url, k: p ? p.k : 0 }] : [], key: p ? p.base + '|' + (x.by || '') + '|' + p.n : null };
       if (one.key && last && last.key === one.key) {
         one.pages.forEach(function (n) { if (last.pages.indexOf(n) < 0) last.pages.push(n); });
         one.components.forEach(function (n) { if (last.components.indexOf(n) < 0) last.components.push(n); });
         if (one.alone && last.alone) one.alone.forEach(function (n) { if (last.alone.indexOf(n) < 0) last.alone.push(n); });
+        if (one.added && last.added) one.added.forEach(function (n) { if (last.added.indexOf(n) < 0) last.added.push(n); }); else last.added = null;   // one part not known: not known for the whole
         last.files += one.files; last.commits = last.commits.concat(one.commits); if (String(one.at) > String(last.at)) last.at = one.at;
         return;
       }
       layers.push(one);
     });
+    // The pages a change touched, in counts by kind on one line: its components' pages counted (they are under Affects),
+    // the other pages named while they are few, the token pages counted (each one's name is its token); every other name
+    // one click away (Show all), never a list of a thousand names in a row of the table (the owner's, 11 November 2026).
+    // comps: the names among them that document a component.
+    var NOT_YET_NAMED = 5;
+    var pagesSaid = function (all, comps) {
+      comps = comps || [];
+      var ofComp = all.filter(function (n) { return comps.indexOf(n) >= 0; }), names = all.filter(function (n) { return comps.indexOf(n) < 0; });
+      var tokens = names.filter(function (n) { return /^--/.test(n); }), pages = names.filter(function (n) { return !/^--/.test(n); });
+      var said = [];
+      if (ofComp.length) said.push(plural(ofComp.length, 'component page', 'component pages'));
+      if (pages.length) said.push(plural(pages.length, 'page', 'pages') + (pages.length <= NOT_YET_NAMED ? ' (' + pages.join(', ') + ')' : ''));
+      if (tokens.length) said.push(plural(tokens.length, 'token page', 'token pages'));
+      var whole = pages.length > NOT_YET_NAMED || tokens.length;
+      return '<span class="sg-log-also">' + esc(said.join(' and ')) + '</span>' + (whole ? ' <button type="button" class="sg-link-pill sg-link-pill--table" data-list-more>Show all</button><span class="pg-par-val sg-log-list" hidden>' + esc(names.join(', ')) + '</span>' : '');
+    };
     layers.forEach(function (x) {
       x.components.sort(); x.commits.sort(function (a, b) { return a.k - b.k; });
       // The pages that document no component, named here: the others are under Affects, as their components. A page is
@@ -408,7 +428,14 @@
       var count = x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page';
       // The count under the commit's own words, unless they say it already ("… 16 pages changed …").
       var saysCount = x.says && String(x.says).indexOf(count.split(',')[0]) >= 0;
-      add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) + (saysCount ? '' : line(quiet(esc(count)))) : line(esc(count))) + (others.length ? line(quiet('Not in the guide yet: ') + '<span class="pg-par-val">' + esc(others.join(', ')) + '</span>') : '') +
+      // What it added apart from what it changed, each on its own line, when the reader knows which pages it made; a
+      // change read before that says the count, and the pages of no component as Also changed.
+      var comps = x.pages.filter(function (p) { return others.indexOf(p) < 0; });
+      var split = x.added && x.pages.length ? (function () {
+        var made = x.pages.filter(function (p) { return x.added.indexOf(p) >= 0; }), edited = x.pages.filter(function (p) { return x.added.indexOf(p) < 0; });
+        return (made.length ? line(quiet('Added: ') + pagesSaid(made, comps)) : '') + (edited.length ? line(quiet('Changed: ') + pagesSaid(edited, comps)) : '');
+      })() : null;
+      add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) : '') + (split != null ? split : (x.says && saysCount ? '' : line(x.says ? quiet(esc(count)) : esc(count))) + (others.length ? line(quiet('Also changed: ') + pagesSaid(others)) : '')) +
         (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
     });
     // The decisions: what was decided, ruled out and why, and what it is about.
@@ -431,7 +458,9 @@
         line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
     }); });
     // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
-    // on. One row a contract, the build's rows side by side; a change that breaks a product said so.
+    // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the person
+    // who ran the build that found it: no person writes a contract, so the one who ran the engine stands behind it (the
+    // owner's rule: every change has a person behind it); a scheduled build, the schedule, as a scheduled commit says.
     (DATA.contractChanges || []).forEach(function (b) {
       (b.changes || []).forEach(function (c) {
         var kind = c.kind === 'component' ? '' : c.kind === 'flow' ? 'Flow ' : 'Pattern ';
@@ -439,7 +468,7 @@
         var items = (c.items || []).map(function (x) { return line(esc(capital(x.what) + ' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
-          [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
       });
     });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
@@ -447,8 +476,14 @@
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     // Sorted by Date, newest first, as the page opens. Only the columns rows of one moment share can sort: What and
     // Affects are one row's own, so ordering by them would tear a moment apart.
-    var LOG_SORT = { 'Date': function (x) { return stamp(x.at); }, 'Type': function (x) { return x.type; }, 'Done by': function (x) { return (x.bys || []).join(' '); } };
-    var logHead = ['Date', 'Type', 'What', 'Affects', 'Done by'].map(function (name) {
+    // The columns in the words the other tables use (the owner's, 11 November 2026): Source, as the Documentation table
+    // names where a thing comes from (Code, Figma, Intent layer, Decisions, the chips above), never Type, which names a
+    // kind of task. What kind of decision or note a row is (a Lesson, a Comment) leads its What.
+    var SOURCE_OF = { code: 'Code', figma: 'Figma', intent: 'Intent layer', contracts: 'Contracts', decisions: 'Decisions' };
+    var sourceOf = function (x) { return SOURCE_OF[x.chip] || x.type; };
+    var kindOf = function (x) { var s = sourceOf(x); return x.type === s || x.type + 's' === s ? '' : x.type === 'Figma comment' ? 'Comment' : x.type; };   // a Contract under Contracts says nothing more
+    var LOG_SORT = { 'Date': function (x) { return stamp(x.at); }, 'Source': function (x) { return sourceOf(x); }, 'Done by': function (x) { return (x.bys || []).join(' '); } };
+    var logHead = ['Date', 'Source', 'What', 'Affects', 'Done by'].map(function (name) {
       return LOG_SORT[name] ? '<th scope="col" data-sort="' + esc(name) + '" aria-sort="' + (name === 'Date' ? 'descending' : 'none') + '"><button type="button" class="sg-mx-sort">' + esc(name) + MX_TRI + '</button></th>'
         : '<th scope="col">' + esc(name) + '</th>';
     }).join('');
@@ -459,7 +494,7 @@
         var lead = !x.group || i === 0 || ROWS[i - 1].group !== x.group, span = n > 1 ? ' rowspan="' + n + '"' : '';
         var shared = function (cell) { return cell.replace(/^<td class="([^"]+)">([\s\S]*)<\/td>$/, '<td class="$1"' + span + '><div class="sg-log-stick">$2</div></td>'); };
         return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
-          (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
+          (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(sourceOf(x)) + '</td>') : '') + '<td class="sg-log-what">' + (kindOf(x) ? line(quiet(esc(kindOf(x)))) : '') + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
     // The table itself, held now: box is a var another page reuses, so by the time a head is measured or a column is
     // clicked it may name another page's. Everything below works from this table, never from box.
@@ -498,6 +533,7 @@
       var th = e.target.closest('th[data-sort]'); if (th) { logSort(th.getAttribute('data-sort')); return; }
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
+      var all = e.target.closest('[data-list-more]'); if (all) { var list = all.nextElementSibling; if (list) list.hidden = false; all.remove(); return; }
       var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove();
     });
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
@@ -750,7 +786,7 @@
     // its kind, as an intent-layer page's reads are.
     var noLayerReads = function (p) {
       var c = docComp(p), by = {}, order = [];
-      try { docIssueRows(c).forEach(function (r) { if (r.st !== 'done' || !r.written || r.kind === 'Intent layer') return; var w = srcNames(r.src || []).join(' · ') || 'The system'; if (!by[w]) { by[w] = []; order.push(w); } by[w].push(r); }); } catch (e) { /* its own area says it */ }
+      try { docIssueRows(c).forEach(function (r) { if (r.st !== 'done' || !r.written || r.kind === 'Intent layer') return; var w = docSrcNames(r.src || []).join(' · ') || 'The system'; if (!by[w]) { by[w] = []; order.push(w); } by[w].push(r); }); } catch (e) { /* its own area says it */ }
       return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(r.kind) + '</p>' + r.written + '</div>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
@@ -763,13 +799,14 @@
       if (p.tokens) return IL_AREA.foundations;
       if (p.absent) return IL_AREA.system;
       if (p.missingFor) return IL_AREA.components;
+      if (p.noLayer) return IL_AREA.components;   // a system with no intent layer: one row a component, a component's own
       return IL_AREA[p.layer] || (p.layer ? capital(p.layer) : '');
     };
     // Where a page's text comes from, as words: the Sources column joins them, and the Source filter offers them.
     var ilSourceWords = function (p) {
       if (p.tokens) return ['Figma', 'Intent layer'];
       if (p.absent) return ['Intent layer'];
-      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0; }
+      if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') docSrcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0; }
       var r = p.reads || {}, out = [];
       if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer');
       ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
@@ -892,7 +929,7 @@
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -1068,7 +1105,7 @@
     // such list (a template, a flow), or none in that source, keeps the page's own state.
     var srcState = function (p, w) {
       var c = docComp(p), list = [];
-      try { if (c) list = docIssueRows(c).filter(function (r) { return srcNames(r.src || []).indexOf(w) >= 0; }); } catch (e) { list = []; }
+      try { if (c) list = docIssueRows(c).filter(function (r) { return docSrcNames(r.src || []).indexOf(w) >= 0; }); } catch (e) { list = []; }
       if (!list.length) return DOC_STATE[statusOf(p)] || 'fix';
       if (list.some(function (r) { return r.st === 'todo'; })) return 'fix';
       return list.some(isOpen) ? 'check' : 'done';

@@ -1,0 +1,122 @@
+/* The theme editor (36-theme-editor.js): the page's own controls, laid out for its panel: the form on the left, the preview on the right. */
+.sg-ts-split { display: grid; grid-template-columns: minmax(20rem, 30rem) minmax(0, 1fr); gap: var(--sg-space-xl); align-items: start; }
+.sg-ts-preview { position: sticky; top: var(--sg-space-l); min-width: 0; }
+.sg-ts-preview-head { display: flex; align-items: center; gap: var(--sg-space-m); flex-wrap: wrap; }
+.sg-ts-preview-head > span:first-child { flex: 1 1 auto; }
+.sg-ts-preview-head .sg-ts-dd { width: auto; min-width: 16rem; }
+.sg-ts-preview-head .sg-ts-seg { width: auto; }
+.sg-ts-stage { padding: var(--sg-space-m); }
+.sg-ts-screen { position: relative; overflow: hidden; border-radius: var(--sg-radius-s); }
+.sg-ts-range { display: flex; align-items: center; gap: var(--sg-space-m); }
+.sg-ts-range input[type="range"] { flex: 1 1 auto; accent-color: var(--sg-text); }
+.sg-ts [hidden] { display: none !important; }   /* a field shown only for Other… or Custom: hidden means hidden, whatever display the page gives its inputs */
+.sg-ts-open svg { flex: none; width: 1em; height: 1em; }
+.sg-ts { display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.sg-ts .pg-controls { padding: 0 var(--sg-cell-x); }
+.sg-ts .pg-controls > .pg-ctl { align-items: flex-start; }
+.sg-ts .pg-controls > .pg-ctl > .sg-mode-label { flex: 0 0 8rem; padding-top: var(--sg-space-s); }
+.sg-ts-field { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--sg-space-xs); max-width: 24rem; }
+.sg-ts-seg { display: flex; width: 100%; max-width: 24rem; }
+.sg-ts-seg > button { flex: 1 1 0; }
+.sg-ts-hint { margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
+.sg-ts-error { margin: 0; font-size: var(--sg-s); color: var(--sg-negative); }
+.sg-ts [aria-invalid="true"] { border-color: var(--sg-negative); }
+.sg-ts-actions { display: flex; gap: var(--sg-space-s); }
+.sg-ts-done { margin: 0; }
+@media (max-width: 1100px) { .sg-ts-split { grid-template-columns: minmax(0, 1fr); } .sg-ts-preview { position: static; order: -1; } }
+@media (max-width: 720px) { .sg-ts .pg-controls > .pg-ctl { flex-direction: column; align-items: stretch; } .sg-ts .pg-controls > .pg-ctl > .sg-mode-label { flex: none; padding-top: 0; } .sg-ts-field, .sg-ts-seg { max-width: none; } }
+
+/* Wider than a row's panel: the form and a whole screen side by side. */
+#sg-theme-panel .sg-comp-panel-box { width: min(100vw, 96vw); }
+.sg-ts-ramps { display: flex; flex-direction: column; gap: var(--sg-space-xxs); margin-top: var(--sg-space-xs); }
+.sg-ts-ramp { display: flex; align-items: center; gap: 2px; }
+.sg-ts-ramp-label { flex: 0 0 2.5rem; font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-ts-step { flex: 1 1 0; height: 1.25rem; border-radius: calc(var(--sg-radius-s) / 4); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-text) 12%, transparent); }
+.sg-ts-step.is-key { outline: 2px solid var(--sg-text); outline-offset: 1px; }
+.sg-ts-link code { font-size: var(--sg-xs); overflow-wrap: anywhere; }
+.sg-ts-frame { position: absolute; top: 0; left: 0; border: 0; display: block; transform-origin: 0 0; background: transparent; }
+/* A colour: light and dark side by side, each a field with its swatch inside (a square with round corners). */
+.sg-ts-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-s); }
+.sg-ts-colour.sg-input { display: flex; align-items: center; gap: var(--sg-space-s); padding-block: 0; padding-inline: var(--sg-space-xs) var(--sg-space-m); cursor: text; }
+.sg-ts-colour input[type="color"] { flex: none; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: calc(var(--sg-control-radius) / 2); background: transparent; cursor: pointer; overflow: hidden; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-text) 16%, transparent); }
+.sg-ts-colour input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.sg-ts-colour input[type="color"]::-webkit-color-swatch { border: var(--sg-line-width, 1px) solid color-mix(in srgb, var(--sg-text) 22%, transparent); border-radius: calc(var(--sg-control-radius) / 2); }   /* a hairline round the colour: it shows on a background of the same colour */
+.sg-ts-colour input[type="color"]::-moz-color-swatch { border: var(--sg-line-width, 1px) solid color-mix(in srgb, var(--sg-text) 22%, transparent); border-radius: calc(var(--sg-control-radius) / 2); }
+.sg-ts-hex { flex: 1 1 auto; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; outline: none; }
+.sg-ts-mode-tag { flex: none; font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-ts-split > * { margin-top: 0; }
+.sg-ts-preview { top: var(--ts-top, 0px) !important; }
+.sg-ts-auto { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
+.sg-ts-auto:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-ts-auto[hidden] { display: none; }
+.sg-ts-auto svg { width: 1rem; height: 1rem; }
+.sg-ts .pg-ctl.is-off { opacity: 0.5; }
+.sg-ts .pg-ctl.is-off input { cursor: not-allowed; }
+/* New theme: an icon button, its menu the Theme choice's own dropdown, opening under it to the right. */
+.sg-brand-ctl .sg-ts-new { position: relative; width: auto; }
+.sg-ts-new .sg-ts-menu { left: 0; right: auto; min-width: 15rem; }
+.sg-ts-auto:hover { color: var(--sg-text); }
+/* A slider's number: a field like the colours', its unit inside it. */
+.sg-ts-num.sg-input { flex: none; display: flex; align-items: center; gap: var(--sg-space-xs); width: 4.75rem; padding-block: 0; cursor: text; }
+.sg-ts-num .sg-ts-hex { text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.sg-ts-num .sg-ts-hex::-webkit-outer-spin-button, .sg-ts-num .sg-ts-hex::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* The panel's actions at its top right; its own close button gone (Escape and Cancel close it). */
+#sg-theme-panel .sg-comp-panel-close { display: none; }
+#sg-theme-panel .sg-panel-head { position: sticky; }
+#sg-theme-panel .sg-panel-head > .sg-ts-actions { position: absolute; right: var(--sg-space-xl); bottom: var(--sg-space-l); display: flex; gap: var(--sg-space-s); }
+.sg-ts-start { display: flex; align-items: center; gap: var(--sg-space-s); }
+.sg-ts-icon { flex: none; width: 1rem; height: 1rem; color: var(--sg-text-2); }
+/* The plus: a square as tall as the controls beside it. */
+.sg-ts-new .sg-ts-open { width: var(--sg-control-h); height: var(--sg-control-h); min-width: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* A saved theme in the Theme list: its name, then a pencil and a trash. */
+.sg-dd-option.sg-ts-saved { display: flex; align-items: center; gap: var(--sg-space-s); }
+.sg-ts-saved-name { flex: 1 1 auto; min-width: 0; }
+.sg-ts-saved-acts { flex: none; display: flex; gap: var(--sg-space-xxs); margin-block: calc(-1 * var(--sg-space-xs)); }   /* its buttons never make the row taller than the others */
+.sg-ts-act svg { width: 1rem; height: 1rem; }
+#sg-brand-select-list { min-width: 15rem; }
+#sg-brand-select-list .sg-dd-option { white-space: nowrap; }
+.sg-ts-saved-name { overflow: hidden; text-overflow: ellipsis; }
+/* Create new theme…, last in the Theme list, a line above it. */
+/* The four starts, each a card: its icon, its name, what it does. */
+.sg-ts-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--sg-space-l); max-width: 64rem; }
+.sg-ts-start-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-s); padding: var(--sg-space-xl); text-align: left; font: inherit; color: var(--sg-text); cursor: pointer; }
+.sg-ts-start-card .sg-ts-icon { width: 1.5rem; height: 1.5rem; color: var(--sg-text); }
+.sg-ts-start-name { font-weight: var(--sg-heading-weight); font-size: var(--sg-m); }
+.sg-ts-start-says { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); }
+#sg-brand-select-list .sg-ts-new-row { display: flex; align-items: center; gap: var(--sg-space-s); }
+/* The line above Create new theme…: between the list's items, outside them. */
+#sg-brand-select-list .sg-ts-sep { height: 0; margin: var(--sg-space-xs) calc(-1 * var(--sg-space-xs)); border-top: var(--sg-line); }
+.sg-ts-act svg { width: 1rem; height: 1rem; }
+.sg-ts-actions [disabled] { opacity: 0.3; cursor: not-allowed; }
+.sg-ts-field > .sg-ts-dd { display: block; width: 100%; }
+/* Create new theme… unfolded: its four starts under it, a step in. */
+#sg-brand-select-list .sg-ts-new-row .sg-ts-chev { margin-left: auto; transition: transform var(--sg-fast); }
+#sg-brand-select-list .sg-ts-new-row.is-open .sg-ts-chev { transform: rotate(90deg); }
+#sg-brand-select-list .sg-ts-start-sub { display: flex; align-items: center; gap: var(--sg-space-s); padding-left: calc(var(--sg-space-m) + var(--sg-space-l)); }
+@media (prefers-reduced-motion: reduce) { #sg-brand-select-list .sg-ts-new-row .sg-ts-chev { transition: none; } }
+/* A component picked in the preview: its tokens by what they are for, each with its control. */
+#sg-theme-panel .sg-panel-body .pg-inspect-head.sg-ts-pick-head { position: sticky; top: var(--ts-head, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); background: var(--sg-bg-2); border-bottom: var(--sg-line); border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; }   /* as a table's header: stays under the panel's own while its tokens scroll */
+.sg-ts-pick { overflow: visible; }
+.sg-ts-pick-trail { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-xs); min-width: 0; }
+.sg-ts-trail { padding: 0; border: 0; background: none; color: var(--sg-muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sg-ts-trail:hover { color: var(--sg-text); }
+.sg-ts-trail-sep { color: var(--sg-muted); }
+.sg-ts-tok-field > .sg-ts-pair { flex: 1 1 auto; }
+.sg-ts-tok-group { margin: var(--sg-space-xl) 0 var(--sg-space-xs); padding-top: var(--sg-space-l); border-top: var(--sg-line); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); text-transform: none; }   /* each part of the component a section of its own */
+.sg-ts-tok-group:first-child { margin-top: var(--sg-space-s); padding-top: 0; border-top: 0; }
+.sg-ts .pg-controls > .pg-ctl.sg-ts-tok > .sg-mode-label { flex: 0 0 8rem; font-size: var(--sg-s); overflow-wrap: anywhere; }
+.sg-ts-tok-field { max-width: none; }   /* room for both colours and their hex in full */
+.sg-ts-tok-field { flex-direction: row; align-items: center; }
+.sg-ts-tok-field > .sg-ts-colour, .sg-ts-tok-field > .sg-ts-seg { flex: 1 1 auto; }
+.sg-ts-pick-empty { padding: var(--sg-space-m) var(--sg-cell-x); }
+.sg-ts.is-focus > :not(.sg-ts-pick) { display: none !important; }   /* focus: the picked component's tokens alone */
+/* Side by side, one scroll only: the properties on the left; the panel's head and the preview stay where they are. */
+@media (min-width: 1101px) {
+  #sg-theme-panel .sg-tk-detail { display: flex; flex-direction: column; overflow: hidden; }
+  #sg-theme-panel .sg-tk-detail > .sg-panel-head { flex: none; }
+  #sg-theme-panel .sg-tk-detail > .sg-panel-body { flex: 1 1 auto; min-height: 0; }
+  #sg-theme-panel .sg-ts-split { height: 100%; min-height: 0; align-items: stretch; }
+  #sg-theme-panel .sg-ts { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: var(--sg-space-xs); }
+  #sg-theme-panel .sg-ts-preview { position: static; align-self: start; }
+  #sg-theme-panel .sg-panel-body .pg-inspect-head.sg-ts-pick-head { top: 0; }
+}

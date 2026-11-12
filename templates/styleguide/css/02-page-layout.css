@@ -11,9 +11,12 @@
 .sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-logo { display: inline-flex; color: var(--sg-text); text-decoration: none; }   /* the system's logo, in the page's text colour */
 .sg-logo > svg { display: block; width: 145px; max-width: 100%; height: auto; }
-.sg-logo-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-s); }   /* the logo, its version at its right */
-.sg-logo-version { flex: none; text-decoration: none; }
 .sg-logo:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 4px; }
+/* The default in place of a logo: the system's name in short, in the style of the Status page's own numbers
+   (.sg-health-num) and 24px under their size (the owner's, 11 November 2026), on one line — the page measures it and
+   drops the size to the width the menu gives it. */
+.sg-sidebar-header .sg-title.sg-wordmark { font-size: calc((var(--sg-h1) * 4 - var(--sg-space-l) - var(--sg-space-s)) * var(--sg-wordmark-fit, 1)); line-height: normal; white-space: nowrap; overflow: hidden; }   /* its own line height, as the big numbers have (.sg-health-num): a system whose line height is a length would cut it */
+.sg-sidebar-header:has(> .sg-wordmark) > p:last-child { margin-top: calc(var(--sg-space-xxs) - var(--sg-space-xs)); font-size: var(--sg-xs); }   /* what the guide is, a step smaller and 4px closer under the wordmark than under a name (the owner's, 11 November 2026) */
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
 .sg-nav a { display: flex; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-s) calc(var(--sg-space-l) + var(--sg-space-s)); font-size: var(--sg-m); font-weight: var(--sg-heading-weight);   /* the system's m text size, a step under l, in its strong weight as the tabs are */ color: var(--sg-text-2); text-decoration: none; transition: background var(--sg-fast), color var(--sg-fast); line-height: var(--sg-lh); }
 .sg-nav a:hover { color: var(--sg-text); background: var(--sg-nav-hover); }   /* the item under the pointer, a step under the chosen one */

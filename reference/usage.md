@@ -674,8 +674,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
 - **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (with an intent layer, the Documentation page gathers it for every component, its rows Review, Missing or Keep; `#documentation`, `#intent-layer` and `#coverage` open it, else `#status/documentation`). Role and Do and don't are read from its page in the intent layer first (a rule `Role: button`; a section titled Do and don't, or rules that start `Do:` / `Don't:`), where agents read them without Figma, and a missing one is to write there; Figma's role annotation naming another role is to check, and its do and don't pictures stay for people. Its columns are Task nr, Kind, Source (where it was read, by name only: Figma, Intent layer, Code, Contract, Guidelines; the file in the row's panel), Status and Last checked; what is written and what to do (who writes it, You in Figma, and where) are in the row's panel (`PANEL_ONLY`). One row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Example, Properties: done, naming its contract file), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
-  `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
-  string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
+  `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`,
+  `examples`, a string or a list); a missing one is said in its Documentation. An example that starts `**Draft:**` (the
+  engine drafts the products' own first use there) is to review, never done, and agents read it named as a draft. Common mistakes the team has not written are what the
   last audit found the products doing with it (a rule laid over it, a look-alike built by hand, a parent's rule
   overriding it), said so.
 - **An address for each area**: a component's area is in the address after a slash (`#c-chip/accessibility`, `/documentation`, `/parity`, `/variants`, `/built-with`, `/used-in`, `/changelog`; the Playground has none), kept as the areas are switched and opened directly from a shared link, before the props of the variant (`#c-chip/accessibility?Size=L`).
@@ -725,12 +726,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
 - **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every change in one
-  table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day, and the time as the
-  reader's clock says it), Type, What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
+  table, newest first, in the card every table of the guide has (its head sticks with the card's corners). Columns: Date (the day and the time as the
+  reader's clock says it, on one line, its release under them), Source (Code, Figma, Intent layer, Contracts, Decisions, as its chips; a contract changed by a build Done by a person: kept in a GitLab store (`stores.contracts`), the author of the store's newest commit on its path (`lastWriterOf`); else who started the pipeline, else the GitLab account of the token (which needs `read_user`), else their git name; a scheduled build, the schedule; the kind of a decision
+  or note, Lesson or Comment, the first line of What), What, Affects, Done by. A row per commit to the code (the issues it names, what it says, its commit, and "Released in
   v2.1.0 on …" once a release holds it, nothing before), a row per component a read of Figma changed (what changed in it), a row per commit to the intent
-  layer (what it says, the pages it changed, its commit; a merge or a commit that changed no file is left out; a change the engine sent in parts, "…
-  (part 2 of 3)", is one row with each commit named), a row per decision (Decision, Lesson, Rule or Sign-off: what was ruled out, why) with the page it
-  is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Type and Done by in one cell that stays in view
+  layer (what it says, what it Added apart from what it Changed, each a line of pages counted by kind, component pages, other pages named while
+  five or fewer and token pages, every name behind Show all; its commit; a merge or a commit that changed no file is left out; a change the engine
+  sent in parts, "… (part 2 of 3)", is one row with each commit named), a row per decision (Decision, Lesson, Rule or Sign-off: what was ruled out, why) with the page it
+  is about. The rows of one moment (a read of Figma, one person's decisions of a day) share their Date, Source and Done by in one cell that stays in view
   under the head as they scroll. **Done by** names the person alone (who-did-it.mjs): one person under two names on the page (an account `qa.lead`
   and the `QA Lead` it signs as) by the name they sign with, a Windows sign-in without its domain. **Affects** shows five components, then "N more". An issue more
   than one commit names says how many ("· 3 commits"), and a click shows those alone. Chips (All, Code, Figma, Intent layer, Contracts, Decisions, each when it
@@ -834,12 +837,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Parity. A component shown in an overlay is read with the overlay it opens in, its backdrop too; one that does not move
   says so.
 - **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Status page's Accessibility, in
-  the same card as the Playground's tables: Task nr (open rows only), Area (Accessibility, with the criterion and its
-  level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
-  panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
-  finding or duty on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what
-  passed and where), What to do (who acts above it; each finding's own fix, what a person checks, "On badge, its Label
-  part, a person checks that…", or what has still to run, else what the criterion asks) and Status (✕ To fix, ! To
+  the same card as the Playground's tables: Task nr (open rows only), WCAG (the criterion and its level; a click, a
+  key or the pointer resting on it opens what it means in plain words and how it is checked, the token panel's own
+  pop-up, Escape closing it), Who acts, Status and Last checked. The row's panel holds the rest: What to do (each
+  finding's own fix, what a person checks, "On badge, its Label part, a person checks that…", or what has still to
+  run, else what the criterion asks), what Figma's annotations state for it, and what was found (each finding or duty
+  on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what passed and where).
+  Above the table All, then Who acts, then a chip a status. Status (✕ To fix, ! To
   check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
   finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
   browser, the last audit or the audit's code capture, a person). A criterion only a person can judge (1.3.3, 1.4.5,
@@ -1186,9 +1190,13 @@ each hands its content; `slots` stays Figma's instance swaps and what each accep
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
 keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
 on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`; each part a
-person named in Figma paired with the class the component's own file puts on it, where one class is the part's name or
-ends in it after the component's prefix, `pairedBy: "name"`, `part-pairing.mjs`; the structure contract's `children`
-win, and `cssSelector: null` stays unpaired), and
+person named in Figma paired with what the component's own file puts on it: the one class that is the part's name or
+ends in it after the component's prefix (`pairedBy: "name"`), else the element carrying the layer's own node id in an
+attribute (`data-figma-node="12:34"`, `pairedBy: "id"`, which survives a rename in Figma), else, for a part that is
+another component, that component's class on one element of the file when no other part is that component
+(`pairedBy: "component"`), never a guess between two, `part-pairing.mjs`; a part Figma sets in one text style in every
+variant carries it as `typographyToken`; the structure contract's `children` win, and `cssSelector: null` stays
+unpaired), and
 `source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
 file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
@@ -1284,9 +1292,10 @@ only while the snapshot still matches the code:
 dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
 `NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
-value, each part paired with its class by name (`part-pairing.mjs`; captured as `part-0`, `part-1` with its Figma
-`name`) compared on its own element against the gap and padding Figma binds on the frame of that name, the difference
-carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
+value, each paired part (`part-pairing.mjs`, by its name, its layer's node id or the component it is; captured as
+`part-0`, `part-1` with its Figma `name` and `textStyle`) compared on its own element against the gap and padding Figma
+binds on the frame of that name and against the text style Figma sets its layer in (font size, weight and line height),
+the difference carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
 background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
@@ -1389,7 +1398,24 @@ the person says yes; `--figma-fix --rule <rule id>` does every component of one 
 component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
 names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
-to reuse. `--query construction` prints it all; building or changing a component in Figma follows it. The Rules
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+
+The code is read the same way (`code-grammar.mjs`), from the system's own component files, and kept beside Figma's in
+`contracts/construction.json` (`code`): the framework, where a component file sits and how it is named; how each kind of
+prop (yes/no, options, text, number) and each option is named and the word a yes/no begins or ends with; a comment on each
+component and each prop; a Code Connect file for each component Figma has, mapping every Figma property to a prop or slot;
+custom properties made for the component or the shared tokens (`own` or `shared`, the team's to say); how each state is
+written (a pseudo-class, a class, a data or an ARIA attribute); how a part's class and a variant's class are named; and a
+shadow, border colour, opacity, corner and text written with a token, the corners sharing one, and custom properties of
+its own for what may be overridden. Every id begins with `code-`, and the team answers it as it answers Figma's
+(`--construction code-<rule> yes|no`); a decided one a component breaks fails `--construction-check`. Beside the rules,
+each component's `anatomy`: each state and how it is written (with file and line), its parts with element and class in
+markup order and whether each is optional, which prop puts which class on and what that class declares, each shadow's
+layers with the attributes they write and how it is turned off, borders, each corner's radius and whether one token holds
+them, opacity, flex-wrap with the row and column gap and the minimum width, whether it hugs or fills, each part's text,
+and the custom properties it declares and reads (its own API, safe to override) against those it inherits from the
+theme. It reads the code capture's API when there is one, else the component files (a Vue or Svelte file's own styles,
+the stylesheets a React file imports); nothing is written to the code. The Rules
 page opens with a card a side, Figma and Code (`doneCard` in the template's `00-start.js`, the Status page's own card and
 bars): a ring of every rule in the colour of its state (done, to decide, to fix) with the share done in its middle, and a bar
 per area in the same colours, weakest first. The Documentation page draws the same card, one a source (intent layer, Figma,
@@ -1480,11 +1506,19 @@ its own dot, and a list for the area and for the side, each saying how many rows
   contracts' catalog where it knows the products (`component-in-products`); what each layer binds and how it looks, kept beside the trees
   (`build-rules.mjs`): a layer whose corners are bound binding one variable for all four (`corners-one-variable`), an
   opacity under 1 bound to a variable (`opacity-bound`), a border's weight bound to one (`border-bound`) and a border
-  sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`) and whether a
-  component uses each one (`text-style-used`); the file's own evidence (`use-rules.mjs`): a swap or slot property listing
+  sitting where most sit (`border-align`); the text styles' own descriptions (`text-style-described`), whether a
+  component uses each one (`text-style-used`), and each component a description names by its own words, after "for
+  example" (Chip Labels, Field and Picker Hints), setting a text in that style (`text-style-as-described`; a whole
+  name only, one a phrase, never what a layer is called); the file's own evidence (`use-rules.mjs`): a swap or slot property listing
   the components it prefers (`swap-preferred`), a variant or yes/no property starting on a value its uses take, never
   one most of them change, counting its own examples and each time it sits inside another's (`default-in-use`), and a
-  component's words, read from its examples' short labels, in the case most components' are (`words-case`); how a
+  component's words, read from its examples' short labels, in the case most components' are (`words-case`); what a
+  component's words need (`content-rules.mjs`, three uses at least): a text property every use sets starting on
+  placeholder words, never ones that read as real (`props-given`), a text that grows on one line, whose uses run past four
+  words, ending in an ellipsis or stopping at a maximum width (`text-room`), and an icon-only use (its label hidden, no
+  words shown) still setting its hidden label, what a screen reader calls it (`icon-only-named`); with, for an agent
+  filling a component in, the text properties a use must set and how many words its uses give each (`content.given`,
+  `content.lengths`); how a
   shadow changes between variants, by the layer's own effect or by a shadow layer shown and hidden, as most components
   change theirs (`shape-rules.mjs`, `shadow-one-way`), a property for one kind of content (Icon, Content) a slot or an
   instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
@@ -1500,7 +1534,8 @@ its own dot, and a list for the area and for the side, each saying how many rows
   `findings.json`) and a product's near copy of a component, to decide.
 
 A row opens in the side panel: its status, who fixes it, and one card holding what the engine suggests, every component
-or place it changes with its fix, and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
+or place it changes with its fix (labelled values: the components on the left, the changes they take on the right, one a
+line, components taking the same changes in one entry; never a table or a box drawn as one), and the decision under them, to copy into Claude Code (Fix it, Another name, Name a
 layer; Fix all for a rule's renames). The code's change is asked for as a patch handed back, never written over the code
 people wrote. `styleguide.construction: "unlisted"` keeps
 the page out of the menu and the search, opened only by its link (`#rules`; `#construction`, the address it had, opens it still); `"off"` leaves it out.

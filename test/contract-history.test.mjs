@@ -21,6 +21,15 @@ test('the first build records, a build that changes nothing adds nothing, a chan
   assert.deepEqual([p.name, p.kind, p.items], ['Save', 'pattern', [{ what: 'should rule', change: 'added', detail: 'Keep it.' }]]);
 });
 
+test('each build\'s changes keep the person who ran it, or the schedule when nobody did', () => {
+  const file = join(tempDir('contract-history-by-'), 'contracts-history.json');
+  withContractHistory(file, '2026-11-01T10:00:00Z', { contracts: [chip([{ name: 'size', options: ['s'] }])] });
+  const log = withContractHistory(file, '2026-11-02T10:00:00Z', { contracts: [chip([])], by: 'QA Lead' });
+  assert.equal(log.at(-1).by, 'QA Lead', 'the person who ran the build');
+  const more = withContractHistory(file, '2026-11-03T10:00:00Z', { contracts: [chip([{ name: 'tone', options: ['a'] }])], run: 'schedule' });
+  assert.deepEqual([more.at(-1).by, more.at(-1).run], [undefined, 'schedule'], 'a scheduled build names nobody it was not');
+});
+
 test('a pattern\'s rules and components compared, at their level', () => {
   const was = { Save: patternSlim(save([{ text: 'Show it.', level: 'should' }])) }, is = { Save: patternSlim(save([{ text: 'Show it.', level: 'must' }])) };
   assert.deepEqual(comparePatterns(was, is)[0].items.map((x) => `${x.what} ${x.change}`), ['must rule added', 'should rule removed'], 'a rule made a must is said');

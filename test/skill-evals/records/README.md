@@ -245,6 +245,16 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-a-field-s-name-gives` | The 24 guide tasks on Haiku (engine a577057) | "A field's name gives way to the code only where the code holds a button and the name says no input outright" |
 | `2026-11-11-comments-left-in-figma-and` | The 24 guide tasks on Haiku (engine b5e80f5) | "Comments left in Figma, and four of the library's own conventions" |
 | `2026-11-11-history-tests-know-the-contracts` | The 24 guide tasks on Haiku (engine 2a3366a) | "A card per source on Rules and Documentation, and pattern contracts" |
+| `2026-11-11-the-style-guide-says-one` | The 24 guide tasks on Haiku (engine f815a8a) | "The style guide says one number, reads as text, and sorts every table" |
+| `2026-11-11-history-a-contract-change-is` | The 24 guide tasks on Haiku (engine 9f794e9) | "History: a contract change is done by the engine, under Contracts" |
+| `2026-11-11-a-component-s-examples-feed` | The 24 guide tasks on Haiku (engine 531ed97) | "A component's examples are read with its guidance" |
+| `2026-11-11-a-contract-change-is-named` | The 24 guide tasks on Haiku (engine 0e03ff5) | "A contract change is named by its store's commit, as the intent layer's are" |
+| `2026-11-11-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine db66ce8) | "A component's examples are read, with main merged in" |
+| `2026-11-11-the-code-grammar-s-test` | The 24 guide tasks on Haiku (engine 8f8f3b6) | "The code grammar's test makes its folder through tempDir" |
+| `2026-11-11-the-theme-editor-in-every-style-guide` | The 20 guide tasks on Haiku (engine 46ed658) | "The theme editor in every style guide: new themes of the system, made over a live screen" |
+| `2026-11-11-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 047ba3c) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into styleguide/source-cards-one-row" |
+| `2026-11-11-merge-origin-main-into-figma` | The 24 guide tasks on Haiku (engine 106e4e9) | "Each Figma part read in the code, and four checks of a component's words" |
+| `2026-11-11-merge-origin-main-into-figma-2` | The 24 guide tasks on Haiku (engine bd8cd70) | "Each Figma part read in the code, and four checks of a component's words, on the code's construction rules" |
 | `2026-11-12-the-composition-path-on-opus` | The 12 prototype tasks on a system built only in Figma, Opus, 5 runs each (engine e62df41) | "The composition path at more runs, on a model above Haiku" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

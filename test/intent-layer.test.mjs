@@ -104,7 +104,7 @@ function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200, commi
     if (/\/repository\/commits$/.test(u.pathname)) return { ok: true, status: 200, json: async () => [{ id: sha, committed_date: '2026-09-15T08:30:00Z' }] };
     if (/\/repository\/compare$/.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ commits, diffs: [{ new_path: 'docs/dsds/components/button-main.dsds.json', old_path: 'docs/dsds/components/button-main.dsds.json' }] }) };
     // One commit's own files (each commit of a read told apart).
-    if (/\/repository\/commits\/[^/]+\/diff$/.test(u.pathname)) return { ok: true, status: 200, json: async () => (u.searchParams.get('page') === '1' ? [{ new_path: 'docs/dsds/components/' + (decodeURIComponent(u.pathname).includes('/c1/') ? 'button-main' : 'chip-filter') + '.dsds.json' }] : []) };
+    if (/\/repository\/commits\/[^/]+\/diff$/.test(u.pathname)) return { ok: true, status: 200, json: async () => (u.searchParams.get('page') === '1' ? [{ new_file: decodeURIComponent(u.pathname).includes('/c1/'), new_path: 'docs/dsds/components/' + (decodeURIComponent(u.pathname).includes('/c1/') ? 'button-main' : 'chip-filter') + '.dsds.json' }] : []) };
     if (/\/repository\/commits\//.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ id: sha, title: 'Docs', committed_date: '2026-10-01T10:00:00Z' }) };
     return { ok: true, status: 200, json: async () => ({ default_branch: 'main' }) };
   };
@@ -288,6 +288,8 @@ test('each commit is a change of its own: who made it, when, what it says and it
     ['c2', '2026-10-01T11:30:00Z', 'Chip rules', 'Done by wombat', ['Filter Chip'], true],
     ['c1', '2026-10-01T09:00:00Z', 'Button rules', 'Done by Quokka', ['Button Main'], true],
   ], 'newest first, the merge left out, each with its own pages');
+  // The pages each commit made, apart from those it edited: c1 created Button Main's page, c2 edited Filter Chip's.
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).changes.map((c) => [c.to, c.added]), [['c2', []], ['c1', ['Button Main']]]);
   // A change kept by an older reader, the read as one: told apart now, though the layer did not move.
   const snap = JSON.parse(readFileSync(file, 'utf8'));
   writeFileSync(file, JSON.stringify({ ...snap, _reader: 18, changes: [{ from: 'abc1234def5678', to: 'fff9999aaa0000', at: '2026-10-01T12:00:00Z', files: [], pages: ['Button Main', 'Filter Chip'] }] }));

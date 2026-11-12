@@ -266,8 +266,8 @@
     var heads = {}, rows = [];
     mxRows.forEach(function (o) { if (!parentOf(o.name)) heads[o.name] = o; });
     mxRows.forEach(function (o) {
-      var pa = parentOf(o.name);
-      if (!pa) { rows.push(o); return; }
+      var pa = rootComponentOf(o.name);   // however deep it sits: a part of a part counts in the one row at the top, never in a row of its own too
+      if (pa === o.name) { rows.push(o); return; }
       var h = heads[pa];
       if (!h) { h = heads[pa] = { name: pa, family: true, figma: true, code: 'missing', par: null, acc: null, doc: null, fix: 0, dec: 0, untested: false, at: null }; rows.push(h); }
       (h.parts = h.parts || []).push(o);

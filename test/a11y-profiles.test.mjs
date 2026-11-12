@@ -86,19 +86,25 @@ test('who acts has a card of its own in the panel, and stays in what to do where
   assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(!whoCol && r\.who \?/);
 });
 
-test('the accessibility table gives what to do the room the other columns leave', () => {
+test('every issue table gives each column its share by what it holds, and the column it is read for the rest', () => {
   const css = readFileSync(join(ROOT, 'templates', 'styleguide', 'css', '09-component-playground.css'), 'utf8');
-  // Eight columns: every one but what to do is given a width, so what to do keeps the rest.
-  for (const nth of [3, 4, 5, 6, 7, 8]) assert.match(css, new RegExp(`\\.sg-issues--a11y\\.sg-cols-8 th:nth-child\\(${nth}\\) \\{ width: \\d+%; \\}`), `column ${nth}`);
-  assert.ok(!/\.sg-issues--a11y\.sg-cols-8 th:nth-child\(2\)/.test(css), 'what to do is never given one: it takes what is left');
+  // A share for each kind of column, in percent, whatever its place: a column a table leaves out never shifts the rest.
+  for (const k of ['no', 'kind', 'whoCell', 'source', 'status', 'updated']) assert.match(css, new RegExp(`\\.sg-issues \\.sg-col-${k} \\{ width: \\d+%; \\}`), `column ${k}`);
+  assert.match(css, /\.sg-issues :is\(\.sg-col-figma, \.sg-col-code\) \{ width: \d+%; \}/);
+  assert.match(css, /\.sg-issues \.sg-col-rest \{ width: auto; \}/, 'the column it is read for takes what is left');
+  assert.doesNotMatch(css, /\.sg-cols-\d th:nth-child/, 'no width set by a column\'s place');
+  assert.match(css, /\.sg-issues \[data-empty-col\] \{ display: none; \}/, 'a column with nothing in any row is left out');
+  const page = templateText();
+  // Accessibility's criterion is what it is read for; Motion's what to do, left out when nothing is to do.
+  assert.match(page, /return read\.length \? read : has\('figma'\) && has\('code'\) \? \['figma', 'code'\] : \['kind'\];/);
 });
 
-test('the style guide shows the task first, the person in a column, and filters by them', () => {
+test('the style guide shows the task, its criterion, the person in a column, and filters by them', () => {
   const page = templateText();
-  // The table: the task, then who does it, then the criterion as a reference beside it.
-  assert.match(page, /Accessibility: \[\['Task nr', 'no'\], \['What to do', 'todo'\], \['Who acts', 'whoCell'\], \['WCAG', 'kind'\]/);
-  // What to do is no longer kept for the panel: two tasks of one criterion differ only by their words.
-  assert.match(page, /PANEL_ONLY = \{ Parity: \['todo'\], Accessibility: \['figma', 'code'\]/);
+  // The table: the task, its criterion, then who does it (the owner's order, 11 November 2026).
+  assert.match(page, /Accessibility: \[\['Task nr', 'no'\], \['WCAG', 'kind'\], \['Who acts', 'whoCell'\], \['What to do', 'todo'\]/);
+  // What to do is read in the row's panel, with what the Figma notes say and what was found.
+  assert.match(page, /PANEL_ONLY = \{ Parity: \['todo'\], Accessibility: \['todo', 'figma', 'code'\]/);
   // One row per person, each with that person's steps alone, and the step said so a row read on its own still says
   // it follows another's.
   assert.match(page, /return byWho\.map\(function \(g\) \{/);

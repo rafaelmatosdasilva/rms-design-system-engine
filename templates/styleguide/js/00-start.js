@@ -148,14 +148,17 @@
     var GAP = DONE_STATES.filter(function (k) { return all[k]; }).length > 1 ? 1.5 : 0;
     var arcs = DONE_STATES.map(function (k) { if (!all[k]) return ''; var len = C * all[k] / t, draw = Math.max(0.5, len - GAP), a = '<circle class="sg-cx-ring-' + k + '" cx="54" cy="54" r="' + R + '" stroke-dasharray="' + draw.toFixed(2) + ' ' + (C - draw).toFixed(2) + '" stroke-dashoffset="' + (-(at + GAP / 2)).toFixed(2) + '"/>'; at += len; return a; }).join('');
     var ring = '<span class="sg-cx-ring"><svg viewBox="0 0 108 108" aria-hidden="true"><circle class="sg-cx-ring-track" cx="54" cy="54" r="' + R + '"/>' + arcs
-      + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(pct + '%') + '</span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
+      + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(String(pct)) + '<small>%</small></span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
     return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p></div>'
       + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div></div>';
   }
   // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
   function doneCards(sec, cards) {
     if (!cards) return;
-    var n = (cards.match(/class="sg-health-tile /g) || []).length;   // all on one row: two a row at the least, so one card is still half the width
+    // On one row up to four, the Documentation page's four sources together (the owner's, 11 November 2026); more wrap,
+    // four a row. A card too narrow for its ring and its areas side by side puts the areas under the ring
+    // (.sg-cx-score-body wraps). Two a row at the least, so one card is still half the width.
+    var n = Math.min(4, (cards.match(/class="sg-health-tile /g) || []).length);
     var html = '<div class="sg-health-box"><div class="sg-health-tiles sg-cx-scores" style="--sg-cx-cards:' + Math.max(2, n) + '">' + cards + '</div></div>';
     var fb = sec.querySelector(':scope > .sg-todo-head');
     if (fb) fb.insertAdjacentHTML('beforebegin', html); else (sec.querySelector(':scope > h2') || sec).insertAdjacentHTML('afterend', html);
@@ -343,7 +346,8 @@
   }
   // What a table would say, inside a panel that opens from a table's row: labelled values, never another table (the
   // owner's rule). kvOne: one item, each label over its value; kvList: several, each its own block. An empty value is left out.
-  function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + esc(p[0]) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
+  // A label is words, escaped; { html } when it is markup the page made itself (the components a change is for, linked).
+  function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + (p[0] && typeof p[0] === 'object' ? p[0].html : esc(p[0])) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
   function kvList(items, cls) { return '<ul class="sg-kv-list' + (cls ? ' ' + cls : '') + '">' + items.map(function (pairs) { return '<li>' + kvOne(pairs) + '</li>'; }).join('') + '</ul>'; }
   // The components that use a token: each its name (its page when it has one) and where it is, in Figma and in the code.
   function usersTable(names) {
@@ -440,26 +444,39 @@
   window.addEventListener('hashchange', function () { closeToken(false); });
   function linkVars(text) { return esc(text).replace(/(^|[^\w-])(--[\w-]+)/g, function (m, pre, v) { return pre + usesLink(v); }); }
   if (DATA.title) { document.getElementById('sg-title').textContent = DATA.title; document.title = DATA.title + ' · Living style guide'; }
-  // The system's logo at the top of the menu, in place of its name (still said to a screen reader); it follows the
-  // page's light and dark.
-  // The top of the menu: the system's name (or the project's own logo, styleguide.logo, when it gives one, the name then
-  // said to a screen reader only), and beside it the system's version.
+  // The top of the menu: the project's own logo (styleguide.logo), when it gives one, in place of the system's name,
+  // which is then said to a screen reader only; it follows the page's light and dark.
+  //
+  // With no logo of its own — every guide that is not a client's — the default takes its place: RMS DS, the engine's own
+  // mark, whatever the system is called (the owner's, 11 November 2026), its name in full on hover and to a screen
+  // reader, in the style of the Status page's own numbers, over what the guide is. No version beside it: a version read from
+  // the code says nothing about the Figma file the same guide shows, so one number over both would be a claim the guide
+  // cannot make. The changelog still carries it, per component and per release.
+  var DEFAULT_MARK = 'RMS DS';
   var lhead = document.querySelector('.sg-sidebar-header'), lfirst = lhead && lhead.querySelector('#sg-title');
   if (lhead && DATA.logo && DATA.logo.svg) {
     Array.prototype.forEach.call(lhead.querySelectorAll('p'), function (p) { p.classList.add('sg-hidden-text'); });
     var la = document.createElement('a'); la.className = 'sg-logo'; la.href = '#status'; la.setAttribute('aria-label', (DATA.title || 'Design system') + ', status');
     la.innerHTML = DATA.logo.svg; var lsvg = la.querySelector('svg'); if (lsvg) { lsvg.setAttribute('aria-hidden', 'true'); lsvg.setAttribute('focusable', 'false'); }
     lhead.insertBefore(la, lhead.firstChild); lfirst = la;
+  } else if (lfirst) {
+    lfirst.classList.add('sg-wordmark');
+    var full = DATA.title || 'Design system';
+    lfirst.innerHTML = '<span aria-hidden="true">' + esc(DEFAULT_MARK) + '</span><span class="sg-hidden-text">' + esc(full) + '</span>';
+    lfirst.setAttribute('title', full);   // the system's own name, on hover
+    fitOneLine(lfirst);
   }
-  // Its version: the newest release its changelog has (styleguide.version, when set), so it moves on with each release;
-  // a click opens the changelog.
-  var newest = DATA.version || null;
-  if (!newest) (DATA.components || []).forEach(function (k) { (k.changelog || []).forEach(function (r) { if (r.release && (!newest || versionAfter(r.release, newest))) newest = r.release; }); });
-  if (lfirst && newest) {
-    var row = document.createElement('div'); row.className = 'sg-logo-row'; lhead.insertBefore(row, lfirst); row.appendChild(lfirst);
-    var vtag = document.createElement('a'); vtag.className = 'sg-logo-version'; vtag.href = '#history'; vtag.setAttribute('aria-label', 'Version ' + newest + ', changelog');
-    vtag.innerHTML = '<span class="sg-status">' + esc(/^v/i.test(newest) ? newest : 'v' + newest) + '</span>';   // the page's tag, inside a plain link
-    row.appendChild(vtag);
+  // The wordmark on one line, whatever the name's length: it starts at the big number's size and drops to the width the
+  // menu gives it. Measured again once the page's own font is in, and on every resize (the menu is narrower on a phone).
+  function fitOneLine(el) {
+    var set = function () {
+      el.style.removeProperty('--sg-wordmark-fit');
+      var room = el.clientWidth, drawn = el.scrollWidth;
+      if (room > 0 && drawn > room) el.style.setProperty('--sg-wordmark-fit', String(Math.floor(room / drawn * 1000) / 1000));
+    };
+    set();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
+    addEventListener('resize', set);
   }
   // Whether release a is later than release b (v2.10.01 after v2.9.3): their numbers compared one by one.
   // The releases of a changelog in order: what is not released yet first, then the newest version (v2.12.00 before
