@@ -289,3 +289,60 @@ test('a class name goes into a regular expression escaped whole, never its hyphe
   assert.ok(a, 'a class holding regular-expression characters is read, never thrown on');
   assert.deepEqual(a.parts.map((p) => p.class), ['acme-grid__cell']);
 });
+
+test('the code\'s words: their case, and words written into the markup instead of coming through a prop or a slot', async () => {
+  const { wordsInMarkup, fallbackWords } = await import('../lib/code-grammar.mjs');
+  const tpl = '<template>\n  <div class="acme-panel">\n    <span>Close panel</span>\n    <b>{{ label }}</b>\n    <slot>Save changes</slot>\n    <i title="More options" :aria-label="hint"></i>\n  </div>\n</template>';
+  assert.deepEqual(wordsInMarkup('src/Panel.vue', tpl), [{ words: 'Close panel', line: 3 }, { words: 'title "More options"', line: 6 }], 'a slot\'s fallback and a bound label are not written in');
+  assert.deepEqual(fallbackWords('src/Panel.vue', tpl), ['Save changes']);
+  const jsx = 'export function Pill({ label, children }) { if (limit > max && y < z) return null;\n  return <div className="acme-pill" onClick={() => go()}>\n    <span>Hello there</span>{children ?? "Pay now"}<em>{label}</em><i aria-label="Close" />\n  </div>; }';
+  assert.deepEqual(wordsInMarkup('src/Pill.jsx', jsx), [{ words: 'Hello there', line: 3 }, { words: 'aria-label "Close"', line: 3 }], 'code around the markup is never read as words');
+  assert.deepEqual(fallbackWords('src/Pill.jsx', jsx), ['Pay now']);
+
+  const one = (name, words, { text = '' } = {}) => ({ name, file: `src/${name}.vue`, root: name, figmaProps: null,
+    text: `<template><button class="${name}"><slot>${words}</slot>${text}</button></template>`, styles: [],
+    api: { props: { label: { type: 'string', default: words } } },
+    stories: [{ file: `src/${name}.stories.js`, text: `export const Main = { args: { label: '${words}' } };` }] });
+  const g = codeGrammarOf({ components: [one('acme-save', 'Save changes'), one('acme-send', 'Send the form'), one('acme-pay', 'Pay Now Please', { text: '<em>Read more</em>' }), one('acme-keep', 'Keep this one')] }).code;
+  const cs = g.rules.find((x) => x.id === 'code-words-case');
+  assert.equal(cs.area, 'content');
+  assert.match(cs.says, /Sentence case, as most are/);
+  assert.deepEqual(cs.toFix.map((t) => [t.component, t.value]), [['acme-pay', 'its words are in Title Case']]);
+  const wp = g.rules.find((x) => x.id === 'code-words-through-props');
+  assert.deepEqual(wp.toFix.map((t) => [t.component, t.value]), [['acme-pay', '"Read more" (src/acme-pay.vue:1)']]);
+});
+
+test('a rule the team already wrote into its linter is the team\'s, said with where it was written', async () => {
+  const { decidedByLint, lintConfigs, lintReports } = await import('../lib/lint-config.mjs');
+  const dir = tempDir('lint-config');
+  writeFileSync(join(dir, 'eslint.config.js'), "export default [\n  {\n    rules: {\n      'vue/prop-name-casing': ['error', 'camelCase'],\n      // 'vue/require-prop-comment': 'error',\n      'vue/no-bare-strings-in-template': 'off',\n    },\n  },\n];\n");
+  writeFileSync(join(dir, '.stylelintrc.json'), JSON.stringify({ rules: { 'selector-class-pattern': '^[a-z]+(-[a-z]+)*(__[a-z]+(-[a-z]+)*)?(--[a-z]+)?$', 'color-no-hex': true, 'scale-unlimited/declaration-strict-value': [['/color/', 'box-shadow']] } }, null, 2));
+  const configs = lintConfigs(dir);
+  assert.deepEqual(configs.map((c) => [c.tool, c.file]), [['stylelint', '.stylelintrc.json'], ['eslint', 'eslint.config.js']]);
+  const { code } = codeGrammarOf({ components: system(), lint: { configs } });
+  const r = (id) => code.rules.find((x) => x.id === id);
+  // The prop casing it sets is the rule's: decided, so the one to fix is the team's to fix, never asked.
+  assert.equal(r('code-boolean-prop-case').by, 'team');
+  assert.equal(r('code-boolean-prop-case').status, 'fix');
+  assert.deepEqual(r('code-boolean-prop-case').decidedIn, { tool: 'eslint', file: 'eslint.config.js', line: 4, setting: 'vue/prop-name-casing', value: ['error', 'camelCase'] });
+  assert.equal(r('code-part-class').decidedIn.setting, 'selector-class-pattern', 'the pattern takes the rule\'s own example (acme-button__label)');
+  assert.equal(r('code-shadow-token').decidedIn.setting, 'color-no-hex');
+  assert.equal(r('code-prop-comment').decidedIn, undefined, 'a setting in a comment decides nothing');
+  // A setting that says another way decides nothing: a pattern that refuses the rule's example.
+  const other = decidedByLint([{ id: 'code-part-class', says: "A part's class is the component's with the part's name (button__label)" }], [{ tool: 'stylelint', file: 'x', settings: { 'selector-class-pattern': { value: '^[a-z]+$', line: 1 } } }]);
+  assert.deepEqual(other, {});
+  // The team's own answer in the authored contract comes first.
+  const said = codeGrammarOf({ components: system(), lint: { configs } }, { answers: { 'code-boolean-prop-case': false } }).code.rules.find((x) => x.id === 'code-boolean-prop-case');
+  assert.equal(said, undefined);
+  // What its own linter reports for the setting, from the project's node_modules only, kept until a file changes.
+  let runs = 0;
+  const run = () => { runs++; const e = new Error('exit 1'); e.stdout = JSON.stringify([{ filePath: 'a.vue', messages: [{ ruleId: 'vue/prop-name-casing' }, { ruleId: 'semi' }] }]); throw e; };
+  assert.deepEqual(lintReports(dir, { x: { tool: 'eslint', setting: 'vue/prop-name-casing', file: 'eslint.config.js' } }, ['eslint.config.js'], { run }), {}, 'no linter installed: none is run');
+  mkdirSync(join(dir, 'node_modules', '.bin'), { recursive: true }); writeFileSync(join(dir, 'node_modules', '.bin', 'eslint'), '');
+  writeFileSync(join(dir, 'a.vue'), '<template></template>');
+  const decided = { x: { tool: 'eslint', setting: 'vue/prop-name-casing', file: 'eslint.config.js' } };
+  assert.deepEqual(lintReports(dir, decided, ['a.vue'], { run }), { 'vue/prop-name-casing': 1 });
+  assert.deepEqual(lintReports(dir, decided, ['a.vue'], { run }), { 'vue/prop-name-casing': 1 });
+  assert.equal(runs, 1, 'read again from what was kept, nothing changed');
+  rmSync(dir, { recursive: true, force: true });
+});
