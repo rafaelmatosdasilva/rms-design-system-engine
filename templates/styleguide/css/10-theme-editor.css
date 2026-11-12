@@ -46,16 +46,11 @@
 .sg-ts-mode-tag { flex: none; font-size: var(--sg-xs); color: var(--sg-muted); }
 .sg-ts-split > * { margin-top: 0; }
 .sg-ts-preview { top: var(--ts-top, 0px) !important; }
-.sg-ts-auto { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
-.sg-ts-auto:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-ts-auto[hidden] { display: none; }
-.sg-ts-auto svg { width: 1rem; height: 1rem; }
 .sg-ts .pg-ctl.is-off { opacity: 0.5; }
 .sg-ts .pg-ctl.is-off input { cursor: not-allowed; }
 /* New theme: an icon button, its menu the Theme choice's own dropdown, opening under it to the right. */
 .sg-brand-ctl .sg-ts-new { position: relative; width: auto; }
 .sg-ts-new .sg-ts-menu { left: 0; right: auto; min-width: 15rem; }
-.sg-ts-auto:hover { color: var(--sg-text); }
 /* A slider's number: a field like the colours', its unit inside it. */
 .sg-ts-num.sg-input { flex: none; display: flex; align-items: center; gap: var(--sg-space-xs); width: 4.75rem; padding-block: 0; cursor: text; }
 .sg-ts-num .sg-ts-hex { text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
@@ -102,7 +97,7 @@
 .sg-ts-trail:hover { color: var(--sg-text); }
 .sg-ts-trail-sep { color: var(--sg-muted); }
 .sg-ts-tok-field > .sg-ts-pair { flex: 1 1 auto; }
-.sg-ts-tok-group { margin: var(--sg-space-xl) 0 var(--sg-space-xs); padding-top: var(--sg-space-l); border-top: var(--sg-line); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); text-transform: none; }   /* each part of the component a section of its own */
+.sg-ts-tok-group { margin: var(--sg-space-xl) 0 var(--sg-space-xs); padding-top: var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); text-transform: none; }   /* each part of the component a section of its own */
 .sg-ts-tok-group:first-child { margin-top: var(--sg-space-s); padding-top: 0; border-top: 0; }
 .sg-ts .pg-controls > .pg-ctl.sg-ts-tok > .sg-mode-label { flex: 0 0 8rem; font-size: var(--sg-s); overflow-wrap: anywhere; }
 .sg-ts-tok-field { max-width: none; }   /* room for both colours and their hex in full */
@@ -151,11 +146,6 @@
 .sg-ts-preview:fullscreen .sg-ts-screen { border-radius: 0; }
 .sg-ts-preview:fullscreen::backdrop { background: var(--sg-bg); }
 .sg-ts-preview:fullscreen > .sg-ts-preview-head { position: static; top: auto; }   /* the page's sticky heads stop under its own bar, which full screen has not */
-/* The components inside the one picked, after its trail: each a click away. */
-.sg-ts-kids { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-xs); margin-left: var(--sg-space-m); padding-left: var(--sg-space-m); border-left: var(--sg-line); }
-.sg-ts-kids-label { color: var(--sg-muted); }
-.sg-ts-kid { padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.sg-ts-kid:hover, .sg-ts-kid:focus-visible { color: var(--sg-accent); }
 /* A colour's hex in full, light and dark alike: each field as wide as seven characters and its tags, the pair one above
    the other where the row is too narrow for both side by side. */
 .sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
@@ -179,30 +169,22 @@
 .sg-showroom-screen:has(> .sg-ts-row) { display: flex; background: transparent !important; }   /* the row as tall as the preview, its screens in the middle of it, the panel behind */
 /* Reset changes: the plainest of the page's buttons, words alone, before Cancel. */
 .sg-ts-reset { align-self: center; padding: 0 var(--sg-space-s); border: 0; background: none; color: var(--sg-text-2); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.sg-ts-reset:hover { color: var(--sg-text); }
+.sg-ts-reset:not(:disabled):hover { color: var(--sg-text); }
+.sg-ts-reset:disabled { color: var(--sg-muted); cursor: not-allowed; opacity: 0.5; }   /* nothing to reset yet */
 .sg-ts-reset:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
 /* A number's − and +, inside its field: before the number and after its unit. */
 .sg-ts-num.sg-input { width: auto; gap: var(--sg-space-xxs); padding-inline: var(--sg-space-xxs); }
 .sg-ts-num .sg-ts-hex { width: 3.5ch; min-width: 0; }
-.sg-ts-step-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
-.sg-ts-step-btn:hover { color: var(--sg-text); }
-.sg-ts-step-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-ts-step-btn svg { width: 0.875rem; height: 0.875rem; }
 .sg-ts-num input:disabled ~ .sg-ts-step-btn, .sg-ts-num:has(input:disabled) .sg-ts-step-btn { opacity: 0.4; cursor: not-allowed; }
 /* The page's sticky card heads paint a band of the page's colour above themselves, to hide what scrolls under them; in
    the editor's own columns nothing does, and the band cut the card's border under its rounded corners. */
 #sg-theme-panel :is(.sg-ts, .sg-ts-preview) .pg-inspect-head { box-shadow: none; }
 /* A pixel field fills the room its row gives it: its − at one end, its + at the other, the number between. */
-.sg-ts-tok-field > .sg-ts-num, .sg-ts-bps > .sg-ts-num { flex: 1 1 auto; width: auto; }
-.sg-ts-tok-field > .sg-ts-num .sg-ts-hex, .sg-ts-bps > .sg-ts-num .sg-ts-hex { flex: 1 1 auto; width: auto; }
+.sg-ts-num:not(.sg-ts-bp), .sg-ts-bps > .sg-ts-num { flex: 1 1 auto; width: auto; }
+.sg-ts-num:not(.sg-ts-bp) .sg-ts-hex, .sg-ts-bps > .sg-ts-num .sg-ts-hex { flex: 1 1 auto; width: auto; }
 .sg-ts-bps { justify-items: stretch; }
-.sg-ts-num .sg-ts-auto { width: 1.25rem; height: 1.25rem; }   /* a number's reset, inside its field */
 /* A token linked to another: what it follows under its name, and the button that detaches it (or links it again). */
 .sg-ts-alias { display: flex; align-items: center; gap: var(--sg-space-xxs); margin-top: var(--sg-space-xxs); font-size: var(--sg-xs); color: var(--sg-muted); }
-.sg-ts-link-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
-.sg-ts-link-btn:hover { color: var(--sg-text); }
-.sg-ts-link-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-ts-link-btn svg { width: 0.875rem; height: 0.875rem; }
 .sg-ts-tok.is-linked .sg-ts-tok-field { opacity: 0.55; }
 .sg-ts .pg-controls > .pg-ctl.sg-ts-tok > .sg-mode-label { display: flex; flex-direction: column; }
 /* A breakpoint's number as a colour's hex is laid out: the value, its breakpoint small under it, − and + at either side. */
@@ -212,9 +194,9 @@
 .sg-ts-bp > .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; text-align: left; width: auto; }
 .sg-ts-bp > .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; margin-top: calc(-1 * var(--sg-space-xs)); font-size: var(--sg-xs); line-height: var(--sg-lh); }
 /* In a field that fills its row, the value (its number, unit and reset) sits in the middle, − and + at the ends. */
-.sg-ts-tok-field > .sg-ts-num .sg-ts-hex { flex: none; field-sizing: content; min-width: 2ch; width: auto; text-align: center; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="-1"] { margin-right: auto; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="1"] { margin-left: auto; }
+.sg-ts-num:not(.sg-ts-bp) .sg-ts-hex { flex: none; field-sizing: content; min-width: 1ch; width: auto; text-align: center; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-step-btn[data-step="-1"] { margin-right: auto; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-step-btn[data-step="1"] { margin-left: auto; }
 /* A linked token's field, as Figma shows it: the name of what it follows in a chip (a colour's swatch in it), and the
    button that detaches it at the end. */
 .sg-ts-chipfield.sg-input { flex: 1 1 auto; display: flex; align-items: center; gap: var(--sg-space-s); min-width: 0; padding-inline: var(--sg-space-xs); }
@@ -226,40 +208,36 @@
 .sg-ts-chipfield > .sg-ts-link-btn { margin-left: auto; }
 .sg-ts-tok.is-linked .sg-ts-tok-field { opacity: 1; }
 /* Zoom, in the preview's bar: the page's own number field. */
-.sg-ts-zoom.sg-ts-num.sg-input { width: 11rem; }   /* the px fields' own layout: the value centred, − and + at the ends */
-.sg-ts-zoom .sg-ts-hex { flex: none; field-sizing: content; min-width: 2ch; width: auto; text-align: center; }
-.sg-ts-zoom > .sg-ts-step-btn[data-step="-1"] { margin-right: auto; }
-.sg-ts-zoom > .sg-ts-step-btn[data-step="1"] { margin-left: auto; }
+/* One number field everywhere (a slider's, a token's, a radius, the zoom): − and + at the ends, the value and its unit (and
+   its reset, when it has one) centred between them. A slider's and the zoom's are all one width. */
+.sg-ts-zoom.sg-ts-num.sg-input, .sg-ts-range > .sg-ts-num.sg-input { flex: none; width: 9.5rem; }
 .sg-ts-stage { overflow: auto; }
 /* A breakpoint's number and its name, both centred between − and +. */
 .sg-ts-bp > .sg-ts-hex, .sg-ts-bp > .sg-ts-mode-tag { justify-self: center; text-align: center; }
 .sg-ts-bp > .sg-ts-hex { width: 100%; }
-/* A breakpoint's reset, inside its field before its +. */
-.sg-ts-bps > .sg-ts-bp.sg-ts-num { grid-template-columns: auto minmax(0, 1fr) auto auto; }
-.sg-ts-bp > .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
-.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 4; }
+/* A breakpoint's field: − and + at the ends, the value with its breakpoint under it and its reset beside them centred
+   together between two equal spaces, so the value is in the middle with no reset and the pair is with one. */
+.sg-ts-bps > .sg-ts-bp.sg-ts-num { grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto; column-gap: 0; }
+.sg-ts-bp > .sg-ts-step-btn[data-step="-1"] { grid-column: 1; grid-row: 1 / 3; }
+.sg-ts-bp > .sg-ts-hex, .sg-ts-bp > .sg-ts-mode-tag { grid-column: 3; }
+.sg-ts-bp > .sg-ts-auto { grid-column: 4; grid-row: 1 / 3; margin-left: var(--sg-space-xs); }
+.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 6; grid-row: 1 / 3; }
 /* A text style with one value (no breakpoints): its one field across the row, as every other number field is. */
 .sg-ts-bps:has(> .sg-ts-bp:only-of-type) { grid-template-columns: minmax(0, 1fr); }
-/* The value stays in the middle with or without its reset: an empty column as wide as the reset mirrors it. */
-.sg-ts-bps > .sg-ts-bp.sg-ts-num { grid-template-columns: auto 1.25rem minmax(0, 1fr) 1.25rem auto; }
-.sg-ts-bp > .sg-ts-step-btn[data-step="-1"] { grid-column: 1; }
-.sg-ts-bp > .sg-ts-hex, .sg-ts-bp > .sg-ts-mode-tag { grid-column: 3; }
-.sg-ts-bp > .sg-ts-auto { grid-column: 4; }
-.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 5; }
 /* And in the fields that fill their row (a token's size, a radius, the zoom): the reset beside the value keeps its own
    place on both sides of it. */
-.sg-ts-tok-field > .sg-ts-num::before, .sg-ts-zoom::before { content: ""; order: 2; flex: none; width: 1.25rem; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="-1"], .sg-ts-zoom > .sg-ts-step-btn[data-step="-1"] { order: 1; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-hex, .sg-ts-zoom > .sg-ts-hex { order: 3; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-mode-tag, .sg-ts-zoom > .sg-ts-mode-tag { order: 4; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-auto, .sg-ts-zoom > .sg-ts-auto { order: 5; flex: none; width: 1.25rem; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-auto[hidden], .sg-ts-zoom > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
-.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="1"], .sg-ts-zoom > .sg-ts-step-btn[data-step="1"] { order: 6; }
-.sg-ts-bp > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-step-btn[data-step="-1"] { order: 1; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-hex { order: 3; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-mode-tag { order: 4; }
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-auto { order: 5; }   /* a reset after the value, the two centred together between − and + (none kept in reserve when hidden) */
+.sg-ts-num:not(.sg-ts-bp) > .sg-ts-step-btn[data-step="1"] { order: 6; }
 /* The system's colours, opened from a colour field: a search over its base, semantic and primitive colours, each a swatch
    and its name; one chosen links the token to it. */
-.sg-ts-lib { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-s) 0 var(--sg-space-m); }
-.sg-ts-lib-list { display: flex; flex-direction: column; max-height: 16rem; overflow: auto; border: var(--sg-line); border-radius: var(--sg-radius-s); }
+.sg-select-list.sg-ts-lib { position: fixed; inset: auto; margin: 0; display: none; flex-direction: column; gap: var(--sg-space-xs); overflow: hidden; color: var(--sg-text); }   /* the guide's dropdown list, on the top layer: placed by the script under (or over) its field */
+.sg-select-list.sg-ts-lib:popover-open { display: flex; }
+.sg-ts-lib-list { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden auto; }
+.sg-ts-lib-item > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* a long name cut, never a sideways scroll */   /* only the list scrolls, the search stays */
+.sg-ts-lib.is-up { flex-direction: column-reverse; }   /* opened upward: the search next to its field */
 .sg-ts-lib-item { display: flex; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-s); border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; cursor: pointer; }
 .sg-ts-lib-item:hover, .sg-ts-lib-item:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .sg-ts-lib-item[hidden] { display: none; }
@@ -267,6 +245,8 @@ button.sg-ts-alias-chip { border: 0; background: none; font: inherit; cursor: po
 button.sg-ts-alias-chip:hover .sg-ts-chip > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
 .sg-ts-tok-field > .sg-ts-relink, .sg-ts-tok-field > .sg-ts-lib-btn { flex: none; }
 /* What the spacing percentage changes: each spacing token on the screens, its size now and at the percentage chosen. */
+.sg-ts .pg-controls > .pg-ctl.sg-ts-has-under { flex-wrap: wrap; row-gap: 0; }
+.sg-ts-has-under > .sg-ts-affects { flex: 1 0 100%; }   /* the row's whole width, under its label and its field */
 .sg-ts-affects { margin-top: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-ts-affects > summary { cursor: pointer; }
 .sg-ts-affects-list { margin: var(--sg-space-xs) 0 0; padding: 0; list-style: none; max-height: 14rem; overflow: auto; }
@@ -274,3 +254,24 @@ button.sg-ts-alias-chip:hover .sg-ts-chip > span:last-child { text-decoration: u
 .sg-ts-affects-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sg-ts-affects-val { flex: none; font-variant-numeric: tabular-nums; }
 .sg-ts-affects-val b { color: var(--sg-text); font-weight: var(--sg-text-weight); }
+.sg-ts-trail-now { color: var(--sg-text); }   /* where the path ends: the text colour, at the heading's own weight */
+/* Side by side, the scroll is inside the card: the column holds still, the open card fills what is left of it and its
+   rows scroll under its own head, as a table scrolls inside its card. */
+@media (min-width: 1101px) {
+  #sg-theme-panel .sg-ts { overflow: hidden; display: flex; flex-direction: column; padding-right: 0; }
+  #sg-theme-panel .sg-ts > .pg-inspect:not([hidden]) { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  #sg-theme-panel .sg-ts > .pg-inspect:not([hidden]) > .pg-inspect-head { flex: none; position: static; }
+  #sg-theme-panel .sg-ts > .pg-inspect:not([hidden]) > .pg-controls { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #sg-theme-panel .sg-ts > .sg-ts-pick-empty, #sg-theme-panel .sg-ts > .sg-ts-pick:has(> .sg-ts-pick-empty) { flex: none; }
+}
+/* A linked token's chip in the middle of its field, the detach button at the end, an empty place at the start to match. */
+.sg-ts-chipfield.sg-input { display: grid; grid-template-columns: var(--sg-icon-btn) minmax(0, 1fr) var(--sg-icon-btn); justify-items: center; align-items: center; }
+.sg-ts-chipfield > .sg-ts-alias-chip { grid-column: 2; }
+.sg-ts-chipfield > .sg-ts-link-btn { grid-column: 3; margin-left: 0; }
+.sg-ts-num.sg-input, .sg-ts-chipfield.sg-input { padding: var(--sg-space-xxs); }   /* the field's inset the same on all four sides: its icon buttons as an option in a switch */
+/* The name labels, in the panel over the preview (never zoomed, never over what they name), as the guide's tooltip. */
+.sg-ts-stage { position: relative; }
+.sg-ts-tag { position: absolute; z-index: 5; pointer-events: none; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-s); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); white-space: nowrap; box-shadow: var(--sg-shadow-lift); }
+#sg-theme-panel .sg-ts .sg-ts-pick:empty { display: none; }   /* nothing picked: no card, the preview itself is the invitation */
+
+.sg-ts .pg-controls > .pg-ctl { flex-shrink: 0; }   /* in a card that scrolls, a row as tall as its label and field, never squeezed under them */

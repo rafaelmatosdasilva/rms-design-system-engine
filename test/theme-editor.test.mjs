@@ -94,19 +94,24 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     await run(`document.querySelector('.sg-brand-ctl [data-ts-open]').click()`);
     assert.deepEqual(await until(`(() => { const m = document.getElementById('sg-ts-menu'); return m && !m.hidden ? [...m.querySelectorAll('[role="menuitem"]')].map((x) => x.textContent.trim()) : null; })()`), ['From a Figma file', 'Upload tokens', 'From scratch', 'From references']);
     await run(`document.querySelector('#sg-ts-menu [data-start="scratch"]').click()`);
-    assert.equal(await until(`(() => { const p = document.getElementById('sg-theme-panel'); return p && !p.hidden && p.querySelector('#ts-name') ? p.querySelector('.sg-ts-pick-head b').textContent : null; })()`), 'Base customization', 'From scratch opens its form');
+    assert.equal(await until(`(() => { const p = document.getElementById('sg-theme-panel'); return p && !p.hidden && p.querySelector('#ts-name') ? p.querySelector('.sg-ts-pick-head > span').textContent.trim() : null; })()`), 'Base customization', 'From scratch opens its form');
     // A name is asked for first.
     await run(`document.querySelector('#sg-theme-panel [data-ts="create"]').click()`);
     assert.equal(await run(`document.getElementById('ts-name-error').textContent`), 'Give the theme a name.');
     // Every number field: − before it, + after it, whole pixels; Reset changes puts the editor back as it opened.
     const radius = () => run(`document.getElementById('ts-btn-r-num').value`);
     const r0 = await radius();
+    assert.equal(await run(`document.querySelector('#sg-theme-panel .sg-ts-actions [data-ts="reset"]').disabled`), true, 'Reset changes asleep until there is a change');
     assert.equal(await run(`(() => { const box = document.getElementById('ts-btn-r-num').closest('.sg-ts-num'); return [...box.querySelectorAll('.sg-ts-step-btn')].map((b) => b.dataset.step).join(); })()`), '-1,1', 'a − and a + in the field');
     await run(`document.getElementById('ts-btn-r-num').closest('.sg-ts-num').querySelector('[data-step="1"]').click()`);
     assert.equal(+(await radius()), +r0 + 1, 'the + adds one');
     await run(`(() => { const i = document.getElementById('ts-btn-r-num'); i.value = '7.6'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     assert.ok(await run(`!!document.querySelector('#sg-theme-panel .sg-ts-actions [data-ts="reset"]')`), 'Reset changes in the top bar');
+    assert.equal(await run(`document.querySelector('#sg-theme-panel .sg-ts-actions [data-ts="reset"]').disabled`), false, 'a change wakes Reset changes');
     await run(`document.querySelector('#sg-theme-panel .sg-ts-actions [data-ts="reset"]').click()`);
+    assert.equal(await until(`(() => { const d = document.querySelector('dialog.sg-dialog[open]'); return d ? d.querySelector('h2').textContent : null; })()`), 'Reset changes?', 'it asks first');
+    await run(`document.querySelector('dialog.sg-dialog[open] [data-yes]').click()`);
+    await until(`!document.querySelector('dialog.sg-dialog') || null`);
     assert.equal(await until(`document.getElementById('ts-btn-r-num') && document.getElementById('ts-btn-r-num').value`), r0, 'back as it opened');
     // Named and made: the folder is asked for (Download instead here), and the theme is kept, applied and in the link.
     await run(`(() => { const n = document.getElementById('ts-name'); n.value = 'Coral Reef'; n.dispatchEvent(new Event('input', { bubbles: true })); const p = document.getElementById('ts-primary-hex'); p.value = '#e11d48'; p.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#sg-theme-panel [data-ts="create"]').click(); })()`);
