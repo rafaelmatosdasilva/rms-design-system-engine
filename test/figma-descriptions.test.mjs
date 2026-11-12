@@ -27,10 +27,12 @@ test('only the approved words are written, never a draft, and nothing Figma hold
     { name: 'acme/nowhere/color', description: '' },
   ];
   const p = descriptionPlan({ entities, variables, toVar });
-  assert.deepEqual(p.write.map((x) => [x.name, x.text]), [['acme/brand/color', 'The colour every primary action is filled with.']]);
+  assert.deepEqual(p.write.map((x) => [x.name, x.text]), [
+    ['acme/brand/color', 'The colour every primary action is filled with.\nCode: var(--acme-brand-color)'],
+  ]);
   assert.ok(!p.write.some((x) => /draft/i.test(x.text)), 'a draft is never written');
-  assert.equal(p.already, 1, 'one that already says the same is left as it is');
-  assert.deepEqual(p.differs.map((x) => [x.name, x.figma, x.layer]), [['acme/info/color', 'Something a designer typed.', 'Neutral notices.']]);
+  // Something a designer typed is never written over: it is listed, with what the engine would have written.
+  assert.deepEqual(p.differs.map((x) => [x.name, x.figma]).sort(), [['acme/danger/color', 'Errors and destructive actions only.'], ['acme/info/color', 'Something a designer typed.']]);
   assert.equal(p.counts.write, 1);
 });
 
@@ -40,9 +42,10 @@ test('a sentence that is the same on many pages with only the name changed is le
   const variables = [...names, 'acme/brand/color'].map((name) => ({ name, description: '' }));
   const p = descriptionPlan({ entities, variables, toVar });
   // The boilerplate line is left out wherever it is; a page with something of its own keeps that part.
-  assert.deepEqual(p.write.map((x) => [x.name, x.text]), [['acme/brand/color', 'The colour every primary action is filled with.']]);
+  assert.deepEqual(p.write.map((x) => [x.name, x.text]), [['acme/brand/color', 'The colour every primary action is filled with.\nCode: var(--acme-brand-color)']]);
+  // With nothing particular to say (no use, no alias), a token whose only line is a template is left out.
   assert.equal(p.leftOut.length, names.length);
-  assert.match(p.leftOut[0].why, /same sentence/);
+  assert.match(p.leftOut[0].why, /nothing particular to say/);
   assert.equal(templatedLines(entities).size, 1);
   assert.equal(wordsFor(entities.at(-1), templatedLines(entities)).left, 1);
 });
@@ -92,4 +95,30 @@ test('the way back puts a variable\'s description back as it was', async () => {
   const script = undoScript([{ kind: 'variableDescription', id: 'VariableID:1:2', was: '', what: 'acme/brand/color' }]);
   assert.match(script, /s\.kind === 'variableDescription'/);
   assert.match(script, /v\.description = s\.was/);
+});
+
+
+test('a description says where an agent should use it: which components use it, what it points at, its name in the code', async () => {
+  const { tokenText, componentText, usedByOf } = await import('../lib/figma-descriptions.mjs');
+  const used = usedByOf([{ name: 'acmeButton', tokens: { used: ['acme/brand/color'] } }, { name: 'acmeChip', tokens: { used: ['acme/brand/color'] } }]);
+  assert.deepEqual(used.get('acme/brand/color'), ['acmeButton', 'acmeChip']);
+  const p = descriptionPlan({ entities: [], variables: [{ name: 'acme/brand/color', description: '' }], toVar, usedBy: used, aliases: { light: { 'acme/brand/color': ['acme/primitive/blue'] } } });
+  // Facts the engine read, with no page of words at all: still something an agent can act on.
+  assert.equal(p.write[0].text, 'Used by: acmeButton, acmeChip\nPoints at: acme/primitive/blue\nCode: var(--acme-brand-color)');
+  // A token with nothing to say but its code name is left alone (Dev Mode's code syntax already says that).
+  assert.deepEqual(tokenText({ css: '--acme-x' }), []);
+  // A component: what it is for, when and when not, what to use instead, its file. A line repeated, or one that only
+  // leads into a list, is not written.
+  const page = comp('Acme Button', ['The one primary action on a screen.'], {
+    whenToUse: ['The one primary action on a screen.', 'A form is ready to submit.'],
+    whenNotToUse: ['Do not use it when:', 'The action is secondary.'],
+  });
+  const text = componentText({ entity: page, contract: { useInstead: 'acmeLink', source: { code: { file: 'src/Button.vue' } } } });
+  assert.deepEqual(text, [
+    'The one primary action on a screen.',
+    'Use when: A form is ready to submit.',
+    'Not when: The action is secondary.',
+    'Use instead: acmeLink',
+    'Code: src/Button.vue',
+  ]);
 });

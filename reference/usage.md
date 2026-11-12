@@ -2059,10 +2059,13 @@ in `prototypes/` is kept unless `--force`.
 
 #### --figma-descriptions (what each token and component is for, written into Figma)
 
-`rms-design-system-engine --figma-descriptions` writes what the intent layer holds approved for each token and
-component into Figma's own description, where a designer reading the file finds it (`figma-descriptions.mjs`). Only
-the team's approved lines are written (an entity's purpose), never a draft, and nothing is written at the point of
-writing. A line that is the same sentence on many pages of its kind with only the name changed is left out and
+`rms-design-system-engine --figma-descriptions` writes into Figma's own description of each token and component what
+it is for and where to use it, so an agent reading the file through a Figma tool knows where each one belongs
+(`figma-descriptions.mjs`). Every line is the team's approved words or a fact the engine read: for a token, what it is
+for and when to use it and not (the intent layer), which components use it (their contracts), what it points at (its
+alias) and its name in the code; for a component, what it is for, when to use it and not, what to use instead (its
+contract) and its file in the code. Never a draft, nothing written at the point of writing, no line that repeats one
+already said or only leads into a list, and no description for a token with nothing to say but its code name. A line that is the same sentence on many pages of its kind with only the name changed is left out and
 listed: it is judged as the layer's reading judges it (`lineShape` in `doc-source-dsds.mjs`), but without the
 exception that keeps a token's templated line for the agents, since a designer learns nothing from it. A token is
 found in Figma by the system's naming (`tokenToVar`), a component by the intent layer's own pairing
