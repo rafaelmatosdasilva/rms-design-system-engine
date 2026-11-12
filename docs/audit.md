@@ -109,6 +109,7 @@ More readings of the library:
 - **Hover shown one way.** A button that shows its hover with an overlay layer when most change their own fill.
 - **A slot or a swap, consistently.** An `Icon` property that is a slot in one component and an instance swap in most.
 - **The gap between two parts.** An icon and a label spaced by `space/m` in one chip and by `space/xs` in most, at the same size.
+- **Nothing overlaps or spills.** A label drawn over its icon, a part cut off by a frame that clips, or one sitting outside its parent, named with its layer and variant. A fault is never a style, so it is always to fix. It needs a Figma read taken since this check came in.
 - **Your declared tiers.** If `ds-config.json` declares `tiers`, a token pointing where its tier may not now shows on the Rules page, not only in the audit summary.
 
 Each is a decision for your team in Figma, and keeping it as it is, as a known exception, is always an option.

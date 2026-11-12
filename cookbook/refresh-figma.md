@@ -1141,6 +1141,8 @@ function propsFacts(root) {
 // once the answer is deflated, which is the size that travels. Plain objects only: it reads.
 async function skeletonOf(root, names = {}) {
   const styles = {}, collections = {}, vars = {}, varNames = {};
+  // The texts and instances a box of a fixed size does not hold (their place is kept: looks[...].at).
+  const B = new Set();
   const clean = (k) => String(k).replace(/#[^#]*$/, '');
   const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : undefined);
   // An annotation's category by its name (Accessibility, Content), read once and kept.
@@ -1214,7 +1216,13 @@ async function skeletonOf(root, names = {}) {
     // has no auto layout, or it is placed absolutely), so the order it is seen in can be held against its layer order
     // (reading order, WCAG 1.3.2). Auto layout draws in layer order. Beside the trees, as the bindings are.
     const at = ['x', 'y', 'width', 'height'].map((k) => num(prop(n, k)));
-    if (depth > 0 && /^(TEXT|INSTANCE|FRAME|GROUP)$/.test(t) && (prop(n, 'layoutPositioning') === 'ABSOLUTE' || prop(n.parent, 'layoutMode') === 'NONE' || (n.parent && n.parent.type === 'GROUP')) && at.every((v) => v !== undefined) && at[2] > 0 && at[3] > 0)
+    // A box that cannot grow to hold what is inside it (a fixed size on a side: one that hugs its content cuts nothing
+    // off, whether it clips or not): where a text or an instance in it runs beyond it, the box's size is kept (box) and
+    // that layer's place (at), so the fault can be named. A box whose parts fit keeps nothing more. Overlaps need no more
+    // than the places already kept: auto layout lays its parts side by side, and a layer placed by hand keeps its place.
+    if (/FIXED/.test(prop(n, 'layoutSizingHorizontal') + prop(n, 'layoutSizingVertical'))) for (const k of prop(n, 'children') || [])
+      if (/^(TEXT|INSTANCE)$/.test(k.type) && k.visible !== false && (k.x < -.5 || k.y < -.5 || k.x + k.width > at[2] + .5 || k.y + k.height > at[3] + .5)) { lk.box = [at[2], at[3]].map(Math.round); B.add(k.id); }
+    if (depth > 0 && /^(TEXT|INSTANCE|FRAME|GROUP)$/.test(t) && (prop(n, 'layoutPositioning') === 'ABSOLUTE' || prop(n.parent, 'layoutMode') === 'NONE' || (n.parent && n.parent.type === 'GROUP') || B.has(n.id)) && at.every((v) => v !== undefined) && at[2] > 0 && at[3] > 0)
       lk.at = at.map(Math.round);
     if (Object.keys(lk).length) look[path] = lk;
     const o = {
