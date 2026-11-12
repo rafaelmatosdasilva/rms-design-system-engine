@@ -1303,7 +1303,9 @@ on a condition, or one a Figma property shows that the code always renders (a pa
 not held to a condition, since a variant's class may hide it); a part's text set by hand where Figma sets a text style;
 corners on one variable in Figma against several values in the code, or the other way round; how many shadow layers the
 frame has against its root rule; and whether it wraps. Each is a line `<component> › <part> <field>: Figma …, the code
-writes …  (file:line)` (`kind: 'anatomy'`), counted, handed back and read as the measured lines are. The order of the
+writes …  (file:line)` (`kind: 'anatomy'`), counted, handed back and read as the measured lines are. It reads no
+browser and no structure contract, so it runs on every project with a Figma skeleton, said on its own when no fresh
+capture lists it with the browser's differences. The order of the
 parts and whether a width fills or hugs are left out: the code's reading cannot say them yet without flagging what is
 fine. On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)

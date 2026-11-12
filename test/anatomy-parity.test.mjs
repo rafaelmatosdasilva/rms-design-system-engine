@@ -58,3 +58,12 @@ test('what agrees adds no difference, and a part nothing pairs is never held to 
   assert.ok(!r.facts.some((f) => /Count/.test(f.key)));
   assert.deepEqual(compareAnatomies({ skeleton: {}, anatomy: anatomy(), paired }).facts, [], 'no skeleton: nothing to hold together');
 });
+
+test('said in plain words with who acts, as every measured difference is, a part\'s own included', async () => {
+  const { plainDifference, plainAction } = await import('../lib/run-diff.mjs');
+  const line = measuredLine(run().differ.find((d) => d.part === 'Icon' && d.field === 'shown'));
+  assert.equal(plainDifference(line), 'In Figma the Icon is shown when showIcon is on; in the code it is always rendered. (src/Chip.vue:3)');
+  assert.deepEqual(plainAction(line, 'acmeChip'), { who: 'code', todo: 'Make the acmeChip\'s Icon shown in the code match Figma.' });
+  assert.equal(plainDifference('acmeChip wrap: Figma one line, the code writes wraps  (src/Chip.vue:11)'), 'In Figma it stays on one line; in the code it wraps. (src/Chip.vue:11)');
+  assert.equal(plainDifference('chip › Content gap: Figma space/s (8px), rendered 4px via --space-xs  (.chip__content · src/chip.css:12)'), 'The Content\'s gap is space/s (8px) in Figma and 4px (from --space-xs) in the code. (src/chip.css:12)');
+});
