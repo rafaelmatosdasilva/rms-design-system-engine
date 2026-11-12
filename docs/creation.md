@@ -7,6 +7,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
 - [Turn code into Figma](#turn-code-into-figma)
+- [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt)
 - [Generate in code from a prompt](#generate-in-code-from-a-prompt)
 
 ## Design themes over your system
@@ -421,6 +422,33 @@ Give it a file instead of a component name, and it draws that page as a Figma fr
 - **A frame, not a component.** It takes no variants. A component the page uses that Figma doesn't have is a question.
 
 The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
+## Generate in Figma from a prompt
+
+You describe what you need, and the engine draws it in Figma from your system's own rules.
+
+### Not only components
+
+- **A component.** Started from the one it is most like ("a tag like the chip").
+- **A pattern, a template or a page.** A frame made of your components, started from your own one it is like ("a template like settings").
+- **A flow.** Its pages side by side, each made the way your system makes it.
+- **A foundation.** A new variable beside the one it is like, pointing at one of your variables.
+
+The kinds are your intent layer's own, so nothing new is invented to say what a thing is.
+
+### Your rules for each kind
+
+- **Read from your own.** What every one of your templates holds is a rule, and what most hold is a fix, the way the engine reads how you build components.
+- **Asked, never assumed.** A new one that lacks what every one of yours holds is a question for you.
+- **A box that is too small.** A layer that runs beyond a box of a fixed size is said, for you to decide: grow the box, or shorten the layer.
+
+### Measured every time
+
+- **A kept set of requests.** The same build and change requests run again whenever the builder or its guide changes.
+- **Separate counts, never one number.** Whether the script runs, whether what was asked is there, whether anything else changed, whether only your components and variables are used, and whether it made a layout fault.
+- **Checked by a person.** A sample goes on a sheet for someone to say whether the counts hold.
+
+The full options are in [the reference](../reference/usage.md) (`--spec`).
 
 ## Generate in code from a prompt
 

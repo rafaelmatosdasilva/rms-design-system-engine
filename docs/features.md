@@ -341,6 +341,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Works in a product file too: the system's variables come from its published library, imported by the key the Figma MCP finds for each.
 - Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
 - Grows the component set to hold new variants, so none is clipped.
+- Builds a pattern, a template, a page or a flow from your own one it is like, and a foundation as a new variable beside the one it is like.
+- Says when a layer runs beyond a box of a fixed size, instead of choosing a new size.
 - Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
 - Writes nothing until someone signs it off and you say yes, then checks the result.
