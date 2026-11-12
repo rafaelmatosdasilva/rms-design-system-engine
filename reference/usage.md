@@ -2074,6 +2074,18 @@ person says yes, each value it replaces recorded for the way back (`variableDesc
 `figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run
 saying which part comes next.
 
+#### --figma-specs (each component's spec, drawn in Figma beside its component set)
+
+`rms-design-system-engine --figma-specs [component …]` draws each component's spec as a frame beside its component set,
+from its contract alone (`spec-frames.mjs`): the anatomy (an instance of the default variant with a numbered marker
+on each part, placed on the layer of the part's own name, the parts listed by number with their tokens), each property
+with its options and default, the states, every token it uses, its sizes per variant as Figma's capture has them, and
+its accessibility (element, role, what names it, its keys) as the code and the browser give it. A part with no layer
+of its name is listed with no marker, and said. Each frame keeps its contract's fingerprint: one drawn from the
+contract as it is now is left as it is, a stale one is drawn afresh. Written as the hand-back script, run only once the
+person says yes; the frames are the engine's own output, recorded for the way back. A system's specs go 40 a run
+(`--chunk 2`, …). Not yet: drawing them in the system's own documentation template when the file has one.
+
 #### --figma-tokens-back (a token the code changed first, written back to Figma's variables)
 
 `rms-design-system-engine --figma-tokens-back` writes back into Figma's variables a token the code changed first
