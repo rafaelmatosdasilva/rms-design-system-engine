@@ -1609,6 +1609,16 @@ drives, and a removed layer takes with it the property that drove only it. The o
 
 A layer is named by its path inside the component (`Content/Label`).
 
+**--spec-from-code.** `--spec-from-code <component>` writes the spec of a component only the code has from what the
+engine reads of it (`code-to-figma.mjs`): `create` with a variant axis for each prop of options, `describe` from its
+own comment, an `addLayer` for each part in markup order (another of the system's components an instance, a part that
+writes a prop's words a text in the text style its text is set in, any other a frame), an `addProperty` boolean for a
+part a prop shows and text for a prop a part writes, and a `bind` for each value of its own base rule written with a
+custom property, named as the Figma variable it stands for (the naming convention, read backwards). Its operations go to
+`.design-system-engine-out/specs/<name>.from-code.ops.json` and through `--spec --ops`, so what the code cannot ground (a
+value written by hand, a text with no text style, a nested component Figma lacks) is a question, and the new component
+is held for sign-off. Figma already having the component, or the code not having it, stops it with the one to use.
+
 **--figma-build.** `--figma-build <name> [--signed-off "<who>"]` checks the spec again against the capture as it is now,
 and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the
 system and waits for a named person to sign it off; `--signed-off` records who and when in the spec. It then writes the

@@ -6,6 +6,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
+- [Turn code into Figma](#turn-code-into-figma)
 
 ## Design themes over your system
 
@@ -364,3 +365,23 @@ The page review measures what it can: one main action, nothing destructive in fr
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
 - **In the style guide.** Each component's rating sits in its Documentation area.
+
+## Turn code into Figma
+
+A component that exists only in your code, drawn into Figma from what the engine reads of it.
+
+### What it reads
+
+- **Its props.** Each prop with options becomes a variant axis with the same options.
+- **Its parts.** Each part becomes a layer, in the order your markup writes them: another of your components becomes an instance of it, a part that writes a prop's words becomes a text layer, anything else a frame.
+- **What each prop drives.** A part a prop shows or hides becomes a boolean property on that layer, and a prop whose words a part writes becomes a text property.
+- **Its look.** Its own base rule's background, padding, gap, border and corners, each bound to the variable it is written with. A hover's or an option's value belongs to that variant, so it is not the component's own.
+- **What it is for.** Its own comment becomes its description in Figma.
+
+### What it never does
+
+- **Make up a value.** A size written by hand, a part's text with no text style of your system's, or a nested component Figma doesn't have is a question for you, never a guess.
+- **Write without you.** It goes through the same path as a component described in words: the spec is checked against your system, held for someone to sign it off, and built in Figma only through the script you say yes to.
+
+The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
