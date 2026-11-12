@@ -1,6 +1,7 @@
 // the criteria that belong to a page, never to a component, tried on a product's own pages and across them: a title
-// and a language on each, a way past the repeated blocks, the navigation in the same order and named alike, help in
-// the same place, a flow never asking twice, and a step that pays or signs left to a person. What a machine cannot
+// and a language on each, neither locked to one orientation, a way past the repeated blocks, the navigation in the
+// same order and named alike, more than one way of finding a page, help in the same place, a flow never asking twice,
+// and a step that pays or signs left to a person. What a machine cannot
 // decide is a person's to check, never a pass. The browser case opens three small pages of one product (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,11 +32,12 @@ const CHROME = findChrome({ playwright: true });
 const HAS_CHROME = !!CHROME && typeof WebSocket === 'function';
 
 const page = (label, o = {}) => ({ label, url: `https://acme.example.com/${label}`, title: `Acme ${label}`, lang: 'en', landmarks: { main: 1, nav: 1 }, skip: { name: 'Skip to content', to: 'main', there: true },
-  navs: [{ label: 'Main', items: ['Home', 'Cards', 'Help'] }], controls: [{ name: 'Home', href: 'https://acme.example.com/home', raw: '/home', region: 'nav' }, { name: 'Cards', href: 'https://acme.example.com/cards', raw: '/cards', region: 'nav' }, { name: 'Help', href: 'https://acme.example.com/help', raw: '/help', region: 'nav' }], forms: [], ...o });
+  navs: [{ label: 'Main', items: ['Home', 'Cards', 'Help'] }], controls: [{ name: 'Home', href: 'https://acme.example.com/home', raw: '/home', region: 'nav' }, { name: 'Cards', href: 'https://acme.example.com/cards', raw: '/cards', region: 'nav' }, { name: 'Help', href: 'https://acme.example.com/help', raw: '/help', region: 'nav' },
+    { name: 'All the cards', href: 'https://acme.example.com/cards', raw: '/cards', region: 'main' }, { name: 'How to pay', href: 'https://acme.example.com/pay', raw: '/pay', region: 'main' }], forms: [], locks: [], sheets: { read: 1, blocked: 0 }, ...o });
 
 test('catalogue: each criterion of a page names the findings that fail it there, in plain words', () => {
   const ofPage = WCAG22.filter((c) => c.pageKinds);
-  assert.deepEqual(ofPage.map((c) => c.sc), ['2.4.1', '2.4.2', '3.1.1', '3.2.3', '3.2.4', '3.2.6', '3.3.4', '3.3.7']);
+  assert.deepEqual(ofPage.map((c) => c.sc), ['1.3.4', '2.4.1', '2.4.2', '2.4.5', '3.1.1', '3.2.3', '3.2.4', '3.2.6', '3.3.4', '3.3.7']);
   for (const c of ofPage) for (const k of c.pageKinds) {
     assert.equal(WCAG_KIND[k], c.sc, k);
     assert.ok(A11Y_GUIDE[k]?.fix, `${k} has words in the audit's guide`);
@@ -47,7 +49,9 @@ test('catalogue: each criterion of a page names the findings that fail it there,
 
 test('pages of one product that agree: each criterion passes, with the pages as its evidence', () => {
   const r = pageCriteria([page('home'), page('cards')]);
-  for (const sc of ['2.4.1', '2.4.2', '3.1.1', '3.2.3', '3.2.6']) assert.equal(r.criteria[sc].st, 'done', `${sc}: ${r.criteria[sc].note}`);
+  for (const sc of ['1.3.4', '2.4.1', '2.4.2', '2.4.5', '3.1.1', '3.2.3', '3.2.6']) assert.equal(r.criteria[sc].st, 'done', `${sc}: ${r.criteria[sc].note}`);
+  // Two ways of finding a page: its menu, and the links in what each page is about.
+  assert.match(r.criteria['2.4.5'].note, /a menu and links between its pages/);
   assert.deepEqual(r.criteria['3.2.3'].pages.sort(), ['cards', 'home']);
   assert.match(r.criteria['2.4.2'].note, /home "Acme home"/);
   // The same links read the same: a person still compares buttons and icons, never a pass on links alone.
@@ -144,11 +148,112 @@ test('the style guide\'s rows: one per criterion left, the code\'s to fix or a p
   assert.deepEqual(productA11yTodos({ issues: [{ issue: 'pagetitle', product: 'acme' }] }), []);
 });
 
-const shell = (title, body, { nav = ['Home', 'Cards', 'Help'], lang = 'en', helpIn = 'nav' } = {}) => `<!doctype html><html${lang ? ` lang="${lang}"` : ''}><head><title>${title}</title><style>body { font: 16px/1.4 sans-serif; color: #111; background: #fff; } a, button { color: #0b3d91; } .skip { position: absolute; left: 8px; top: 8px; }</style></head><body>
+test('1.3.4: a rule that hides the page sideways is the page\'s to fix, words asking the reader to rotate are a person\'s', () => {
+  // Nothing in its styles or scripts locks it: a pass, with how far the reading went.
+  let r = pageCriteria([page('home'), page('cards')]);
+  assert.equal(r.criteria['1.3.4'].st, 'done');
+  assert.match(r.criteria['1.3.4'].note, /Nothing in the styles or the scripts of home and cards/);
+  // A style sheet from another origin cannot be read, and the pass says so rather than standing for it.
+  r = pageCriteria([page('home', { sheets: { read: 1, blocked: 1 } })]);
+  assert.match(r.criteria['1.3.4'].note, /1 style sheet from another origin could not be read/);
+  // A rule inside an orientation query that hides the page: a fail, on that page, with the rule.
+  r = pageCriteria([page('home', { locks: [{ at: '(orientation: landscape)', sel: 'body', what: 'hides the page' }] }), page('cards')]);
+  assert.deepEqual([r.criteria['1.3.4'].st, r.criteria['1.3.4'].pages], ['todo', ['home']]);
+  const f = r.findings.find((x) => x.kind === 'orientation');
+  assert.deepEqual([f.severity, f.el], ['blocker', 'html']);
+  assert.match(f.desc, /@media \(orientation: landscape\) hides the page \(body\)/);
+  // A lock asked of the browser in a script is the same fail, said where it is.
+  r = pageCriteria([page('home', { locks: [{ at: 'a script', sel: 'screen.orientation.lock()', what: 'asks the browser to lock the orientation' }] })]);
+  assert.equal(r.criteria['1.3.4'].st, 'todo');
+  assert.match(r.findings.find((x) => x.kind === 'orientation').desc, /a script asks the browser to lock the orientation/);
+  // Words asking the reader to rotate: a person reads them, since only a person knows whether the page needs it.
+  r = pageCriteria([page('home', { locks: [{ at: 'the page', sel: 'div.rotate', what: 'asks the reader to rotate the device' }] })]);
+  assert.deepEqual([r.criteria['1.3.4'].st, r.criteria['1.3.4'].pages], ['check', ['home']]);
+  assert.match(r.criteria['1.3.4'].note, /A person checks whether the page needs that orientation/);
+  assert.equal(r.findings.find((x) => x.kind === 'orientation').severity, 'warning');
+});
+
+test('2.4.5: two ways of finding a page pass, one fails, and a flow is the process the criterion excepts', () => {
+  // The menu and the links in what each page is about: two ways.
+  let r = pageCriteria([page('home'), page('cards')]);
+  assert.equal(r.criteria['2.4.5'].st, 'done');
+  // Only a menu: a fail, named for the product, once.
+  const only = (o) => ({ ...o, controls: o.controls.filter((c) => c.region !== 'main') });
+  r = pageCriteria([only(page('home')), only(page('cards'))]);
+  assert.deepEqual([r.criteria['2.4.5'].st, r.criteria['2.4.5'].pages.sort()], ['todo', ['cards', 'home']]);
+  const f = r.findings.filter((x) => x.kind === 'oneway');
+  assert.equal(f.length, 1, 'one finding for the product, not one per page');
+  assert.match(f[0].desc, /only a menu/);
+  // A search read from the page itself is the second way.
+  r = pageCriteria([only(page('home', { ways: { search: true } })), only(page('cards'))]);
+  assert.equal(r.criteria['2.4.5'].st, 'done');
+  assert.match(r.criteria['2.4.5'].note, /a menu and a search/);
+  // The pages of one flow are a step of a process, which the criterion excepts: a pass that says so.
+  r = pageCriteria([only(page('home')), only(page('cards'))], { flows: [{ name: 'Checkout', pages: ['home', 'cards'] }] });
+  assert.equal(r.criteria['2.4.5'].st, 'done');
+  assert.match(r.criteria['2.4.5'].note, /steps of Checkout, which the criterion excepts/);
+  // One page of a product is no set of pages to find a page within: nothing is claimed.
+  r = pageCriteria([page('home')]);
+  assert.equal(r.criteria['2.4.5'].st, 'check');
+  assert.match(r.criteria['2.4.5'].note, /name more of its pages|not two of one product/);
+});
+
+test('3.3.7: a flow walked through decides the criterion; one stopped early says how far it got', () => {
+  const pages = [page('cart'), page('pay')];
+  const flows = [{ name: 'Checkout', pages: ['cart', 'pay'] }];
+  const steps = [{ label: 'cart', sent: true, moved: true, given: [{ key: 'email', label: 'Email', value: 'someone@example.com' }] }, { label: 'pay', sent: true, moved: true, given: [] }];
+  // Walked the whole way, nothing asked twice: a pass that says the steps were filled in and sent.
+  let r = pageCriteria(pages, { flows, walked: [{ name: 'Checkout', walked: steps, asked: [], ended: null }] });
+  assert.equal(r.criteria['3.3.7'].st, 'done');
+  assert.match(r.criteria['3.3.7'].note, /Checkout \(cart and pay, 2 steps filled in and sent\)/);
+  // Asked again after a real step was filled in and sent: the criterion fails, and it is nobody's to confirm.
+  r = pageCriteria(pages, { flows, walked: [{ name: 'Checkout', walked: steps, asked: [{ page: 'pay', label: 'Email', key: 'email', after: 'cart' }], ended: null }] });
+  assert.equal(r.criteria['3.3.7'].st, 'todo');
+  assert.match(r.findings.find((x) => x.kind === 'askedagain').desc, /asked again, empty, after cart was given it and the flow was walked through/);
+  // Stopped before a step that pays: what it walked is said, the rest is a person's.
+  r = pageCriteria(pages, { flows, walked: [{ name: 'Checkout', walked: [{ label: 'cart', given: [], sent: false, stopped: 'its button reads "Pay now"' }], asked: [], ended: 'stopped before sending cart: its button reads "Pay now"' }] });
+  assert.equal(r.criteria['3.3.7'].st, 'check');
+  assert.match(r.criteria['3.3.7'].note, /its button reads "Pay now".*a person walks the rest/s);
+  // No walk asked for: the pages are opened one by one, as before, and a person confirms.
+  r = pageCriteria([page('cart', { forms: [{ fields: [{ name: 'email', label: 'Email', autocomplete: 'email', type: 'text', filled: false }], submit: ['Continue'], actions: [], checks: [], words: '' }] }),
+    page('pay', { forms: [{ fields: [{ name: 'email', label: 'Email', autocomplete: 'email', type: 'text', filled: false }], submit: ['Continue'], actions: [], checks: [], words: '' }] })], { flows });
+  assert.equal(r.criteria['3.3.7'].st, 'check');
+  assert.match(r.criteria['3.3.7'].note, /A person runs the flow/);
+});
+
+const shell = (title, body, { nav = ['Home', 'Cards', 'Help'], lang = 'en', helpIn = 'nav', lock = '', search = false, sitemap = false } = {}) => `<!doctype html><html${lang ? ` lang="${lang}"` : ''}><head><title>${title}</title><style>body { font: 16px/1.4 sans-serif; color: #111; background: #fff; } a, button { color: #0b3d91; } .skip { position: absolute; left: 8px; top: 8px; }${lock}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>
-<header><nav aria-label="Main">${nav.filter((n) => n !== 'Help' || helpIn === 'nav').map((n) => `<a href="${n.toLowerCase()}.html">${n}</a>`).join(' ')}</nav></header>
+<header><nav aria-label="Main">${nav.filter((n) => n !== 'Help' || helpIn === 'nav').map((n) => `<a href="${n.toLowerCase()}.html">${n}</a>`).join(' ')}</nav>${search ? '<form role="search"><label>Search <input type="search" name="q"></label></form>' : ''}</header>
 <main id="main"><h1>${title}</h1>${body}</main>
-<footer>${helpIn === 'footer' ? '<a href="help.html">Help</a>' : '<p>Acme</p>'}</footer></body></html>`;
+<footer>${sitemap ? '<a href="sitemap.html">Sitemap</a> ' : ''}${helpIn === 'footer' ? '<a href="help.html">Help</a>' : '<p>Acme</p>'}</footer></body></html>`;
+
+test('in the browser: an orientation lock read from the page\'s own styles, and the ways it offers of finding a page', { timeout: budget(300000), skip: !HAS_CHROME && 'no Chrome' }, () => {
+  // One page hides itself sideways and another asks the reader to rotate; both offer a search and a sitemap beside
+  // the menu, so 2.4.5 passes while 1.3.4 fails.
+  const dir = makeFixture({
+    'home.html': shell('Acme home', '<p>Welcome.</p>', { search: true, sitemap: true, lock: '@media (orientation: landscape) { body { display: none; } }' }),
+    'cards.html': shell('Acme cards', '<p>Turn your device to see the cards.</p>', { search: true, sitemap: true }),
+  });
+  try {
+    const urls = ['home.html', 'cards.html'].flatMap((f) => ['--url', pathToFileURL(join(dir, f)).href]);
+    let out = '';
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), ...urls, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
+    const d = JSON.parse(out.slice(out.indexOf('{')));
+    const c = d.pages?.criteria ?? {};
+    const label = (f) => pathToFileURL(join(dir, f)).href;
+    // The rule that hides the page is the fail; the page that only asks is listed with it, as its own finding.
+    assert.deepEqual([c['1.3.4'].st, c['1.3.4'].pages], ['todo', [label('home.html')]], JSON.stringify(c['1.3.4']));
+    const locks = d.issues.filter((i) => i.issue === 'orientation');
+    assert.equal(locks.length, 2, JSON.stringify(locks.map((i) => i.selector)));
+    assert.ok(locks.some((i) => /@media \(orientation: landscape\) hides the page/.test(i.selector)), JSON.stringify(locks.map((i) => i.selector)));
+    assert.ok(locks.some((i) => /asks the reader to rotate the device/.test(i.selector)), JSON.stringify(locks.map((i) => i.selector)));
+    assert.equal(locks.find((i) => /hides the page/.test(i.selector)).wcag, '1.3.4');
+    // A menu, a search and a sitemap read from the pages themselves: more than one way.
+    assert.equal(c['2.4.5'].st, 'done', JSON.stringify(c['2.4.5']));
+    assert.match(c['2.4.5'].note, /a menu, a search and a sitemap/);
+    assert.ok(!d.issues.some((i) => i.issue === 'oneway'), 'nothing to fix about finding a page');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 
 test('in the browser: three pages of one product, a flow through two, each criterion tried and said with its pages', { timeout: budget(300000), skip: !HAS_CHROME && 'no Chrome' }, () => {
   const dir = makeFixture({
@@ -171,6 +276,12 @@ test('in the browser: three pages of one product, a flow through two, each crite
     assert.deepEqual([c['3.2.6'].st, c['3.2.6'].pages], ['todo', [label('pay.html')]]);
     assert.equal(c['3.3.7'].st, 'check');
     assert.equal(c['3.3.4'].st, 'check');
+    // Nothing locks these pages to one orientation, and their styles were read.
+    assert.equal(c['1.3.4'].st, 'done', JSON.stringify(c['1.3.4']));
+    // Their menu is the only way of finding a page: no search, no sitemap, no breadcrumbs, and nothing in what each
+    // page is about links to another.
+    assert.deepEqual([c['2.4.5'].st, c['2.4.5'].pages.length], ['todo', 3], JSON.stringify(c['2.4.5']));
+    assert.match(c['2.4.5'].note, /Only one way of finding a page on .*\(a menu\)/);
     assert.deepEqual(d.pages.flows, [{ name: 'Checkout', pages: [label('details.html'), label('pay.html')], missing: [] }]);
     const of = (k) => d.issues.filter((i) => i.issue === k);
     assert.equal(of('pagelang').length, 1);

@@ -8,7 +8,12 @@
 (function () {
   var SG = window.SG; if (!SG || !SG.themeBar) return;
   var DATA_EL = document.getElementById('sg-theme-editor-data'), EDITOR = (function () { try { return JSON.parse((DATA_EL && DATA_EL.textContent) || '{}') || {}; } catch (e) { return {}; } })();
-  var esc = SG.esc, T = SG.tokens || {}, KEY = 'sg-theme-draft';
+  // What this browser keeps is kept per system: every style guide opened from disk shares one storage, so a theme made
+  // on one guide never shows on another's Theme list. (What the keys held before, for every system at once, is left as
+  // it was and read by none.)
+  if (EDITOR.enabled !== true) return;   // Coming soon: on only where the page's data turns it on (the demo)
+  var PER = ':' + ((EDITOR.system || 'system'));
+  var esc = SG.esc, T = SG.tokens || {}, KEY = 'sg-theme-draft' + PER;
   // Every variable of the system, each with its CSS variable: its own, else its Figma name as the system writes it
   // (a/b/c → --a-b-c; a switch has none in the page's data). A copy: the page's own data is left as it is.
   var VARS = (SG.allVars || []).map(function (v) { return Object.assign({}, v, { var: v.var || '--' + String(v.figma).split('/').join('-').replace(/\s+/g, '') }); });
@@ -152,6 +157,46 @@
     ['references', 'From references', ICON('<rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1.2"/><path d="M14 10.5l-3.5-3.5L4 13"/>')]
   ];
   var START_SAYS = { figma: 'Read the variables of another Figma file and match them to these tokens.', file: 'Bring tokens as JSON (DTCG or a theme), CSS variables, or a .zip of them.', scratch: 'Set the colours, the type, the corners and the spacing yourself.', references: 'Upload pictures (screens, moodboards) to build a theme from them.' };
+
+  // The specimen: a screen of the system's own components, so every system has one to preview, Showroom or not. What it
+  // places is planned by the build (specimen.mjs) and held to the guardrail every composition is (the catalog's check):
+  // the page only draws it, each tile the component as its code renders it, never a drawing.
+  var PLAN = EDITOR.specimen || null;
+  var codeMarkups = function (c) {
+    var r = (c.renders || []).map(function (x) { return x && x.markup; }).filter(Boolean);
+    if (!r.length && c.markup) r = [c.markup].concat(c.markups || []);
+    var seen = {}; return r.filter(function (m) { if (seen[m]) return false; seen[m] = 1; return true; });
+  };
+  var specText = (function () { var v = VARS.filter(function (x) { return x.var && /(text|content|foreground)[^/]*\/?(primary|default|main)?[^/]*colou?r?$/i.test(x.figma) && !/(button|disabled|inverse|on[A-Z]|link|placeholder)/i.test(x.figma) && hexOf(x.values && x.values[0]); }).sort(function (a, b) { return a.figma.length - b.figma.length; })[0]; return v ? v.var : null; })();
+  var prettyName = function (n) { return String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_/]+/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); }); };
+  var stripIds = function (m) { return String(m).replace(/\s(id|for|aria-controls|aria-labelledby|aria-describedby)="[^"]*"/g, ''); };
+  var specimen = function () {
+    if (!PLAN || !(PLAN.sections || []).length) return null;
+    var byName = {}; (SG.components || []).forEach(function (c) { byName[c.name] = c; });
+    var marks = function (name) { var c = byName[name]; return c ? codeMarkups(c) : []; };
+    var placed = [];
+    // One grid, no headings: each component a tile, its name only on hover. A button shows the variants its code renders;
+    // what reads in a row (navigation, tables, charts) and a text area take two columns; an overlay stays in its tile.
+    var tile = function (name, list, cls) { if (!list.length) return ''; placed.push(name); return '<figure class="sg-spec-tile' + (cls ? ' ' + cls : '') + '" title="' + esc(prettyName(name)) + '">' + list.map(function (m) { return '<div class="sg-spec-stage">' + stripIds(m) + '</div>'; }).join('') + '</figure>'; };
+    var body = '<div class="sg-spec-grid">' + (PLAN.sections || []).map(function (sec) {
+      return sec.components.map(function (c) {
+        var m = marks(c), wide = /^(navigation|data)$/.test(sec.key) || /text ?area/i.test(c);
+        return sec.key === 'actions' ? tile(c, m.slice(0, 4), 'is-buttons') : tile(c, m.slice(0, 1), (sec.overlays || []).indexOf(c) >= 0 ? 'is-overlay' : wide ? 'is-wide' : '');
+      }).join('');
+    }).join('') + '</div>';
+    if (!placed.length) return null;
+    var colourVar = function (t) { return t && t.v ? 'var(' + t.v + ')' : null; };
+    var swatch = function (label, v) { return v ? '<div class="sg-spec-sw"><span class="sg-spec-dot" style="background:' + v + '"></span><span>' + esc(label) + '</span></div>' : ''; };
+    var lead = ((PLAN.sections[0] || {}).key === 'actions' ? PLAN.sections[0].components : []).slice(0, 2);
+    var hero = '<section class="sg-spec-hero"><div class="sg-spec-hero-text"><p class="sg-spec-title">' + esc(SG.title || 'Your system') + '</p><div class="sg-spec-hero-acts">' + lead.map(function (x) { var m = marks(x); return m.length ? '<div class="sg-spec-stage">' + stripIds(m[0]) + '</div>' : ''; }).join('') + '</div></div>' +
+      '<div class="sg-spec-hero-art" aria-hidden="true"><span class="sg-spec-blob is-a" style="background:' + (colourVar(PRIMARY) || 'currentColor') + '"></span><span class="sg-spec-blob is-b" style="background:' + (colourVar(SECONDARY) || 'currentColor') + '"></span><span class="sg-spec-glyph">Aa</span></div>' +
+      '<div class="sg-spec-swatches">' + swatch('Primary', colourVar(PRIMARY)) + swatch('Secondary', colourVar(SECONDARY)) + swatch('Background', APP_BG ? 'var(' + APP_BG.v + ')' : null) +
+      '<div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (BTN && BTN.v ? 'var(' + BTN.v + ')' : '8px') + '"></span><span>Button corner</span></div><div class="sg-spec-sw"><span class="sg-spec-shape" style="border-radius:' + (CARD && CARD.v ? 'var(' + CARD.v + ')' : '16px') + '"></span><span>Card corner</span></div></div></section>';
+    return { key: 'sg-specimen', title: 'Specimen · every component', size: [1280, 900], flow: true, uses: placed,
+      markup: '<div class="sg-spec" style="' + (PRIMARY && PRIMARY.v ? '--spec-accent:var(' + PRIMARY.v + ');' : '') + (SECONDARY && SECONDARY.v ? '--spec-accent-2:var(' + SECONDARY.v + ');' : '') + (CARD && CARD.v ? '--spec-r:var(' + CARD.v + ');' : '') + (APP_BG ? 'background:var(' + APP_BG.v + ');' : '') + (specText ? 'color:var(' + specText + ');' : '') + (T.typeFamily && T.typeFamily.var ? 'font-family:var(' + T.typeFamily.var + '), inherit;' : '') + '">' + hero + body + '</div>' };
+  };
+  SG.specimen = function () { previewScreens(); return SPECIMEN || null; };   // for the check and its tests
+  var SPECIMEN = null, previewScreens = function () { if (SPECIMEN === null) SPECIMEN = specimen() || false; return (SPECIMEN ? [SPECIMEN] : []).concat((SG.screens || []).filter(function (s) { return s.markup; })); };
   var startName = function (k) { return (STARTS.filter(function (x) { return x[0] === k; })[0] || STARTS[2])[1]; };
   // A new theme starts from the theme the guide shows (its own brand, under a saved theme the brand that one is based on).
   var baseTheme = document.documentElement.getAttribute('data-brand') || '';
@@ -161,17 +206,27 @@
   // is given in light; in dark, each token keeps the system's own dark lightness and takes the new hue, so the dark
   // values follow from the light ones as the system's do.
   var BY = {}, BYVAR = {}; VARS.forEach(function (v) { BY[v.figma] = v; if (v.var) BYVAR[v.var] = v; });
-  // Each component's own tokens (advanced/cardPrimary/background/color → cardPrimary), so a component picked in the
+  // Each component's own tokens (advanced/cardTile/background/color → cardTile), so a component picked in the
   // preview shows what it is made of.
   var normN = function (n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
   var COMP_TOK = {};
   var OWNER = {};   // a component token's CSS variable → its component's key
+  var TEXT_STYLES = (T.typography || []).filter(function (x) { return x && x.scale && x.size; });   // the system's text styles, each with its variables
   VARS.forEach(function (v) { var p = String(v.figma).split('/'); if (!v.var || p.length < 3 || !/^(advanced|components?)$/i.test(p[0])) return; var k = normN(p[1]); (COMP_TOK[k] = COMP_TOK[k] || { name: p[1], toks: [] }).toks.push(v); OWNER[v.var] = k; });
+  // The screen itself, picked where no component is: the app's background tokens (an app, page or canvas background,
+  // none of a component's own), so the background a whole product sits on is a click away too.
+  (function () {
+    var toks = VARS.filter(function (v) { return v.var && !OWNER[v.var] && /(app|page|canvas|screen|body)[\s_/-]*(background|bg|surface)|(background|surface)[\s_/-]*(app|page|canvas|primary|default|base)\b/i.test(v.figma) && hexOf(v.values && v.values[0]); }).slice(0, 12);
+    if (toks.length) COMP_TOK.__app = { name: 'App background', toks: toks };
+  })();
   // The component an element of a screen belongs to: the nearest one whose class names it (card-primary, has-card-primary…).
+  // A class names its component with what is around the name taken off (has-, is-, data-; -wrapper, -container…):
+  // data-table-wrapper is the table's.
+  var compKey = function (c) { var a = String(c).replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles|root|wrap)$/, ''), k = normN(a); if (COMP_TOK[k]) return k; var b = normN(a.replace(/^(data|ds|ui|app|c)-/, '')); return COMP_TOK[b] ? b : k; };
   var compOf = function (el) {
     for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
       var cls = String(n.getAttribute('class') || '').split(/\s+/);
-      for (var i = 0; i < cls.length; i++) { var k = normN(cls[i].replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles)$/, '')); if (k && COMP_TOK[k]) return { el: n, key: k }; }
+      for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k]) return { el: n, key: k }; }
     }
     return null;
   };
@@ -432,11 +487,21 @@
         shadowRules += '\n' + sel + ' { box-shadow: ' + [px(g.x, '0px'), px(g.y, '2px'), b.shadowBlur != null ? b.shadowBlur + 'px' : px(g.blur, '16px'), px(g.spread, '0px'), colour].join(' ') + ' !important; }';
       });
     }
+    // A text given another of the system's text styles: its size, weight and line height from that style's own variables,
+    // so it changes with each breakpoint as the system's text does.
+    Object.keys(tk.radius || {}).forEach(function (sel) { extra += '\n' + scope + ' ' + sel + ' { border-radius: ' + (+tk.radius[sel] || 0) + 'px !important; }'; });
+    Object.keys(tk.text || {}).forEach(function (sel) {
+      var st = TEXT_STYLES.filter(function (x) { return x.scale === tk.text[sel]; })[0]; if (!st) return;
+      var val = function (p) { return p ? (p.var ? 'var(' + p.var + ')' : p.value) : null; }, props = [['font-size', val(st.size)], ['font-weight', val(st.weight)], ['line-height', val(st.lh)]].filter(function (p) { return p[1]; });
+      extra += '\n' + scope + ' ' + sel + ' { ' + props.map(function (p) { return p[0] + ': ' + p[1] + ' !important'; }).join('; ') + '; }';
+    });
     return scope + ' { ' + decl.join('; ') + (decl.length ? ';' : '') + ' }' + shadowRules + extra + (b.shadows ? '' : '\n' + [' ', '::before', '::after'].map(function (p) { return scope + ' ' + OWN + p.trim(); }).join(', ') + ' { box-shadow: none !important; }') + '\n' + scope + ' { font-family: var(' + ((T.typeFamily && T.typeFamily.var) || '--x') + ', inherit); }';
   };
 
   // The controls, in the page's own rows (a name on the left, its control on the right).
   var row = function (label, id, control, hint) { return '<div class="pg-ctl"><label class="sg-mode-label" for="' + id + '">' + esc(label) + '</label><div class="sg-ts-field">' + control + (hint ? '<p class="sg-ts-hint">' + esc(hint) + '</p>' : '') + '<p class="sg-ts-error" id="' + id + '-error" hidden></p></div></div>'; };
+  // On or off: the playground's own switch (pg-switch), so a switch reads the same everywhere on the page.
+  var toggle = function (attrs, on) { return '<button type="button" class="pg-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '"' + attrs + '></button>'; };
   var seg = function (name, opts, on) { return '<div class="sg-seg sg-seg-default sg-ts-seg" role="group" data-seg="' + name + '">' + opts.map(function (o) { return '<button type="button" data-v="' + esc(o[0]) + '" aria-pressed="' + (String(o[0]) === String(on)) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>'; };
   // A choice: the guide's own dropdown (as its Theme choice), drawn over a select that keeps the value.
   var select = function (id, opts, on, label) { return '<span class="sg-hidden-text" id="' + id + '-label">' + esc(label) + '</span><span class="sg-dd sg-ts-dd"><select id="' + id + '" class="sg-input sg-select-native" tabindex="-1" aria-hidden="true">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(on) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></span>'; };
@@ -460,7 +525,7 @@
 
   var body = function () {
     var famIdx = families.map(function (f) { return f.toLowerCase(); }).indexOf(String(brief.fontFamily || '').toLowerCase()), famKnown = famIdx >= 0; if (famKnown) brief.fontFamily = families[famIdx];
-    var screens = (SG.screens || []).filter(function (s) { return s.markup; });
+    var screens = previewScreens();
     var screenKey = (screens.filter(function (s) { return s.key === draft.screen; })[0] || screens[0] || {}).key;
     var form = '<div class="sg-ts">' +
       '<div class="pg-inspect sg-token-card" data-pane="figma"' + (source === 'figma' ? '' : ' hidden') + '><div class="pg-controls">' +
@@ -488,14 +553,14 @@
         row('Card roundness', 'ts-card-r', slider('ts-card-r', brief.cardRadius, 'Card roundness')) +
         (SPACES.length ? row('Spacing', 'ts-space', slider('ts-space', brief.spacing || 100, 'Spacing', 200, 5, '%', 50)) : '') +
         (BORDER ? row('Border thickness', 'ts-border', slider('ts-border', brief.borderWidth, 'Border thickness', 8, 0.5)) : '') +
-        '<div class="pg-ctl"><span class="sg-mode-label" id="ts-shadows-label">Shadows</span><div class="sg-ts-field">' + seg('shadows', [['true', 'On'], ['false', 'Off']], String(brief.shadows)) + '</div></div>' +
+        '<div class="pg-ctl"><span class="sg-mode-label" id="ts-shadows-label">Shadows</span><div class="sg-ts-field">' + toggle(' data-sw="shadows" aria-labelledby="ts-shadows-label"', brief.shadows !== false) + '</div></div>' +
         (BLUR ? row('Shadow blur', 'ts-blur', slider('ts-blur', brief.shadowBlur, 'Shadow blur', 40, 1)) : '') +
       '</div></div>' +
       '<p class="sg-info sg-ts-done" role="status" hidden></p>' +
     '</div>';
     var preview = screens.length ? '<div class="sg-ts-preview pg-inspect sg-token-card"><div class="pg-inspect-head sg-ts-preview-head"><span>Preview</span>' +
         (screens.length > 1 ? select('ts-screen', screens.map(function (s) { return [s.key, s.title || s.key]; }), screenKey, 'Screen') : '<span>' + esc(screens[0].title || screens[0].key) + '</span>') +
-        (COLOUR_AXIS ? seg('mode', [['light', 'Light'], ['dark', 'Dark']], 'light') : '') + '</div><div class="sg-ts-stage"><div class="sg-ts-screen" data-screen="' + esc(screenKey) + '"></div></div></div>' : '';
+        (COLOUR_AXIS ? seg('mode', [['light', 'Light'], ['dark', 'Dark']], 'light') : '') + (document.fullscreenEnabled ? SG.sysButton('button', '', ' data-ts-full aria-pressed="false" aria-label="Full screen" title="Full screen"', 'sg-ts-full', null, FULL_ICON) : '') + '</div><div class="sg-ts-stage"><div class="sg-ts-screen" data-screen="' + esc(screenKey) + '"></div></div></div>' : '';
     return '<div class="sg-ts-split">' + form + preview + '</div>';
   };
 
@@ -510,7 +575,7 @@
   var editing = null;   // the saved theme being edited, else null (a new one)
   var open = function (from, kind, theme) {
     editing = theme || null;
-    var tokOver = { light: {}, dark: {}, all: {} }, picked = null;
+    var tokOver = { light: {}, dark: {}, all: {}, text: {}, radius: {} }, picked = null;
     if (theme) { source = 'scratch'; brief = Object.assign({}, start, theme.brief || {}, { name: theme.name }); baseTheme = theme.base || ''; }
     else {
       if (kind) source = kind;
@@ -524,6 +589,7 @@
     if (phead && !phead.querySelector('.sg-ts-actions')) phead.insertAdjacentHTML('beforeend', '<div class="sg-ts-actions">' + SG.sysButton('button', 'Cancel', ' data-ts="cancel"') + SG.sysButton('button', editing ? 'Save changes' : 'Create theme', ' data-ts="create" data-tone="primary"' + (editing ? ' disabled' : '')) + '</div>');
     phead.querySelector('.sg-ts-actions').onclick = function (e) { var a = e.target.closest('[data-ts]'); if (!a) return; if (a.getAttribute('data-ts') === 'cancel') return panel.close(); create(); };
     var err = function (id, text) { var e = $(id + '-error'); if (!e) return; e.textContent = text || ''; e.hidden = !text; var f = $(id); if (f) { if (text) f.setAttribute('aria-invalid', 'true'); else f.removeAttribute('aria-invalid'); } };
+    var swVal = function (name) { var b = root.querySelector('[data-sw="' + name + '"]'); return b ? (b.getAttribute('aria-checked') === 'true' ? 'true' : 'false') : null; };
     var segVal = function (name) { var b = root.querySelector('[data-seg="' + name + '"] [aria-pressed="true"]'); return b ? b.getAttribute('data-v') : null; };
 
     // The preview's box, and the page's own style for the theme (kept empty: the theme goes in the preview's frame).
@@ -547,21 +613,35 @@
       var sc = box.closest('.sg-tk-detail'), pvEl = box.closest('.sg-ts-preview'), headEl = pvEl && pvEl.querySelector('.sg-ts-preview-head');
       var top = parseFloat(getComputedStyle(root).getPropertyValue('--ts-top')) || 0;
       var oneScroll = getComputedStyle(root.querySelector('.sg-ts')).overflowY === 'auto';   // side by side: the split is the room
-      var h = oneScroll ? root.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 :
+      var full = pvEl && document.fullscreenElement === pvEl;   // full screen: the whole screen is the room
+      var h = full ? pvEl.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) : oneScroll ? root.clientHeight - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 :
         sc ? sc.clientHeight - top - (headEl ? headEl.offsetHeight : 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8 : Infinity;
       // Fluid: the screen laid out in all the room there is (its own width at least, scaled down to fit when the room
       // is narrower), so it fills the stage's width and the panel's height.
       var k = Math.max(0.2, Math.min(1, w / size[0])), lw = Math.round(w / k), lh = Math.round((h > 160 ? h : size[1] * k) / k);
       frame.style.width = lw + 'px'; frame.style.height = lh + 'px'; frame.style.transform = 'scale(' + k + ')';
-      if (screenEl) { screenEl.style.width = lw + 'px'; screenEl.style.height = lh + 'px'; }
+      // Every screen scrolls in its frame: the specimen as long as it runs, a Showroom screen at its own height at least.
+      if (screenEl) { screenEl.style.width = lw + 'px'; screenEl.style.minHeight = lh + 'px'; screenEl.style.height = screenEl._flow ? 'auto' : Math.max(lh, size[1]) + 'px'; }
       box.style.width = Math.floor(lw * k) + 'px'; box.style.height = Math.floor(lh * k) + 'px'; box.style.marginInline = 'auto';
     };
     window.addEventListener('resize', function () { fit(); });
+    // Full screen: the preview alone, at its own size, to judge the theme as a person will see it; the button or Escape
+    // brings the form back, and the theme and the mode chosen stay as they were.
+    var fullBtn = root.querySelector('[data-ts-full]'), pvBox = root.querySelector('.sg-ts-preview');
+    if (fullBtn && pvBox) {
+      fullBtn.addEventListener('click', function () { if (document.fullscreenElement === pvBox) document.exitFullscreen(); else pvBox.requestFullscreen().catch(function () { /* refused: it stays in the panel */ }); });
+      document.addEventListener('fullscreenchange', function () {
+        var on = document.fullscreenElement === pvBox;
+        fullBtn.setAttribute('aria-pressed', String(on)); fullBtn.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); fullBtn.title = on ? 'Exit full screen' : 'Full screen';
+        fullBtn.innerHTML = on ? EXIT_ICON : FULL_ICON;
+        requestAnimationFrame(fit);
+      });
+    }
     var draw = function (key) {
       if (!box) return;
-      var s = (SG.screens || []).filter(function (x) { return x.key === key; })[0]; if (!s) return;
+      var s = previewScreens().filter(function (x) { return x.key === key; })[0]; if (!s) return;
       box.setAttribute('data-screen', key); size = [(s.size && s.size[0]) || 1280, (s.size && s.size[1]) || 800];
-      box.innerHTML = ''; frame = document.createElement('iframe'); frame.className = 'sg-ts-frame'; frame.title = 'Preview: ' + (s.title || s.key); frame.tabIndex = -1; box.appendChild(frame);
+      box.innerHTML = ''; frame = document.createElement('iframe'); frame.className = 'sg-ts-frame'; frame.style.visibility = 'hidden'; /* shown once the theme is on it, never the brand under it first */ frame.title = 'Preview: ' + (s.title || s.key); frame.tabIndex = -1; box.appendChild(frame);
       fdoc = frame.contentDocument; fdoc.open(); fdoc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); fdoc.close();
       Array.prototype.forEach.call(document.documentElement.attributes, function (a) { if (a.name !== 'class' && a.name !== 'style') fdoc.documentElement.setAttribute(a.name, a.value); });
       if (baseTheme) fdoc.documentElement.setAttribute('data-brand', baseTheme); else fdoc.documentElement.removeAttribute('data-brand');
@@ -571,6 +651,7 @@
       fdoc.body.style.margin = '0'; fdoc.body.style.background = 'transparent';
       screenEl = fdoc.createElement('div'); screenEl.id = 'ts-screen'; screenEl.className = 'sg-showroom sg-showroom-screen'; screenEl.setAttribute('aria-hidden', 'true');
       screenEl.style.cssText = 'position: relative; width: ' + size[0] + 'px; height: ' + size[1] + 'px;';
+      screenEl._flow = !!s.flow;   // the specimen runs as long as the system has components: the frame scrolls it
       screenEl.innerHTML = s.markup;
       // The screen's own other modes (its breakpoint, its language), as the Showroom sets them.
       var named = Object.keys(s.modes || {}).map(function (k) { return String(s.modes[k]).toLowerCase(); });
@@ -579,25 +660,43 @@
       // Picking: what is under the pointer is outlined; a click picks its component, which flashes once and then shows
       // as it is, so nothing sits over what is being changed. Nothing in the screen does what it
       // would on its own (a link, a field, a button).
-      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: 2px; } #ts-screen .ts-picked { outline: 2px solid transparent !important; outline-offset: 2px; animation: ts-picked-flash 1s ease-out; } @keyframes ts-picked-flash { 0%, 40% { outline-color: var(--sg-accent, #2563eb); } 100% { outline-color: transparent; } } @media (prefers-reduced-motion: reduce) { #ts-screen .ts-picked { animation-duration: 0.6s; animation-timing-function: steps(1, end); } }'; fdoc.head.appendChild(hl);
+      // Drawn inside the element's own edge: outside it, a tile's clipping or the cell beside it cut its sides off.
+      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked, #ts-screen .ts-picked-part { outline: 2px solid var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked:has(.ts-picked-part) { outline-style: dotted !important; } #ts-screen .ts-tok-hit { outline: 3px dashed var(--sg-accent, #2563eb) !important; outline-offset: -3px !important; } #ts-pick-label { position: absolute; z-index: 2147483647; pointer-events: none; padding: 1px 6px; border-radius: 3px; background: var(--sg-accent, #2563eb); color: #fff; font: 600 11px/1.5 system-ui, sans-serif; white-space: nowrap; }'; fdoc.head.appendChild(hl);
       var hovered = null, stop = function (e) { e.preventDefault(); e.stopPropagation(); };
       ['mousedown', 'mouseup', 'submit', 'keydown', 'dblclick', 'contextmenu'].forEach(function (t) { fdoc.addEventListener(t, stop, true); });
-      fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.part ? partEl(e.target, n.el, n.part) : n.el; if (hovered) hovered.classList.add('ts-hover'); }, true);   // what the next click picks, a layer too
+      fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.node || n.el; if (hovered) hovered.classList.add('ts-hover'); }, true);   // what the next click picks, a layer too
       fdoc.addEventListener('mouseleave', function () { if (hovered) hovered.classList.remove('ts-hover'); hovered = null; }, true);
       fdoc.addEventListener('click', function (e) { stop(e); var n = nextPick(e.target); if (n) pick(n, n.same); }, true);
-      if (picked) { var again = screenEl.querySelector('.' + picked.cls); if (again) again.classList.add('ts-picked'); }
+      if (picked) { var again = screenEl.querySelector('.' + picked.cls); if (again) { again.classList.add('ts-picked'); picked.el = again; picked.node = null; picked.part = null; } }
       ['dark', 'light'].forEach(function (md) { setMode(md); readLive(screenEl, md); }); setMode(mode);
       if (FONT) live.font = firstFamily(fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(FONT.v));
+      // The theme put on the new screen before it shows (its system's colours read above, without it).
+      if (drawnOnce) paint();
+      frame.style.visibility = '';
       fit();
     };
     var tokSaved = (brief.tokens && typeof brief.tokens === 'object') ? brief.tokens : {};   // a theme being edited keeps its own
-    ['light', 'dark', 'all'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
+    ['light', 'dark', 'all', 'text', 'radius'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
     var pickCard = root.querySelector('.sg-ts-pick');
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
     // A colour in light, and in dark: set by hand, else worked out from light when light was changed, else the system's.
-    var lightOf = function (v) { return tokOver.light[v.var] || shown(v, 'light') || '#000000'; };
-    var darkOf = function (v) { return tokOver.dark[v.var] || (tokOver.light[v.var] ? tokenDark({ v: v.var }, tokOver.light[v.var]) : shown(v, 'dark')) || lightOf(v); };
+    // What the preview draws each token as in a mode, the theme on it (its colours, the primary moved, each change by
+    // hand): read from the frame once per mode and paint, so a component picked shows the values it has now, never
+    // the system's from before the theme. The other mode is read with its own CSS in place for that moment.
+    var THEMED = {};
+    var themed = function (md) {
+      if (THEMED[md]) return THEMED[md];
+      var out = THEMED[md] = {}; if (!fdoc || !screenEl || !tstyle) return out;
+      var was = tstyle.textContent, swap = md !== mode;
+      if (swap) { if (source === 'scratch') tstyle.textContent = themeCss(current(), '#ts-screen', md); setMode(md); }
+      var cs = fdoc.defaultView.getComputedStyle(screenEl);
+      VARS.forEach(function (v) { if (v.var) { var x = cs.getPropertyValue(v.var).trim(); if (x) out[v.var] = x; } });
+      if (swap) { setMode(mode); tstyle.textContent = was; }
+      return out;
+    };
+    var lightOf = function (v) { return tokOver.light[v.var] || hexOf(themed('light')[v.var]) || shown(v, 'light') || '#000000'; };
+    var darkOf = function (v) { return tokOver.dark[v.var] || (tokOver.light[v.var] ? tokenDark({ v: v.var }, tokOver.light[v.var]) : hexOf(themed('dark')[v.var]) || shown(v, 'dark')) || lightOf(v); };
     // Every component an element sits in, the outermost first: a click picks the innermost, the others a click away.
     // The layer clicked inside a component: an icon (an svg or anything named icon), else a text (an element with words
     // of its own), else none (the component as a whole).
@@ -639,7 +738,7 @@
           for (var i = 0; i < r.style.length; i++) {
             var prop = r.style[i], val = r.style.getPropertyValue(prop), m, re = /var\((--[\w-]+)/g, vars = [];
             while ((m = re.exec(val))) vars.push(m[1]);
-            if (vars.length) decls.push({ prop: prop, vars: vars, imp: r.style.getPropertyPriority(prop) === 'important' });
+            if (vars.length) decls.push({ prop: prop, vars: vars, val: val, imp: r.style.getPropertyPriority(prop) === 'important' });
           }
           if (!decls.length) return;
           var sels = String(r.selectorText).split(',').map(function (sel) {
@@ -649,24 +748,36 @@
           fdoc._tokRules.push({ order: order, sels: sels, decls: decls });
         });
       }
+      if (c.key === '__app') return null;   // the screen: its own tokens, never every rule of the page
       var root0 = c.part && c.node ? c.node : c.el;   // a layer picked: that layer alone
       var targets = [root0].concat(Array.prototype.filter.call(root0.querySelectorAll('*'), function (n) { var ch = compChain(n); return !ch.length || ch[ch.length - 1].el === c.el; }));
-      var win = {}, states = {};
+      // How each token is used, read from the rules that name it: calc(var(--x) * 1%) is a percentage, * 1px pixels, an
+      // opacity a fraction shown as a percentage; a token is never given a unit its rules do not give it.
+      var units = c.units = {}, unitIn = function (d, v) {
+        if (units[v]) return;
+        var m = new RegExp('var\\(' + v.replace(/[-]/g, '\\-') + '[^)]*\\)\\s*\\*\\s*1(%|px|rem|em|deg|ms|s)(?![a-z])').exec(d.val || '');
+        if (m) units[v] = { unit: m[1], scale: 1 };
+        else if (/(^|-)opacity$/.test(d.prop)) units[v] = { unit: '%', scale: 100 };
+        else if (/radius|width|height|gap|padding|margin|inset|top|left|right|bottom|size|spacing|blur|offset/.test(d.prop)) units[v] = { unit: 'px', scale: 1 };
+      };
+      var win = {}, states = {}, who = {}, hit = function (v, el) { (who[v] = who[v] || []).indexOf(el) < 0 && who[v].push(el); };
       fdoc._tokRules.forEach(function (r) {
         targets.forEach(function (t, ti) {
           r.sels.forEach(function (x) {
             var ok = false; try { ok = t.matches(x.s); } catch (e) { ok = false; } if (!ok) return;
             r.decls.forEach(function (d) {
-              if (x.dyn) { d.vars.forEach(function (v) { states[v] = 1; }); return; }
+              d.vars.forEach(function (v) { unitIn(d, v); });
+              if (x.dyn) { d.vars.forEach(function (v) { states[v] = 1; hit(v, t); }); return; }
               var key = ti + '|' + x.pe + '|' + d.prop, w = win[key], rank = [d.imp ? 1 : 0, x.spec, r.order];
-              if (!w || rank[0] > w.rank[0] || (rank[0] === w.rank[0] && (rank[1] > w.rank[1] || (rank[1] === w.rank[1] && rank[2] >= w.rank[2])))) win[key] = { rank: rank, vars: d.vars };
+              if (!w || rank[0] > w.rank[0] || (rank[0] === w.rank[0] && (rank[1] > w.rank[1] || (rank[1] === w.rank[1] && rank[2] >= w.rank[2])))) win[key] = { rank: rank, vars: d.vars, t: t };
             });
           });
         });
       });
       // The winners' tokens, followed through the custom properties they set (a part's own --x: var(--token)).
       var out = {};
-      Object.keys(win).forEach(function (k) { win[k].vars.forEach(function (v) { out[v] = 1; }); });
+      Object.keys(win).forEach(function (k) { win[k].vars.forEach(function (v) { out[v] = 1; hit(v, win[k].t); }); });
+      c.who = who;   // each token, the elements that draw with it: what a token's row outlines on the screen
       Object.keys(states).forEach(function (v) { out[v] = 1; });
       var toks = Object.keys(out).filter(function (v) { return OWNER[v]; }).map(function (v) { return BYVAR[v]; }).filter(Boolean);
       return toks.length ? toks : null;
@@ -674,21 +785,102 @@
     // What a click picks, as in Figma: the outermost component under the pointer first (all its tokens); a click inside
     // the one picked goes a level deeper: the component nested in it, then the layer clicked (its icon or its text).
     var nextPick = function (t) {
-      var chain = compChain(t); if (!chain.length) return null;
+      var chain = compChain(t);
+      // Nothing of a component under the pointer: the screen itself, its app background and the tokens around it.
+      if (!chain.length) { var bg = appPick(); return bg && !(picked && picked.key === '__app') ? bg : null; }
       var at = picked ? chain.map(function (x) { return x.el; }).indexOf(picked.el) : -1;
       var mk = function (x, part) { return { el: x.el, key: x.key, cls: x.cls, chain: chain, part: part || null }; };
       if (at < 0) return mk(chain[0]);
       if (at < chain.length - 1) return mk(chain[at + 1]);
-      var part = partOf(t, picked.el); if (!part || part === picked.part) return null;
-      var n = mk(chain[at], part); n.same = true; n.node = partEl(t, picked.el, part); return n;
+      // The deepest component picked: each click goes one layer deeper toward what was clicked (a table, its row, the
+      // cell, its text), as Figma's does. A wrapper the same size as the one layer inside it is passed through.
+      var from = picked.node && picked.node.contains(t) ? picked.node : picked.el;
+      if (t === from) return null;
+      var step = t; while (step.parentElement && step.parentElement !== from) step = step.parentElement;
+      if (!from.contains(step) || step === from) return null;
+      while (step.children.length === 1 && step.children[0].contains(t) && !ownText(step) && sameBox(step, step.children[0])) step = step.children[0];
+      var n = mk(chain[at], layerName(step)); n.same = true; n.node = step; return n;
     };
+    var ownText = function (el) { return Array.prototype.some.call(el.childNodes || [], function (x) { return x.nodeType === 3 && x.textContent.trim(); }); };
+    var sameBox = function (a, b) { var x = a.getBoundingClientRect(), y = b.getBoundingClientRect(); return Math.abs(x.width - y.width) < 2 && Math.abs(x.height - y.height) < 2; };
+    // A layer named for what it is: a row, a cell, an icon, a text…, else after its own class.
+    var layerName = function (el) {
+      var tag = String(el.tagName || '').toLowerCase(), cls = String(el.getAttribute('class') || '');
+      var byTag = { tr: 'row', td: 'cell', th: 'header cell', thead: 'header', tbody: 'rows', tfoot: 'footer', li: 'item', label: 'label', button: 'button', a: 'link', input: 'field', textarea: 'field', select: 'field', svg: 'icon', img: 'image' };
+      if (/(^|[\s-])icon/i.test(cls)) return 'icon';
+      if (byTag[tag]) return byTag[tag];
+      if (/(^|[\s_-])row([\s_-]|$)/i.test(cls)) return 'row';
+      if (/(^|[\s_-])cell([\s_-]|$)/i.test(cls)) return 'cell';
+      if (ownText(el)) return 'text';
+      var first = cls.split(/\s+/).filter(function (x) { return x && !/^ts-/.test(x); }).pop();
+      return first ? first.replace(/[-_]+/g, ' ') : tag;
+    };
+    var appPick = function () { return COMP_TOK.__app && screenEl && screenEl.firstElementChild ? { el: screenEl.firstElementChild, key: '__app', cls: '', chain: [] } : null; };
     var compChain = function (el) {
       var out = [];
       for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
         var cls = String(n.getAttribute('class') || '').split(/\s+/);
-        for (var i = 0; i < cls.length; i++) { var k = normN(cls[i].replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles)$/, '')); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: cls[i] }); break; } }
+        for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: cls[i] }); break; } }
       }
       return out;
+    };
+    // What is being changed stays marked on the screen: its outline, and a label with its name (and the layer, an icon
+    // or a text, when one is picked), placed at its top left and moved with it.
+    var placeLabel = function () {
+      if (!fdoc || !screenEl) return;
+      var lab = fdoc.getElementById('ts-pick-label');
+      Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked-part'), function (x) { if (!picked || x !== picked.node) x.classList.remove('ts-picked-part'); });
+      if (!picked || !picked.el || !picked.el.isConnected) { if (lab) lab.remove(); return; }
+      if (picked.part && picked.node) picked.node.classList.add('ts-picked-part');
+      if (!lab) { lab = fdoc.createElement('div'); lab.id = 'ts-pick-label'; lab.setAttribute('aria-hidden', 'true'); screenEl.appendChild(lab); }
+      lab.textContent = COMP_TOK[picked.key].name + (picked.part ? ' › ' + picked.part : '');
+      var t = (picked.part && picked.node) || picked.el, r = t.getBoundingClientRect(), sr = screenEl.getBoundingClientRect();
+      var top = r.top - sr.top - lab.offsetHeight - 2; if (top < 0) top = r.top - sr.top + 2;
+      lab.style.top = top + 'px'; lab.style.left = Math.max(0, r.left - sr.left) + 'px';
+    };
+    // The components right inside the one picked, each a click away: a nested one is hard to hit on the screen itself.
+    var kidsOf = function (c) {
+      var out = [], seen = {};
+      Array.prototype.forEach.call(c.el.querySelectorAll('*'), function (n) {
+        var ch = compChain(n); if (ch.length < 2 || ch[ch.length - 1].el !== n || ch[ch.length - 2].el !== c.el) return;
+        var x = ch[ch.length - 1]; if (seen[x.key]) return; seen[x.key] = 1; out.push({ el: n, key: x.key, cls: x.cls, chain: ch });
+      });
+      return out;
+    };
+    // The text style a picked text is drawn in: the system's style whose own variables, read where the text is (so at the
+    // screen's breakpoint), give its size, weight and line height; and a choice of the others, for this text in every
+    // copy of the component.
+    var textElOf = function (t) { if (ownText(t)) return t; var all = t.querySelectorAll('*'); for (var i = 0; i < all.length; i++) if (ownText(all[i])) return all[i]; return null; };
+    var nodeSel = function (el) { var cl = Array.prototype.filter.call(el.classList, function (x) { return !/^ts-/.test(x); }); return cl.length ? cl.map(function (x) { return '.' + CSS.escape(x); }).join('') : el.tagName.toLowerCase(); };
+    var styleOf = function (el) {
+      var cs = fdoc.defaultView.getComputedStyle(el), px = function (v) { return Math.round(parseFloat(v) * 10) / 10; }, best = null, bestScore = 0;
+      TEXT_STYLES.forEach(function (st) {
+        var get = function (p) { return p ? (p.var ? cs.getPropertyValue(p.var).trim() : String(p.value)) : ''; };
+        if (px(get(st.size)) !== px(cs.fontSize)) return;
+        var sc = 1 + (st.weight && String(parseInt(get(st.weight), 10)) === String(parseInt(cs.fontWeight, 10)) ? 2 : 0) + (st.lh && px(get(st.lh)) === px(cs.lineHeight) ? 1 : 0);
+        if (sc > bestScore) { best = st; bestScore = sc; }
+      });
+      return best;
+    };
+    // A token's unit as its rules use it (usedBy), else as its value is written (px when it says px, none when not).
+    var unitOf = function (v, cur) { var u = picked && picked.units && picked.units[v.var]; return u || (/px$/.test(String(cur).trim()) ? { unit: 'px', scale: 1 } : { unit: '', scale: 1 }); };
+    // Its corners: the radius it is drawn with now, changed for this component in every copy (its own rule over it),
+    // whether its radius is a token of its own or the system's shared one.
+    var radiusRow = function (c) {
+      if (c.key === '__app') return '';
+      var el = c.node || c.el, sel = '.' + CSS.escape(c.cls || '') + (el === c.el ? '' : ' ' + nodeSel(el));
+      var now = parseFloat(fdoc.defaultView.getComputedStyle(el).borderTopLeftRadius) || 0, set = tokOver.radius[sel];
+      return '<p class="sg-ts-tok-group">Corners</p><div class="pg-ctl sg-ts-tok"><span class="sg-mode-label">Corner radius</span><div class="sg-ts-field sg-ts-tok-field"><label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-kind="radius" data-sel="' + esc(sel) + '" min="0" step="1" value="' + esc(set != null ? set : Math.round(now * 10) / 10) + '" aria-label="Corner radius in px"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>' +
+        '<button type="button" class="sg-ts-auto" data-radius-reset="' + esc(sel) + '" title="Back to the component\'s own" aria-label="Back to the component\'s own corner radius"' + (set != null ? '' : ' hidden') + '>' + RESET + '</button></div></div>';
+    };
+    var textRow = function (c) {
+      if (!TEXT_STYLES.length || c.key === '__app') return '';
+      var el = textElOf(c.node || c.el); if (!el) return '';
+      var sel = '.' + CSS.escape(c.cls || '') + (el === c.el ? '' : ' ' + nodeSel(el));
+      var chosen = tokOver.text[sel], now = styleOf(el), pickNow = chosen || (now && now.scale) || '';
+      return '<p class="sg-ts-tok-group">Text style</p><div class="pg-ctl sg-ts-tok"><span class="sg-mode-label">Style</span><div class="sg-ts-field sg-ts-tok-field">' +
+        select('ts-textstyle', (pickNow ? [] : [['', 'Not one of the system\'s styles']]).concat(TEXT_STYLES.map(function (x) { return [x.scale, x.scale + (x.size && x.size.value ? ' · ' + x.size.value : '')]; })), pickNow, 'Text style').replace('<select ', '<select data-sel="' + esc(sel) + '" data-was="' + esc(now ? now.scale : '') + '" ') +
+        '<button type="button" class="sg-ts-auto" data-text-reset="' + esc(sel) + '" title="Back to the component\'s own" aria-label="Back to the component\'s own text style"' + (chosen ? '' : ' hidden') + '>' + RESET + '</button></div></div>';
     };
     var pick = function (c, keep) {
       if (!keep) {
@@ -707,20 +899,27 @@
       var rowOf = function (x) {
         var cur = nowOf(x.v), over = tokOver.all[x.v.var], ctl;
         if (x.kind === 'colour') ctl = '<div class="sg-ts-pair">' + colourOf(x, 'light') + (COLOUR_AXIS ? colourOf(x, 'dark') : '') + '</div>';
-        else if (x.kind === 'size') ctl = '<label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="size" step="0.5" value="' + esc(parseFloat(cur) || 0) + '" aria-label="' + esc(x.label + ' in px') + '"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>';
-        else { var on = /^true$/i.test(cur); ctl = '<div class="sg-seg sg-seg-default sg-ts-seg" role="group" aria-label="' + esc(x.label) + '">' + [['true', 'On'], ['false', 'Off']].map(function (o) { return '<button type="button" data-tok="' + esc(x.v.var) + '" data-kind="bool" data-v="' + o[0] + '" aria-pressed="' + (String(on) === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>'; }
-        return '<div class="pg-ctl sg-ts-tok"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
+        else if (x.kind === 'size') { var u = unitOf(x.v, cur); ctl = '<label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="size" data-scale="' + u.scale + '" data-px="' + (/px$/.test(String(cur).trim()) ? 1 : '') + '" step="' + (u.scale === 100 ? 1 : 0.5) + '" value="' + esc(Math.round((parseFloat(cur) || 0) * u.scale * 100) / 100) + '" aria-label="' + esc(x.label + (u.unit ? ' in ' + (u.unit === '%' ? 'percent' : u.unit) : '')) + '">' + (u.unit ? '<span class="sg-ts-mode-tag" aria-hidden="true">' + esc(u.unit) + '</span>' : '') + '</label>'; }
+        else ctl = toggle(' data-tok="' + esc(x.v.var) + '" data-kind="bool" aria-label="' + esc(x.label) + '"', /^true$/i.test(cur));
+        return '<div class="pg-ctl sg-ts-tok" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
           (x.kind !== 'size' ? '' : '<button type="button" class="sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
       };
       // Its head stays in view: the components it sits in (each a click away), the one picked, and Done.
-      var trail = (c.chain || [c]).map(function (x, i) { var name = COMP_TOK[x.key].name; return x.key === c.key && !c.part ? '<b>' + esc(name) + '</b>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + i + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
-      if (c.part) trail += '<span class="sg-ts-trail-sep" aria-hidden="true">›</span><b>' + esc(c.part) + '</b>';
-      var n = 0, html = '<div class="pg-inspect-head sg-ts-pick-head"><span class="sg-ts-pick-trail">' + trail + '</span>' + SG.sysButton('button', 'Done', ' data-tok-done') + '</div><div class="pg-controls">';
+      var trail = (c.chain && c.chain.length ? c.chain : [c]).map(function (x, i) { var name = COMP_TOK[x.key].name; return x.key === c.key && !c.part ? '<b>' + esc(name) + '</b>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + i + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
+      // The layers from the component down to the one picked, each a click back to it (a pass-through wrapper left out).
+      c.layers = [];
+      if (c.part && c.node) { for (var q = c.node; q && q !== c.el; q = q.parentElement) if (!(q !== c.node && q.children.length === 1 && !ownText(q) && sameBox(q, q.children[0]))) c.layers.unshift(q); }
+      trail += c.layers.map(function (q, i) { var sep = '<span class="sg-ts-trail-sep" aria-hidden="true">›</span>'; return sep + (i === c.layers.length - 1 ? '<b>' + esc(layerName(q)) + '</b>' : '<button type="button" class="sg-ts-trail" data-tok-layer="' + i + '">' + esc(layerName(q)) + '</button>'); }).join('');
+      c.kids = c.key === '__app' ? [] : kidsOf(c);
+      var kids = c.kids.length ? '<span class="sg-ts-kids"><span class="sg-ts-kids-label">Inside</span>' + c.kids.map(function (x, i) { return '<button type="button" class="sg-ts-kid" data-tok-kid="' + i + '">' + esc(COMP_TOK[x.key].name) + '</button>'; }).join('') + '</span>' : '';
+      var n = 0, html = '<div class="pg-inspect-head sg-ts-pick-head"><span class="sg-ts-pick-trail">' + trail + kids + '</span>' + SG.sysButton('button', 'Done', ' data-tok-done') + '</div><div class="pg-controls">';
       var PART = { icon: /icon/i, text: /text|label|title|font|typo/i };
-      var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
+      var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || !PART[c.part] || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
       if (!shownG.length) shownG = Object.keys(groups);
+      html += radiusRow(c) + textRow(c);
       shownG.sort().forEach(function (g) { html += '<p class="sg-ts-tok-group">' + esc(g) + '</p>' + groups[g].map(function (x) { n++; return rowOf(x); }).join(''); });
       pickCard.innerHTML = html + (n ? '' : '<p class="sg-ts-hint">Nothing to change here: its tokens are not colours, sizes or switches.</p>') + '</div>';
+      placeLabel(); dropdowns(pickCard);
       // Its head stays just under the panel's own; picked, the panel scrolls to the card's top.
       var ph = panel.el.querySelector('.sg-panel-head'), col = root.querySelector('.sg-ts'), own = col && getComputedStyle(col).overflowY === 'auto', sc = own ? col : panel.el.querySelector('.sg-tk-detail'), off = own ? 0 : (ph ? ph.offsetHeight : 0);
       if (ph) root.style.setProperty('--ts-head', ph.offsetHeight + 'px');
@@ -742,18 +941,38 @@
     };
     pickCard.addEventListener('input', function (e) {
       e.stopPropagation();
-      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v) return;
+      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v && k !== 'radius') return;
       if (k === 'colour') { t.parentNode.querySelector('[data-kind="colour-hex"]').value = t.value; showMode(md); setTok(v, 'colour', t.value, md); }
       else if (k === 'colour-hex') { var hx = hexOf(t.value); if (hx) { t.parentNode.querySelector('[data-kind="colour"]').value = hex6(hx); showMode(md); setTok(v, 'colour', hx, md); } }
-      else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) setTok(v, 'size', n + 'px'); }
+      else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) { n = n / (+t.getAttribute('data-scale') || 1); setTok(v, 'size', String(Math.round(n * 10000) / 10000) + (t.getAttribute('data-px') ? 'px' : '')); } }
+      else if (k === 'radius') { var r = parseFloat(t.value); if (!isNaN(r)) { tokOver.radius[t.getAttribute('data-sel')] = Math.max(0, r); var rb = pickCard.querySelector('[data-radius-reset]'); if (rb) rb.hidden = false; changed(); repaint(); } }
     });
-    pickCard.addEventListener('change', function (e) { e.stopPropagation(); });
+    pickCard.addEventListener('change', function (e) {
+      e.stopPropagation();
+      var t = e.target; if (t.id !== 'ts-textstyle') return;
+      var sel = t.getAttribute('data-sel'); if (!t.value || t.value === t.getAttribute('data-was')) delete tokOver.text[sel]; else tokOver.text[sel] = t.value;
+      changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80);
+    });
+    // A nested component's button outlines it on the screen while the pointer is on it, so it is found before it is picked.
+    ['mouseover', 'mouseout', 'focusin', 'focusout'].forEach(function (t) { pickCard.addEventListener(t, function (e) {
+      var kd = e.target.closest && e.target.closest('[data-tok-kid]'), y = kd && picked && picked.kids && picked.kids[+kd.getAttribute('data-tok-kid')];
+      if (y) y.el.classList.toggle('ts-hover', t === 'mouseover' || t === 'focusin');
+      // A token's row: the parts of the screen drawn with it, outlined while the pointer (or the focus) is on the row.
+      var row = e.target.closest && e.target.closest('[data-hit]');
+      if (row && fdoc) { var on = t === 'mouseover' || t === 'focusin', els = (picked && picked.who && picked.who[row.getAttribute('data-hit')]) || [];
+        Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-tok-hit'), function (x) { x.classList.remove('ts-tok-hit'); });
+        if (on) (els.length ? els : [picked && (picked.node || picked.el)]).forEach(function (x) { if (x) x.classList.add('ts-tok-hit'); }); }
+    }); });
     pickCard.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = '<p class="sg-ts-hint sg-ts-pick-empty">Click a component in the preview to change its tokens.</p>'; return; }
+      var rr = e.target.closest('[data-radius-reset]'); if (rr) { delete tokOver.radius[rr.getAttribute('data-radius-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      var kd = e.target.closest('[data-tok-kid]'); if (kd && picked && picked.kids) { var y = picked.kids[+kd.getAttribute('data-tok-kid')]; if (y) { y.el.classList.remove('ts-hover'); pick({ el: y.el, key: y.key, cls: y.cls, chain: y.chain }); } return; }
+      if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); placeLabel(); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = '<p class="sg-ts-hint sg-ts-pick-empty">Click a component in the preview to change its tokens.</p>'; return; }
       var ch = e.target.closest('[data-tok-chain]'); if (ch && picked && picked.chain) { var x = picked.chain[+ch.getAttribute('data-tok-chain')]; if (x) pick({ el: x.el, key: x.key, cls: x.cls, chain: picked.chain }); return; }
-      if (e.target.closest('[data-tok-part-clear]') && picked) { picked.part = null; pick(picked, true); return; }
-      var bt = e.target.closest('[data-kind="bool"]'); if (bt) { Array.prototype.forEach.call(bt.parentNode.children, function (x) { x.setAttribute('aria-pressed', String(x === bt)); }); setTok(bt.getAttribute('data-tok'), 'bool', bt.getAttribute('data-v')); return; }
+      if (e.target.closest('[data-tok-part-clear]') && picked) { picked.part = null; picked.node = null; pick(picked, true); return; }
+      var ly = e.target.closest('[data-tok-layer]'); if (ly && picked && picked.layers) { var q = picked.layers[+ly.getAttribute('data-tok-layer')]; if (q) { picked.node = q; picked.part = layerName(q); pick(picked, true); } return; }
+      var bt = e.target.closest('[data-kind="bool"]'); if (bt) { var to = bt.getAttribute('aria-checked') === 'true' ? 'false' : 'true'; bt.setAttribute('aria-checked', to); setTok(bt.getAttribute('data-tok'), 'bool', to); return; }
       var rs = e.target.closest('[data-tok-reset]'); if (rs) { e.preventDefault(); setTok(rs.getAttribute('data-tok-reset'), rs.getAttribute('data-kind'), null, rs.getAttribute('data-mode')); setTimeout(function () { if (picked) pick(picked, true); }, 60); }
     });
     var lastSide = 'bg';   // the menu's background or its content (the colours drawn on it): which was edited last
@@ -764,15 +983,16 @@
         buttonRadius: Math.max(0, Math.round(+$('ts-btn-r-num').value || 0)), cardRadius: Math.max(0, Math.round(+$('ts-card-r-num').value || 0)), spacing: $('ts-space-num') ? Math.max(0, +$('ts-space-num').value || 100) : 100, borderWidth: $('ts-border-num') ? Math.max(0, +$('ts-border-num').value || 0) : start.borderWidth, shadowBlur: $('ts-blur-num') ? Math.max(0, +$('ts-blur-num').value || 0) : start.shadowBlur,
         grad: STOPS.reduce(function (o, st) { var f = $(st.id + '-hex'); if (f && hexOf(f.value)) o[st.v] = hexOf(f.value); return o; }, {}),
         menuLead: lastSide, tokens: JSON.parse(JSON.stringify(tokOver)),
-        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: segVal('shadows') !== 'false' };
+        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: swVal('shadows') !== 'false' };
     };
     var paint = function () {
       if (!box) return;
       var on = source === 'scratch', b = current();
       if (on && b.fontFamily && fdoc) ensureFont(b.fontFamily, fdoc);
       if (tstyle) tstyle.textContent = on ? themeCss(b, '#ts-screen', mode) : '';
+      THEMED = {};   // the theme changed: what each token is now is read again
       // No shadows, no blur to set: its slider is off with them.
-      var noShadow = segVal('shadows') === 'false';
+      var noShadow = swVal('shadows') === 'false';
       ['ts-blur', 'ts-blur-num'].forEach(function (id) { var x = $(id); if (x) x.disabled = noShadow; });
       var blurRow = $('ts-blur') && $('ts-blur').closest('.pg-ctl'); if (blurRow) blurRow.classList.toggle('is-off', noShadow);
       // Each colour's dark field shows the value worked out from light until it is set by hand.
@@ -782,8 +1002,11 @@
         if (document.activeElement !== f) f.value = d; pick.value = hex6(d);
       });
       STOPS.forEach(function (st) { var f = $(st.id + '-d-hex'), pick = $(st.id + '-d'), hex = (b.grad || {})[st.v]; if (!f || !hex || f.dataset.hand === '1') return; var d = tokenDark(st, hex); if (document.activeElement !== f) f.value = d; pick.value = hex6(d); });
-      fit();
+      // A component picked shows its tokens as they are now: drawn again, unless one of its own fields is being typed in.
+      if (picked && !pickCard.contains(document.activeElement)) pick(picked, true);
+      fit(); placeLabel();
     };
+    var drawnOnce = false;   // the first screen is themed by the opening's own paint, after its fields are filled
     var later = null, repaint = function () { clearTimeout(later); later = setTimeout(paint, 40); };
     // The colours the theme starts from, as the screen shows them; written into the fields when asked (a theme just
     // opened, or another one chosen to start from).
@@ -801,7 +1024,7 @@
     if (box) {
       draw(box.getAttribute('data-screen'));
       seed(!draft.brief && !editing);   // a theme being edited keeps its own colours
-      paint(); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(box.parentNode); }
+      paint(); drawnOnce = true; if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(box.parentNode); }
     panel.el.addEventListener('transitionend', fit, { once: true });
     // The preview stays in view while the form scrolls, just under the panel's own title (which stays too).
     var head = panel.el.querySelector('.sg-panel-head'), pv = root.querySelector('.sg-ts-preview');
@@ -824,6 +1047,7 @@
         if (which === 'source') { source = b.getAttribute('data-v'); Array.prototype.forEach.call(root.querySelectorAll('[data-pane]'), function (p) { p.hidden = p.getAttribute('data-pane') !== source; }); root.querySelector('.sg-ts-done').hidden = true; }
         repaint(); return;
       }
+      var sw = e.target.closest('[data-sw]'); if (sw) { sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); changed(); repaint(); return; }
       var au = e.target.closest('[data-auto]');
       if (au) { e.preventDefault(); var f = $(au.getAttribute('data-auto') + '-hex'); f.dataset.hand = ''; f.value = ''; au.hidden = true; paint(); return; }
       var a = e.target.closest('[data-ts]'); if (!a) return;
@@ -902,7 +1126,7 @@
 
   // Saved themes: kept in this browser, each listed in the guide's Theme choice after the file's own; chosen, it is the
   // theme it is based on with its changes over it, everywhere the guide draws the system.
-  var SAVED_KEY = 'sg-ts-themes', ACTIVE_KEY = 'sg-ts-active';
+  var SAVED_KEY = 'sg-ts-themes' + PER, ACTIVE_KEY = 'sg-ts-active' + PER;
   // The link names the theme in use beside its base (?brand=retail&theme=ocean), so it opens the same page.
   var slugOf = function (t) { return String(t.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || t.id; };
   var themeParam = function (t) { try { var u = new URL(location.href); if (t) u.searchParams.set('theme', slugOf(t)); else u.searchParams.delete('theme'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) { /* a page opened as a file */ } };
@@ -910,7 +1134,7 @@
   // Themes are kept as files in a themes folder of their own, apart from the engine and from the system's project: one
   // file each in its <system>/ subfolder, which the build puts into the page. This browser keeps a working copy: a file newer than it
   // replaces it, and a theme deleted here is not brought back by its file.
-  var GONE_KEY = 'sg-ts-deleted', FILES = (EDITOR.files || []).filter(function (t) { return t && t.id && t.name; });
+  var GONE_KEY = 'sg-ts-deleted' + PER, FILES = (EDITOR.files || []).filter(function (t) { return t && t.id && t.name; });
   var SYS = EDITOR.system || 'system', HOME = EDITOR.folder || '';   // the themes folder, as the setup writes it (styleguide.themes)
   var gone = function () { try { return JSON.parse(localStorage.getItem(GONE_KEY) || '[]'); } catch (e) { return []; } };
   (function () {
@@ -1046,6 +1270,8 @@
       new MutationObserver(function () { if (list.hidden) { var r = list.querySelector('.sg-ts-new-row'); if (r) unfold(r, false); } }).observe(list, { attributes: true, attributeFilter: ['hidden'] });
     }
   };
+  var FULL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>';
+  var EXIT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg>';
   var CHEVRON = '<svg class="sg-ts-icon sg-ts-chev" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
   var PLUS_ICON = '<svg class="sg-ts-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>';
   var PENCIL = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3l7.5-7.5Z"/><path d="M9 4l3 3"/></svg>';

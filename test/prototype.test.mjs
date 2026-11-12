@@ -221,6 +221,22 @@ test('--prototype --from-screens turns each designed screen into a drawn startin
   assert.match(again.stdout, /kept as it was; --force replaces it/);
 });
 
+test('a kept prototype file that is not valid JSON is named, never a stack trace', { timeout: budget(600000) }, () => {
+  // Found by measuring the composition path on a system built only in Figma: every run of one task ended with a
+  // raw SyntaxError from inside fromScreens, because the file it read is the person's own and nothing guarded it -
+  // while the screen capture read two lines above says plainly "is not a screen capture". A trailing comma or a
+  // note left in the file took the whole command down, and no command of the engine ever answers with a trace.
+  const dir = builtTidepool('tp-screens-bad-');
+  assert.equal(run(dir, '--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json').status, 0);
+  writeFileSync(join(dir, 'prototypes', 'settings.json'), '{\n  "prototype": {  // a note somebody left\n}\n');
+  const r = run(dir, '--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');
+  assert.doesNotMatch(r.stdout, /SyntaxError|at fromScreens|at JSON\.parse/, `a stack trace reached the person:\n${r.stdout}`);
+  assert.match(r.stdout, /prototypes\/settings\.json is not valid JSON/, r.stdout);
+  assert.match(r.stdout, /fix it, or --force to write it again from the screen/, 'and what to do about it');
+  // The rest of the run still stands: the screens it could read are still reported on.
+  assert.match(r.stdout, /HOW THESE SCREENS ARRANGE THINGS/, r.stdout);
+});
+
 // ── Asking for a prototype in words ──────────────────────────────────────────────────────────────────────────────
 test('a prototype request routes to the prototype recipe and its catalog, in English and Portuguese', async () => {
   const { route } = await import('../lib/route.mjs');

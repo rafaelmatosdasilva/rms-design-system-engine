@@ -129,8 +129,13 @@
       // Labelled values, as the draft is: the panel opens from a row of the rules' table.
       var ways = fam ? '<div class="sg-cx-changes"><p class="sg-il-label">' + esc('How the ' + fam.components + ' in the family are built') + '</p>' + kvOne(fam.shapes.map(function (x) { return [x[0], esc(x[1] + (x[1] === 1 ? ' component' : ' components'))]; }), 'sg-cx-kv') + '</div>' : '';
       // What is suggested, what it changes and the decision are one card: the draft is read, then approved under it.
+      // A rule the team already wrote into its linter (lint-config.mjs): where, the setting, and what the linter itself
+      // reports for it, so its findings and the engine's are one list. Labelled values, as the draft is.
+      var dl = r.decidedIn, TOOL = { eslint: 'ESLint', stylelint: 'stylelint' };
+      var decidedCard = dl ? card('Decided in the team\'s ' + (TOOL[dl.tool] || dl.tool) + ' config', kvOne([['Where', '<code>' + esc(dl.file + ':' + dl.line) + '</code>'], ['Setting', '<code>' + esc(dl.setting + ' ' + JSON.stringify(dl.value)) + '</code>']]
+        .concat(dl.reported != null ? [[(TOOL[dl.tool] || dl.tool) + ' reports', esc(dl.reported === 0 ? 'Nothing for this setting' : dl.reported + (dl.reported === 1 ? ' finding' : ' findings') + ' for this setting')]] : []), 'sg-cx-kv')) : '';
       var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
-        + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
+        + decidedCard + card(r.status === 'rule' ? 'Nothing to change' : 'Suggested change', suggest + ways + list + decide);
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);

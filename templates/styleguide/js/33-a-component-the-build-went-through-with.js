@@ -94,11 +94,16 @@
     var tried = !!live || !!(audited && audited.ran.indexOf('wcag21') >= 0);
     var by = {};
     items.forEach(function (it) { (by[it.sc] = by[it.sc] || []).push(it); });
+    // The criteria, then what the checks look at beyond them (forced colours, reduced motion): each a row of its own,
+    // in its own words, never a criterion (wcag21.mjs BEYOND_AA). They are the audit's: both are emulated through the
+    // browser's protocol, which this page cannot do, so a row reads Run the audit until one has run.
     var crit = (WCAG ? WCAG.criteria.slice() : []);
+    if (WCAG && WCAG.beyond) WCAG.beyond.forEach(function (b) { crit.push({ sc: b.sc, name: b.name, level: '', how: b.how, kinds: b.kinds, says: b.says, extra: true, beyond: true }); });
     // A criterion the checks stand for beyond WCAG 2.2 A and AA (a AAA one: a focus ring's thickness, a comfortable target): listed when it has a
     // finding, named as its label names it.
     Object.keys(by).forEach(function (sc) {
       if (crit.some(function (k) { return k.sc === sc; })) return;
+      if (/\(beyond WCAG 2\.2 at A and AA\)$/.test(by[sc][0].label || '')) return;   // its own row is already in the list
       var m = /WCAG [\d.]+ (.+) \((A+)\)$/.exec(by[sc][0].label || '');
       crit.push({ sc: sc, name: m ? m[1] : '', level: m ? m[2] : '', how: 'auto', says: 'Beyond WCAG 2.2 at A and AA (a AAA criterion), advisory.', extra: true });
     });
@@ -108,7 +113,7 @@
       var how = (WCAG_HOW[k.how] || '') + (fig.length ? ', with the Figma annotation' + (fig.length > 1 ? 's ' : ' ') + fig.join(', ') : '');
       var texts = /^(1\.3\.3|1\.4\.5|3\.1\.2|1\.4\.12|2\.4\.6)$/.test(k.sc) && (c.__textParts || []).length ? ', its ' + c.__textParts.join(', ') : '';
       var person = k.person ? 'On ' + c.name + texts + ', a person checks that ' + k.person.replace(/^\w/, function (x) { return x.toLowerCase(); }) : '';
-      if (k.extra) st = 'done';
+      if (k.extra && !k.beyond) st = 'done';
       else if (k.how === 'page') st = null;   // the page that uses it answers for it
       else if (k.how === 'media' && !(live && live.ran.media)) st = null;   // it plays no video or sound
       else if (k.how === 'person' || (k.how === 'media' && !k.kinds)) { st = 'check'; note = person; }
@@ -170,7 +175,9 @@
     var order = { todo: 0, check: 1, done: 2 }, num = function (sc) { return sc.split('.').map(function (x) { return ('000' + x).slice(-3); }).join('.'); };
     rows.sort(function (p, q) { return (!!p.k.extra - !!q.k.extra) || order[p.st] - order[q.st] || (num(p.k.sc) < num(q.k.sc) ? -1 : 1); });
     return rows.map(function (r) {
-      var name = r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '');
+      // "1.4.3 Contrast (Minimum) (AA)" for a criterion; "Forced colours: icons, borders… " for a row beyond A and AA,
+      // written exactly as the engine labels its findings (styleguide-data.mjs wcagLabel).
+      var name = r.k.sc + (r.k.beyond ? ': ' : ' ') + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '');
       var found = r.its.map(function (it) { var y = STATUS[it.st] || STATUS.done; return '<div class="pg-a11y-item"><span class="pg-par--' + y[2] + '"><span class="pg-par-sign" aria-hidden="true">' + y[0] + '</span></span> ' + it.html + '</div>'; }).join('');
       // Its note, as the area always said it under what was found (never on a row to fix): what passed and where stays
       // there; what a person checks, or what has still to run, is what to do.
@@ -221,7 +228,7 @@
       // Its date, its own check's: tried now on this page, the last audit's day, else when the page was built (what the
       // code and Figma said then).
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
-      var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML('WCAG ' + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
+      var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML((r.k.beyond ? '' : 'WCAG ') + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
         who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
         // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.

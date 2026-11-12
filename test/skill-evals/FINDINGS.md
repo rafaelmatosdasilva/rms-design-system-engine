@@ -8,6 +8,24 @@ Newest first.
 
 ---
 
+## On the composition side the agent does not fail; the engine does
+
+**Found** 12 November 2026, measuring the composition path on a model above Haiku. **Fixed in** `lib/prototype.mjs` (`fromScreens`) and `test/skill-evals/record.mjs` (`scrubPaths`).
+
+**Evidence.** The twelve prototype tasks on Tidepool with only its Figma file, Opus 5, five runs each: 60 runs, $53.94, every run passed, no check ever failed and no rule was broken. Against the first pass of this arm (Haiku 5.5, 24 runs, 19 of 24 before the catalog was given Figma's spacing), a stronger model at more runs finds nothing wrong with what the agent builds.
+
+The engine, meanwhile, fell over in 5 of those runs — every run of `proto-linked-figma` — with a raw `SyntaxError` from inside `fromScreens`. `--prototype --from-screens` reads a kept `prototypes/<name>.json` with `JSON.parse` and no guard, twice, while the screen capture read two lines above it is guarded and says plainly *"is not a screen capture"*. That file is the person's own, edited by hand: a trailing comma or a note left in it took the whole command down. No command of the engine ever answers with a stack trace, and this one did, every time.
+
+**Guess ruled out.** Not the task's linked guidelines, and not the Figma-only system: the crash reproduces on a plain copy of the fixture the moment the kept file is not valid JSON, and reproduces nowhere else. What the task did was write that file and then run the command again — which is what anybody iterating on a prototype does.
+
+**What changed.** The kept file is read once, inside a guard that names the file and the position and says `--force` rewrites it from the screen; the other screens in the run are still drawn. `test/prototype.test.mjs` holds it.
+
+**And a second thing the record itself showed.** The 60 rows carried a folder of this computer into a public record, which `scrubPaths` was supposed to prevent. It writes out the engine's root and the home folder whole — but what a run says about itself is kept to 80 characters, so a root longer than that never appears whole and never matched. The scrub now writes out each shorter beginning of a root as well, down to 24 characters.
+
+**What it settles.** The composition path is no longer the unmeasured half: 60 runs on a strong model say the agent's side of it holds. The failures there are the engine's own, and they are invisible in a pass rate — all 5 crashed runs count as passes, because the fault is not the agent's. A measurement read by its pass column alone would have reported this arm perfect.
+
+---
+
 ## A question in place of the confirmation, once in thirty
 
 **Found** 9 November 2026, measuring the rules read from the file's own examples. **Changed** nothing: the miss was not the change's.
