@@ -1864,3 +1864,13 @@ test('History: a contract change is done by the person who ran the build, under 
   assert.doesNotMatch(src, /Done by the engine/);
   assert.match(src, /contracts: 'Contracts'/, 'its source as its chip says it');
 });
+
+test('each Figma rule a component breaks is a task on that component, under Rules, waiting on the Figma file', async () => {
+  const { readTemplate, ENGINE_TEMPLATE } = await import('../lib/styleguide-template.mjs');
+  const tpl = readTemplate(ENGINE_TEMPLATE);
+  assert.match(tpl, /var TODO_KINDS = \['Parity', 'Rules',/);
+  assert.match(tpl, /function rulesRows\(c\)/);
+  assert.match(tpl, /rulesRows\(c\)\.forEach\(function \(r\) \{ rows\.push\(r\); \}\);/);
+  // Only Figma's side, and never a rule every component follows.
+  assert.match(tpl, /if \(\(r\.side \|\| 'figma'\) !== 'figma' \|\| r\.status === 'rule'\) return;/);
+});
