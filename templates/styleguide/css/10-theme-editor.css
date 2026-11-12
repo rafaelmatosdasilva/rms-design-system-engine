@@ -255,3 +255,13 @@
 .sg-ts-tok-field > .sg-ts-num > .sg-ts-auto[hidden], .sg-ts-zoom > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
 .sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="1"], .sg-ts-zoom > .sg-ts-step-btn[data-step="1"] { order: 6; }
 .sg-ts-bp > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
+/* The system's colours, opened from a colour field: a search over its base, semantic and primitive colours, each a swatch
+   and its name; one chosen links the token to it. */
+.sg-ts-lib { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-s) 0 var(--sg-space-m); }
+.sg-ts-lib-list { display: flex; flex-direction: column; max-height: 16rem; overflow: auto; border: var(--sg-line); border-radius: var(--sg-radius-s); }
+.sg-ts-lib-item { display: flex; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-s); border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; cursor: pointer; }
+.sg-ts-lib-item:hover, .sg-ts-lib-item:focus-visible { background: var(--sg-hover-fill); }
+.sg-ts-lib-item[hidden] { display: none; }
+button.sg-ts-alias-chip { background: none; font: inherit; font-size: var(--sg-s); cursor: pointer; }
+button.sg-ts-alias-chip:hover { background: var(--sg-hover-fill); }
+.sg-ts-tok-field > .sg-ts-relink, .sg-ts-tok-field > .sg-ts-lib-btn { flex: none; }

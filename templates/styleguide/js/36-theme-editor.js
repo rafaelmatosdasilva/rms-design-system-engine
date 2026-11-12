@@ -477,6 +477,7 @@
       });
     }
     var tk = b.tokens || {}, applyTok = function () {
+      Object.keys(tk.alias || {}).forEach(function (k) { set[k] = 'var(' + tk.alias[k] + ')'; });   // pointed at one of the system's colours, as Figma links a variable
       Object.keys(tk.all || {}).forEach(function (k) { set[k] = tk.all[k]; });
       if (mode !== 'light') Object.keys(tk.light || {}).forEach(function (k) { if (!(tk[mode] || {})[k] && BYVAR[k]) set[k] = tokenDark({ v: k }, tk.light[k]); });
       Object.keys(tk[mode] || {}).forEach(function (k) { set[k] = tk[mode][k]; });
@@ -637,7 +638,7 @@
   var editing = null;   // the saved theme being edited, else null (a new one)
   var open = function (from, kind, theme) {
     editing = theme || null;
-    var tokOver = { light: {}, dark: {}, all: {}, text: {}, radius: {}, bp: {}, detached: {} }, picked = null;
+    var tokOver = { light: {}, dark: {}, all: {}, text: {}, radius: {}, bp: {}, detached: {}, alias: {} }, picked = null;
     if (theme) { source = 'scratch'; brief = Object.assign({}, start, theme.brief || {}, { name: theme.name }); baseTheme = theme.base || ''; }
     else {
       if (kind) source = kind;
@@ -778,7 +779,7 @@
       fit();
     };
     var tokSaved = (brief.tokens && typeof brief.tokens === 'object') ? brief.tokens : {};   // a theme being edited keeps its own
-    ['light', 'dark', 'all', 'text', 'radius', 'bp', 'detached'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
+    ['light', 'dark', 'all', 'text', 'radius', 'bp', 'detached', 'alias'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
     var pickCard = root.querySelector('.sg-ts-pick');
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
@@ -1066,7 +1067,7 @@
         return '<label class="sg-ts-colour sg-input"><input type="color" data-tok="' + esc(x.v.var) + '" data-kind="colour" data-mode="' + md + '" value="' + esc(hex6(val)) + '" aria-label="' + esc(x.label + (dark ? ' in dark' : ' in light')) + '"><input type="text" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="colour-hex" data-mode="' + md + '" value="' + esc(val) + '" spellcheck="false" aria-label="' + esc(x.label + (dark ? ' in dark, hex' : ' in light, hex')) + '">' +
           '<button type="button" class="sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="colour" data-mode="' + md + '" title="' + (dark ? 'Back to automatic' : 'Back to the theme') + '" aria-label="' + (dark ? 'Back to the automatic dark colour' : 'Back to the theme\'s colour') + '"' + (hand ? '' : ' hidden') + '>' + RESET + '</button><span class="sg-ts-mode-tag">' + (dark ? 'Dark' : 'Light') + '</span></label>';
       };
-      var aliasOf = function (v) { var to = v.aliases && v.aliases[0] && BY[v.aliases[0]]; return to && to.var ? to : null; };
+      var aliasOf = function (v) { if (tokOver.alias[v.var] && BYVAR[tokOver.alias[v.var]]) return BYVAR[tokOver.alias[v.var]]; var to = v.aliases && v.aliases[0] && BY[v.aliases[0]]; return to && to.var ? to : null; };
       var shortName = function (v) { var p = String(v.figma).split('/'); return (p.length > 2 && OWNER[v.var] ? p.slice(2) : p).join(' / '); };
       var rowOf = function (x) {
         var cur = nowOf(x.v), over = tokOver.all[x.v.var], ctl;
@@ -1081,9 +1082,13 @@
         var linked = src && !tokOver.detached[x.v.var];
         if (linked) {
           var sw = x.kind === 'colour' ? '<span class="sg-ts-chip-swatch" style="background:' + esc(lightOf(x.v)) + '"></span>' : x.kind === 'size' ? '<span class="sg-ts-chip-icon" aria-hidden="true">#</span>' : '';
-          ctl = '<div class="sg-ts-chipfield sg-input"><span class="sg-ts-alias-chip" title="' + esc(src.figma) + '">' + sw + '<span>' + esc(shortName(src)) + '</span></span><button type="button" class="sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button></div>';
+          ctl = '<div class="sg-ts-chipfield sg-input">' + (x.kind === 'colour' ? '<button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours">' : '<span class="sg-ts-alias-chip" title="' + esc(src.figma) + '">') + sw + '<span>' + esc(shortName(src)) + '</span>' + (x.kind === 'colour' ? '</button>' : '</span>') + '<button type="button" class="sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button></div>';
         }
-        var link = src && !linked ? '<span class="sg-ts-alias">Own value <button type="button" class="sg-ts-link-btn" data-relink="' + esc(x.v.var) + '" title="Link again to ' + esc(shortName(src)) + '" aria-label="Link ' + esc(x.label) + ' to ' + esc(shortName(src)) + ' again">' + LINK + '</button></span>' : '';
+        // Detached: its own value, and a reset in its field that links it again to what it followed. A colour also offers
+        // the system's own colours to point at.
+        var link = src && !linked ? '<span class="sg-ts-alias">Own value, was ' + esc(shortName(src)) + '</span>' : '';
+        if (src && !linked) ctl += '<button type="button" class="sg-ts-auto sg-ts-relink" data-relink="' + esc(x.v.var) + '" title="Back to ' + esc(shortName(src)) + '" aria-label="' + esc(x.label) + ' back to ' + esc(shortName(src)) + '">' + RESET + '</button>';
+        if (!linked && x.kind === 'colour') ctl += '<button type="button" class="sg-ts-auto sg-ts-lib-btn" data-lib="' + esc(x.v.var) + '" title="Use one of the system\'s colours" aria-label="Use one of the system\'s colours for ' + esc(x.label) + '">' + LIB + '</button>';
         if (linked) over = null;
         return '<div class="pg-ctl sg-ts-tok' + (linked ? ' is-linked' : '') + '" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + link + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
           (x.kind !== 'size' ? '' : '<button type="button" class="sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
@@ -1123,6 +1128,18 @@
       }
       changed(); repaint();
     };
+    // The system's own colours, to point a colour token at: every colour token that is not a component's own (its base,
+    // semantic and primitive colours), with its swatch, searched by name.
+    var openLib = function (btn) {
+      var row = btn.closest('.sg-ts-tok'), was = pickCard.querySelector('.sg-ts-lib'); if (was) { var same = was.previousElementSibling === row; was.remove(); if (same) return; }
+      var forVar = btn.getAttribute('data-lib');
+      var lib = VARS.filter(function (v) { return v.var && !OWNER[v.var] && !/^(advanced|components?)\//i.test(v.figma) && !/shadow|statelayer/i.test(v.figma) && hexOf(v.values && v.values[0]); });
+      var item = function (v) { return '<button type="button" class="sg-ts-lib-item" data-pick-alias="' + esc(v.var) + '" data-for="' + esc(forVar) + '"><span class="sg-ts-chip-swatch" style="background:' + esc(shown(v, 'light') || hexOf(v.values[0])) + '"></span><span>' + esc(v.figma) + '</span></button>'; };
+      row.insertAdjacentHTML('afterend', '<div class="sg-ts-lib"><input type="search" class="sg-input sg-ts-lib-q" placeholder="Search the system\'s colours" aria-label="Search the system\'s colours"><div class="sg-ts-lib-list" role="list">' + lib.map(item).join('') + '</div></div>');
+      var box = row.nextElementSibling, q = box.querySelector('.sg-ts-lib-q');
+      q.addEventListener('input', function () { var t = q.value.toLowerCase(); Array.prototype.forEach.call(box.querySelectorAll('.sg-ts-lib-item'), function (it) { it.hidden = t && it.textContent.toLowerCase().indexOf(t) < 0; }); });
+      q.focus();
+    };
     pickCard.addEventListener('input', function (e) {
       e.stopPropagation();
       var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v && k !== 'radius') return;
@@ -1152,8 +1169,10 @@
     pickCard.addEventListener('click', function (e) {
       e.stopPropagation();
       var br = e.target.closest('[data-bp-reset]'); if (br) { var bv = br.getAttribute('data-bp-reset'); if (tokOver.bp[bv]) { delete tokOver.bp[bv][br.getAttribute('data-bp')]; if (!Object.keys(tokOver.bp[bv]).length) delete tokOver.bp[bv]; } changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      var lb = e.target.closest('[data-lib]'); if (lb) { openLib(lb); return; }
+      var pa = e.target.closest('[data-pick-alias]'); if (pa) { var tv = pa.getAttribute('data-for'); tokOver.alias[tv] = pa.getAttribute('data-pick-alias'); delete tokOver.detached[tv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][tv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var dt = e.target.closest('[data-detach]'); if (dt) { tokOver.detached[dt.getAttribute('data-detach')] = 1; changed(); pick(picked, true); return; }
-      var rl = e.target.closest('[data-relink]'); if (rl) { var rv = rl.getAttribute('data-relink'); delete tokOver.detached[rv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][rv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      var rl = e.target.closest('[data-relink]'); if (rl) { var rv = rl.getAttribute('data-relink'); delete tokOver.detached[rv]; delete tokOver.alias[rv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][rv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var rr = e.target.closest('[data-radius-reset]'); if (rr) { delete tokOver.radius[rr.getAttribute('data-radius-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var kd = e.target.closest('[data-tok-kid]'); if (kd && picked && picked.kids) { var y = picked.kids[+kd.getAttribute('data-tok-kid')]; if (y) { y.el.classList.remove('ts-hover'); pick({ el: y.el, key: y.key, cls: y.cls, chain: y.chain }); } return; }
@@ -1474,6 +1493,7 @@
   var EXIT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg>';
   var LINK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1"/><path d="M9 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/></svg>';
   var UNLINK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1"/><path d="M9 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/><path d="M3 3l2 2M11 11l2 2"/></svg>';
+  var LIB = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="5" r="2.25"/><circle cx="11" cy="5" r="2.25"/><circle cx="5" cy="11" r="2.25"/><circle cx="11" cy="11" r="2.25"/></svg>';
   var CHEVRON = '<svg class="sg-ts-icon sg-ts-chev" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
   var PLUS_ICON = '<svg class="sg-ts-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>';
   var PENCIL = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3l7.5-7.5Z"/><path d="M9 4l3 3"/></svg>';
