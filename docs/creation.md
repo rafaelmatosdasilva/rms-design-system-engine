@@ -185,6 +185,31 @@ Three things it deliberately stays quiet about:
 - **A page your own written flow already names.** The step that fails to link to it says the same thing; one mistake should not read as two.
 - **A page that is reached and stops.** `--prototype --flow` already names it under `ends:`, beside the start and the links, which reads better than the same fact alone in a list of faults.
 
+### What a prototype still owes a developer
+
+Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.
+
+At the end of a run, the engine says what is left:
+
+```
+🤝 BEFORE A DEVELOPER TAKES "Orders" FORWARD  4 of 4 thing(s) the product does,
+   that this page does not yet:
+   • a route — the product declares its pages with a router (src/router), and nothing
+     here registers this page: a developer has to wire it before anyone can reach it
+   • its data from the store — the product keeps state in a store (src/stores), and
+     this page carries its own: the numbers on screen are the ones somebody typed
+   • its words as translations — the product has translated words (src/locales), and
+     the words here are written into the page: they would ship in one language
+   • a test — the product has tests, and this page has none
+```
+
+**Every convention is read from your product, never assumed.** No router in your dependencies and nothing asks for a route. No translations and nobody mentions hardcoded words. A list of good practice your project never adopted would be noise — and worse, it would read as your team's own rules.
+
+Two more limits worth knowing:
+
+- **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
+- **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
