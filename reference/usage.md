@@ -1570,12 +1570,12 @@ the page out of the menu and the search, opened only by its link (`#rules`; `#co
 
 A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
-`--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing fails until the team decided
-a rule. Each finding has a severity (`checkFindings`, `construction-grammar.mjs`): an error for a rule the team decided (in
-the authored contract, or in its own linter), which fails the run, and a warning for every other rule a component does not
-follow, counted on one line and never failed. `--json` prints `{ errors, warnings, findings }`, each finding with its
-severity, side, rule, component, value, the Figma fix and where a linter decided it; `--github` prints each as an
-annotation a pull request shows. The ready-made GitHub Action runs it in one line of a team's workflow (`uses:
+`--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing is said until the team decided
+a rule. Beside those errors it says the **warnings**: a rule nobody has decided yet that components already break, said
+and never failing the run, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on
+both; `--json` writes the same as data (`errors`, `warnings`, `counts`, each rule with what breaks it and where the team
+decided it), for a job that posts it. `--github` prints each place that breaks a rule as an annotation a pull request
+shows (`annotationsOf`). The ready-made GitHub Action runs it in one line of a team's workflow (`uses:
 rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`, after `actions/checkout`;
 `working-directory` names the folder with `ds-config.json`); it runs the engine from its own checkout, installs nothing
 and changes nothing.
