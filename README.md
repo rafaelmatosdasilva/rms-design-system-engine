@@ -31,7 +31,7 @@ See what is ready at work in the [live style guide](https://rafaelmatosdasilva.g
 | Collaboration | | |
 |:---|---|:---:|
 | [Publish a living style guide](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | 🟢 |
-| [Try components in a playground](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it. | 🟡 |
+| [Try components in a playground](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | 🟡 |
 
 | Creation | | |
 |:---|---|:---:|
