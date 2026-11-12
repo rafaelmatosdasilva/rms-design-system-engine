@@ -262,7 +262,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-merge-main-the-batch-is` | The 24 guide tasks on Haiku (engine df790fa) | "Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA" |
 | `2026-11-12-merge-origin-main-into-parity` | The 24 guide tasks on Haiku (engine 0029a14) | "Figma's anatomy held against the code's, on the latest main" |
 | `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci" |
+| `2026-11-12-a-description-a-designer-wrote` | The 24 guide tasks on Haiku (engine d20790c) | "A description a designer wrote is put to the person, with both texts" |
 | `2026-11-12-layout-faults` | The 24 guide tasks on Haiku (engine 3f231b9) | "Layout faults, construction check annotations and the skill file" |
-| `2026-11-12-testimony-judgement-browsers` | The 24 guide tasks on Haiku (engine f5ca2ea) | "A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion" |
+| `2026-11-12-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 7050066) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/written-back" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
