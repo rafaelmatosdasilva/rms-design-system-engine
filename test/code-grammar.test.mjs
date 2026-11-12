@@ -123,7 +123,7 @@ test('a component read as deeply as Figma: states, parts, what each prop changes
   assert.match(off.selector, /:disabled/);
   assert.equal(a.radius.shared, true);
   assert.deepEqual(a.radius.tokens, ['--radius-m']);
-  assert.deepEqual(a.wrap, { wrap: 'wrap', rowGap: 'var(--space-s)', columnGap: 'var(--space-m)', minWidth: 'var(--size-min)' });
+  assert.deepEqual(a.wrap, { at: 'src/components/buttons/Button.vue:15', wrap: 'wrap', rowGap: 'var(--space-s)', columnGap: 'var(--space-m)', minWidth: 'var(--size-min)' });
   assert.equal(a.sizing, 'hug');
   // What only the code has: the custom property it declares as its own, and those it reads from the theme.
   assert.deepEqual(a.exposes, []);   // --acme-button-gap is declared, never read: no API
