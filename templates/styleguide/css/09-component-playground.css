@@ -245,6 +245,10 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .pg-a11y-steps { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .pg-a11y-steps li { margin: 0 0 var(--sg-space-xxs); }
 .pg-a11y-say { margin: var(--sg-space-s) 0 0; color: var(--sg-muted); }
+/* The wordings a model listed for a person to look at first: a reading of the words, under what to do. */
+.pg-a11y-listed { margin: var(--sg-space-s) 0 0; color: var(--sg-muted); }
+.pg-a11y-listed-list { margin: var(--sg-space-xxs) 0 0; padding-left: var(--sg-space-l); }
+.pg-a11y-listed-list li { margin: 0 0 var(--sg-space-xxs); }
 .pg-a11y-say code { word-break: break-word; }
 .sg-issues td.sg-todo-whocell .sg-todo-who { margin-bottom: 0; }
 /* A task that follows another person's: which step it is, so a row read on its own still says so. */

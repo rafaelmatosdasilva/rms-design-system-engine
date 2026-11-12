@@ -2445,6 +2445,23 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
 - **A name that changes with content** ("3 items") is compared as written, so it is reported as a difference.
   Describe such names in prose instead.
+- **Which browser answered it** — every browser check runs in Chrome (`cdp.mjs`). Each criterion says what it
+  depends on (`wcag21.mjs` `browser`): `same`, decided by the code, the markup or the system's own values and true in
+  every browser; `each`, decided by the browser (what Tab reaches, where the focus shows, reflow, zoom, text spacing,
+  what an input does, dragging, target size), tried in Chrome and in no other engine today; `chrome`, what a screen
+  reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. The style guide says
+  which under each row, the run names a browser that is not installed rather than passing over it (`browsers.mjs`),
+  and the result records which were here (`browsers` in `a11y.json`, names only). The passes in Firefox and WebKit
+  are not built yet.
+- **Judgement calls, pre-sorted** (`--judge-a11y`) — a model reads the words a component's own code shows and marks
+  the ones a person should look at first for 2.4.6, 3.3.3 and 2.4.4, each likely, unclear or fine with one short
+  reason. Advisory and asked for only (`a11yJudgement.cmd`): no criterion passes or fails on it, and the answer is
+  kept by the words, so the same wording is never paid for twice.
+- **A check made by hand is testimony** — `--checked` records what a person says they looked at and what with. Nothing
+  confirms the screen reader was running, or that it said what they report, so the row reads Done on their word and
+  says so: whose word it is, what they checked with (or that they did not say), and that the engine measured none of
+  it. Where a row names the measurement it came from, this one reads "A person's word (QA, 5 Nov)", and the badge for
+  meeting WCAG 2.2 at A and AA counts how many of its criteria rest on one.
 - **Reduced motion** — under `prefers-reduced-motion: reduce`, anything that still transitions or
   animates (`motion`). Its own row, beyond WCAG 2.2 at A and AA, advisory: the standard asks for this nowhere at
   those levels, so no criterion is marked as failing for it.
