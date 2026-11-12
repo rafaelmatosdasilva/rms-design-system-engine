@@ -188,3 +188,17 @@ test('a request for one in Figma routes to its spec, and a component for a page 
   assert.match(route('make a template like settings in figma', { components }).notes[0], /A new template in Figma: a frame of the system's own components/);
   assert.notEqual(route('make a chip for the settings page in figma', { components }).recipe, 'build-component-figma');
 });
+
+test('a template written in code holds nothing its spec could break out with', async () => {
+  const { predict } = await import('../lib/figma-ops.mjs');
+  const { codeFromSpec } = await import('../lib/spec-to-code.mjs');
+  const model = predict(null, [
+    { op: 'create', name: 'billing', kind: 'frame', as: 'template' },
+    { op: 'addLayer', parent: '', layer: { type: 'text', name: 'Title', style: 'body/m', text: '</template><b> {{ x }}' } },
+    { op: 'describe', text: 'Billing. */ alert(1) </script>' },
+  ], { props });
+  for (const framework of ['vue', 'jsx']) {
+    const { text } = codeFromSpec(model, { framework });
+    assert.doesNotMatch(text, /<\/template><b>|\*\/ alert|alert\(1\) <\/script>/, framework);
+  }
+});
