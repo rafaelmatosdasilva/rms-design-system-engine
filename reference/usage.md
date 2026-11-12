@@ -2074,6 +2074,22 @@ person says yes, each value it replaces recorded for the way back (`variableDesc
 `figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run
 saying which part comes next.
 
+#### --figma-tokens-back (a token the code changed first, written back to Figma's variables)
+
+`rms-design-system-engine --figma-tokens-back` writes back into Figma's variables a token the code changed first
+(`code-led-tokens.mjs`). A difference alone never says which side moved, so the engine reads the code as it was when
+Figma was last read: the theme stylesheet at that moment from git, else the code's values the engine kept at that read
+(`code-at-figma-read.json`, written each time Figma's variables are read). Per variable and mode: the code held then
+what Figma holds and has moved since → its value is written back; the two differed already when Figma was read →
+drift, listed in `handback/figma-tokens-back.json` and never written, since nobody can tell who is right; the past
+cannot be read → listed, never written, until the next Figma read keeps it. Two numbers that differ only by a unit
+(Figma writes `500px` for a font weight the code writes `500`) are the same value. A token the code added since Figma
+was read is made as a new variable, in the collection most of its layer's variables are in. A value that replaces an
+alias in Figma names the alias it breaks. Written as the hand-back script, run only once the person says yes: each
+value is read again in the file, and one changed in Figma since is a conflict, left for a person, never written over.
+Each value it replaces, and each variable it makes, is recorded for the way back (`variableValue`, `deleteVariable`).
+A long list goes 300 a run (`--chunk 2`, …).
+
 #### --figma-edits (Figma brought in line with the code, once the person says yes)
 
 `rms-design-system-engine --figma-edits` lists what the code already states that Figma does not, as edits the engine
