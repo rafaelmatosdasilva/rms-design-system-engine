@@ -411,6 +411,12 @@ The engine reads what your design system defines in Figma, its tokens and each c
   - Or, for a part that is another component (an icon), by that component's class, when the file puts it on one element only.
   - Its gap and padding are compared with the frame of that name in Figma, and its text with the text style Figma sets that layer in.
   - A difference names the part (`chip › Label font weight`) with the rule and the line that set it.
+- **How it is put together.** Figma's anatomy against the code's, part by part, each with the line to patch:
+  - a part Figma always shows that the code renders only on a condition, or one a Figma property shows that the code always renders;
+  - a part's text set by hand where Figma sets a text style;
+  - corners on one variable in Figma and several values in the code, or the other way round;
+  - a different number of shadow layers, and a frame that wraps on one side only.
+  Your parity score may fall at first: these differences were always there, and now they are seen.
 - **Sub-frames in the structure contract.** A frame the contract names whose gap or padding differs is said with the file and line of the rule that sets it.
 
 Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
@@ -465,15 +471,6 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 - **Transitions.** The durations and easings from the design.
 - **Motion.** Movement values match Figma, when your design defines them.
 - **Shadows.** They match Figma, when your design defines them.
-
-### How a component is built
-
-The value checks compare what a component draws. Two things about how it is built are read on both sides and compared too, component by component:
-
-- **Its corners.** Figma binds all four to one variable while the code sets each corner on its own, or the other way round.
-- **Its parts.** Figma always shows a part that the code renders on a condition (`v-if`, `&&`, `{#if}`, or inside an element that has one). Or Figma shows it by a property (its visibility wired to a yes/no) while the code always renders it.
-
-Each difference names the component, the part and the line of its file, and shows in that component's Parity area as a decision: which side is right is the team's to say. Advice, never a failure. Only what both sides say is compared: a part the pairing cannot match to a class is left alone, never guessed.
 
 ### In the browser
 

@@ -103,12 +103,6 @@
       var todo = e.side === 'code' ? 'Draw it as Figma does.' : 'Decide which one is right: add it to Figma, or change the code.';
       out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
     });
-    // How it is built, where the values cannot say (anatomy-parity.mjs): its corners one or apart, a part shown always or
-    // on a condition. Each a decision: which side is right is the team's to say, then the other follows.
-    (c.anatomyDiffs || []).forEach(function (e) {
-      var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span>' + (e.at ? '<span class="pg-par-val">' + esc(e.at) + '</span>' : '');
-      out.push({ key: c.name + '\u0000anatomy:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Anatomy', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ': ' : '') + e.what) + '. Decide which one is right, then change the other to match.'), who: WHO.both, st: 'check', rel: PAR_REL.differs, at: at0 });
-    });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     (SR_FOR[c.name] || []).forEach(function (f) { var n = f.screens.length; out.push({ key: c.name + '\u0000showroom:' + f.m.name, area: 'Parity', kind: 'Showroom', type: 'Other', figma: side({ name: f.m.name }), code: '<span class="pg-par-none">Not there</span>', todo: esc(f.m.what + ' Needed by ' + n + (n === 1 ? ' Showroom screen.' : ' Showroom screens.')), who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 }); });
     if (c.codeOnly && c.codeOnly.figma) out.push({ key: c.name + '\u0000codeOnly', area: 'Parity', kind: 'Component', type: 'Other', figma: side(null), code: side({ name: c.name, value: c.codeOnly.file }), todo: esc('Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.'), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 });

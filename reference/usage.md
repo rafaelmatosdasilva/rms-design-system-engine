@@ -766,9 +766,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
-- **Parity** (`parityView`, `parityRows`), with how it is built held against Figma's (`anatomy-parity.mjs`, the audit's
-  `anatomy.json`: its corners, one variable for all four against one custom property, and each paired part shown always
-  against on a condition, its own or its parent's; a decision each, with the part and its file's line): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
+- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
   slot the contract gives a part of its own is paired with that part (`.modal-slot`); every slot is marked in the
   Playground as the area it takes, dashed and named Slot inside, in place of the placeholder its markup holds
   (`drawSlots`): its own part (`.pg-slot-area`, at least 40 by 96 pixels so an empty one is seen), or, for a slot whose
@@ -1302,7 +1300,17 @@ value, each paired part (`part-pairing.mjs`, by its name, its layer's node id or
 binds on the frame of that name and against the text style Figma sets its layer in (font size, weight and line height),
 the difference carrying `part` with its `rule` and `at` so the hand-back patches that line, font against the first text element,
 background as "paints or not" (Figma often paints on a child
-layer, code on the element). On a project whose parity is green this is a calibration: every difference is
+layer, code on the element). Beside the values, Gate [13] holds Figma's anatomy against the code's
+(`anatomy-parity.mjs`), part by part for each part paired with its class: a part Figma always shows that the code renders
+on a condition, or one a Figma property shows that the code always renders (a part Figma shows in some variants only is
+not held to a condition, since a variant's class may hide it); a part's text set by hand where Figma sets a text style;
+corners on one variable in Figma against several values in the code, or the other way round; how many shadow layers the
+frame has against its root rule; and whether it wraps. Each is a line `<component> › <part> <field>: Figma …, the code
+writes …  (file:line)` (`kind: 'anatomy'`), counted, handed back and read as the measured lines are. It reads no
+browser and no structure contract, so it runs on every project with a Figma skeleton, said on its own when no fresh
+capture lists it with the browser's differences. The order of the
+parts and whether a width fills or hugs are left out: the code's reading cannot say them yet without flagging what is
+fine. On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
 runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
 Figma token the page resolves to another value only where the browser alone read it (a script, or a stylesheet
