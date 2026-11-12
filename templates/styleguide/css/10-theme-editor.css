@@ -165,8 +165,93 @@
 .sg-ts-colour.sg-input { display: grid; grid-template-columns: auto minmax(7.5ch, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--sg-space-s); row-gap: 0; align-items: center; height: auto; min-height: var(--sg-control-h); padding-block: var(--sg-space-xxs); }
 .sg-ts-colour input[type="color"] { grid-column: 1; grid-row: 1 / 3; }
 .sg-ts-colour .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; }
-.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; font-size: var(--sg-xs); line-height: var(--sg-lh); }
+.sg-ts-colour .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; margin-top: calc(-1 * var(--sg-space-xs)); font-size: var(--sg-xs); line-height: var(--sg-lh); }   /* 4px closer to its hex */
 .sg-ts-colour .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
 .sg-ts-pair { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
 /* A card's sticky head inside its round corners: the card clips what it holds (clip, not hidden, so the head still sticks). */
 .sg-ts .sg-token-card, .sg-ts-preview { overflow: clip; }
+/* Screens side by side (a page that asks for it, the demo): each at its own size, in a row. */
+.sg-ts-row { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; background: transparent; }   /* around the screens, nothing of its own: the panel shows through, never the app */
+.sg-ts-row-screen { position: relative; flex: none; overflow: hidden; border-radius: var(--sg-radius-l); box-shadow: 0 0 0 var(--sg-line-width, 1px) var(--sg-line-colour); }
+/* A text style's size or line height, one field per breakpoint, its breakpoint's name inside it. */
+.sg-ts-bps { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: var(--sg-space-xs); }
+.sg-ts-bps .sg-ts-bp.sg-input { width: auto; }
+.sg-showroom-screen:has(> .sg-ts-row) { display: flex; background: transparent !important; }   /* the row as tall as the preview, its screens in the middle of it, the panel behind */
+/* Reset changes: the plainest of the page's buttons, words alone, before Cancel. */
+.sg-ts-reset { align-self: center; padding: 0 var(--sg-space-s); border: 0; background: none; color: var(--sg-text-2); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.sg-ts-reset:hover { color: var(--sg-text); }
+.sg-ts-reset:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; border-radius: var(--sg-radius-s); }
+/* A number's − and +, inside its field: before the number and after its unit. */
+.sg-ts-num.sg-input { width: auto; gap: var(--sg-space-xxs); padding-inline: var(--sg-space-xxs); }
+.sg-ts-num .sg-ts-hex { width: 3.5ch; min-width: 0; }
+.sg-ts-step-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: var(--sg-radius-s); background: transparent; color: var(--sg-text-2); cursor: pointer; }
+.sg-ts-step-btn:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
+.sg-ts-step-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-ts-step-btn svg { width: 0.875rem; height: 0.875rem; }
+.sg-ts-num input:disabled ~ .sg-ts-step-btn, .sg-ts-num:has(input:disabled) .sg-ts-step-btn { opacity: 0.4; cursor: not-allowed; }
+/* The page's sticky card heads paint a band of the page's colour above themselves, to hide what scrolls under them; in
+   the editor's own columns nothing does, and the band cut the card's border under its rounded corners. */
+#sg-theme-panel :is(.sg-ts, .sg-ts-preview) .pg-inspect-head { box-shadow: none; }
+/* A pixel field fills the room its row gives it: its − at one end, its + at the other, the number between. */
+.sg-ts-tok-field > .sg-ts-num, .sg-ts-bps > .sg-ts-num { flex: 1 1 auto; width: auto; }
+.sg-ts-tok-field > .sg-ts-num .sg-ts-hex, .sg-ts-bps > .sg-ts-num .sg-ts-hex { flex: 1 1 auto; width: auto; }
+.sg-ts-bps { justify-items: stretch; }
+.sg-ts-num .sg-ts-auto { width: 1.25rem; height: 1.25rem; }   /* a number's reset, inside its field */
+/* A token linked to another: what it follows under its name, and the button that detaches it (or links it again). */
+.sg-ts-alias { display: flex; align-items: center; gap: var(--sg-space-xxs); margin-top: var(--sg-space-xxs); font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-ts-link-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; border-radius: var(--sg-radius-s); background: transparent; color: var(--sg-text-2); cursor: pointer; }
+.sg-ts-link-btn:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
+.sg-ts-link-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-ts-link-btn svg { width: 0.875rem; height: 0.875rem; }
+.sg-ts-tok.is-linked .sg-ts-tok-field { opacity: 0.55; }
+.sg-ts .pg-controls > .pg-ctl.sg-ts-tok > .sg-mode-label { display: flex; flex-direction: column; }
+/* A breakpoint's number as a colour's hex is laid out: the value, its breakpoint small under it, − and + at either side. */
+.sg-ts-bps > .sg-ts-bp.sg-ts-num { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--sg-space-xs); row-gap: 0; align-items: center; height: auto; min-height: var(--sg-control-h); padding-block: var(--sg-space-xxs); }
+.sg-ts-bp > .sg-ts-step-btn[data-step="-1"] { grid-column: 1; grid-row: 1 / 3; }
+.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 3; grid-row: 1 / 3; }
+.sg-ts-bp > .sg-ts-hex { grid-column: 2; grid-row: 1; align-self: end; text-align: left; width: auto; }
+.sg-ts-bp > .sg-ts-mode-tag { grid-column: 2; grid-row: 2; align-self: start; margin-top: calc(-1 * var(--sg-space-xs)); font-size: var(--sg-xs); line-height: var(--sg-lh); }
+/* In a field that fills its row, the value (its number, unit and reset) sits in the middle, − and + at the ends. */
+.sg-ts-tok-field > .sg-ts-num .sg-ts-hex { flex: none; field-sizing: content; min-width: 2ch; width: auto; text-align: center; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="-1"] { margin-right: auto; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="1"] { margin-left: auto; }
+/* A linked token's field, as Figma shows it: the name of what it follows in a chip (a colour's swatch in it), and the
+   button that detaches it at the end. */
+.sg-ts-chipfield.sg-input { flex: 1 1 auto; display: flex; align-items: center; gap: var(--sg-space-s); min-width: 0; padding-inline: var(--sg-space-xs); }
+.sg-ts-alias-chip { display: inline-flex; align-items: center; gap: var(--sg-space-xs); min-width: 0; max-width: 100%; padding: var(--sg-space-xxs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); font-size: var(--sg-s); color: var(--sg-text); }
+.sg-ts-alias-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-ts-chip-swatch { flex: none; width: 0.875rem; height: 0.875rem; border-radius: calc(var(--sg-radius-s) / 2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-text) 22%, transparent); }
+.sg-ts-chip-icon { flex: none; font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-ts-chipfield > .sg-ts-link-btn { margin-left: auto; }
+.sg-ts-tok.is-linked .sg-ts-tok-field { opacity: 1; }
+/* Zoom, in the preview's bar: the page's own number field. */
+.sg-ts-zoom.sg-ts-num.sg-input { width: 11rem; }   /* the px fields' own layout: the value centred, − and + at the ends */
+.sg-ts-zoom .sg-ts-hex { flex: none; field-sizing: content; min-width: 2ch; width: auto; text-align: center; }
+.sg-ts-zoom > .sg-ts-step-btn[data-step="-1"] { margin-right: auto; }
+.sg-ts-zoom > .sg-ts-step-btn[data-step="1"] { margin-left: auto; }
+.sg-ts-stage { overflow: auto; }
+/* A breakpoint's number and its name, both centred between − and +. */
+.sg-ts-bp > .sg-ts-hex, .sg-ts-bp > .sg-ts-mode-tag { justify-self: center; text-align: center; }
+.sg-ts-bp > .sg-ts-hex { width: 100%; }
+/* A breakpoint's reset, inside its field before its +. */
+.sg-ts-bps > .sg-ts-bp.sg-ts-num { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.sg-ts-bp > .sg-ts-auto { grid-column: 3; grid-row: 1 / 3; }
+.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 4; }
+/* A text style with one value (no breakpoints): its one field across the row, as every other number field is. */
+.sg-ts-bps:has(> .sg-ts-bp:only-of-type) { grid-template-columns: minmax(0, 1fr); }
+/* The value stays in the middle with or without its reset: an empty column as wide as the reset mirrors it. */
+.sg-ts-bps > .sg-ts-bp.sg-ts-num { grid-template-columns: auto 1.25rem minmax(0, 1fr) 1.25rem auto; }
+.sg-ts-bp > .sg-ts-step-btn[data-step="-1"] { grid-column: 1; }
+.sg-ts-bp > .sg-ts-hex, .sg-ts-bp > .sg-ts-mode-tag { grid-column: 3; }
+.sg-ts-bp > .sg-ts-auto { grid-column: 4; }
+.sg-ts-bp > .sg-ts-step-btn[data-step="1"] { grid-column: 5; }
+/* And in the fields that fill their row (a token's size, a radius, the zoom): the reset beside the value keeps its own
+   place on both sides of it. */
+.sg-ts-tok-field > .sg-ts-num::before, .sg-ts-zoom::before { content: ""; order: 2; flex: none; width: 1.25rem; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="-1"], .sg-ts-zoom > .sg-ts-step-btn[data-step="-1"] { order: 1; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-hex, .sg-ts-zoom > .sg-ts-hex { order: 3; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-mode-tag, .sg-ts-zoom > .sg-ts-mode-tag { order: 4; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-auto, .sg-ts-zoom > .sg-ts-auto { order: 5; flex: none; width: 1.25rem; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-auto[hidden], .sg-ts-zoom > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
+.sg-ts-tok-field > .sg-ts-num > .sg-ts-step-btn[data-step="1"], .sg-ts-zoom > .sg-ts-step-btn[data-step="1"] { order: 6; }
+.sg-ts-bp > .sg-ts-auto[hidden] { display: inline-flex !important; visibility: hidden; }
