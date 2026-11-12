@@ -90,12 +90,14 @@ jobs:
           set -euo pipefail
           # Thousands separators without depending on the runner's locale.
           pretty=$(echo "${COUNT:-0}" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')
+          # Read as one phrase, "Tests passed 2,807": the count is of tests that passed. A red run says only that it
+          # failed, never a count that reads as that many failures.
           if [ "$RESULT" = success ]; then
-            message="$pretty passing"; color=brightgreen
+            label="Tests passed"; message="$pretty"; color=brightgreen
           else
-            message="$pretty failing"; color=red
+            label="Tests"; message="failing"; color=red
           fi
-          json=$(printf '{"schemaVersion":1,"label":"tests","message":"%s","color":"%s"}' "$message" "$color")
+          json=$(printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}' "$label" "$message" "$color")
           sha=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .sha 2>/dev/null || true)
           now=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .content 2>/dev/null | base64 -d 2>/dev/null || true)
           if [ "$(echo "$now" | tr -d '[:space:]')" = "$(echo "$json" | tr -d '[:space:]')" ]; then

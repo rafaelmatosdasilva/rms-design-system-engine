@@ -22,3 +22,9 @@ test('the badge is written from main only, after the suite, and says what the ru
   assert.match(badge, /permissions:\n {6}contents: write/);
   assert.equal(wf.slice(0, wf.indexOf('  badge:')).includes('contents: write'), false, 'the test job stays read-only');
 });
+
+test('the badge reads as one phrase, "Tests passed 2,807", and a red run never shows a count as failures', () => {
+  assert.match(wf, /label="Tests passed"; message="\$pretty"; color=brightgreen/);
+  assert.match(wf, /label="Tests"; message="failing"; color=red/);
+  assert.match(wf, /"label":"%s","message":"%s"/);
+});
