@@ -30,3 +30,22 @@ test('a part with no frame of its name in Figma, or none paired, adds nothing', 
   const r = compareComponents(code, { chip: { childFrameGaps: [{ name: 'Content', gapVar: 'space/s' }] } }, vars, cfg, maps());
   assert.ok(![...r.differ, ...r.notComparable].some((d) => d.part), 'nothing said of a part Figma has no frame for');
 });
+
+test('a part\'s text compared with the text style Figma sets its layer in, the difference naming the part and its line', () => {
+  const typo = { 'label/strong': { size: '14px', weight: '700', lh: '20px' } };
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, props: {}, parts: {
+    'part-0': { name: 'Label', textStyle: 'label/strong', props: { fontSize: fact('14px'), fontWeight: fact('500'), lineHeight: fact('20px') } },
+  } } } };
+  const r = compareComponents(code, { chip: {} }, { ...vars, typography: typo }, cfg, maps());
+  const w = r.differ.find((d) => d.part === 'Label');
+  assert.equal(w.field, 'font weight');
+  assert.equal(w.at, 'src/chip.css:12');
+  assert.match(measuredLine(w), /^chip › Label font weight: Figma label\/strong \(700\), rendered 500/);
+  assert.equal(r.differ.filter((d) => d.part === 'Label').length, 1, 'its size and line height agree');
+});
+
+test('a part with no text style of its own is not held to one', () => {
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, props: {}, parts: { 'part-0': { name: 'Label', props: { fontSize: fact('11px') } } } } } };
+  const r = compareComponents(code, { chip: {} }, { ...vars, typography: { 'label/strong': { size: '14px' } } }, cfg, maps());
+  assert.ok(![...r.differ, ...r.notComparable].some((d) => d.part), 'nothing said');
+});

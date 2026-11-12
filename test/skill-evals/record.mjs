@@ -106,8 +106,23 @@ export function moreSteps(b, s) {
 // matches. The engine is written out first, being the longer of the two where one holds the other.
 export function scrubPaths(text, { engine = ENGINE, home = homedir() } = {}) {
   const roots = [[engine, '<engine>'], [home, '~']].filter(([r]) => r && r !== '/');
-  return roots.reduce((s, [r, as]) => s.split(r).join(as), String(text));
+  let out = String(text);
+  for (const [r, as] of roots) {
+    out = out.split(r).join(as);
+    // A path cut short still carries the name. What a run says about itself is kept to 80 characters (a stack
+    // trace's first line, a command), and a root longer than that never appears whole, so the whole root never
+    // matched and the folder's name went into a public record. Each shorter beginning of the root is written out
+    // too, longest first, down to a length no ordinary sentence would hold by accident.
+    for (let n = r.length - 1; n >= PART_ROOT; n--) {
+      const part = r.slice(0, n);
+      if (out.includes(part)) out = out.split(part).join(`${as}…`);
+    }
+  }
+  return out;
 }
+// How much of a root has to be there before a cut-short path is written out. Long enough that no sentence holds
+// one by chance: a folder this deep is already past "/Users/<name>".
+export const PART_ROOT = 24;
 
 // The RESULTS.md entry for one recorded evaluation. `now` and `before` are { model: runStats } (before may be empty).
 export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, fileHashes = null, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {

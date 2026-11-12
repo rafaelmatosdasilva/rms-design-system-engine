@@ -158,6 +158,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
+- Finds classes your markup uses that nothing styles, and styles nothing uses, each with its file and line.
+- Gives your code one health number from its own rules, by area, with the change since the last build.
 - Flags CSS variables and text casing the design never asked for.
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
 - Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
@@ -178,6 +180,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
+| `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
 ## Write component specs
 
@@ -297,6 +300,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Opens from the style guide's Theme choice, as **Create new theme…**, beside the system's own themes.
 - Sets the colours, the font, the corners, the spacing, the borders and the shadows, with the screen on the right taking each change live.
+- Previews every system on a specimen of its own components, as your code renders them, each checked against the catalog so nothing is invented.
 - Works out dark from light the way your system does, so a new colour keeps each step of a scale as light as yours, and every text it sits under stays readable (WCAG AA).
 - Click a component on the screen to see the tokens it really draws with, then change one of them alone.
 - A theme you make is applied across the whole guide, kept as a file in your own themes folder, and named in the link, so the link opens it.
