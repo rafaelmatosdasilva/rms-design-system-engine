@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Two severities for the construction check, and the same as data (continuous evaluation)
+
+What changed since the entry below (engine dc9f336): The theme editor previews a specimen of the system's own components, checked so nothing is invented (#443); The code's words read as Figma's are, and the team's own linters read as decided rules (#445); The composition path measured at more runs, on a model above Haiku (#444); Several directions for one request, each one the system's own (#447); Two severities for the construction check, and the same as data. The guide changed in `cookbook/ci-and-hooks.md`, `reference/usage.md`.
+
+Guide set measured: `73b77d0f8fbd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 561ed94d` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 500b0a04` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md bdb4e265` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine fd52a2f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.057 |
+| Input a run | 97k | 102k |
+| Turns a run | 3.6 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 97k, in 3.7 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-two-severities-for-the-construction`.
+
 ## 2026-11: The code's words read as Figma's are, and the team's own linters read as decided rules (continuous evaluation)
 
 What changed since the entry below (engine bd8cd70): The code's construction rules, read as deeply as Figma's; Each component's way of writing a state, said with its example; The code grammar's test makes its folder through tempDir; The code's rules read text styles, Sass and styles written in JavaScript; A score for the code's health, the way the Figma library has one; Classes nothing styles, styles nothing uses, and Sass comments that swallowed a file; System health says only what the token layer does; A class name goes into a regular expression escaped whole; The nothing-matches test finds its own empty combination; The Rules cards keep the ring and the areas alone; The code's words read as Figma's are, and the team's own linters read as decided rules; The code read as it is written: text styles, Sass, classes nothing styles, and a score (#442); Each Figma part read in the code, and four checks of a component's words (#440). The guide changed in `reference/usage.md`.
