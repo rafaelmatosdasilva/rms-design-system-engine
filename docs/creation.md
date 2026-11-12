@@ -159,6 +159,32 @@ Two things it will not do:
 
 A shell your documentation says nothing about still appears, and says it has none — being undocumented is worth seeing, not worth hiding.
 
+### A prototype is the journey, not a screen
+
+You take a prototype to a user test, hand it to a development team and show it to a client. Isolated pages fail all three — so a folder of pages that do not link is a failure, not a partial success.
+
+The engine already knew which pages were joined and never said anything about the ones that were not. Now it does:
+
+```
+⚠️  3 prototypes and no link between any of them (orders, detail, settings): this is a
+    folder of pages, not a prototype. Give the part that leads on "goesTo": "<page>", so
+    it can be clicked through in a user test and handed on as one thing
+```
+
+And for a page left out of an otherwise joined-up prototype:
+
+```
+⚠️  nothing leads to "settings" and it leads nowhere: it is drawn beside the prototype
+    rather than in it. Give the part that reaches it "goesTo": "settings", or say it is
+    a page of its own
+```
+
+Three things it deliberately stays quiet about:
+
+- **One page.** One page is not a flow, and saying so would be noise.
+- **A page your own written flow already names.** The step that fails to link to it says the same thing; one mistake should not read as two.
+- **A page that is reached and stops.** `--prototype --flow` already names it under `ends:`, beside the start and the links, which reads better than the same fact alone in a list of faults.
+
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
