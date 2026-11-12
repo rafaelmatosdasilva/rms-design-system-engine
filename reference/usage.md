@@ -2100,7 +2100,27 @@ It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its 
 as it is, keeps every annotation a person wrote, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
-Descriptions, missing components and layout are never written: they stay in `changes-in-Figma.md`.
+Missing components and layout are never written: they stay in `changes-in-Figma.md`.
+
+Three more edits write what the engine knows where designers read it (`figma-docs-edits.mjs`), after the same yes and
+each with its way back:
+- **Descriptions from the intent layer.** What a page says a component or a token is for (its purpose lines, else its
+  summary) becomes the description of its component set or its variable. Only the team's word is written: a drafted
+  line (`**Draft:**`) is never written, and nothing is drafted at that point. Components are matched to their pages as
+  everywhere else (`matchComponents`); a token page by its variable's name or its CSS name. A description Figma has
+  already is kept, and listed (`descKept`) when it says something else. Variables go in chunks of 400 a run; the
+  script says how many are left, and running it again goes on.
+- **A spec page beside each component set**, a frame "Spec · <name>": its anatomy (an instance of its default variant,
+  a numbered marker on each part a person named), its properties with their options and default, its height, padding,
+  gap, corners, type and colours in each variant with the variable each binds (the structure capture), its role and
+  what a screen reader says (`heard`). The frame is the engine's own and written afresh on every yes, so it never goes
+  stale.
+- **Token values the code changed first.** A token whose value the code changed since the two sides last agreed
+  (`agreed.mjs`, code-moved) is written into its Figma variable in that mode, the value before and after listed
+  first. One only the code has is created, named by the naming convention (`varToToken`), in the collection of the
+  variable it shares the most of its name with. A token both sides changed, a Figma value that is an alias, and a value
+  with no one Figma value (a `rem`, a `calc`) are listed for a person and never written (`tokKept` says what the script
+  left). Needs a fresh code capture.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
