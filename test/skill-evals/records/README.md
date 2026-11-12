@@ -261,5 +261,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-two-severities-for-the-construction` | The 24 guide tasks on Haiku (engine fd52a2f) | "Two severities for the construction check, and the same as data" |
 | `2026-11-12-merge-main-the-batch-is` | The 24 guide tasks on Haiku (engine df790fa) | "Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA" |
 | `2026-11-12-merge-origin-main-into-parity` | The 24 guide tasks on Haiku (engine 0029a14) | "Figma's anatomy held against the code's, on the latest main" |
+| `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
