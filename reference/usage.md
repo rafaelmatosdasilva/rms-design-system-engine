@@ -1555,7 +1555,10 @@ the page out of the menu and the search, opened only by its link (`#rules`; `#co
 A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
 `--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing is said until the team decided
-a rule.
+a rule. Beside those errors it says the **warnings**: a rule nobody has decided yet that components already break, said
+and never failing the run, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on
+both; `--json` writes the same as data (`errors`, `warnings`, `counts`, each rule with what breaks it and where the team
+decided it), for a job that posts it.
 
 #### A component built in Figma (`--spec`, `--figma-build`)
 
