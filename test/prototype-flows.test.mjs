@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { linksOf, flowGraph, teamFlows, stepPage, flowFindings, targetOf } from '../lib/prototype-flows.mjs';
+import { linksOf, flowGraph, teamFlows, stepPage, flowFindings, targetOf, wholeFindings } from '../lib/prototype-flows.mjs';
 import { checkPrototype } from '../lib/prototype-pieces.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
 
@@ -105,4 +105,36 @@ test('--prototype --flow holds the pages of a flow to each other: the frame, the
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /❌ prototypes\/signup\.json is not one page \(no "component" at its root\): one page per file, so make it one or remove it/);
   assert.match(r.stdout, /🔗 FLOWS {2}4 page\(s\)/, 'never counted as a page');
+});
+
+// A prototype is the journey, not a screen. The designer who asked for it takes it to a user test, hands it to a
+// development team and shows it to a client: isolated pages are a failure there, not a partial success. Until
+// this, a folder of unconnected pages passed every check the engine had.
+test('a folder of pages with no link between them is not a prototype', () => {
+  const page = (links) => ({ root: 'r', components: [{ id: 'r', component: 'Page' }, ...links.map((t, i) => ({ id: `b${i}`, component: 'Button', label: 'Go', goesTo: t }))] });
+  const g = flowGraph({ orders: page([]), detail: page([]), settings: page([]) });
+  const found = wholeFindings(g);
+  assert.equal(found.length, 1, 'said once, not once a page: naming all three is the same thing three times');
+  assert.match(found[0].message, /3 prototypes and no link between any of them/);
+  assert.match(found[0].message, /a folder of pages, not a prototype/);
+  assert.match(found[0].message, /"goesTo"/, 'and how to join them');
+  assert.equal(found[0].level, 'warning');
+});
+
+test('a page drawn beside the prototype rather than in it', () => {
+  const page = (links) => ({ root: 'r', components: [{ id: 'r', component: 'Page' }, ...links.map((t, i) => ({ id: `b${i}`, component: 'Button', label: 'Go', goesTo: t }))] });
+  const found = wholeFindings(flowGraph({ orders: page(['detail']), detail: page([]), settings: page([]) }));
+  const said = found.map((f) => f.message).join('\n');
+  assert.match(said, /nothing leads to "settings" and it leads nowhere/);
+  // A page that is reached and stops is not said here: the flow view already names it under "ends:", beside the
+  // start and the links, which reads better than the same thing alone in a list of faults.
+  assert.doesNotMatch(said, /"detail"/, 'a dead end is the flow view\'s to report');
+});
+
+test('one page is not a flow, and a joined-up prototype says nothing', () => {
+  const page = (links) => ({ root: 'r', components: [{ id: 'r', component: 'Page' }, ...links.map((t, i) => ({ id: `b${i}`, component: 'Button', label: 'Go', goesTo: t }))] });
+  // Telling somebody their one page is not linked to anything would be noise.
+  assert.deepEqual(wholeFindings(flowGraph({ orders: page([]) })), []);
+  // Start → middle → end, all joined: nothing to say, the end included.
+  assert.deepEqual(wholeFindings(flowGraph({ a: page(['b']), b: page(['c']), c: page([]) })), []);
 });
