@@ -2069,9 +2069,13 @@ already said or only leads into a list, and no description for a token with noth
 listed: it is judged as the layer's reading judges it (`lineShape` in `doc-source-dsds.mjs`), but without the
 exception that keeps a token's templated line for the agents, since a designer learns nothing from it. A token is
 found in Figma by the system's naming (`tokenToVar`), a component by the intent layer's own pairing
-(`matchComponents`); one that pairs with nothing is said. A description Figma already holds is never written over:
-one that says the same is left, one that says something else is listed in `handback/figma-descriptions.json` for a
-person to decide. The script checks each one again in the file, so one a designer typed after the list was made is
+(`matchComponents`); one that pairs with nothing is said. A description Figma already holds is never written over
+unasked: one that already holds every line is left; one that says something else is put to the person in the list
+under "For a person to decide", with both texts. Where the engine has only facts (no words of the team's), or Figma
+already holds the team's very sentence, the suggestion keeps the designer's words and adds the facts below them;
+otherwise it is the team's approved words instead of the designer's. `--replace <name …>` writes the ones the person
+chose, `--replace-all` every one, and only where Figma still holds exactly the text that was listed, so one a
+designer changed again since is left. The script checks each one again in the file, so one a designer typed after the list was made is
 left too. It is written as the hand-back script (`handback/figma-apply.js`), run with the Figma tool only once the
 person says yes, each value it replaces recorded for the way back (`variableDescription`, `description` in
 `figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run

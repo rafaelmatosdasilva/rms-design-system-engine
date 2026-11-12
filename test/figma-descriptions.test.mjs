@@ -32,7 +32,9 @@ test('only the approved words are written, never a draft, and nothing Figma hold
   ]);
   assert.ok(!p.write.some((x) => /draft/i.test(x.text)), 'a draft is never written');
   // Something a designer typed is never written over: it is listed, with what the engine would have written.
-  assert.deepEqual(p.differs.map((x) => [x.name, x.figma]).sort(), [['acme/danger/color', 'Errors and destructive actions only.'], ['acme/info/color', 'Something a designer typed.']]);
+  assert.deepEqual(p.differs.map((x) => [x.name, x.figma, !!x.adds]).sort(), [['acme/danger/color', 'Errors and destructive actions only.', true], ['acme/info/color', 'Something a designer typed.', false]]);
+  // Figma already holds the team's very sentence: the engine only adds what is missing below it.
+  assert.equal(p.differs.find((x) => x.name === 'acme/danger/color').layer, 'Errors and destructive actions only.\nCode: var(--acme-danger-color)');
   assert.equal(p.counts.write, 1);
 });
 
@@ -121,4 +123,40 @@ test('a description says where an agent should use it: which components use it, 
     'Use instead: acmeLink',
     'Code: src/Button.vue',
   ]);
+});
+
+test('a description a designer wrote is put to the person with both texts, and replaced only at their word', () => {
+  const differs = [
+    { kind: 'variable', name: 'acme/info/color', figma: 'Something a designer typed.', layer: 'Neutral notices.\nCode: var(--acme-info-color)' },
+    { kind: 'component', name: 'acmeButton', nodeId: '1:2', figma: 'Old words.', layer: 'The one primary action.' },
+  ];
+  // Nobody chose yet: each is a decision, listed with both texts, never applied.
+  const asked = descriptionEdits({ items: [], n: 1, of: 1 }, { differs });
+  assert.deepEqual(asked.map((e) => e.kind), ['description-differs', 'description-differs']);
+  assert.ok(asked.every((e) => e.decision));
+  const said = editLines(asked).join('\n');
+  assert.match(said, /For a person to decide \(2\)/);
+  assert.match(said, /acme\/info\/color: Figma says "Something a designer typed\."; the engine would write instead "Neutral notices\. · Code: var\(--acme-info-color\)"\. Replace it with --replace acme\/info\/color/);
+  // The person chose one: it is written over, the other is still theirs to decide.
+  const chose = descriptionEdits({ items: [], n: 1, of: 1 }, { differs, replace: new Set(['acmeButton']) });
+  const write = chose.find((e) => e.kind === 'descriptions');
+  assert.deepEqual(write.replace, [{ kind: 'component', name: 'acmeButton', id: '1:2', was: 'Old words.', text: 'The one primary action.' }]);
+  assert.deepEqual(chose.filter((e) => e.decision).map((e) => e.component), ['acme/info/color']);
+  // Written over only where Figma still holds exactly the text the person saw.
+  const script = applyScript(chose);
+  assert.match(script, /if \(String\(node\.description \|\| ''\)\.trim\(\) !== String\(d\.was\)\.trim\(\)\) \{ movedOn\.push\(d\.name\); continue; \}/);
+  assert.ok(script.indexOf('U.description(node)') < script.indexOf('node.description = d.text'));
+  // All of them at once.
+  assert.equal(descriptionEdits({ items: [] }, { differs, replace: true }).find((e) => e.kind === 'descriptions').replace.length, 2);
+});
+
+
+test('where the engine has only facts, the suggestion keeps the designer\'s words and adds the facts below them', () => {
+  const p = descriptionPlan({ entities: [], variables: [{ name: 'acme/brand/color', description: 'primary brand color' }], toVar, usedBy: new Map([['acme/brand/color', ['acmeButton']]]) });
+  assert.deepEqual(p.differs.map((d) => [d.figma, d.layer, d.adds]), [['primary brand color', 'primary brand color\nUsed by: acmeButton\nCode: var(--acme-brand-color)', true]]);
+  const said = editLines(descriptionEdits({ items: [] }, { differs: p.differs })).join('\n');
+  assert.match(said, /Figma says "primary brand color"; the engine would keep it and add "Used by: acmeButton · Code: var\(--acme-brand-color\)"\. Add it with --replace acme\/brand\/color/);
+  // Once added, the next run finds Figma saying it already, and lists nothing.
+  const again = descriptionPlan({ entities: [], variables: [{ name: 'acme/brand/color', description: p.differs[0].layer }], toVar, usedBy: new Map([['acme/brand/color', ['acmeButton']]]) });
+  assert.deepEqual([again.differs.length, again.already], [0, 1]);
 });
