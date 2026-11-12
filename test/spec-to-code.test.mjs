@@ -42,3 +42,19 @@ test('what the system cannot give is a note, never invented; the file comes as a
   assert.match(jsx.text, /export function AcmePill\(\{ size = "s", showIcon = true, label = "Active" \}\)/);
   assert.match(jsx.text, /\{showIcon && <AcmeIcon className="acme-pill__icon" \/>\}/);
 });
+
+test('what the spec says is written as code that nothing in it can break out of', async () => {
+  const { predict } = await import('../lib/figma-ops.mjs');
+  const { codeFromSpec } = await import('../lib/spec-to-code.mjs');
+  const model = predict(null, [
+    { op: 'create', name: 'acmeNote', axes: [{ name: 'tone', options: ['a</script>'] }] },
+    { op: 'addLayer', parent: '', layer: { type: 'text', name: 'Label', style: 'body', text: "it's \\ </script><b>" } },
+    { op: 'describe', text: 'A note. */ alert(1) /*' },
+  ], {});
+  for (const framework of ['vue', 'jsx']) {
+    const { text } = codeFromSpec(model, { framework });
+    assert.doesNotMatch(text, /<\/script><b>|a<\/script>/, framework);
+    assert.doesNotMatch(text, /\*\/ alert/, framework);
+    assert.match(text, /\\u003c\/script\\u003e/, framework);
+  }
+});

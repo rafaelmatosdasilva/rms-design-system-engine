@@ -87,3 +87,8 @@ test('a template drawn as a frame: nested frames, the system\'s components as in
   assert.match(script, /createFrame/);
   assert.match(script, /o\.kind !== 'frame' && [^\n]*combineAsVariants/, 'a frame is never combined as variants');
 });
+
+test('a comment in the markup is taken out however it nests or is left open', () => {
+  assert.deepEqual(markupTree('<div class="a"><!-<!-- x -->- y --><span>Hi</span></div><!-- open').kids.map((k) => k.tag), ['div']);
+  assert.deepEqual(markupTree('<div class="a"><!-<!-- x -->- y --><span>Hi</span></div>').kids[0].kids.map((k) => k.tag), ['span']);
+});
