@@ -1085,7 +1085,7 @@
         var linked = src && !tokOver.detached[x.v.var];
         if (linked) {
           var sw = x.kind === 'colour' ? '<span class="sg-ts-chip-swatch" style="background:' + esc(lightOf(x.v)) + '"></span>' : x.kind === 'size' ? '<span class="sg-ts-chip-icon" aria-hidden="true">#</span>' : '';
-          ctl = '<div class="sg-ts-chipfield sg-input">' + (x.kind === 'colour' ? '<button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours">' : '<span class="sg-ts-alias-chip" title="' + esc(src.figma) + '">') + sw + '<span>' + esc(shortName(src)) + '</span>' + (x.kind === 'colour' ? '</button>' : '</span>') + '<button type="button" class="sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button></div>';
+          ctl = '<div class="sg-ts-chipfield sg-input">' + (x.kind === 'colour' ? '<button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours">' : '<span class="sg-ts-alias-chip" title="' + esc(src.figma) + '">') + '<span class="sg-ts-chip">' + sw + '<span>' + esc(shortName(src)) + '</span></span>' + (x.kind === 'colour' ? '</button>' : '</span>') + '<button type="button" class="sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button></div>';
         }
         // Detached: its own value, and a reset in its field that links it again to what it followed. A colour also offers
         // the system's own colours to point at.

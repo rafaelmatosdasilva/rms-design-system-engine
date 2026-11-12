@@ -180,12 +180,12 @@
 /* Reset changes: the plainest of the page's buttons, words alone, before Cancel. */
 .sg-ts-reset { align-self: center; padding: 0 var(--sg-space-s); border: 0; background: none; color: var(--sg-text-2); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .sg-ts-reset:hover { color: var(--sg-text); }
-.sg-ts-reset:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; border-radius: var(--sg-radius-s); }
+.sg-ts-reset:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
 /* A number's − and +, inside its field: before the number and after its unit. */
 .sg-ts-num.sg-input { width: auto; gap: var(--sg-space-xxs); padding-inline: var(--sg-space-xxs); }
 .sg-ts-num .sg-ts-hex { width: 3.5ch; min-width: 0; }
-.sg-ts-step-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: var(--sg-radius-s); background: transparent; color: var(--sg-text-2); cursor: pointer; }
-.sg-ts-step-btn:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
+.sg-ts-step-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
+.sg-ts-step-btn:hover { color: var(--sg-text); }
 .sg-ts-step-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-ts-step-btn svg { width: 0.875rem; height: 0.875rem; }
 .sg-ts-num input:disabled ~ .sg-ts-step-btn, .sg-ts-num:has(input:disabled) .sg-ts-step-btn { opacity: 0.4; cursor: not-allowed; }
@@ -199,8 +199,8 @@
 .sg-ts-num .sg-ts-auto { width: 1.25rem; height: 1.25rem; }   /* a number's reset, inside its field */
 /* A token linked to another: what it follows under its name, and the button that detaches it (or links it again). */
 .sg-ts-alias { display: flex; align-items: center; gap: var(--sg-space-xxs); margin-top: var(--sg-space-xxs); font-size: var(--sg-xs); color: var(--sg-muted); }
-.sg-ts-link-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; border-radius: var(--sg-radius-s); background: transparent; color: var(--sg-text-2); cursor: pointer; }
-.sg-ts-link-btn:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
+.sg-ts-link-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; background: transparent; color: var(--sg-text-2); cursor: pointer; }
+.sg-ts-link-btn:hover { color: var(--sg-text); }
 .sg-ts-link-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-ts-link-btn svg { width: 0.875rem; height: 0.875rem; }
 .sg-ts-tok.is-linked .sg-ts-tok-field { opacity: 0.55; }
@@ -218,8 +218,9 @@
 /* A linked token's field, as Figma shows it: the name of what it follows in a chip (a colour's swatch in it), and the
    button that detaches it at the end. */
 .sg-ts-chipfield.sg-input { flex: 1 1 auto; display: flex; align-items: center; gap: var(--sg-space-s); min-width: 0; padding-inline: var(--sg-space-xs); }
-.sg-ts-alias-chip { display: inline-flex; align-items: center; gap: var(--sg-space-xs); min-width: 0; max-width: 100%; padding: var(--sg-space-xxs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); font-size: var(--sg-s); color: var(--sg-text); }
-.sg-ts-alias-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-ts-alias-chip { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; padding: 0; color: var(--sg-text); }
+.sg-ts-chip { display: inline-flex; align-items: center; gap: var(--sg-space-xs); min-width: 0; max-width: 100%; padding: var(--sg-space-xxs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); font-size: var(--sg-s); }   /* the chip's frame on its label, never on the button */
+.sg-ts-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sg-ts-chip-swatch { flex: none; width: 0.875rem; height: 0.875rem; border-radius: calc(var(--sg-radius-s) / 2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-text) 22%, transparent); }
 .sg-ts-chip-icon { flex: none; font-size: var(--sg-xs); color: var(--sg-muted); }
 .sg-ts-chipfield > .sg-ts-link-btn { margin-left: auto; }
@@ -260,10 +261,10 @@
 .sg-ts-lib { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-s) 0 var(--sg-space-m); }
 .sg-ts-lib-list { display: flex; flex-direction: column; max-height: 16rem; overflow: auto; border: var(--sg-line); border-radius: var(--sg-radius-s); }
 .sg-ts-lib-item { display: flex; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-s); border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; cursor: pointer; }
-.sg-ts-lib-item:hover, .sg-ts-lib-item:focus-visible { background: var(--sg-hover-fill); }
+.sg-ts-lib-item:hover, .sg-ts-lib-item:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .sg-ts-lib-item[hidden] { display: none; }
-button.sg-ts-alias-chip { background: none; font: inherit; font-size: var(--sg-s); cursor: pointer; }
-button.sg-ts-alias-chip:hover { background: var(--sg-hover-fill); }
+button.sg-ts-alias-chip { border: 0; background: none; font: inherit; cursor: pointer; }
+button.sg-ts-alias-chip:hover .sg-ts-chip > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
 .sg-ts-tok-field > .sg-ts-relink, .sg-ts-tok-field > .sg-ts-lib-btn { flex: none; }
 /* What the spacing percentage changes: each spacing token on the screens, its size now and at the percentage chosen. */
 .sg-ts-affects { margin-top: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text-2); }
