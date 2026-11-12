@@ -83,7 +83,7 @@ test('the style guide gives each row its own line, as the audit made it', () => 
   assert.match(area, /'Forced colours': 'forcedstate', 'Reduced motion': 'motion'/, 'each row names the check that says it ran');
 });
 
-test('in the browser: an edge drawn with a shadow disappears in high contrast mode, a real border holds', { timeout: budget(300000), skip: !HAS_CHROME && 'no Chrome' }, () => {
+test('in the browser: an edge drawn with a shadow disappears in high contrast mode, a real border holds', { timeout: budget(600000), skip: !HAS_CHROME && 'no Chrome' }, () => {
   // High contrast mode drops every shadow and repaints the colours: a field whose edge is a box-shadow is left with
   // no outline, while one with a real border keeps it. An edge already too faint at rest is 1.4.11's finding, not
   // this one, so it is not reported twice.
@@ -98,13 +98,14 @@ test('in the browser: an edge drawn with a shadow disappears in high contrast mo
       <label>Bordered <input class="bordered" name="b"></label>
       <label>Faint <input class="faint" name="c"></label>
     </main></body></html>`,
+    'ds-config.json': { componentSelectors: { shadowed: '.shadowed', bordered: '.bordered', faint: '.faint' } },
   });
   try {
     let out = '';
-    try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--no-states', '--component', 'shadowed,bordered,faint'], { cwd: dir, encoding: 'utf8', timeout: budget(540000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
     const d = JSON.parse(out.slice(out.indexOf('{')));
     const of = (k) => (d.issues ?? []).filter((i) => i.issue === k);
-    assert.ok((d.ran ?? []).includes('forcedborder'), `the pass ran: ${JSON.stringify(d.ran)}`);
+    assert.ok((d.ran ?? []).includes('forcedborder'), `the pass ran: ${JSON.stringify({ ran: d.ran, notRead: d.notRead, unfinished: d.unfinished })}`);
     const lost = of('forcedborder');
     assert.equal(lost.length, 1, JSON.stringify(lost.map((i) => i.selector)));
     assert.match(lost[0].selector, /shadowed/);

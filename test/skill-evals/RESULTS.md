@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA (continuous evaluation)
+
+What changed since the entry below (engine 46ed658): A component's examples reach its Documentation and the agents, a draft to review (#437); The theme editor in every style guide: new themes of the system, made over a live screen (#438); Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `44b9410ce7b9` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 2f1951c7` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 8d80800 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 58/58 | 79/79 |
+| Mean cost a run | 0.050 | 0.058 |
+| Input a run | 76k | 99k |
+| Turns a run | 2.8 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 76k, in 3.5 turns against 2.8. no task changed state; 9 runs moved inside tasks that pass sometimes, which is noise, not a difference. Input moved but input a turn held (27k to 28k): the turns moved, 2.8 to 3.5, and nothing a run reads grew - most in `new-ui-saved` 14.0 to 11.3. Records: `records/2026-11-12-pages-and-flows-orientation-more`.
+
 ## 2026-11: The theme editor in every style guide: new themes of the system, made over a live screen (continuous evaluation)
 
 What changed since the entry below (engine 0e03ff5): styleguide.themes added to reference/config.md (the theme editor's folder). 58 of the 72 runs measured, all passed; the weekly usage limit stopped the other 14 (the new-ui-saved runs at 10 among them), measured with --resume after it resets. The guide changed in `reference/config.md`.

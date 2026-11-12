@@ -251,5 +251,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-a-contract-change-is-named` | The 24 guide tasks on Haiku (engine 0e03ff5) | "A contract change is named by its store's commit, as the intent layer's are" |
 | `2026-11-11-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine db66ce8) | "A component's examples are read, with main merged in" |
 | `2026-11-11-the-theme-editor-in-every-style-guide` | The 20 guide tasks on Haiku (engine 46ed658) | "The theme editor in every style guide: new themes of the system, made over a live screen" |
+| `2026-11-12-pages-and-flows-orientation-more` | The 24 guide tasks on Haiku (engine 8d80800) | "Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
