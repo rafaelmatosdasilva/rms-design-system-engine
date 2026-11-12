@@ -62,6 +62,7 @@
   --sg-mark: 1rem;   /* every mark the page draws itself (the menu's, a button's, the search's, the way back): one size, so their 1.5 lines read one weight */
   --sg-card-gap: calc(var(--sg-space-xl) + var(--sg-space-s));   /* the room between any two cards or tables, side by side or one under another (32px on an 8px system) */
   --sg-control-h: calc(var(--sg-space-xxl) + var(--sg-space-s));   /* every capsule control's height: a switch, a select, a search, a button (40px on an 8px system) */   /* every table row at least this tall, from the system's spacing */
+  --sg-icon-btn: calc(var(--sg-control-h) - 2 * var(--sg-space-xxs) - 2 * var(--sg-line-width, 1px));   /* the page's icon button: square, as tall as a control leaves inside its 4px inset */
   --sg-radius-s: 12px; --sg-radius: 16px; --sg-radius-l: 20px; --sg-radius-pill: 999px;   /* the template's own corners, whatever the system's */
   /* A control's corners (a button, a chip, a field), and a count's inside one: the control's less the room around it,
      so the two curves run side by side. Every count is drawn so, in a chip or not. */
