@@ -159,6 +159,22 @@ Two things it will not do:
 
 A shell your documentation says nothing about still appears, and says it has none — being undocumented is worth seeing, not worth hiding.
 
+### A page's own navigation
+
+The flow check reads what leads from page to page. It knew nothing of what moves *inside* one — so ask for "a page with a tab for each section of the account" and the page comes back with a tab strip, four tabs, one panel, and every check calls it whole. In a user test the second tab does nothing, and the person running the test finds it rather than the engine.
+
+A composition already says how something moves inside a page: a part carries `opens` with the id of the part a click shows. So the reading is narrow:
+
+```
+⚠️  "account" has TabStrip (3 choices) and nothing on the page opens anything: in a
+    user test the second choice does nothing. Give each choice "opens" with the id of
+    the part it shows, or say the page is one view and the choices lead elsewhere
+```
+
+Tabs, segmented controls, steppers, side rails, accordions and pagination all count. **One choice is not navigation** and says nothing.
+
+**What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
+
 ### A behaviour has to rest on a rule
 
 Someone asked for nested rows that select with their parent. The agent built exactly that — and no rule in the system covered it, while the system's own helper did it differently. The prototype taught the team a pattern nobody had decided.
