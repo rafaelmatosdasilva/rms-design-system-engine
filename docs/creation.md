@@ -36,6 +36,12 @@ The panel shows the form on the left and a preview on the right, in a frame of i
 
 Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
 
+- **Only what the screens use.** A setting is listed only when the screens on show draw with its token, so every setting changes something you see.
+- **Spacing says what it changes.** Under its percentage, a list of each spacing token the screens use, its size now and at the percentage chosen (`spacing/gap/l 16px → 20px`), in whole pixels. Hovering one outlines what draws with it.
+- **A shadow colour** for every shadow at once (the system gives each component its own), and the shadow settings locked while shadows are off.
+- **Undo and reset.** Each colour, and each slider's number, has a reset arrow back to where it started, shown only while the value differs from it, and **Reset changes**, in the panel's top bar, puts the whole editor back as it opened. It stays disabled until something changes, and asks before it resets.
+- **Number fields** have − and + on either side, and take whole pixels.
+
 ### The preview
 
 The preview opens on the **specimen**, a screen the engine builds from your own system, so every system has something to preview. Your Showroom's screens follow it in the same list.
@@ -43,7 +49,9 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 - **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
 - **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back.
+- **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview scrolls; hold the space bar, or the middle button, and drag to move it.
 - **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
+- **Screens side by side.** A page built for showing the editor can ask for its screens in a row, with no list to choose from (`row: true` in its data, as `enabled` is): phone screens shown together, centred, the panel's own background around them.
 
 ### Light and dark
 
@@ -54,14 +62,17 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 ### One component's tokens
 
-Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, layer by layer toward where you clicked (a table, its rows, a row, a cell, its text).
+Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a Showroom screen marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
 
-- **What you edit stays marked.** The picked part keeps its outline and a label with its name. The head of the card shows the path to it, each step a click back, and lists the components inside it, each a click away.
+- **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card shows the path to it, ending at the level picked, each step above it a click back to that level.
+- **Text of its own.** A text in no component is picked by its text style, named on hover.
 - **Only its own tokens.** The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
 - **Values as they are now.** Each token shows its value with the theme on it, in light and dark, and follows as you change the theme.
 - **Units from how a token is used.** A token its rules use as `calc(var(…) * 1%)` reads as a percentage, an opacity from 0 to 1 as a percentage, a size in pixels as px, and anything else as a plain number.
-- **Corner radius and text style.** A picked part shows its corner radius, and a text shows which of your text styles it is drawn in. Changing either changes that part in every copy of the component. A text style keeps changing per breakpoint as yours do, since it is set through the style's own variables.
-- **The app background.** Clicking where no component is picks the screen itself.
+- **Linked tokens, as Figma shows them.** A token that follows another shows that token's name in its field (a colour's with its swatch) instead of a value, and a button to detach it. Detached, it takes a value of its own, and a reset in its field links it again. A token linked to another of its own component (its corners on one radius) follows it as it changes.
+- **The system's colours.** A colour's chip, or the button beside a detached colour, opens every base, semantic and primitive colour of the system, searchable, each swatch as this theme draws it. The list opens over the panel, below its field or above it when there is more room, and only the list scrolls; a click outside it, or Escape, closes it. One chosen links the token to it, its dark value following that colour's own.
+- **Corner radius.** A picked part shows its corner radius; changing it changes that part in every copy of the component.
+- **Text style.** A text shows the text style it is drawn in, and that style's own size and line height at the breakpoints the screens on show are at (phones: Phone), its breakpoint named under each value. The values are the token's own breakpoint modes. A change is the style's token's, so every text in that style follows.
 - A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 
 ### Where a theme is kept

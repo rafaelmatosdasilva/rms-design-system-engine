@@ -2,23 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
-## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion (continuous evaluation)
+## 2026-11: Layout faults, construction check annotations and the skill file (continuous evaluation)
 
-Measured on the merge of main (#452) into the batch (engine 802d734), so the guide set recorded is the one that ships. What changed since the entry below (engine 0ebb6b5): A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion; The rows beyond A and AA keep what they depend on; The evaluation reads "lacks a green" as the gap said, as it reads "no green"; Measured: 79/79, no rule broken, no task changed state; What a run says about the browsers is the same on every machine; a row panel closed the page's own way; Two severities for the construction check, and the same as data (#452); The demo's golden report says what a run answers about browsers. The guide changed in `reference/config.md`, `reference/usage.md`.
+What changed since the entry below (engine 0ebb6b5): The Figma review's findings on the Tasks page: each rule a component breaks, a task on that component; The construction check for CI: errors and warnings, JSON and annotations, a ready-made Action; the skill files checked as skills; Take the Figma rules out of the task list: each component's Rules area does it; Layout faults in Figma: text over text or an icon, a part cut off or spilling out, each with its layer and variant; Two severities for the construction check, and the same as data (#452); Layout faults read on a real library: a layer placed on purpose, a group's layers and a cover crop are never faults; A prototype is the journey, not a screen (#454). The guide changed in `cookbook/ci-and-hooks.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
 
-Guide set measured: `8c40cb7c3903` · Project measured: `13d811a9d668`
+Guide set measured: `922e1168e4d2` · Project measured: `13d811a9d668`
 
-Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 561ed94d` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md de8874ab` `rms-design-system-engine.md 0f804311`
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md 3e7fe882` `rms-design-system-engine.md 0f804311`
 
-| Haiku, engine 802d734 | Entry below | This version |
+**The agent changed.** The runs of this evaluation did not all have the same bundled skills: a change in the results may come from them, not from the guide.
+
+| Haiku, engine 3f231b9 | Entry below | This version |
 |---|---|---|
 | The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
-| Mean cost a run | 0.057 | 0.056 |
-| Input a run | 96k | 99k |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 96k | 100k |
 | Turns a run | 3.5 | 3.6 |
 | Rule violations | 0 | 0 |
 
-**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 96k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-merge-main-the-batch-is-2`.
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 96k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-layout-faults`.
 
 ## 2026-11: Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci (continuous evaluation)
 
