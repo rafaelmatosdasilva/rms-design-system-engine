@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Figma's anatomy held against the code's, on the latest main (continuous evaluation)
+
+What changed since the entry below (engine 922ee07): The theme editor previews a specimen of the system's own components, checked so nothing is invented (#443); The code's words read as Figma's are, and the team's own linters read as decided rules (#445); The composition path measured at more runs, on a model above Haiku (#444); Several directions for one request, each one the system's own (#447); Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA (#448). The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `7224292f915b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md dc794c06` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 83da9d0c` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 1e80e5e2` `reference/personality.md 7f1584bf` `reference/usage.md ef5260d7` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 0029a14 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.057 |
+| Input a run | 95k | 101k |
+| Turns a run | 3.4 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 95k, in 3.6 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-12-merge-origin-main-into-parity`.
+
 ## 2026-11: Figma's anatomy held against the code's (continuous evaluation)
 
 What changed since the entry below (engine bd8cd70): The code's construction rules, read as deeply as Figma's; Each component's way of writing a state, said with its example; The code grammar's test makes its folder through tempDir; The code's rules read text styles, Sass and styles written in JavaScript; A score for the code's health, the way the Figma library has one; Classes nothing styles, styles nothing uses, and Sass comments that swallowed a file; System health says only what the token layer does; A class name goes into a regular expression escaped whole; The nothing-matches test finds its own empty combination; The Rules cards keep the ring and the areas alone; The code's anatomy says where each part, its wrap and its sizing are written, for holding it against Figma's; The anatomy test reads where the wrap is written; The code read as it is written: text styles, Sass, classes nothing styles, and a score (#442); Each Figma part read in the code, and four checks of a component's words (#440); Figma's anatomy held against the code's: a part shown on one side only, text by hand, corners, shadow layers, wrap; Figma's anatomy against the code's runs with no contract and no browser, and reads in plain words, a part's own lines too. The guide changed in `reference/usage.md`.
