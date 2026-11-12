@@ -5,6 +5,9 @@ How the engine tests the accessibility of every component, and of your products'
 **On this page**
 
 - [Test accessibility](#test-accessibility)
+  - [Pages and flows](#pages-and-flows)
+  - [Beyond A and AA](#beyond-a-and-aa)
+  - [Video and sound](#video-and-sound)
 
 ## Test accessibility
 
@@ -26,6 +29,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 ### What it tries
 
 - **Every state and colour mode.** Each control is measured again while hovered, focused and pressed, in every colour mode, its text and its edge.
+- **High contrast mode and reduced motion.** Each is tried as well, and reported apart from AA (see [beyond A and AA](#beyond-a-and-aa)).
 - **The keyboard.** The Tab key is followed through the page. It finds an element a mouse can click that Tab never reaches, a keyboard trap, focus that jumps back up the page and focus that lands where no one can see it. A modal dialog must keep the focus inside.
 - **Reading order.** On each variant, the words, images and controls come in the code in the order they are seen, with one control or none as well as many (WCAG 1.3.2). Content hidden from screen readers is left out.
 - **A control by what it does.** A `<div>` that answers a click with no role and no tab stop is a control no keyboard reaches, on its component's page too, not a part that needs no focus.
@@ -91,13 +95,38 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 | 3.2.3 Consistent Navigation | Each navigation, by its name, keeps the items it shares in the same order | Passes or to fix |
 | 3.2.4 Consistent Identification | A link to the same place, in a header, navigation or footer, reads the same on each page | To fix, or a person checks the buttons and icons |
 | 3.2.6 Consistent Help | Help (a help page, a contact, a chat) stays in the same part of the page, among the same things | Passes or to fix |
-| 3.3.7 Redundant Entry | A field a later page of a flow asks for again, empty when it opens | A person checks |
+| 3.3.7 Redundant Entry | A field a later page of a flow asks for again, empty when it opens | A person checks; passes or to fix once the flow is walked through |
 | 3.3.4 Error Prevention | A form whose button reads as paying, signing or deleting, with or without a way to review or undo it | A person checks |
+| 1.3.4 Orientation | What in the page's own styles or scripts locks it to one orientation | Passes, to fix, or a person reads words that ask for a rotation |
+| 2.4.5 Multiple Ways | How many ways the product offers of finding a page | Passes or to fix |
 
 - **Flows.** Name each flow in `ds-config.json` → `a11y.flows`, its pages in order: `[{ "name": "Checkout", "pages": ["cart.html", "/checkout/address", "/checkout/pay"] }]`. A page is matched by its address or the end of it. With no flow named, 3.3.7 is a person's to check.
-- **What a person decides.** The pages are opened one by one and never filled in, so a field a flow fills once it runs looks empty here. Whether a step really commits money or data, and whether its review lets people correct it, is read from words only. These end as A person checks, never as Passes.
+- **A flow walked through.** `a11y.walkFlows: true` fills each step in with values of its own and sends it, then reads what the next step asks for. A field asked again after the flow was really given it is a fail, not a question for a person. It types into your running product, so:
+  - nothing is walked unless you ask for it;
+  - nothing is ever typed into a password field, or one that asks for a card, an account or a government number;
+  - it stops before a step whose button reads as paying, signing, ordering or deleting, and says how far it got;
+  - it stops when a step does not move on, since the made-up values may have been refused;
+  - the last step is read, never sent.
+- **Orientation.** 1.3.4 is read from each page's own style sheets and inline scripts: a rule inside an `(orientation: …)` query that hides the page or turns it on its side, and `screen.orientation.lock()`, are the page's to fix; words asking the reader to rotate the device are a person's to read, since only a person knows whether the page is one the standard excepts (a game, a piano keyboard). A style sheet from another origin cannot be read, and the pass says how many were left out.
+- **More than one way.** 2.4.5 counts the ways one product offers of finding a page: its menu, a search, a sitemap, breadcrumbs, and links between its own pages. Two or more pass. A product whose pages are all steps of one named flow is the process the criterion excepts, and passes with that said.
+- **What a person decides.** Without a walk the pages are opened one by one and never filled in, so a field a flow fills once it runs looks empty here. Whether a step really commits money or data, and whether its review lets people correct it, is read from words only. These end as A person checks, never as Passes.
 - **One page alone.** 3.2.3, 3.2.4 and 3.2.6 need two pages of the product. With one, the check says so and asks for more pages.
 - **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the style guide's Status page, each one left to fix or to check is a row under Accessibility, with its pages.
+
+### Beyond A and AA
+
+Two things the check looks at are not asked for by WCAG 2.2 at level A or AA. Each is a row of its own on a component's Accessibility area, named in words, listed after the criteria and always advisory — no criterion is marked as failing for them:
+
+- **Forced colours.** In Windows high contrast mode the browser throws your colours away and paints with the reader's own. The check looks for an icon or a text the mode makes vanish, a state that then looks like the rest, a focus ring that was only a shadow, and the edge of a field, checkbox, radio or switch that read at rest and is gone there (a box-shadow, or a background colour standing in for a border). An edge already too faint at rest is 1.4.11's own finding and is not counted twice.
+- **Reduced motion.** Under `prefers-reduced-motion: reduce`, anything that still transitions or animates.
+
+Both are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
+
+Why apart: an icon that disappears in high contrast mode used to be reported as WCAG 1.4.11 failing, and a focus ring as 2.4.7. That told a team an AA criterion was broken where the standard asks for nothing at all — and a conformance claim has to be true about the standard, not about everything worth fixing.
+
+### Video and sound
+
+A component that plays video or sound runs the media criteria (1.2.1 to 1.2.5, 1.4.2) and no other component does. A video with no captions track (1.2.2) and sound that starts by itself (1.4.2) are found in the browser; what only a person can judge — whether a transcript is accurate, whether live captions keep up, whether what the picture shows is described — is a row with the steps to check it. A component that plays nothing leaves all of these out.
 
 ### How sure each finding is
 

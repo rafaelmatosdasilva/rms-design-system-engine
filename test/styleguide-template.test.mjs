@@ -366,6 +366,11 @@ test('in the browser: no script error, a control changes the real component, the
     // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
     // it and when the audit last ran. Only what applies. No separate table of sources.
     assert.match(a11y, /Task nr.*WCAG.*Who acts.*Status.*Last checked/, 'the task, its criterion, the person who does it, its status and when it was checked');
+    // What the checks look at beyond WCAG 2.2 at A and AA (wcag21.mjs BEYOND_AA): a row of its own, in words, after
+    // the criteria, and never read as a criterion that failed.
+    assert.match(a11y, /Forced colours: icons, borders, states and the focus ring stay visible/, 'high contrast mode is a row of its own');
+    assert.match(a11y, /Reduced motion: what moves stops for a person who asks for less/, 'reduced motion is a row of its own');
+    assert.doesNotMatch(a11y, /WCAG Forced colours|WCAG Reduced motion/, 'neither is named as a criterion');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what to do, what the Figma notes say and what was found: in the row\'s panel only');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
