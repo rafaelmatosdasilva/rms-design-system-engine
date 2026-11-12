@@ -34,6 +34,8 @@ test('what a request makes: the noun it makes, never a word that only says where
   assert.equal(kindOf('make a chip for the settings page'), 'component');
   assert.equal(kindOf('a tag like the chip'), 'component');
   assert.equal(kindOf('anything', { kind: 'pattern' }), 'pattern');
+  assert.equal(kindOf('renomeei a variável surface/old no Figma'), 'component', 'a change names a kind without making one');
+  assert.equal(kindOf('remove the template header'), 'component');
 });
 
 test('the system\'s own of each kind, and what every one of them holds, read as rules', () => {
