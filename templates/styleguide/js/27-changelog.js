@@ -77,7 +77,7 @@
   // A text copied, the button says so for a moment and a screen reader hears it.
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
-  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', parts: 'parts', used: 'used-in', log: 'history' };
+  var AREA_SLUG = { play: 'playground', variants: 'variants', rules: 'rules', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', parts: 'parts', used: 'used-in', log: 'history' };
   // What a page shows is in its address, so a link opens it as it is: each filter chosen (show, st, the Tokens page's
   // coll, group, kind and q, a Showroom screen's kind) and the side panel open (panel=doc:<file> | row:<area>:<row>).
   // Written in place (no new history entry); a filter at its All and a panel closed leave nothing.
@@ -158,7 +158,7 @@
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['parts', 'Parts'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['rules', 'Rules'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['parts', 'Parts'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // What the Variants area shows: each variant prop's options, and each on/off prop the code builds as off and on.

@@ -98,7 +98,7 @@
     // in its own words, never a criterion (wcag21.mjs BEYOND_AA). They are the audit's: both are emulated through the
     // browser's protocol, which this page cannot do, so a row reads Run the audit until one has run.
     var crit = (WCAG ? WCAG.criteria.slice() : []);
-    if (WCAG && WCAG.beyond) WCAG.beyond.forEach(function (b) { crit.push({ sc: b.sc, name: b.name, level: '', how: b.how, kinds: b.kinds, says: b.says, extra: true, beyond: true }); });
+    if (WCAG && WCAG.beyond) WCAG.beyond.forEach(function (b) { crit.push({ sc: b.sc, name: b.name, level: '', how: b.how, kinds: b.kinds, says: b.says, browser: b.browser, extra: true, beyond: true }); });
     // A criterion the checks stand for beyond WCAG 2.2 A and AA (a AAA one: a focus ring's thickness, a comfortable target): listed when it has a
     // finding, named as its label names it.
     Object.keys(by).forEach(function (sc) {
@@ -148,12 +148,16 @@
       var ok = k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo' || it.st === 'check'; }) && (a.confirmed || {})[k.sc];
       // What it was checked with, when the person said: a criterion read out loud is only checked for the pair that
       // read it, so the page says which rather than letting the row stand for every browser and screen reader.
-      var withSaid = ok && ok.using ? ', in ' + ok.using : '';
-      if (ok && ok.current) { st = 'done'; note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ': ' + k.person; }
-      else if (ok) note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ', before ' + c.name + ' changed. ' + person;
+      // A record is testimony, never a measurement: nothing confirms the screen reader was running, or that it said
+      // what the person reports. The row still reads Done - their word is what the criterion asks for - but it says
+      // whose word it is, what they checked with (or that they did not say), and that the engine measured none of it.
+      var withSaid = ok && ok.using ? ', in ' + ok.using : ', and they did not say what they checked with';
+      var said = false;
+      if (ok && ok.current) { st = 'done'; said = true; note = 'Said by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ': their word, not a measurement the engine made. ' + k.person; }
+      else if (ok) note = 'Said by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ', before ' + c.name + ' changed - and their word, not a measurement. ' + person;
       if (k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo'; })) note += ' Once someone has checked it, record it as checked and this row reads Done.';
       if (!st) return null;
-      return { k: k, st: st, its: its, note: note, how: how, fig: fig };
+      return { k: k, st: st, its: its, note: note, how: how, fig: fig, said: said };
     }).filter(Boolean);
     return rows;
   }
@@ -185,6 +189,10 @@
       if (/a person checks that/.test(note) && cut >= 0) { act = note.slice(cut); note = note.slice(0, cut).trim(); }
       else if (/^(Run the audit|Build .* in the code: the audit|For every component|The last audit did not get|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(note)) { act = note; note = ''; }
       if (note) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(note) + '</div>';
+      // Where it was tried, by what the criterion depends on: the same in every browser, in each browser (and only
+      // Chrome runs today), or Chrome alone for what a screen reader hears.
+      var triedLine = WCAG && WCAG.tried ? WCAG.tried[r.k.browser || 'same'] : '';
+      if (triedLine) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(triedLine) + '</div>';
       // What to do: each open finding's own fix, then what a person checks or what has still to run; a finding with no
       // fix of its own, what the criterion asks.
       var todos = [];
@@ -199,6 +207,11 @@
       // A finding with no fix of its own: what the criterion asks, said where it is fixed (the colours in Figma and in the
       // code when the system has both, else the code), as who acts says.
       if (!todos.length && r.st === 'todo' && r.k.says) todos.push(esc((COLOUR_SC.test(r.k.sc) ? (HAS_FIGMA ? 'Change the colours in Figma and in the code so ' : 'Change the colours in the code so ') : 'Change the code so ') + r.k.says.replace(/^\w/, function (k) { return k.toLowerCase(); })));
+      // The wordings a model listed for this criterion on this component (--judge-a11y): what to look at first, in
+      // its own words, marked as a reading of the words and not a decision - the row's status is untouched by it.
+      var listed = ((WCAG && WCAG.judged && WCAG.judged[c.name] ? WCAG.judged[c.name].words : []) || []).filter(function (w) { return w.sc === r.k.sc && w.verdict !== 'fine'; });
+      if (listed.length) todos.push('<p class="pg-a11y-listed">' + esc(listed.length === 1 ? 'One wording to look at first, from a model\'s reading of the words (it decides nothing):' : listed.length + ' wordings to look at first, from a model\'s reading of the words (it decides nothing):') + '</p><ul class="pg-a11y-listed-list">' +
+        listed.map(function (w) { return '<li><b>' + esc('"' + w.text + '"') + '</b> ' + esc('(' + w.where + (w.verdict === 'unclear' ? ', unclear from the words alone' : '') + ')') + (w.why ? ' - ' + esc(w.why) : '') + '</li>'; }).join('') + '</ul>');
       // What is still to be tried once the audit runs in a browser: running it is what to do.
       if (!todos.length && r.st === 'check' && r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) todos.push(esc('Run the audit, it tries this on ' + c.name + ' in a browser.'));
       var open = r.its.filter(function (it) { return it.st !== 'done'; });
@@ -224,13 +237,16 @@
       // the Figma column.
       var src = [];
       r.its.forEach(function (it) { if (it.from && src.indexOf(it.from) < 0) src.push(it.from); });
+      // A criterion a person answered is read from their word, and the row says so where every other row says which
+      // measurement it came from.
+      if (r.said) { var sb = (c.a11y.confirmed || {})[r.k.sc] || {}; src.unshift('A person\'s word (' + (sb.by || 'someone') + ', ' + String(sb.at || '').slice(0, 10) + ')'); }
       if (!src.length) src.push(r.k.how === 'audit' && c.a11y && c.a11y.checked && c.a11y.checked.at ? auditOn(c.a11y.checked.at) : WCAG_SRC[r.k.how] || r.how || '');
       // Its date, its own check's: tried now on this page, the last audit's day, else when the page was built (what the
       // code and Figma said then).
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
       var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML((r.k.beyond ? '' : 'WCAG ') + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
-        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
+        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
         // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.
         unrun: r.st === 'check' && (/^(Run the audit|Build .* in the code: the audit|The last audit did not|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(act || r.note || '') || r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) };
       // Owed to one person, or to nobody yet: the row as it was. Owed to several: one row each, with that person's
@@ -349,11 +365,12 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || ruleRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
         // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
+        if (a[0] === 'rules') { var nr = ruleRows(c).length; return { v: a[0], label: a[1], state: { cls: 'differs', say: nr + ' to fix in Figma' } }; }
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
         return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
@@ -389,6 +406,9 @@
       ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
+      // Rules: the Figma review's findings for this component, each rule it breaks with its fix, waiting on whoever
+      // keeps the Figma file; each opens the component's node in Figma (ruleRows).
+      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par">' + rulesLead(c) + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
@@ -841,9 +861,16 @@
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
+      // What meeting the standard rests on: a criterion a person answered is their word, and a claim that does not say
+      // so reads as though the engine measured all of it.
+      function saidRest(rows) {
+        var said = 0;
+        Array.prototype.forEach.call(rows, function (r) { if (r.hasAttribute('data-said')) said++; });
+        return said ? ' \u00b7 ' + said + (said === 1 ? ' criterion on a person\'s word' : ' criteria on a person\'s word') : '';
+      }
       a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility', whoChipsHTML(a11yEl.rows)) +
         // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
-        (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA</span>' : '');
+        (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA' + saidRest(a11yEl.rows) + '</span>' : '');
       var ch = c.a11y && c.a11y.checked;
       // Only what a row cannot say: when each check ran is in its own row.
       a11yNote.innerHTML = [!ch ? esc('The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.') : ch.notRead ? '<span class="sg-mx-why">' + esc('The last audit (' + when(ch.at) + ') could not try it: ' + plainWhy(ch.why) + '. Run the audit again once that is fixed.') + whyTip(ch.why) + '</span>' : '',

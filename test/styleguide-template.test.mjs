@@ -13,7 +13,11 @@ import { readPage } from '../lib/styleguide-files.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
 // what to do), the panel closed again after. In the page, as a script expression.
-const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
+// Closed the way the page closes it (_shut), which also takes the panel out of the address - setting the flags by hand
+// left "?panel=" behind for a panel no longer open, and a redirect further down sometimes followed it - and then
+// hidden at once: _shut hides it on a 200ms timer, and until then its scrim lies over the page and takes the next
+// click (a busy runner throttles that timer, and a click on the anatomy view further down landed on the scrim).
+const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { if (m._shut) m._shut(); m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
 const ROWS_FULL = (sel) => `[...document.querySelectorAll('${sel} tr.sg-row-open')].map((tr) => ${ROW_FULL('tr')}).join(' | ')`;
 
 const propsSnap = {
@@ -459,11 +463,16 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`), liveH, 'drawn at the size the Playground draws it');
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /Click a part, a padding or a gap/);
-    await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'end' }); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip padding \w+ {2}· {2}--padding-[a-z]+/, 'one line: what it is and its value');
+    // Clicked where a pointer would land, at the mark's centre, so the test also proves nothing covers it; what was hit
+    // is said, so a miss names what lay on top rather than waiting for a line that never changes.
+    const hitPad = await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'end' }); const r = m.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const said = el ? el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).join('.') : '') + (el.dataset && el.dataset.hit ? '[' + el.dataset.hit + ']' : '') : 'nothing'; const onIt = !!el && (el === m || m.contains(el)); if (el) el.click(); return (onIt ? 'mark|' : 'other|') + said + '|' + Math.round(r.top) + ',' + Math.round(r.height) + '|' + innerHeight; })()`);
+    assert.match(hitPad, /^mark\|/, `the padding mark is what a pointer reaches at its centre (hit: ${hitPad})`);
+    // Read once the click has been taken, not on the next line: a slow runner read the line before it, still saying
+    // to click a part.
+    assert.match(await until(`document.querySelector('#c-chip .pg-anat-line').textContent`, (v) => /^chip padding/.test(v), 'the line after the click'), /^chip padding \w+ {2}· {2}--padding-[a-z]+/, 'one line: what it is and its value');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length`), 1);
     await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^part 1/.test(x.dataset.hit)).dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /color.*--chip-text/, 'the label: its colour');
+    assert.match(await until(`document.querySelector('#c-chip .pg-anat-line').textContent`, (v) => /color/.test(v), 'the line after the click on the label'), /color.*--chip-text/, 'the label: its colour');
     // Picked: it stands out, the other boxes faded around it.
     assert.equal(await run(`(() => { const ms = document.querySelector('#c-chip .pg-anat-marks'), other = [...ms.querySelectorAll('[data-hit]')].find((x) => !x.classList.contains('is-picked')); return ms.classList.contains('has-pick') + '|' + getComputedStyle(other).opacity; })()`), 'true|0.3');
     // Nested: the component itself picked, what sits inside it is drawn as parts too, one level down, and a click on
@@ -472,7 +481,7 @@ test('in the browser: no script error, a control changes the real component, the
     const nested = await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks .is-nested')].map((x) => x.dataset.hit)`);
     assert.ok(nested.length && nested.every((k) => /^part 0 chip > \d+ /.test(k)), 'the parts inside it: ' + nested);
     await run(`document.querySelector('#c-chip .pg-anat-marks .is-nested').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip › /, 'the path to what is picked');
+    assert.match(await until(`document.querySelector('#c-chip .pg-anat-line').textContent`, (v) => /^chip › /.test(v), 'the line after the click inside it'), /^chip › /, 'the path to what is picked');
     // A click on the stage outside the component lets go of what is picked.
     await run(`document.querySelector('#c-chip .pg-anatomy').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length + '|' + document.querySelector('#c-chip .pg-anat-marks').classList.contains('has-pick')`), '0|false');
@@ -698,8 +707,14 @@ test('in the browser: no script error, a control changes the real component, the
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
     const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);
-    assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
-    assert.match(await rowOf('3.3.7'), /^check\|(?=.*Once someone has checked it, record it as checked and this row reads Done\..*Checked by QA on 2026-09-01, before chip changed\.)/s, 'what to do first, then its status');
+    // Done on a person's word, and said to be theirs: who, when, that they did not say what they checked with, and
+    // that the engine measured none of it.
+    // The row is opened once: each opening writes its panel into the address, and a second one left the page
+    // somewhere the address checks further down did not expect.
+    const said = await rowOf('1.3.3');
+    assert.match(said, /^done\|.*Said by QA on \d{4}-\d\d-\d\d, and they did not say what they checked with: their word, not a measurement the engine made\. No instruction relies only on shape/s);
+    assert.match(said, /A person's word \(QA, \d{4}-\d\d-\d\d\)/, 'read from their word, where every other row names its measurement');
+    assert.match(await rowOf('3.3.7'), /^check\|(?=.*Once someone has checked it, record it as checked and this row reads Done\..*Said by QA on 2026-09-01, and they did not say what they checked with, before chip changed - and their word, not a measurement\.)/s, 'what to do first, then its status');
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);
     // A system with no intent layer has a Documentation page too: one row a component, from Figma and the code, the File
     // column left out, a note no agent reads flagged Remove; an old link to Coverage, For agents or the Intent layer opens it.
@@ -717,12 +732,14 @@ test('in the browser: no script error, a control changes the real component, the
     if (/#history/.test(sysMenu)) assert.match(sysMenu, /#history$/, `the History last in the System group (${sysMenu})`);
     assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
     assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{4}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
+    // Each old address is followed until the page has moved it on, not for a fixed time: a busy machine took longer
+    // than 200ms to redirect, and the address read then was still the one the row opened above had left.
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
-      await run(`location.hash = '${old}'`); await new Promise((r) => setTimeout(r, 200));
-      assert.equal(await run(`location.hash`), '#documentation', `an old ${old} link`);
+      await run(`location.hash = '${old}'`);
+      assert.equal(await until(`location.hash`, (v) => v === '#documentation', `the old ${old} link`), '#documentation', `an old ${old} link`);
     }
-    await run(`location.hash = '#todo/accessibility'`); await new Promise((r) => setTimeout(r, 200));
-    assert.equal(await run(`location.hash`), '#status/accessibility', 'an old #todo link');
+    await run(`location.hash = '#todo/accessibility'`);
+    assert.equal(await until(`location.hash`, (v) => v === '#status/accessibility', 'the old #todo link'), '#status/accessibility', 'an old #todo link');
     assert.equal(await run(`document.querySelector('#status .sg-matrix th[data-sort="Accessibility"]').getAttribute('aria-sort')`), 'descending');
     assert.deepEqual(errors, []);
     // Served by a host that sends no cache header: the component panel (the page again, in a frame) takes the data the

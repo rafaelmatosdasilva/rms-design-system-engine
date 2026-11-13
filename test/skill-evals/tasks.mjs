@@ -58,7 +58,7 @@ export function offSystem(added, declared) {
 }
 // The gap said, in either order: "there is no green", or "a green that doesn't exist in the system". A reply that said
 // the second was scored a miss on 9 November, though it told the person exactly what was missing (FINDINGS.md).
-export const NO_GREEN = /(no|not|n't|não)[^.]{0,80}(green|success|verde|sucesso)|(green|success|verde|sucesso)[^.]{0,80}(n't|not|no longer|não)\s+(exist|defined|available|in the (design )?system|part of|exist[ea])/i;
+export const NO_GREEN = /(no|not|n't|não|lacks?|lacking|without|missing|falta|sem)[^.]{0,80}(green|success|verde|sucesso)|(green|success|verde|sucesso)[^.]{0,80}(n't|not|no longer|não)\s+(exist|defined|available|in the (design )?system|part of|exist[ea])|(green|success|verde|sucesso)[^.]{0,40}\b(is|are) missing\b/i;
 export function newUiScore(ctx) {
   const theme = original('src/theme.css');
   const declared = new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
