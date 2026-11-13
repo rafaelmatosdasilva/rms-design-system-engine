@@ -9,9 +9,10 @@
 3. Run `rms-design-system-engine`. It lists what is left to build (`🧱 TO BUILD`), tokens first, and its NEXT line names the next item with its commands.
 4. Tokens: copy the declarations the engine wrote in `.design-system-engine-out/handback/tokens-to-build.css` into the theme file it names, exactly as written, then run the engine again.
 5. Components, one at a time, in the order NEXT gives: run `rms-design-system-engine --query <name>` and write the component exactly as its build sheet says: the class, the sizes and variables, the selector for each state and variant, the role, and the prop names. Inside it, use the system's own components, never a copy. Write no colour, size or variable the system does not have: use the closest one it has and say so, or ask.
-6. Run `rms-design-system-engine --component <name>` and fix what it names until it passes, then build the next item.
-7. Screens: build them only from the system's components and variables (`rms-design-system-engine --recipe ask-the-system`), and check each file with `rms-design-system-engine --check-ui <file>`.
-8. At the end, say what was built and passes, what is left to build, and anything the system did not have.
+6. To start from the files instead of writing each one: run `rms-design-system-engine --scaffold` (with `--framework vue|react --folder <folder>` when it asks). It hands back one patch with each component's file, written from what is exact in Figma, and lists in each file what is still yours. Show the person the patch; only on their yes do they apply it (`git apply`). Then finish what each file lists, one at a time.
+7. Run `rms-design-system-engine --component <name>` and fix what it names until it passes, then build the next item.
+8. Screens: build them only from the system's components and variables (`rms-design-system-engine --recipe ask-the-system`), and check each file with `rms-design-system-engine --check-ui <file>`.
+9. At the end, say what was built and passes, what is left to build, and anything the system did not have.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
