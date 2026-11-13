@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## An agent with only the server no longer tries the shell first
+
+**Found** 30 October 2026, in the first route benchmark; **settled** 13 November 2026, running it again. **Fixed in** engine #290 (the routed block names each command's MCP tool beside it).
+
+**Evidence.** On 30 October every route that reached the engine passed, but 10 of the 12 runs with the MCP server and no shell first tried the shell command the routed request named (`RUN:`), were refused, and only then called the tool. Run again on 13 November with the same tasks, model, runs and budget: 12 of 12 with only the server, and none of the 12 tried the shell; each went to the server's tools at once, on 60k of input a run against 70k and 2.0 calls against 2.9. The routes with a shell still use the command line (11 of 12 alone where both are offered), and with neither only reading the last summary as a file passes (2 of 12, against 3).
+
+**Guess ruled out.** That the skill should prefer the server where both are offered, to save the refused call: the refusal happened only without a shell, and with a shell the command line answers in the same number of calls.
+
+**What changed.** Nothing more: the skill keeps the command line first where there is a shell and names the MCP tool beside each command, which is what this run measured.
+
+---
+
 ## A layer beyond a box of a fixed size, built without a word
 
 **Found** 12 November 2026, the first run of the Figma build benchmark (`test/figma-bench/`). **Fixed in** `lib/figma-ops.mjs` (the build script's `faults`).

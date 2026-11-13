@@ -30,6 +30,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      issues: read
       id-token: write
       attestations: write
       packages: write
@@ -72,13 +73,21 @@ jobs:
           # Each pull request merged in the range, with its labels, read once: the release labels set how big the
           # step is (release-version.mjs) and the "after:" labels say what a person does to see it
           # (release-after.mjs).
-          labels='[' ; prs='['
+          labels='[' ; prs='[' ; fixed='['
           for n in $(git log "$range" --format=%s | sed -nE 's/.*\(#([0-9]+)\)$/\1/p'); do
             l=$(gh pr view "$n" --json labels --jq '[.labels[].name]' 2>/dev/null || echo '[]')
             labels="$labels$l,"
             prs="$prs{\"number\":$n,\"labels\":$l},"
+            # The issues it closes, each with who wrote it and its body: whoever ticked the issue form's box to be
+            # thanked is named in the notes (release-credits.mjs), and nobody else.
+            issues=$(gh pr view "$n" --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]' 2>/dev/null || echo '[]')
+            each='['
+            for i in $(echo "$issues" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).join(" "))'); do
+              each="$each$(gh issue view "$i" --json number,author,body 2>/dev/null || echo '{}'),"
+            done
+            fixed="$fixed{\"number\":$n,\"issues\":${each%,}]},"
           done
-          labels="${labels%,}]" ; prs="${prs%,}]"
+          labels="${labels%,}]" ; prs="${prs%,}]" ; fixed="${fixed%,}]"
           next=$(node lib/release-version.mjs "$last" "$(node -p "require('./package.json').version")" "$labels")
           echo "Releasing $next (previous: ${last:-none})"
           git tag "$next"
@@ -87,6 +96,9 @@ jobs:
           # silence reads as nobody having written it down.
           node lib/release-after.mjs "$prs" > "$RUNNER_TEMP/notes.md"
           printf '\n' >> "$RUNNER_TEMP/notes.md"
+          # Who reported what this release fixes, when they asked to be thanked; nothing when nobody did.
+          node lib/release-credits.mjs "$fixed" > "$RUNNER_TEMP/thanks.md"
+          if [ -s "$RUNNER_TEMP/thanks.md" ]; then cat "$RUNNER_TEMP/thanks.md" >> "$RUNNER_TEMP/notes.md"; printf '\n' >> "$RUNNER_TEMP/notes.md"; fi
           gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$next" \
             ${last:+-f previous_tag_name="$last"} --jq .body >> "$RUNNER_TEMP/notes.md"
           gh release create "$next" --title "$next" --notes-file "$RUNNER_TEMP/notes.md"
