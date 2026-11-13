@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Merge remote-tracking branch 'origin/main' into figma/findings-reach-designers (continuous evaluation)
+
+What changed since the entry below (engine fcc5d31): wip: the Figma review's findings in a Rules area on each component's page; The Figma review's findings on each component's page, in a Rules area; The hand-back as a Figma plugin, for a designer to review and apply inside Figma; A Rules row's scope is said once above its table, never on each row; Release notes thank whoever reported a fix, when they asked to be (#472); The route benchmark run again, and answers through MCP ready (#473); A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion (#453). The guide changed in `reference/usage.md`.
+
+Guide set measured: `7313ef788fb8` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 5db4a181` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md d9a409a4` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 07e571f4` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine ba70b55 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.056 | 0.059 |
+| Input a run | 97k | 105k |
+| Turns a run | 3.5 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 97k, in 3.7 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-13-merge-remote-tracking-branch-origin`.
+
 ## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion, on main (continuous evaluation)
 
 What changed since the entry below (engine 5ed611f): Starting files from what is exact in Figma, and the way back from a Figma write in the guide (#471); The spec frames' Figma script parses again (#470). The guide changed in `cookbook/build-component-figma.md`, `cookbook/build-from-figma.md`, `cookbook/change-component-figma.md`, `cookbook/figma-edits.md`, `reference/usage.md`.
