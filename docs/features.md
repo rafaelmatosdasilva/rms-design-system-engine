@@ -469,7 +469,7 @@ Your tools stay as they are, and the engine fits around them.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
 - Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
-- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
+- Answers agents that have no terminal, such as prototyping tools, through MCP.
 
 ## What you can count on
 
