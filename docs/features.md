@@ -248,6 +248,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes each component's accessibility spec into Figma.
 - Pins accessibility problems on the layers of your designed screens.
 - Links each component to its code file in Dev Mode.
+- Writes into each token's and component's Figma description what it is for and where to use it, so an agent reading Figma knows where it belongs; never over one a designer wrote.
+- Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
+- Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
 - Shows you every change first. Nothing changes until you say yes.
 
 ## Publish a living style guide
@@ -326,6 +329,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Draws a component that exists only in code as a Figma component: its props as properties and variants, its tokens as variables, its parts as layers.
 - Starts from the components the style guide marks Only in the code.
+- Draws a template or a pattern too, as a frame made of the system's own components.
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.
 
@@ -340,6 +344,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Works in a product file too: the system's variables come from its published library, imported by the key the Figma MCP finds for each.
 - Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
 - Grows the component set to hold new variants, so none is clipped.
+- Builds a pattern, a template, a page or a flow from your own one it is like, and a foundation as a new variable beside the one it is like.
+- Says when a layer runs beyond a box of a fixed size, instead of choosing a new size.
 - Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
 - Writes nothing until someone signs it off and you say yes, then checks the result.
