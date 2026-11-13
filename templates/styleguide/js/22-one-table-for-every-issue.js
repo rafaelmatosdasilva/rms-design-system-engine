@@ -43,7 +43,8 @@
   // to do. A component's own Parity, Accessibility and Documentation areas show the same tables as the Status page.
   // Local or shared (local-shared.mjs): a row's own, else its component's (what changes a system component every
   // product using it gets). Said beside who acts, its reason on hover and in the row's panel; only a shared one waits.
-  function rowScope(r) { if (r.scope) return r.scope; if (r.from && r.from.scope) return r.from.scope; var c = HAS_PAGE[String(r.key || '').split('\u0000')[0]]; return (c && c.scope) || null; }
+  // A Rules row's scope is its component's, said once above its table (rulesLead), never on each row.
+  function rowScope(r) { if (r.area === 'Rules') return null; if (r.scope) return r.scope; if (r.from && r.from.scope) return r.from.scope; var c = HAS_PAGE[String(r.key || '').split('\u0000')[0]]; return (c && c.scope) || null; }
   function scopeWords(x) { return x ? (x.scope === 'shared' ? 'Shared' + (x.decider && x.decider.name ? ', waits on ' + x.decider.name : '') : 'Local, waits on no one') : ''; }
   function scopeHTML(x) { return x ? '<span class="sg-todo-scope" data-scope="' + esc(x.scope) + '" title="' + esc(x.reason || '') + '">' + esc(scopeWords(x)) + '</span>' : ''; }
   var ISSUE_CELL = {
@@ -56,7 +57,8 @@
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
     code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
-    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
+    // A Rules row says neither who acts nor its scope: they are the same on every row, said once above the table.
+    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' && r.area !== 'Rules' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
     // Who acts, in a column of its own: an accessibility task says the person, so a team can see its own work without
     // opening every row.
     whoCell: function (r) { return '<td class="sg-todo-whocell">' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + '</td>'; },
@@ -79,6 +81,8 @@
     Documentation: [['Task nr', 'no'], ['Type', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    // The Figma review's findings on a component's page: who acts and where are the same for every row, so said once above.
+    Rules: [['Task nr', 'no'], ['Rule', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Page: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']]
   };

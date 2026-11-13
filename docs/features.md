@@ -254,6 +254,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes into each token's and component's Figma description what it is for and where to use it, so an agent reading Figma knows where it belongs; never over one a designer wrote.
 - Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
 - Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
+- Comes as a Figma plugin too, so a designer reviews the change and applies it inside Figma, with an Undo.
 - Shows you every change first. Nothing changes until you say yes.
 
 ## Publish a living style guide
