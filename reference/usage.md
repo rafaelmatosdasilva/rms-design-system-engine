@@ -179,7 +179,7 @@ node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --list     
 
 A project whose code has no design tokens yet starts in **build mode** (`ds-config.json` → `"build": true`): setup
 chooses it when the code's folder has no stylesheet of tokens and a Figma file is given, or when it runs with `--build`. The engine still writes no code; it says what to build and
-checks each piece once it exists.
+checks each piece once it exists, and hands back the starting files when asked (`--scaffold`), as a patch a person applies.
 
 - **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
   Figma has and the code does not yet, a component after the ones it nests. NEXT names the next item with its commands.
@@ -215,8 +215,34 @@ checks each piece once it exists.
 - **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
 - **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
+- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react] [--folder <folder>]` writes each
+  component still to build (all of them in build order, or the ones named) from what is exact in Figma, as one patch
+  that adds the files: `.design-system-engine-out/handback/scaffold.patch`, for a person to apply with `git apply`.
+  Each is the component file and a stylesheet of its own beside it (`Button.vue` or `Button.jsx` with `button.css`):
+  its element by its role (a `<button type="button">`), its props as the catalog names them (a variant of True and
+  False a boolean), a modifier class for each value that has one and the element's `disabled` where a value is
+  `:disabled`, its text props as text, the system's components it holds as their tags, and every rule of its build
+  sheet as CSS, in `box-sizing: border-box` as Figma sizes a frame, a variant's own height included. What the sheet
+  says and Figma does not give exactly (what a state is wired to, `aria-pressed`, a focus ring the design does not
+  draw, a border whose width the capture does not hold) is never filled in: the file lists it as still yours to
+  write. What the files are written in and where they go come from the flags, `ds-config.json` (`framework`,
+  `componentFiles`) or `package.json`, and are asked otherwise, never chosen. A file the code already has is left out,
+  and a project not in build mode has nothing to scaffold. Once applied, `--component <name>` checks each one.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
   before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
+### The way back from a Figma write
+
+Every write the engine makes in Figma (`--figma-build`, `--figma-change`, `--figma-edits`, `--figma-fix`) goes
+through one script, and each step of it records the value it is about to replace. When the script has run, the guard
+reads that record from the tool's own answer and writes the way back beside the change:
+`.design-system-engine-out/handback/figma-undo.json` (the steps) and `figma-undo.js` (a script that puts each back,
+newest first). It is run like the change, with the Figma MCP's `use_figma` and only when the person says yes, and it
+touches nothing else. A step Figma keeps no copy of (a variant, a layer or a property the change removed) has no way
+back: the record says so, and the script refuses to run rather than put the file half back, since a person who
+believes a change is gone when part of it stays is worse off than one who knows. The file's version history is then
+the only way. `--change-report <component>` says, after a refresh, whether the way back ran and whether the read
+after is the same as the read before.
 
 ### Where the engine may write
 

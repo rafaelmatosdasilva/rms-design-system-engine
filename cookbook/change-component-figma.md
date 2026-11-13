@@ -10,6 +10,8 @@
 4. What breaks or adds waits for someone to sign it off: ask who, and run the same command with `--signed-off "<who>"`. The engine writes the script (`.design-system-engine-out/handback/figma-apply.js`). Ask the person, and only when they say yes, run it with the Figma MCP's `use_figma` exactly as written: it changes only the listed steps, in every variant, and returns what it changed, skipped and could not find.. When what it could not find names a variable the file does not have, it is a library's: find each one's key with the Figma MCP's `search_design_system`, write them in a file (`{ "name": "key" }`), run the command again with `--keys <file>`, and run the new script. Tell the person.
 5. Refresh the Figma snapshots (`--recipe refresh-figma`), then run `rms-design-system-engine --change-report <component>`: the read before beside the read after, and where it is not what the change said. Then `--construction-check` and `--hygiene`, and say what they find on it.
 
+6. To take the change back: the guard wrote the way back beside it (`.design-system-engine-out/handback/figma-undo.js`). Run it with `use_figma`, as written, only when the person asks and says yes, then refresh and run `--change-report <component>` again: it says whether the read after is the read before. When a step has no way back, the script refuses and the report says so; the file's version history is the only way.
+
 A change is made the system's way even on a component that breaks the system's rules: those faults are listed apart, and fixed only when someone asks (`--recipe figma-edits`).
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
