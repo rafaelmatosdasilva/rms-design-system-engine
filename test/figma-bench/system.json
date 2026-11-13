@@ -1,0 +1,38 @@
+{
+  "about": "An invented system the Figma build benchmark runs on: a chip of two sizes with an icon and a label, an icon, a tile of a fixed size, the parts of a page, two templates and a few variables. Nothing here is taken from a project.",
+  "page": "Components",
+  "pages": ["Templates"],
+  "modes": { "Tokens": ["light", "dark"] },
+  "textStyles": ["body/m"],
+  "variables": [
+    { "name": "size/32", "collection": "Tokens" },
+    { "name": "size/40", "collection": "Tokens" },
+    { "name": "spacing/s", "collection": "Tokens" },
+    { "name": "spacing/32", "collection": "Tokens", "alias": "size/32" },
+    { "name": "text/default", "collection": "Tokens", "type": "COLOR" },
+    { "name": "surface/muted", "collection": "Tokens", "type": "COLOR" },
+    { "name": "chip/label/color", "collection": "Tokens", "type": "COLOR", "alias": "text/default" }
+  ],
+  "components": {
+    "icon": { "variants": ["icon"], "description": "An icon.", "tree": { "fixed": [16, 16] } },
+    "chip": {
+      "variants": ["size=s", "size=l"], "axes": true, "description": "A chip, to filter or choose.",
+      "properties": { "size": { "type": "VARIANT", "variantOptions": ["s", "l"], "defaultValue": "s" }, "showIcon#1:2": { "type": "BOOLEAN", "defaultValue": true }, "labelContent#1:3": { "type": "TEXT", "defaultValue": "Chip" } },
+      "tree": { "layout": { "dir": "HORIZONTAL" }, "bind": { "fill": "surface/muted" }, "c": [
+        { "t": "FRAME", "n": "Content", "layout": { "dir": "HORIZONTAL" }, "bind": { "itemSpacing": "spacing/s" }, "c": [
+          { "t": "INSTANCE", "n": "icon", "of": { "name": "icon" }, "wired": { "visible": "showIcon" } },
+          { "t": "TEXT", "n": "Label", "text": "Chip", "wired": { "characters": "labelContent" }, "bind": { "fill": "chip/label/color" } }
+        ] }
+      ] }
+    },
+    "tile": { "variants": ["tile"], "description": "A tile of a fixed size.", "tree": { "layout": { "dir": "VERTICAL" }, "fixed": [120, 40], "c": [{ "t": "TEXT", "n": "Title", "text": "Tile" }] } },
+    "headerPage": { "variants": ["headerPage"], "description": "The page's header.", "tree": { "layout": { "dir": "HORIZONTAL" }, "c": [{ "t": "TEXT", "n": "Title", "text": "Page" }] } },
+    "dataTable": { "variants": ["dataTable"], "description": "A table of data.", "tree": { "layout": { "dir": "VERTICAL" }, "c": [{ "t": "TEXT", "n": "Row", "text": "Row" }] } },
+    "actionBar": { "variants": ["actionBar"], "description": "The page's actions.", "tree": { "layout": { "dir": "HORIZONTAL" }, "c": [{ "t": "TEXT", "n": "Action", "text": "Save" }] } },
+    "toast": { "variants": ["toast"], "description": "A short message.", "tree": { "layout": { "dir": "HORIZONTAL" }, "c": [{ "t": "TEXT", "n": "Message", "text": "Saved" }] } }
+  },
+  "templates": {
+    "settings": { "name": "settings", "nodeId": "T:1", "components": ["headerPage", "dataTable", "actionBar"] },
+    "orders": { "name": "orders", "nodeId": "T:2", "components": ["headerPage", "dataTable", "toast"] }
+  }
+}

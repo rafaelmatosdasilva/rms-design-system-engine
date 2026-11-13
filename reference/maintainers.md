@@ -167,6 +167,22 @@ outcome, the guard belongs in Gate [24] (Renders correctly in a browser) (render
 The isolation-fix override rules themselves are then documented in `ALLOWED_BROAD_RULES`
 as `ISOLATION FIX`.
 
+## Figma build benchmark - the builder measured against the same requests every time
+
+`test/figma-bench/` keeps a set of build and change requests (`requests.json`: each as a person asks it, the answers a
+person gives to what it asks, as operations, and what it must hold once built) and an invented system to run them on
+(`system.json`). `node test/figma-bench/bench.mjs` runs each through the engine's own path (the spec, the change, a
+template, a foundation) and its script on a stand-in for Figma that lays out auto layout (`standin.mjs`), and scores
+it on separate counts, never one number: the script runs, what was asked is there, nothing else changed, only the
+system's components and variables are used, no layout fault the result did not have before (`layout-faults.mjs`) and
+none the script left unsaid; with the questions asked and the time it took. No model is asked on this path, so it
+spends no tokens: an agent's turns and tokens on the same requests are the skill evaluation's. The kept results
+(`results.json`) are what `test/figma-bench.test.mjs` holds every run to, so a change to the builder or its guide that
+scores worse on any count fails the suite; `--keep` writes them again only when a change is meant. `--sample <n>`
+writes a sheet (`review/<date>.md`) of what was asked, what was built and the counts, with a line for a person (QA,
+the system's owner) to say whether the counts hold; the run reads the sheets back and says on how many they did. A new
+kind of request gets a request here when it is built; a request is never changed to make a run pass.
+
 ## Skill evaluation - a guide change is measured before it ships
 
 The guide is instructions for an agent, so a change to it (the main file, a recipe or a reference file) can
