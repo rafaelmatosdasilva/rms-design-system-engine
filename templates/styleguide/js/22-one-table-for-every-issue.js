@@ -56,7 +56,8 @@
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
     code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
-    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
+    // A Rules row says neither who acts nor its scope: they are the same on every row, said once above the table.
+    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' && r.area !== 'Rules' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) && r.area !== 'Rules' ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
     // Who acts, in a column of its own: an accessibility task says the person, so a team can see its own work without
     // opening every row.
     whoCell: function (r) { return '<td class="sg-todo-whocell">' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + '</td>'; },
@@ -79,6 +80,8 @@
     Documentation: [['Task nr', 'no'], ['Type', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    // The Figma review's findings on a component's page: who acts and where are the same for every row, so said once above.
+    Rules: [['Task nr', 'no'], ['Rule', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Page: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']]
   };

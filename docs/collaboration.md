@@ -152,6 +152,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
+| Rules | Each of the system's rules the component breaks in Figma (from the Rules page), with its fix. Who fixes it and a link to its node in Figma are said once above the table. Shown only when it breaks one |
 | Accessibility | One table by WCAG 2.2 criterion: its task number, the criterion, who acts, its status and when it was last checked. What to do, what Figma states and what was found are in the row's panel |
 | Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
