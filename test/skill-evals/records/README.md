@@ -269,5 +269,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-a-description-a-designer-wrote` | The 24 guide tasks on Haiku (engine d20790c) | "A description a designer wrote is put to the person, with both texts" |
 | `2026-11-12-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 7050066) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/written-back" |
 | `2026-11-13-everything-the-system-holds-on-main` | The 24 guide tasks on Haiku (engine 6859d53) | "Everything the system holds, generated, on main" |
+| `2026-11-13-starting-files-from-what-is` | The 24 guide tasks on Haiku (engine 479ebc8) | "Starting files from what is exact in Figma, and the way back from a Figma write in the guide" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
