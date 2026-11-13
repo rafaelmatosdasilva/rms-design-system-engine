@@ -2,23 +2,23 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
-## 2026-11: A Rules row's scope is said once above its table, never on each row (continuous evaluation)
+## 2026-11: Starting files from what is exact in Figma, and the way back from a Figma write in the guide (continuous evaluation)
 
-What changed since the entry below (engine 6859d53): Everything the system holds, generated, and a kept benchmark for Figma builds (#466); wip: the Figma review's findings in a Rules area on each component's page; The Figma review's findings on each component's page, in a Rules area; The hand-back as a Figma plugin, for a designer to review and apply inside Figma; A Rules row's scope is said once above its table, never on each row. The guide changed in `reference/usage.md`.
+What changed since the entry below (engine 6859d53): Everything the system holds, generated, and a kept benchmark for Figma builds (#466); Starting files from what is exact in Figma, and the way back from a Figma write in the guide. The guide changed in `cookbook/build-component-figma.md`, `cookbook/build-from-figma.md`, `cookbook/change-component-figma.md`, `cookbook/figma-edits.md`, `reference/usage.md`.
 
-Guide set measured: `8f76d46907f5` · Project measured: `13d811a9d668`
+Guide set measured: `98cb30a7497a` · Project measured: `13d811a9d668`
 
-Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md a662f652` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 2367dd72` `rms-design-system-engine.md 0f804311`
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 5db4a181` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md d9a409a4` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 206ac2f0` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 6a170b72` `rms-design-system-engine.md 0f804311`
 
-| Haiku, engine 6075a84 | Entry below | This version |
+| Haiku, engine 479ebc8 | Entry below | This version |
 |---|---|---|
 | The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
-| Mean cost a run | 0.057 | 0.057 |
-| Input a run | 97k | 102k |
-| Turns a run | 3.5 | 3.6 |
+| Mean cost a run | 0.057 | 0.060 |
+| Input a run | 97k | 108k |
+| Turns a run | 3.5 | 3.7 |
 | Rule violations | 0 | 0 |
 
-**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 97k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-13-a-rules-row-s-scope`.
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 97k, in 3.7 turns against 3.5. no task changed state, and no run moved: the same result. Input moved but input a turn held (28k to 29k): the turns moved, 3.5 to 3.7, and nothing a run reads grew - most in `forbidden-green` 2.3 to 6.0, `new-ui-saved` 10.8 to 11.6. Records: `records/2026-11-13-starting-files-from-what-is`.
 
 ## 2026-11: Everything the system holds, generated, on main (continuous evaluation)
 

@@ -6,6 +6,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
+- [Turn Figma into code](#turn-figma-into-code)
 - [Turn code into Figma](#turn-code-into-figma)
 - [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt)
 - [Generate in code from a prompt](#generate-in-code-from-a-prompt)
@@ -473,6 +474,29 @@ The page review measures what it can: one main action, nothing destructive in fr
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
 - **In the style guide.** Each component's rating sits in its Documentation area.
+
+## Turn Figma into code
+
+A system that exists only in Figma, built in code piece by piece, each piece checked against Figma once it exists.
+
+### What it does with no code yet
+
+- **Says what to build, in order.** Your tokens first, then each component after the ones it holds. Something still to build is never a failure.
+- **Gives the exact lines.** Each component's build sheet names its class, its sizes and variables, the selector of each state and option, its role and its props, as the checks will read them.
+- **Writes the starting files, when you ask.** Each component as a file and a stylesheet of its own, written from those exact lines, and handed back as a patch for you to apply.
+
+### What a starting file holds
+
+- **Its element and its props.** A button is a real `<button>`, and its props are named as Figma names them.
+- **Every rule of its build sheet.** Its sizes, spacing and colours as your variables, a class for each option that changes its look, and its own height where an option changes it.
+- **What is still yours.** What Figma does not say exactly, such as what a state is wired to or a focus ring the design does not draw, is listed at the top of the file, never made up.
+
+### What it never does
+
+- **Write into your code.** The files come back as a patch, and a file you already have is left out.
+- **Choose for you.** What your components are written in, and where they go, come from your project or are asked.
+
+The full options are in [the reference](../reference/usage.md) (*Build mode*, `--scaffold`).
 
 ## Turn code into Figma
 
