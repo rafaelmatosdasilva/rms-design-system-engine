@@ -221,6 +221,7 @@
 
 🧮 Values written by hand in the styles: 0 errors, 3 warnings in 1 file (font size 3); the most in src/theme.css (0 errors, 3 warnings).
    rms-design-system-engine --census lists each one with the token to use, and keeps the count so it only falls.
+ℹ️  [a11y] The criteria a browser decides (what Tab reaches, where the focus shows, reflow, zoom, text spacing) are answered for Chrome only: the passes in Firefox and WebKit are not built yet.
 
 ─── Accessibility check (advisory — never blocks the build) ───
 

@@ -16,8 +16,10 @@ export function asksForToken(text) {
     && !(/\b(paste|share|send|give|provide|tell)\b\s+(me\s+)?(the|a|your)?\s*(colou?r|hex|shade|green|red|blue)\b|\b(a|as a|the)\s+new\s+token\b|\btoken\s+(to|in)\s+the\s+(design system|system|theme)\b/i.test(s)
       && !/\b(api|access|personal|auth|figma|gitlab|github)\s+(token|key)\b|\byour\s+token\b|\bpassword\b|\bsecret\b/i.test(s))
     && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\bso the engine\b|\bfor the engine\b|\bto the engine\b|\bthe engine (will|can|then)\b|\b(give|send|tell|provide|show|share with) you\b|\bshare[sd]?\s+the\s+same\b/i.test(s)
-    // "you'll need to provide a token: 1. create it 2. add it to .env": set up in the project, not asked for in the chat
-    && !(/\b(provide|give)\b/i.test(s) && !/\b(paste|share|send|tell)\b/i.test(s) && /\.env\b/.test(parts.slice(i + 1, i + 4).join(' '))));   // set up for the engine, given to the person, or design tokens in common: not asked of them
+    // "you'll need to provide a token: 1. create it 2. add it to .env": set up in the project, not asked for in the chat.
+    // The .env may come just before as well as just after ("…the REST API with FIGMA_TOKEN in .env. The images are
+    // fetched live if you provide a FIGMA_TOKEN."), seen in a real run; paste, share, send and tell stay a request.
+    && !(/\b(provide|give)\b/i.test(s) && !/\b(paste|share|send|tell)\b/i.test(s) && /\.env\b/.test([...parts.slice(Math.max(0, i - 3), i), ...parts.slice(i + 1, i + 4)].join(' '))));   // set up for the engine, given to the person, or design tokens in common: not asked of them
 }
 
 // The agent's own edits of a file: an edit tool on it, or a shell command that writes it (not the engine).

@@ -51,10 +51,26 @@ test('the style guide shows the steps, the command that records them, and what i
   assert.match(page, /r\.k\.steps && r\.k\.steps\.length && r\.st === 'check'/, 'the steps show while it is still to check');
   assert.match(page, /<ol class="pg-a11y-steps">/);
   assert.match(page, /--checked ' \+ esc\(c\.name\) \+ ' ' \+ esc\(r\.k\.sc\) \+ ' --by "&lt;name&gt;" --with "&lt;browser and screen reader&gt;"/, 'the command names the component and its criterion');
-  // Checked, and checked before the component changed, both say what it was checked with.
-  assert.match(page, /var withSaid = ok && ok\.using \? ', in ' \+ ok\.using : '';/);
-  assert.match(page, /'Checked by ' \+ ok\.by \+ ' on ' \+ String\(ok\.at\)\.slice\(0, 10\) \+ withSaid \+ ': ' \+ k\.person/);
-  assert.match(page, /withSaid \+ ', before ' \+ c\.name \+ ' changed\. ' \+ person/, 'a check made before the component changed says what it was made with');
+  // Checked, and checked before the component changed, both say what it was checked with - and when the person said
+  // nothing, the row says that too rather than leaving a reader to assume.
+  assert.match(page, /var withSaid = ok && ok\.using \? ', in ' \+ ok\.using : ', and they did not say what they checked with';/);
+  assert.match(page, /'Said by ' \+ ok\.by \+ ' on ' \+ String\(ok\.at\)\.slice\(0, 10\) \+ withSaid \+ ': their word, not a measurement the engine made\. ' \+ k\.person/);
+  assert.match(page, /withSaid \+ ', before ' \+ c\.name \+ ' changed - and their word, not a measurement\. ' \+ person/, 'a check made before the component changed says what it was made with');
+});
+
+// A record is testimony: a person's word that they looked, with nothing confirming the screen reader was running or
+// that it said what they report. It is better than a row that says nothing, and it is not a measurement - so the page
+// says whose word it is, what they checked with, and what the claim of meeting the standard rests on.
+test('a check made by hand is shown as a person\'s word, and what meets the standard says how much of it rests on one', () => {
+  const page = templateText();
+  // The row carries it, the table marks it, and the badge counts it.
+  assert.match(page, /said: said/, 'the row keeps whether a person answered it');
+  assert.match(page, /r\.said \? ' data-said="1"' : ''/, 'the table marks the row');
+  assert.match(page, /function saidRest\(rows\)/, 'the badge counts them');
+  assert.match(page, /' criterion on a person\\'s word' : ' criteria on a person\\'s word'/);
+  assert.match(page, /Meets WCAG 2\.2 at level A and AA' \+ saidRest\(a11yEl\.rows\)/, 'the claim says what it rests on');
+  // Where the row was read from is their word, never a measurement.
+  assert.match(page, /A person\\'s word \(' \+ \(sb\.by \|\| 'someone'\)/);
 });
 
 test('what the person says they checked it with reaches the command, and nothing is guessed', () => {
