@@ -143,6 +143,29 @@
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });
   }
+  // The Figma review's findings for one component, from the Rules page (DATA.construction): each Figma rule it breaks
+  // that is to fix (most components follow it, or the team decided it), with the fix the Rules page names, waiting on
+  // whoever keeps the Figma file. A rule still to decide is the team's question and stays on the Rules page alone. The
+  // component links to its node in the Figma file, in a tab of its own with Figma's mark, so the person checks there
+  // whether the task holds: this is a Figma task, the one kind that links to Figma.
+  function ruleRows(c) {
+    var G = DATA.construction;
+    if (!G || !G.rules) return [];
+    var url = (G.figmaUrls || {})[c.name];
+    var figma = url ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(url) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c.name + ' in Figma') + '">' + FIGMA_SVG + esc(c.name) + '</a>' : '';
+    var out = [];
+    G.rules.forEach(function (r) {
+      if ((r.side || 'figma') !== 'figma' || r.status !== 'fix') return;
+      (r.toFix || []).forEach(function (t, i) {
+        if (t.component !== c.name) return;
+        var fix = (t.fix && t.fix.say) || r.todo || 'Change it in Figma so it follows the rule.';
+        out.push({ key: c.name + '\u0000rule:' + r.id + ':' + (t.value || i), area: 'Rules', kind: r.says, figma: figma, code: '',
+          todo: esc(t.value ? r.says + ': ' + t.value : r.says) + '<span class="pg-todo">' + esc(fix) + '</span>',
+          who: WHO.figma, st: 'todo', rel: '', at: DATA.builtAt || null });
+      });
+    });
+    return out;
+  }
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
@@ -170,6 +193,7 @@
       } catch (e) { /* its accessibility is read on its own page */ }
       migrationRows(c).forEach(function (r) { rows.push(r); });
       copyRows(c).forEach(function (r) { rows.push(r); });
+      ruleRows(c).forEach(function (r) { rows.push(r); });
       motionIssueRows(c).filter(isOpen).forEach(function (r) { rows.push(r); });
       docRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });
