@@ -2215,6 +2215,16 @@ the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse 
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Descriptions, missing components and layout are never written: they stay in `changes-in-Figma.md`.
 
+Every hand-back that changes something also writes the same script as a Figma development plugin
+(`handback/figma-plugin/`: `manifest.json`, `code.js`, `ui.html`, from `figma-plugin.mjs`), so a designer can review
+and apply it inside Figma without an agent. A designer imports it once (Plugins › Development › Import plugin from
+manifest…) and runs "Design system hand-back": it lists what the change does, in the words the engine prints, and
+changes nothing until they press Apply, which is their yes. The apply is `figma-apply.js` as written, never a second
+copy of its logic. What it replaced is kept in the file itself (plugin data), so "Undo last change" puts it back from
+any computer, the same way the engine's own way back does (`undoScript` in `figma-undo.mjs`): newest first, refused
+whole when part of it has no way back. Each later hand-back rewrites the plugin's files, so running it again shows the
+latest list. It asks for no network access. Decisions left for a person are never in it.
+
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
 A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates
