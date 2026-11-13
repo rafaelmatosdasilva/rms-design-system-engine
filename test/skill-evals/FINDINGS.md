@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## A layer beyond a box of a fixed size, built without a word
+
+**Found** 12 November 2026, the first run of the Figma build benchmark (`test/figma-bench/`). **Fixed in** `lib/figma-ops.mjs` (the build script's `faults`).
+
+**Evidence.** Of the eight kept requests, seven scored clean on every count. The eighth, a caption added to a tile of a fixed size (120 by 40), ran, was what was asked and touched nothing else, and left a layout fault the tile did not have: the caption ran 6px beyond the box on the stand-in, which lays auto layout out as Figma does. The script returned it among what it changed, with nothing to say it no longer fit.
+
+**Guess ruled out.** Not the stand-in's geometry: the same caption in a box that hugs its content fits, and the fault is the one the construction check's layout rule names once the box is read from Figma. Not a reason to grow the box either: its size is the designer's, and a size the script picked would be a value the system never had.
+
+**What changed.** The build script says it, in `faults`, for the person to decide (grow the box, or shorten the layer); the recipe tells the agent to pass each one on. The benchmark counts a layout fault the script leaves unsaid apart from one it says, so the kept result for this request is a fault said, and one made silently fails the suite.
+
+---
+
 ## On the composition side the agent does not fail; the engine does
 
 **Found** 12 November 2026, measuring the composition path on a model above Haiku. **Fixed in** `lib/prototype.mjs` (`fromScreens`) and `test/skill-evals/record.mjs` (`scrubPaths`).

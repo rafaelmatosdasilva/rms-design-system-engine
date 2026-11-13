@@ -6,6 +6,9 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
+- [Turn code into Figma](#turn-code-into-figma)
+- [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt)
+- [Generate in code from a prompt](#generate-in-code-from-a-prompt)
 
 ## Design themes over your system
 
@@ -470,3 +473,78 @@ The page review measures what it can: one main action, nothing destructive in fr
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
 - **In the style guide.** Each component's rating sits in its Documentation area.
+
+## Turn code into Figma
+
+A component that exists only in your code, drawn into Figma from what the engine reads of it.
+
+### What it reads
+
+- **Its props.** Each prop with options becomes a variant axis with the same options.
+- **Its parts.** Each part becomes a layer, in the order your markup writes them: another of your components becomes an instance of it, a part that writes a prop's words becomes a text layer, anything else a frame.
+- **What each prop drives.** A part a prop shows or hides becomes a boolean property on that layer, and a prop whose words a part writes becomes a text property.
+- **Its look.** Its own base rule's background, padding, gap, border and corners, each bound to the variable it is written with. A hover's or an option's value belongs to that variant, so it is not the component's own.
+- **What it is for.** Its own comment becomes its description in Figma.
+
+### What it never does
+
+- **Make up a value.** A size written by hand, a part's text with no text style of your system's, or a nested component Figma doesn't have is a question for you, never a guess.
+- **Write without you.** It goes through the same path as a component described in words: the spec is checked against your system, held for someone to sign it off, and built in Figma only through the script you say yes to.
+
+### A template or a pattern too
+
+Give it a file instead of a component name, and it draws that page as a Figma frame made of your components.
+
+- **Its layout.** Each element that holds others becomes a frame, laid out in the direction its own style sets.
+- **Your components.** Each one the page uses becomes an instance of it, found through what the file itself imports.
+- **Its texts.** Each one is set in the text style its class uses.
+- **Its spacing.** Each gap, padding, background and corner is bound to the variable it is written with.
+- **A frame, not a component.** It takes no variants. A component the page uses that Figma doesn't have is a question.
+
+The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
+## Generate in Figma from a prompt
+
+You describe what you need, and the engine draws it in Figma from your system's own rules.
+
+### Not only components
+
+- **A component.** Started from the one it is most like ("a tag like the chip").
+- **A pattern, a template or a page.** A frame made of your components, started from your own one it is like ("a template like settings").
+- **A flow.** Its pages side by side, each made the way your system makes it.
+- **A foundation.** A new variable beside the one it is like, pointing at one of your variables.
+
+The kinds are your intent layer's own, so nothing new is invented to say what a thing is.
+
+### Your rules for each kind
+
+- **Read from your own.** What every one of your templates holds is a rule, and what most hold is a fix, the way the engine reads how you build components.
+- **Asked, never assumed.** A new one that lacks what every one of yours holds is a question for you.
+- **A box that is too small.** A layer that runs beyond a box of a fixed size is said, for you to decide: grow the box, or shorten the layer.
+
+### Measured every time
+
+- **A kept set of requests.** The same build and change requests run again whenever the builder or its guide changes.
+- **Separate counts, never one number.** Whether the script runs, whether what was asked is there, whether anything else changed, whether only your components and variables are used, and whether it made a layout fault.
+- **Checked by a person.** A sample goes on a sheet for someone to say whether the counts hold.
+
+The full options are in [the reference](../reference/usage.md) (`--spec`).
+
+## Generate in code from a prompt
+
+The same spec Figma is built from, written as a component file the way your own components are.
+
+### What it follows
+
+- **Your construction rules.** Your framework, the folder and file name, how parts and options are named, and how props are written, all read from your own code.
+- **Your tokens.** Each value is the custom property your naming convention gives the variable.
+- **Your text styles.** Each text is set the way your components set it, with your mixin or your class.
+- **Your components.** A part that is another of your components is written as its own tag.
+
+### What it never does
+
+- **Change your code.** The file comes back as a patch for you to apply, never written straight into your project.
+- **Skip the check.** What it wrote is read back with the code's own reader and held against the spec, so the two start out matching.
+
+The full options are in [the reference](../reference/usage.md) (`--code-build`).
+

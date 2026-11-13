@@ -1,0 +1,109 @@
+{
+  "about": "The kept result of each request (bench.mjs): a run that scores worse on any count fails the test.",
+  "results": [
+    {
+      "id": "copy",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 2,
+      "left": 0,
+      "ops": 3
+    },
+    {
+      "id": "copy-with-option",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 2,
+      "left": 0,
+      "ops": 4
+    },
+    {
+      "id": "copy-without",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 2,
+      "left": 0,
+      "ops": 5
+    },
+    {
+      "id": "change-option",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 0,
+      "left": 0,
+      "ops": 1
+    },
+    {
+      "id": "change-property",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 0,
+      "left": 0,
+      "ops": 1
+    },
+    {
+      "id": "change-layer-in-a-fixed-box",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 1,
+      "said": 1,
+      "unsaid": 0,
+      "questions": 1,
+      "left": 0,
+      "ops": 1
+    },
+    {
+      "id": "template",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 1,
+      "left": 0,
+      "ops": 6
+    },
+    {
+      "id": "foundation",
+      "runs": 1,
+      "asked": 1,
+      "untouched": 0,
+      "system": 0,
+      "layout": 0,
+      "said": 0,
+      "unsaid": 0,
+      "questions": 0,
+      "left": 0,
+      "ops": 1
+    }
+  ]
+}
