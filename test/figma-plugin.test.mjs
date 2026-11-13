@@ -25,7 +25,9 @@ test('the plugin is the hand-back script itself, parses, and asks for no network
   // The list is the engine's own words, escaped, with no NEXT line meant for an agent.
   assert.ok(!/NEXT:/.test(f['ui.html']));
   assert.ok(!f['ui.html'].includes('<for>'));
-  const script_ = f['ui.html'].match(/<script>([\s\S]*)<\/script>/)[1];
+  // The page's own script, cut out by its tags (the page is the engine's, written with exactly these).
+  const ui = f['ui.html'], open = '<script>', start = ui.indexOf(open) + open.length;
+  const script_ = ui.slice(start, ui.indexOf('</script>', start));
   new Function('parent', 'onmessage', script_);
 });
 
