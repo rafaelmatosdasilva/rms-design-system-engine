@@ -104,7 +104,7 @@
   function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
-    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
+    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.said ? ' data-said="1"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
       tableColsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
   }
   // A row in full, in a panel from the right, as a token opens: each column of its table as a card, nothing cut short,

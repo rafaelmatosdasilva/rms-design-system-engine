@@ -119,7 +119,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
-- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
+- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again. It is shown as their word, not a measurement, and what meets the standard says how much of it rests on one.
+- Sorts the judgement calls for whoever checks them, when you ask: a model reads your headings, labels, link words and error messages and lists the ones worth looking at first, with why. It decides nothing — no criterion passes or fails on it.
+- Says which browser answered each criterion: the same in every browser, the browser's own to decide, or Chrome alone for what a screen reader hears.
 - Tries what belongs to a page across your products' own pages: a title and a language, a page that works both ways up, a skip link, the same navigation and help in the same place, more than one way of finding a page, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
 - Walks a flow for real when you ask it to: each step filled in and sent, so a field asked twice is a finding and not a question. It never types a password or a card number, and stops before a step that pays, signs or deletes.
 - Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
@@ -136,6 +138,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine check the accessibility of our pages and flows` | What belongs to a page, tried across your product's own pages |
 | `/rms-design-system-engine walk our checkout flow and check nothing is asked twice` | The flow filled in and sent step by step, with what it asks for again |
 | `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
+| `/rms-design-system-engine judge the wordings of our components` | The headings, labels, links and error messages a person should look at first |
 
 ## Lint your codebase rules
 
@@ -470,7 +473,7 @@ Your tools stay as they are, and the engine fits around them.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
 - Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
-- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
+- Answers agents that have no terminal, such as prototyping tools, through MCP.
 
 ## What you can count on
 

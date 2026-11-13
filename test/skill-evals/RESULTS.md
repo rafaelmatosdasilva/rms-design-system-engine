@@ -2,6 +2,63 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion, on main (continuous evaluation)
+
+What changed since the entry below (engine 5ed611f): Starting files from what is exact in Figma, and the way back from a Figma write in the guide (#471); The spec frames' Figma script parses again (#470). The guide changed in `cookbook/build-component-figma.md`, `cookbook/build-from-figma.md`, `cookbook/change-component-figma.md`, `cookbook/figma-edits.md`, `reference/usage.md`.
+
+Guide set measured: `ba018d8d9c94` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 5db4a181` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md d9a409a4` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 836f61f1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine fcc5d31 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.060 | 0.056 |
+| Input a run | 103k | 97k |
+| Turns a run | 3.6 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 103k, in 3.5 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-13-merge-main-this-batch-lands`.
+
+## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion (continuous evaluation)
+
+Measured on the merge of main of 13 November into the batch (engine 5ed611f). What changed since the entry below (engine 6859d53): A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion; The rows beyond A and AA keep what they depend on; The evaluation reads "lacks a green" as the gap said, as it reads "no green"; Measured: 79/79, no rule broken, no task changed state; What a run says about the browsers is the same on every machine; a row panel closed the page's own way; The demo's golden report says what a run answers about browsers; The anatomy view's test waits for each click to land, and says what a missed one hit; A table with no task keeps its top-left corner rounded; The token rule sees a .env said just before, as it sees one said just after; Measured on the merge: 79/79, no rule broken; A row panel closed in the test is hidden at once, so its scrim takes no later click; Everything the system holds, generated, and a kept benchmark for Figma builds (#466). The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `74360e9a6f74` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md a662f652` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 17c54670` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 5ed611f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.060 |
+| Input a run | 97k | 103k |
+| Turns a run | 3.5 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 97k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-13-testimony-judgement-and-browsers-on`.
+## 2026-11: Route benchmark, run again
+
+The four route tasks (`--set route`) on each route again, as on 30 October: `claude-haiku-5-5`, 3 runs each, a budget
+of $1 a run, now on engine a9d1c3c, after the routed block came to name each command's MCP tool beside it
+(`RUN (no shell): the query tool …`, engine #290).
+
+| Route | 30 October | Now | Input a run, now | Tool calls a run, now |
+|---|---|---|---|---|
+| Shell only (the command line) | 12/12 | 12/12 | 78k | 2.6 |
+| Shell and the MCP server | 12/12 | 12/12 | 77k | 2.3 |
+| MCP server, no shell | 12/12 | 12/12 | 60k | 2.0 |
+| No shell, no server | 3/12 | 2/12 | 114k | 5.4 |
+
+**Reading.** What #290 was for holds: in October 10 of the 12 runs with only the server first tried the shell command
+the routed request named, were refused, then called the tool; now none of the 12 tries the shell, each goes straight
+to the server's tools (the props and token tasks one or two `query` calls, the summary one `summary`, the UI one
+`query`, a `catalog` in two of three, and `check_ui`, beside writing the UI file it was asked for), on less input
+(60k a run against 70k) and fewer calls (2.0 against 2.9). With a shell the agent still uses the command line: in the
+route with both, 11 of 12 runs used it alone and one called the server beside it. With neither, only reading the last
+audit's summary as a file passes (2 of 3), as before: everything else needs the engine, which is the point of both
+routes. Records: `records/2026-11-13-route-benchmark/route` (`route-report.mjs <folder>`).
+
 ## 2026-11: Starting files from what is exact in Figma, and the way back from a Figma write in the guide (continuous evaluation)
 
 What changed since the entry below (engine 6859d53): Everything the system holds, generated, and a kept benchmark for Figma builds (#466); Starting files from what is exact in Figma, and the way back from a Figma write in the guide. The guide changed in `cookbook/build-component-figma.md`, `cookbook/build-from-figma.md`, `cookbook/change-component-figma.md`, `cookbook/figma-edits.md`, `reference/usage.md`.

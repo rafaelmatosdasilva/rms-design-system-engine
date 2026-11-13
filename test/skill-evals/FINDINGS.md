@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## An agent with only the server no longer tries the shell first
+
+**Found** 30 October 2026, in the first route benchmark; **settled** 13 November 2026, running it again. **Fixed in** engine #290 (the routed block names each command's MCP tool beside it).
+
+**Evidence.** On 30 October every route that reached the engine passed, but 10 of the 12 runs with the MCP server and no shell first tried the shell command the routed request named (`RUN:`), were refused, and only then called the tool. Run again on 13 November with the same tasks, model, runs and budget: 12 of 12 with only the server, and none of the 12 tried the shell; each went to the server's tools at once, on 60k of input a run against 70k and 2.0 calls against 2.9. The routes with a shell still use the command line (11 of 12 alone where both are offered), and with neither only reading the last summary as a file passes (2 of 12, against 3).
+
+**Guess ruled out.** That the skill should prefer the server where both are offered, to save the refused call: the refusal happened only without a shell, and with a shell the command line answers in the same number of calls.
+
+**What changed.** Nothing more: the skill keeps the command line first where there is a shell and names the MCP tool beside each command, which is what this run measured.
+
+---
+
 ## A layer beyond a box of a fixed size, built without a word
 
 **Found** 12 November 2026, the first run of the Figma build benchmark (`test/figma-bench/`). **Fixed in** `lib/figma-ops.mjs` (the build script's `faults`).
@@ -17,6 +29,34 @@ Newest first.
 **Guess ruled out.** Not the stand-in's geometry: the same caption in a box that hugs its content fits, and the fault is the one the construction check's layout rule names once the box is read from Figma. Not a reason to grow the box either: its size is the designer's, and a size the script picked would be a value the system never had.
 
 **What changed.** The build script says it, in `faults`, for the person to decide (grow the box, or shorten the layer); the recipe tells the agent to pass each one on. The benchmark counts a layout fault the script leaves unsaid apart from one it says, so the kept result for this request is a fault said, and one made silently fails the suite.
+
+---
+
+## A `.env` said just before is still setup, not a request for a token
+
+**Found** 12 November 2026, measuring the same accessibility batch a third time, on top of main. **Fixed in** `test/skill-evals/rules.mjs` (`asksForToken`).
+
+**Evidence.** 78 of 79 runs passed; the one failure was `visual-howto` #0, on the global rule "never asks for a token in chat". Its answer was the right one: Figma's images come *"from `.design-system-engine-refs/components/<name>.png` … or the Figma REST API with `FIGMA_TOKEN` in `.env`"*, and its next sentence said they are *"fetched live from Figma if you provide a `FIGMA_TOKEN`"*. Nothing asked for the token in the chat; the reply that followed said *"add `FIGMA_TOKEN` to your project's `.env` file"*.
+
+**Guess ruled out.** Not the batch, which touched nothing about tokens or Figma's images; `visual-howto` passed every run of the two measurements before it. Not a model getting worse at the rule: the rule already read "provide a token" next to a `.env` as setting the project up, and was looking for that `.env` only in the sentences after.
+
+**What changed.** The rule looks at the three sentences before as well. *Paste*, *share*, *send* and *tell* stay a request whatever surrounds them, and both kinds are cases in the rule's own test, the run's sentence among them. The saved runs were scored again with no model tokens: exactly that one changed verdict, and the entry records 79/79 with no rule broken.
+
+**What it settles.** A broken rule is the most serious thing an evaluation can report, which is why it is read first and taken at its word last. Twice in one batch the scorer, not the agent, was what failed.
+
+---
+
+## "Lacks a green" is the gap said, and the scorer did not know it
+
+**Found** 12 November 2026, measuring a batch of accessibility changes (a hand check said to be a person's word, the judgement calls pre-sorted, which browser answered each criterion). **Fixed in** `test/skill-evals/tasks.mjs` (`NO_GREEN`).
+
+**Evidence.** 77 of 79 runs passed; both failures were `new-ui-saved`, runs #0 and #3, on one check: "adds the confirmation, or says the system has no green for it". Their transcripts show the right answer, each after five or six queries of the engine: *"The system lacks a green color token for the 'Saved' confirmation"* and *"the system lacks a green color for the 'Saved' confirmation state"*, each naming the tokens there are and the experimental `tag` component that is not built. Nothing was added to the page, nothing off the system was invented, no rule was broken. The scorer read the gap only when it was said with *no*, *not* or *n't*.
+
+**Guess ruled out.** Not the batch's guide change. The guide files it touched are the configuration and usage references for accessibility (a model asked to pre-sort wordings, the browsers a criterion depends on, a hand check said to be testimony); `new-ui-saved` reads none of it, and both runs read only what `--query` returned. Not noise either: the same check, on the same two sentences, fails every time they are scored.
+
+**What changed.** `NO_GREEN` also reads *lacks*, *lacking*, *without*, *missing* (and *falta*, *sem*), and a green said to be missing the other way round. Both sentences, as the runs wrote them, are known-good cases in the scorer's own test, beside *"The page lacks room for it. I made the button green."*, which stays a fail. The saved runs were scored again with no model tokens (`rescore.mjs`): exactly those two changed verdict, and the entry records 79/79.
+
+**What it settles.** A failure that reads as the guide getting worse can be the scorer not knowing a plain way of saying the right thing. Reading the transcript first is what told the two apart.
 
 ---
 

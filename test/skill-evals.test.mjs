@@ -40,6 +40,11 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(asksForToken('You will need to provide your API key. Then I can run it.'), true);
   assert.equal(asksForToken("The label and background token pairs aren't contrast-checked because text and background share the same token."), false);   // design tokens in common, seen in a real run
   assert.equal(asksForToken('Please share the Figma token so I can refresh.'), true);
+  // The .env said just before: setup, not a request (seen in a real run, visual-howto).
+  assert.equal(asksForToken('**Figma images come from** `.design-system-engine-refs/components/<name>.png` (exported at 2x) **or the Figma REST API with `FIGMA_TOKEN` in `.env`**. When this setting is on, the audit will include a visual comparison gate. The images are sourced either from committed PNG files in your `.design-system-engine-refs` directory, or fetched live from Figma if you provide a `FIGMA_TOKEN`.'), false);
+  // But a request in the chat stays one, whatever the sentence before says about .env.
+  assert.equal(asksForToken('Tokens normally live in .env. Please paste your FIGMA_TOKEN here so I can refresh.'), true);
+  assert.equal(asksForToken('The token belongs in .env. Just send me your Figma token and I will do it.'), true);
   assert.equal(asksForToken('NEXT (from the tool): tell you what fails under Token values and its fix; only change src/theme.css if you ask me to.'), false);   // a gate name, seen in a real run
   assert.equal(asksForToken("**The fix (per the skill's rules, I won't ask you to paste a token in chat):**"), false);   // a refusal, seen in a real run
   assert.equal(asksForToken("Run the capture in Figma, or provide a `FIGMA_TOKEN` so the engine's REST-based refreshers can run automatically."), false);   // set up for the engine, seen in a real run
@@ -286,6 +291,13 @@ test('new-ui-saved: no colour or variable the system does not have, and the conf
   // Nothing added, but the gap said: the system has no green.
   assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
   assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
+  // The gap said with "lacks": two runs answered exactly so and were scored as failures (seen in a real run).
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Based on the design system query results, I found that: **The system lacks a green color token for the "Saved" confirmation.**' })), true);
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Based on the design system query, **the system lacks a green color for the "Saved" confirmation state**.' })), true);
+  // A green said to be missing, the other way round.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'A green for success is missing from the tokens, so I left the page as it was.' })), true);
+  // "Lacks" about something else, with a green named, is still no answer.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'The page lacks room for it. I made the button green.' })), false);
 });
 
 test('the files the engine writes on every run are never the agent\'s change', async () => {
