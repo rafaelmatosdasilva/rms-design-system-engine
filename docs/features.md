@@ -321,6 +321,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - With no code yet, lists what to build, in order, instead of failing.
 - Gives Claude Figma's exact names and values before it writes the code.
+- Writes each component's starting file from what is exact in Figma, as a patch you apply, with what Figma does not say listed in the file.
 - Checks every piece once it is built.
 
 ## Turn code into Figma
