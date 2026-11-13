@@ -1614,11 +1614,61 @@ drives, and a removed layer takes with it the property that drove only it. The o
   paddingX, paddingY, paddingTop…, radius, fontSize, strokeWeight, width, height; where: `{ size: "l" }` for some
   variants), `rebind { from, to }` (every binding of one variable moved to another)
 - `describe { text }`, `place { page?, section? }`; and to start one, `clone { from, name }` (what `--like` writes) or
-  `create { name, axes?, layout? }` when no component is like it
+  `create { name, axes?, layout?, kind?, as? }` when no component is like it (`kind: "frame"` a plain frame, `as` which of
+  the system's kinds it is)
+- `addVariable { name, like, alias? | byMode? | value? }`: a foundation, a new variable in the collection of the one it
+  is like, of its type and scopes, pointing at one of the system's variables (`byMode: { light: …, dark: … }` when the
+  one it is like points at a different one in each mode), or holding a value only where the one it is like holds its
+  own (a primitive); a name without a group is put in the group of the one it is like
 
 A layer is named by its path inside the component (`Content/Label`).
 
-**--figma-build.** `--figma-build <name> [--signed-off "<who>"]` checks the spec again against the capture as it is now,
+Not only components (`system-kinds.mjs`): what the description makes decides what is built, by the intent layer's own
+kinds. "Make a template like settings", "a settings page", "a pattern for bulk actions" and "a checkout flow" build a
+frame (`create { kind: "frame", as }`) of the system's own components; "a spacing token like spacing/32" builds a
+variable; anything else is a component, as above. `--kind <component | pattern | template | page | flow | foundation>`
+says it when the words do not. A template, a page or a pattern starts from the system's own of that kind it is like (by
+its name, with or without its kind's word): the Figma templates (`templates`, their snapshot) and the intent layer's
+pages of that kind, each with the components it names. From those it reads how the system builds that kind, as the
+construction grammar reads components: a component every one holds is a rule and one most hold a fix (with three or
+more), and the one every one opens with a rule. The request's "with a toast" adds one of the system's components and
+"without the toolbar" drops one; a rule the new one breaks is asked (and what most hold, when it starts from nothing),
+never added behind the person's back. A flow is its pages side by side, each as the system composes it, from the flow
+it is like or the pages it names ("from orders to settings"). Every one is held for sign-off and asked where it goes, as
+a component is. `--code-build` writes a template, a pattern or a page in code too, its tags nested as the spec nests
+them and no props of its own, in the folder the code keeps its templates (`templates[].file`); a foundation reaches the
+code as every token does.
+
+**--spec-from-code.** `--spec-from-code <component>` writes the spec of a component only the code has from what the
+engine reads of it (`code-to-figma.mjs`): `create` with a variant axis for each prop of options, `describe` from its
+own comment, an `addLayer` for each part in markup order (another of the system's components an instance, a part that
+writes a prop's words a text in the text style its text is set in, any other a frame), an `addProperty` boolean for a
+part a prop shows and text for a prop a part writes, and a `bind` for each value of its own base rule written with a
+custom property, named as the Figma variable it stands for (the naming convention, read backwards). Its operations go to
+`.design-system-engine-out/specs/<name>.from-code.ops.json` and through `--spec --ops`, so what the code cannot ground (a
+value written by hand, a text with no text style, a nested component Figma lacks) is a question, and the new component
+is held for sign-off. Figma already having the component, or the code not having it, stops it with the one to use.
+
+Given a file instead (`--spec-from-code src/templates/Settings.vue`: a path, or a name ending in `.vue`, `.svelte`,
+`.jsx`, `.tsx` or `.html`), it draws a template or a pattern as a plain frame (`create { kind: "frame" }`, which takes no
+axes and is never combined as variants): an `addLayer` for each element in markup order, an element that holds others a
+frame in the direction its own rule lays it out, a tag the system has an instance of its Figma component, a text element
+a text in the text style its class sets, and a `bind` for each gap, padding, background and corner its rule writes with
+a custom property. A tag is the component the file itself imports it from (`import HeaderPage from '@/…/headers/Page'`
+is `<header-page>`), paired with Figma's the way the code reading pairs them, or the Figma component of its own name;
+one Figma lacks is a question. Its spec is named after the file (`settings`).
+
+**--code-build.** `--code-build <name>` writes the component a spec describes in code, the way the system writes one
+(`spec-to-code.mjs`): its framework (Vue or JSX), folder, file name case, part classes and prop case from the code's
+construction rules, an axis as a prop with its options, a property as a prop of its kind, a part as an element (another
+of the system's components its own tag, a text the prop that writes it, set in the text style the system sets it with:
+its mixin or its class), each bound variable the custom property the naming convention gives it. Nothing is written to
+the code: the file goes to `.design-system-engine-out/handback/code-build-<name>.patch`, a patch that adds it, which a
+person applies with `git apply`. It is read back with the code's own reader and held against the spec (every layer a
+part, every property a prop), and exits 1 when it falls short. A spec that still asks a question, or a file the code
+already has, stops it with the one to use.
+
+**--figma-build.** `--figma-build <name> [--signed-off "<who>"]` (a foundation's name with `-` for `/`: `spacing-40`) checks the spec again against the capture as it is now,
 and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the
 system and waits for a named person to sign it off; `--signed-off` records who and when in the spec. It then writes the
 steps to `.design-system-engine-out/handback/figma-build.json` and the Figma script to `handback/figma-apply.js` (the one
