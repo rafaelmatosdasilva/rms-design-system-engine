@@ -2181,32 +2181,15 @@ and ask first when the person's last message does not approve. Then `--refresh-f
 Missing components and layout are never written: they stay in `changes-in-Figma.md`.
 
 Each kind of change is a yes of its own: `roles`, `accessibility-specs`, `accessibility-review`, `renames`,
-`dev-mode`, `to-do`, `descriptions`, `spec-pages`, `tokens` (`EDIT_KINDS`). When a run lists more than one and the
+`dev-mode`, `to-do` (`EDIT_KINDS`). When a run lists more than one and the
 project asks before the design file is changed, no script is written: its `NEXT:` line names each kind, the person is
 asked about each, and `--figma-edits <kind…>` lists only those and writes the script for them. A decision is listed
 whatever the kinds; a word that is no kind is refused with the kinds there are; a script an earlier run left is taken
-away when a run writes none. A request that names a kind ("write the spec pages into Figma") starts with that kind
-alone (`figmaKindsSaid`).
+away when a run writes none. A request that names a kind ("add the roles in Figma") starts with that kind alone
+(`figmaKindsSaid`), and one that names descriptions, token values or spec pages runs that command.
 
-Three more edits write what the engine knows where designers read it (`figma-docs-edits.mjs`), after the same yes and
-each with its way back:
-- **Descriptions from the intent layer.** What a page says a component or a token is for (its purpose lines, else its
-  summary) becomes the description of its component set or its variable. Only the team's word is written: a drafted
-  line (`**Draft:**`) is never written, and nothing is drafted at that point. Components are matched to their pages as
-  everywhere else (`matchComponents`); a token page by its variable's name or its CSS name. A description Figma has
-  already is kept, and listed (`descKept`) when it says something else. Variables go in chunks of 400 a run; the
-  script says how many are left, and running it again goes on.
-- **A spec page beside each component set**, a frame "Spec · <name>": its anatomy (an instance of its default variant,
-  a numbered marker on each part a person named), its properties with their options and default, its height, padding,
-  gap, corners, type and colours in each variant with the variable each binds (the structure capture), its role and
-  what a screen reader says (`heard`). The frame is the engine's own and written afresh on every yes, so it never goes
-  stale.
-- **Token values the code changed first.** A token whose value the code changed since the two sides last agreed
-  (`agreed.mjs`, code-moved) is written into its Figma variable in that mode, the value before and after listed
-  first. One only the code has is created, named by the naming convention (`varToToken`), in the collection of the
-  variable it shares the most of its name with. A token both sides changed, a Figma value that is an alias, and a value
-  with no one Figma value (a `rem`, a `calc`) are listed for a person and never written (`tokKept` says what the script
-  left). Needs a fresh code capture.
+Descriptions, token values the code changed first and spec pages are commands of their own (`--figma-descriptions`,
+`--figma-tokens-back`, `--figma-specs`), each one kind already, after the same yes and with the same way back.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 

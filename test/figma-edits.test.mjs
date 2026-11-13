@@ -87,8 +87,11 @@ test('router: bringing Figma in line with the code goes to the engine\'s edits; 
   // A request that names a kind of change gets only that kind: each is a yes of its own.
   for (const [t, kinds] of [['update Figma to match the code', ''], ['update Figma so it states the roles the code has', ' roles'], ['add the roles in Figma', ' roles'], ['alinha o figma com o código', ''], ['make figma match the code', ''],
     ['pin the accessibility findings in Figma', ' accessibility-review'], ['add the accessibility specs to Figma', ' accessibility-specs'], ['manda os problemas de acessibilidade pro Figma', ''],
-    ['write the spec pages into Figma', ' spec-pages'], ['put the intent layer descriptions in Figma', ' descriptions'], ['write the token values the code changed into Figma', ' tokens'], ['link each component to its code in Dev Mode', ' dev-mode']])
+    ['link each component to its code in Dev Mode', ' dev-mode']])
     assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', [`rms-design-system-engine --figma-edits${kinds}`]], t);
+  // Descriptions, token values and spec pages: each its own command.
+  for (const [t, cmd] of [['write the spec pages into Figma', '--figma-specs'], ['put the intent layer descriptions in Figma', '--figma-descriptions'], ['write the token values the code changed into Figma', '--figma-tokens-back']])
+    assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', [`rms-design-system-engine ${cmd}`]], t);
   for (const t of ['take back the last change in Figma', 'undo the last change in figma', 'desfaz a última mudança no Figma']) assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', ['rms-design-system-engine --figma-undo']], t);
   assert.equal(route('change the chip radius in Figma to 12px so it matches the code', {}).recipe, 'fix-a-difference');
   assert.notEqual(route('update the code to match Figma', {}).recipe, 'figma-edits', 'the code to Figma is the other way');
@@ -102,7 +105,7 @@ test('the prototypes\' gaps become the design team\'s to do list in Figma: its o
   const lines = editLines(edits).join('\n');
   assert.match(lines, /to do list in Figma, page "Design system to do", frame "Gaps from prototypes" \(2 needs the system lacks, from 2 prototypes, the most needed first\)/);
   assert.match(lines, /• a toggle switch: component · meanwhile: chip · needed in 2 prototypes: notify, settings/);
-  assert.match(lines, /NEXT: these are 2 kinds of change to the design file, and the person says yes to each on its own\. Ask about each, in words: roles \(role notes read from the code\); to-do \(the design team's to do page\)/);
+  assert.match(lines, /NEXT: these are 2 kinds of change to the design file, and the person says yes to each on its own\. Ask about each, in words: roles \(role notes read from the code\), to-do \(the design team's to do page\)/);
   assert.match(editLines(edits, { named: ['roles', 'to-do'] }).join('\n'), /NEXT: show the person the 1 change and to do list above and ask/, 'the kinds they said yes to, named: one script for them');
   const script = applyScript(edits);
   // A fake Figma: pages, frames and texts that keep what is set on them.

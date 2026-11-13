@@ -423,21 +423,21 @@ The engine writes into your Figma file what it already knows from the code and t
 - **Accessibility specs.** Each component's role, what names it, its states and its keys, as an annotation.
 - **Problems pinned on your screens.** Each accessibility problem on its layer, with a summary on each screen.
 - **Dev Mode links.** Each component linked to its code file, and each variable given its CSS name.
-- **Descriptions.** What the intent layer says each component and token is for. Only what the team wrote, never a draft.
-- **Spec pages.** A frame beside each component set: its parts numbered, its properties, each variant's sizes, spacing and tokens, and its role.
-- **Token values the code changed first.** Written into the variable, in that mode. A token only the code has is created beside the ones its name is closest to.
+- **Descriptions.** What the intent layer says each component and token is for, and where to use it. Only what the team approved, never a draft, and never a line repeated on every page.
+- **Spec pages.** A frame beside each component set, drawn from its contract: its parts numbered, its properties, states, tokens, sizes and accessibility. A frame whose contract changed is drawn again.
+- **Token values the code changed first.** Written into the variable, in that mode, only where the engine can tell the code moved first. A token the code added is made in the collection its layer lives in.
 - **The design team's to do page.** What the prototypes needed and the system lacks, and what the design owes for accessibility.
 
 ### What it never writes
 
 - **Over what a person wrote.** A description Figma already has is kept. If it says something else, you see both.
-- **A token both sides changed.** That is a decision for a person, so it is listed and left.
-- **Over an alias.** A Figma value that points to another variable is never replaced by a raw value.
+- **A token whose history it cannot read.** Without knowing which side moved first, it is listed and left.
+- **A value changed in Figma since.** That is a conflict for a person, never written over.
 - **A design decision.** A missing component, a screen's layout, or a role Figma and the code disagree on is listed for the team.
 
 ### One kind at a time
 
-When a run finds several kinds of change, nothing is written yet. You are asked about each kind (roles, specs, descriptions, spec pages, tokens and the rest), and only the kinds you say yes to go into the script. Asking for one kind by name, such as the spec pages, starts with that kind alone.
+When a run finds several kinds of change, nothing is written yet. You are asked about each kind (roles, accessibility specs, renames, Dev Mode and the rest), and only the kinds you say yes to go into the script. Descriptions, token values and spec pages are each asked on their own already. Asking for one by name, such as the spec pages, starts with it alone.
 
 ### Taking a change back
 
