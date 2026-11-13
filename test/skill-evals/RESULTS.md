@@ -2,6 +2,28 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Route benchmark, run again
+
+The four route tasks (`--set route`) on each route again, as on 30 October: `claude-haiku-5-5`, 3 runs each, a budget
+of $1 a run, now on engine a9d1c3c, after the routed block came to name each command's MCP tool beside it
+(`RUN (no shell): the query tool …`, engine #290).
+
+| Route | 30 October | Now | Input a run, now | Tool calls a run, now |
+|---|---|---|---|---|
+| Shell only (the command line) | 12/12 | 12/12 | 78k | 2.6 |
+| Shell and the MCP server | 12/12 | 12/12 | 77k | 2.3 |
+| MCP server, no shell | 12/12 | 12/12 | 60k | 2.0 |
+| No shell, no server | 3/12 | 2/12 | 114k | 5.4 |
+
+**Reading.** What #290 was for holds: in October 10 of the 12 runs with only the server first tried the shell command
+the routed request named, were refused, then called the tool; now none of the 12 tries the shell, each goes straight
+to the server's tools (the props and token tasks one or two `query` calls, the summary one `summary`, the UI one
+`query`, a `catalog` in two of three, and `check_ui`, beside writing the UI file it was asked for), on less input
+(60k a run against 70k) and fewer calls (2.0 against 2.9). With a shell the agent still uses the command line: in the
+route with both, 11 of 12 runs used it alone and one called the server beside it. With neither, only reading the last
+audit's summary as a file passes (2 of 3), as before: everything else needs the engine, which is the point of both
+routes. Records: `records/2026-11-13-route-benchmark/route` (`route-report.mjs <folder>`).
+
 ## 2026-11: Starting files from what is exact in Figma, and the way back from a Figma write in the guide (continuous evaluation)
 
 What changed since the entry below (engine 6859d53): Everything the system holds, generated, and a kept benchmark for Figma builds (#466); Starting files from what is exact in Figma, and the way back from a Figma write in the guide. The guide changed in `cookbook/build-component-figma.md`, `cookbook/build-from-figma.md`, `cookbook/change-component-figma.md`, `cookbook/figma-edits.md`, `reference/usage.md`.
