@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion (continuous evaluation)
+
+Measured on the merge of main of 13 November into the batch (engine 5ed611f). What changed since the entry below (engine 6859d53): A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion; The rows beyond A and AA keep what they depend on; The evaluation reads "lacks a green" as the gap said, as it reads "no green"; Measured: 79/79, no rule broken, no task changed state; What a run says about the browsers is the same on every machine; a row panel closed the page's own way; The demo's golden report says what a run answers about browsers; The anatomy view's test waits for each click to land, and says what a missed one hit; A table with no task keeps its top-left corner rounded; The token rule sees a .env said just before, as it sees one said just after; Measured on the merge: 79/79, no rule broken; A row panel closed in the test is hidden at once, so its scrim takes no later click; Everything the system holds, generated, and a kept benchmark for Figma builds (#466). The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `74360e9a6f74` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md a662f652` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md a92e2303` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 17c54670` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 5ed611f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.060 |
+| Input a run | 97k | 103k |
+| Turns a run | 3.5 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 97k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-13-testimony-judgement-and-browsers-on`.
+
 ## 2026-11: Everything the system holds, generated, on main (continuous evaluation)
 
 What changed since the entry below (engine 7efa620): What Figma is told: descriptions an agent can use, tokens the code changed first, and each component's spec (#465); Looking at a project without leaving anything in it (#464); A host it cannot reach is a warning, not a stack trace (#467). The guide changed in `reference/usage.md`.
