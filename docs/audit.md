@@ -60,6 +60,13 @@ How your tokens are layered is read from the tokens themselves, so you never hav
 - **And a token named like another collection's.** For example, `primitives/…` sitting in Semantic.
 - **Nothing is imposed.** A group of tokens that points in every direction has no clear layer, so it gets no rule.
 
+When your code has its own names for how things are laid out, each auto-layout frame is checked against them:
+
+- **The code's layout parts are read from its CSS.** A class named after a layout (`l-stack`, `o-cluster`, `ds-grid`) that lays out its children, with what it sets: its direction, gap, wrap and alignment.
+- **Each frame is named after the part it is laid out as.** A vertical frame called `Frame 47` is the code's Stack, so the fix says to name it Stack. A row that wraps is a Cluster, and one that does not wrap is not.
+- **Its gap is bound to a spacing variable.** A frame the code has a part for, with a gap typed by hand, is listed with that gap.
+- **Nothing is guessed.** With no layout parts in the code, there is nothing to name a frame after, and no rule.
+
 With the layers known, four more checks on what components bind:
 
 - **No base token on a component.** A primitive bound directly, where the rest of your system binds a semantic or component token.
@@ -415,6 +422,9 @@ The engine reads what your design system defines in Figma, its tokens and each c
   - Or, for a part that is another component (an icon), by that component's class, when the file puts it on one element only.
   - Its gap and padding are compared with the frame of that name in Figma, and its text with the text style Figma sets that layer in.
   - A difference names the part (`chip › Label font weight`) with the rule and the line that set it.
+  - A turned part (a chevron) is compared at its angle. Figma turns counter-clockwise and CSS clockwise, so Figma's 90° is the code's `rotate(-90deg)`, and -90° and 270° are the same turn.
+- **Icons are two sizes.** The icon's box and the glyph drawn inside it (16 inside 24) are each compared, so a glyph stretched to fill its box is found.
+- **One font face, however it is named.** Figma's Inter in Semi Bold, a file called `Inter-SmBld.otf` and the CSS's `Inter SemiBold` are the same face, so none of them is reported as a different or missing font.
 - **How it is put together.** Figma's anatomy against the code's, part by part, each with the line to patch:
   - a part Figma always shows that the code renders only on a condition, or one a Figma property shows that the code always renders;
   - a part's text set by hand where Figma sets a text style;
@@ -464,6 +474,8 @@ A collection whose values change with a mode (a sizing collection per breakpoint
   - `Size` and `size` are two prop names, and the finding shows the letters that differ (`letter case S → s`).
   - `L` and `large` are two values, and the finding says which code value it most likely is.
   - The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
+  - What each may hold is compared too. Figma's `label` text property takes words, and a code `label: ReactNode` takes anything, an icon or a spinner included. A swap that takes only some components is held against a code type that names them (`typeof Icon | typeof Spinner`).
+  - When your team says which is right (`holds` in `contract.authored.json`), the contract names the side to change.
 - **Sub-components match Figma.** The parts Figma nests are the ones the code uses.
 - **Templates compose the right components.** Each page uses the components Figma composes.
 - **Markup.** Ids, classes and icons match, and every control the design shows is built.
