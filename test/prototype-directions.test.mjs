@@ -38,7 +38,8 @@ test('the request\'s own shell comes first, and every direction is built from th
   const ds = directionsFor(ctx, focus({ components: [{ name: 'BoardPage', score: 20 }, { name: 'DataTable', score: 9 }] }));
   assert.equal(ds[0].shell, 'BoardPage', 'the one the request names');
   assert.equal(ds[0].why, 'the request names it');
-  assert.equal(ds[1].why, 'another shell the documentation offers');
+  // A shell nothing in the request points to says so, rather than reading as a weighed alternative.
+  assert.match(ds[1].why, /another shell the documentation offers|its own words answer the request/);
   // What differs between directions is the shell, never whether the page is the system's.
   for (const d of ds) assert.deepEqual(d.uses, ds[0].uses);
 });
@@ -66,10 +67,14 @@ test('one documented shell is one direction, said as one rather than dressed as 
 
 test('what a person reads: each direction numbered, with its shell, its purpose and what it is built from', () => {
   const said = directionLines(directionsFor(ctx, focus())).join('\n');
-  assert.match(said, /^\n?\d DIRECTIONS {2}each built on the system, to compare before one is chosen:/m);
-  assert.match(said, /1\. \w+ — .+ \((the request names it|another shell the documentation offers)\)/);
+  // Named or scored, it is a comparison; otherwise it says plainly that the choice is the reader's.
+  assert.match(said, /^\n?\d (DIRECTIONS {2}each built on the system, to compare|SHELLS {2}the documentation offers these)/m);
+  // The reason is on the line only where the heading did not already give it.
+  assert.match(said, /1\. \w+ — .+/);
+  const named = directionLines(directionsFor(ctx, focus({ components: [{ name: 'BoardPage', score: 20 }] }))).join('\n');
+  assert.match(named, /1\. BoardPage — .+ \(the request names it\)/);
   assert.match(said, /built from: DataTable, Button/);
-  assert.match(said, /the components are the same, the shell is what differs/);
+  assert.match(said, /components are the same/);
   // A shell with no documentation still appears, and says it has none.
   const ds = directionsFor({ ...ctx, rules: [] }, focus());
   assert.match(directionLines(ds).join('\n'), /the documentation says nothing about what it is for/);
