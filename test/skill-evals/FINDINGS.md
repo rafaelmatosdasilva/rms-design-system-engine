@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## An empty run is the runner's, not the engine's
+
+**Found** 14 November 2026, measuring the batch that added colour merges, owed states and lesson evidence (guide set f1f79254251b). **Fixed in** nothing: no fix was owed.
+
+**Evidence.** One of 79 runs (`accept-radius` #1) came back with no result and no reply, so both its checks failed. It ran while a second evaluation from another session was running on the same computer. The task's other two runs passed in 2 turns each, and the task run again alone passed 3 of 3, in 2 turns each.
+
+**Guess ruled out.** That the batch's guide change made the agent stop answering on that task: the change touched no part of what `accept-radius` reads, and a run the agent finishes leaves a reply even when it is wrong. A run with no reply at all never started its answer.
+
+**What changed.** Nothing in the engine. The failed row is kept in the record as it ran, beside this note and the clean run again.
+
+---
+
 ## The counts were true and the result was still useless
 
 **Found** 14 November 2026, the owner's review of the Figma build benchmark's first sample, each result built in a Figma file to be seen rather than read. **Fixed in** `lib/figma-ops.mjs` and `lib/component-spec.mjs` (three questions the builder now asks), `test/figma-bench/` (the counts sense, asks and rules, requests in a person's own words, `--source` on a team's own library, the sample built in Figma).

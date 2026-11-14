@@ -278,5 +278,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-14-a-layout-part-is-a` | The 24 guide tasks on Haiku (engine 7cfcaf8) | "A layout part is a class named after a layout, never one that only ends in its word" |
 | `2026-11-14-figma-builder-asks-on-main` | The 24 guide tasks on Haiku (engine 253ad7b) | "The Figma builder asks, and its benchmark on a real library, on main" |
 | `2026-11-14-the-status-cards-measured-on` | The 24 guide tasks on Haiku (engine f7ce0c9) | "The Status cards' measured-on line taken out, at the owner's word" |
+| `2026-11-14-a-merge-keeps-the-shared` | The 24 guide tasks on Haiku (engine b64f57b) | "A merge keeps the shared colour, never a component's own, and the demo report shows the new advice" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
