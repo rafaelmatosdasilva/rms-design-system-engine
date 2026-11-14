@@ -58,7 +58,12 @@ export function standin(system) {
     }
     findAll(f = () => true) { const out = []; const walk = (n) => { for (const k of n.children) { if (f(k)) out.push(k); walk(k); } }; walk(this); return out; }
     findOne(f) { return this.findAll(f)[0] ?? null; }
-    setBoundVariable(f, v) { if (v) this.boundVariables[f] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete this.boundVariables[f]; }
+    // A size bound to a variable takes its value, as Figma sizes the layer by it.
+    setBoundVariable(f, v) {
+      if (v) this.boundVariables[f] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete this.boundVariables[f];
+      const n = v && (f === 'height' || f === 'width') ? resolve(v) : null;
+      if (typeof n === 'number') { if (f === 'height') { this._h = n; if (this.layoutMode === 'VERTICAL') this.primaryAxisSizingMode = 'FIXED'; else this.counterAxisSizingMode = 'FIXED'; } else { this._w = n; if (this.layoutMode === 'HORIZONTAL') this.primaryAxisSizingMode = 'FIXED'; else this.counterAxisSizingMode = 'FIXED'; } }
+    }
     addComponentProperty(name, type, def) { const k = `${name}#${++seq}:0`; this.componentPropertyDefinitions[k] = { type, defaultValue: def }; return k; }
     editComponentProperty(k, { name, defaultValue }) { const d = this.componentPropertyDefinitions[k]; delete this.componentPropertyDefinitions[k]; if (defaultValue !== undefined) d.defaultValue = defaultValue; const nk = name ? `${name}#${k.split('#')[1]}` : k; this.componentPropertyDefinitions[nk] = d; return nk; }
     deleteComponentProperty(k) { delete this.componentPropertyDefinitions[k]; }
@@ -77,6 +82,9 @@ export function standin(system) {
     vars.push({ id: `V:${vars.length + 1}`, name: v.name, resolvedType: v.type ?? 'FLOAT', scopes: v.scopes ?? ['ALL_SCOPES'], variableCollectionId: collections.get(v.collection).id, valuesByMode: {}, remove() { vars.splice(vars.indexOf(this), 1); }, setValueForMode(m, x) { this.valuesByMode[m] = x; } });
   }
   const varNamed = (n) => vars.find((v) => v.name === n);
+  // A variable's value in its first mode, through its aliases.
+  const resolve = (v, seen = 0) => { const x = Object.values(v?.valuesByMode ?? {})[0]; return x?.type === 'VARIABLE_ALIAS' && seen < 10 ? resolve(vars.find((y) => y.id === x.id), seen + 1) : x; };
+  for (const v of system.variables) if (v.value != null) { const x = varNamed(v.name), c = [...collections.values()].find((k) => k.id === x.variableCollectionId); for (const m of c.modes) x.valuesByMode[m.modeId] = v.value; }
   for (const v of system.variables) if (v.alias) { const x = varNamed(v.name), to = varNamed(v.alias), c = [...collections.values()].find((k) => k.id === x.variableCollectionId); for (const m of c.modes) x.valuesByMode[m.modeId] = { type: 'VARIABLE_ALIAS', id: to.id }; }
 
   // Each component from the capture: a set of its variants, each built from its tree, sized and bound as it says.
@@ -84,18 +92,22 @@ export function standin(system) {
   const pages = [page, ...(system.pages ?? []).map((p) => new N('PAGE', p))];
   const nodes = {};
   const build = (t, comps) => {
-    const n = t.t === 'INSTANCE' ? comps[t.of.name].createInstance() : new N(t.t, t.n, t.t === 'TEXT' ? { characters: t.text ?? t.n } : {});
+    const of = t.t === 'INSTANCE' ? (comps[t.of?.name] ?? (comps[t.of?.name] = Object.assign(new N('COMPONENT', t.of?.name ?? 'component'), { componentPropertyDefinitions: {} }))) : null;
+    const n = of ? of.createInstance() : new N(t.t ?? 'FRAME', t.n, t.t === 'TEXT' ? { characters: t.text ?? t.n } : {});
     n.name = t.n ?? n.name;
     if (t.layout) { n.layoutMode = t.layout.dir; n.primaryAxisSizingMode = t.fixed ? 'FIXED' : 'AUTO'; n.counterAxisSizingMode = t.fixed ? 'FIXED' : 'AUTO'; n.itemSpacing = t.gap ?? 4; }
     if (t.fixed) { n._w = t.fixed[0]; n._h = t.fixed[1]; }
     if (t.clip) n.clipsContent = true;
     if (t.wired) n._wired = t.wired;
-    for (const [f, v] of Object.entries(t.bind ?? {})) { const x = varNamed(v); if (f === 'fill') n.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: x.id } } }]; else n.setBoundVariable(f, x); }
+    for (const [f, v] of Object.entries(t.bind ?? {})) { const x = varNamed(v); if (!x) continue; if (f === 'fill') n.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: x.id } } }]; else n.setBoundVariable(f, x); }
     for (const k of t.c ?? []) n.appendChild(build(k, comps));
     return n;
   };
   const comps = {};
-  for (const [name, c] of Object.entries(system.components)) {
+  const nests = (t) => [...(t?.t === 'INSTANCE' && t.of?.name ? [t.of.name] : []), ...(t?.c ?? []).flatMap(nests)];
+  const order = [], seen = new Set(), visit = (n) => { if (seen.has(n) || !system.components[n]) return; seen.add(n); for (const m of nests(system.components[n].tree)) visit(m); order.push(n); };
+  for (const n of Object.keys(system.components)) visit(n);
+  for (const [name, c] of order.map((n) => [n, system.components[n]])) {
     const variants = c.variants.map((vn) => { const v = build({ ...c.tree, t: 'COMPONENT', n: vn }, comps); v.type = 'COMPONENT'; v.componentPropertyDefinitions = {}; return v; });
     const set = variants.length > 1 || c.axes ? new N('COMPONENT_SET', name, { componentPropertyDefinitions: {} }) : variants[0];
     if (set !== variants[0]) { variants.forEach((v, i) => { set.appendChild(v); v.y = i * 60; }); set.resizeWithoutConstraints(400, variants.length * 60); }
