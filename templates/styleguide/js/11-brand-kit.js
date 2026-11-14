@@ -1470,7 +1470,7 @@
         // Each axis leans as the modes do together; the evidence says each mode's colour where they differ.
         var AX = AXM[0].map(function (ax, k) {
           var lean = AXM.reduce(function (n, m) { return n + m[k][2]; }, 0) / AXM.length;
-          var cs = AXM.map(function (m) { return m[k][4]; }), col = !cs[0] ? '' : two && cs[0] !== cs[1] ? 'in light ' + cs[0] + '; in dark ' + cs[1] : cs[0];
+          var cs = AXM.map(function (m) { return m[k][4]; }), col = !cs[0] ? '' : two && cs[0] !== cs[1] ? 'in light ' + cs[0] + ', in dark ' + cs[1] : cs[0];
           var pl = AXM.map(function (m) { return m[k][5] || []; }), bits = pl[0].filter(Boolean).filter(function (b, i, a) { return a.indexOf(b) === i; });
           if (two) pl[1].forEach(function (b) { if (b && bits.indexOf(b) < 0) bits.push(b + ' in dark'); });
           return [ax[0], ax[1], lean, ax[3] + (col ? ', ' + col : ''), bits.filter(Boolean)];

@@ -81,9 +81,9 @@ test('the plan carried out: each call its own, and a refusal never stops the res
 test('each issue body says local or shared in one line, with its reason', () => {
   const [chip] = issuesFor(findings(), { ctx: { owners: { chip: 'Cards team' }, usage: { chip: { products: [{ name: 'Northwind' }, { name: 'Acme shop' }] } } } });
   assert.equal(chip.scope.scope, 'shared');
-  assert.match(chip.body, /^Shared: waits on Cards team — chip is the system's: 2 products use it \(Northwind, Acme shop\); easy to undo, low risk\.$/m);
+  assert.match(chip.body, /^Shared: waits on Cards team — chip is the system's: 2 products use it \(Northwind, Acme shop\), easy to undo, low risk\.$/m);
   const [own] = issuesFor([{ check: 'No hand-built DS components', evidence: 'a button built by hand on a product screen', difference: true }]);
-  assert.match(own.body, /^Local: the product team's own — a product's own screen stays in one product: no other product gets it; easy to undo, low risk\.$/m);
+  assert.match(own.body, /^Local: the product team's own — a product's own screen stays in one product: no other product gets it, easy to undo, low risk\.$/m);
   const [none] = issuesFor([{ check: 'Token values', evidence: '--gap differs', difference: true }]);
   assert.match(none.body, /^Shared: waits on whoever decides for the system \(ds-config\.json owners\) — /m, 'no owner named: said so');
   assert.equal(chip.body.split('\n').filter((l) => /^(Shared|Local): /.test(l)).length, 1, 'one line');

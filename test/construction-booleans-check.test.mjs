@@ -51,7 +51,7 @@ test('a frame\'s layers come in one order, and each component sits on its family
 
 test('a yes/no variant that only shows a layer is a boolean property in all but name; one that restyles is a variant', () => {
   const r = rule(grammarOf({ props, structure }), 'yes-no-variant-restyles');
-  assert.equal(r.says, 'A yes/no variant changes how the component looks; one that only shows or hides layers is a boolean property');
+  assert.equal(r.says, 'A yes/no variant changes how the component looks, and one that only shows or hides layers is a boolean property');
   assert.equal(r.area, 'wiring');
   assert.deepEqual(r.toFix.map((x) => [x.component, x.value]), [['buttonGhost', 'showIcon: Icon'], ['buttonTertiary', 'showIcon: Icon']]);
   assert.equal(r.status, 'decide', 'half do: the team says whether it is the rule');

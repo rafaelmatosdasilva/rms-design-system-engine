@@ -17,7 +17,7 @@
       // where the component is marked, so a screen reader hears each once (alt="", never the name twice).
       var shot = p ? '<div class="pg-shot"><img loading="lazy" src="' + p.shot + '" alt="">' +
         (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
-      var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '); its Tasks say to use this one.' : k.figmaOnly ? 'Its screens use it in Figma; its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
+      var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '), and its Tasks say to use this one.' : k.figmaOnly ? 'Its screens use it in Figma, but its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
       var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
       var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own');
       return '<' + tag + ' class="' + cls + '"' + (k.href ? ' href="' + esc(k.href) + '" target="_blank" rel="noopener"' : '') + '>' + shot + '<h3>' + esc(k.name) + '</h3>' + (note ? '<p class="pg-selector">' + esc(note) + '</p>' : '') + '</' + tag + '>';
