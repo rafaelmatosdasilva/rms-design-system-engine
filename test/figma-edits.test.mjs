@@ -2,7 +2,7 @@
 // listed as an edit, and applied by a script that changes only what was listed, once.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits } from '../lib/figma-edits.mjs';
+import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits, onlyKinds } from '../lib/figma-edits.mjs';
 import { figmaWriteVerdict } from '../lib/guard.mjs';
 import { route } from '../lib/route.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -313,4 +313,19 @@ test('--figma-undo says what the way back puts back before it runs, and that it 
   assert.match(out, /^NEXT: show the person what the way back puts back, as printed above, and ask; only when they say yes, run .*figma-undo\.js .*\(fileKey K\)/m);
   writeFileSync(join(hb, 'figma-undone.json'), JSON.stringify({ at: '2026-11-12T10:00:00Z', refused: false }));
   assert.match(run(), /was taken back already, 2026-11-12T10:00:00Z\. Nothing left to put back\./);
+});
+
+test('asked for the roles alone, a role the accessibility spec would state is still listed as a role note', () => {
+  const role = { kind: 'role', component: 'field', label: 'Role: textbox' };
+  const spec = { kind: 'spec', component: 'field', role: 'textbox' };
+  const differs = { kind: 'role-differs', component: 'chip', decision: true };
+  // Everything at once: the spec states the role, so the note is not added twice.
+  assert.deepEqual(onlyKinds([role, spec, differs]).edits, [spec, differs]);
+  // The specs asked for: the same.
+  assert.deepEqual(onlyKinds([role, spec, differs], ['accessibility-specs']).edits, [spec, differs]);
+  // The roles alone: no spec is written, so the role note is what states it, and the run never says every role is stated.
+  const roles = onlyKinds([role, spec, differs], ['roles']).edits;
+  assert.deepEqual(roles, [role, differs]);
+  assert.ok(!editLines(roles).some((l) => /states every role/.test(l)));
+  assert.deepEqual(onlyKinds([role], ['nope']).unknown, ['nope']);
 });
