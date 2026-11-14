@@ -77,13 +77,15 @@ test('every finding carries its tasks, so a11y.json says who acts', () => {
 // do and left the new column saying "Nothing.", the eight columns shared the room evenly so the one sentence a person
 // reads wrapped to five lines, and the tooltip that lists where a criterion was tried repeated one address thirty
 // times. Each is checked here, against the template as it is written.
-test('who acts has a card of its own in the panel, and stays in what to do where no column shows it', () => {
+test('who acts has a card of its own in the panel, and what to do says only what to do, at the top', () => {
   const page = templateText();
-  // Its own card, from the row's own who.
+  // Its own card, from the row's own who, where the table has its column.
   assert.match(page, /if \(k === 'whoCell'\) return card\(col\[0\], r\.who \?/);
-  // And what to do writes it only where the table gives it no column (Documentation, Parity).
-  assert.match(page, /var whoCol = order\.some\(function \(c\) \{ return c\[1\] === 'whoCell'; \}\);/);
-  assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(!whoCol && r\.who \?/);
+  // What to do never repeats who acts (the owner's, 12 November 2026), and every panel opens with it.
+  assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(r\.todo \?/);
+  assert.match(page, /order = order\.filter\(function \(col\) \{ return col\[1\] === 'todo'; \}\)\.concat/);
+  assert.doesNotMatch(page, /if \(taskOpen\) order =/, 'whether the task is open or done');
+  assert.match(page, /cards\.splice\(firstTodo, 0, '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects/, 'what it affects goes under it');
 });
 
 test('every issue table gives each column its share by what it holds, and the column it is read for the rest', () => {

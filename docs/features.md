@@ -65,6 +65,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the style guide's Rules page, beside the code's.
 - Fixes a component's construction, such as renaming its layers, after you say yes.
 - Compares components of one kind, so every button sets its states and names its options the same way.
+- Names each auto-layout frame after the code's own layout part it is laid out as (a stack, a cluster), so `Frame 47` comes back into code as what it is.
 - Says when the file is not reliable enough to compare, before any result.
 
 ### What to ask
@@ -85,6 +86,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
 - Finds the code file of each Figma component on its own, so nobody writes a map.
 - Checks icons, slots and the parts inside each component.
+- Compares what each property may hold, so a Figma text that takes words and a code prop that takes anything are a difference, not a match.
+- Compares a turned part at its angle, an icon's box and its glyph as two sizes, and a font by its face, however each side names it.
 - Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
 - Checks that a brand changes only values, never which parts a component draws or how they are laid out.
 - Warns when a Figma frame changed since the version you approved.
@@ -119,7 +122,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
-- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
+- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again. It is shown as their word, not a measurement, and what meets the standard says how much of it rests on one.
+- Sorts the judgement calls for whoever checks them, when you ask: a model reads your headings, labels, link words and error messages and lists the ones worth looking at first, with why. It decides nothing — no criterion passes or fails on it.
+- Says which browser answered each criterion: the same in every browser, the browser's own to decide, or Chrome alone for what a screen reader hears.
 - Tries what belongs to a page across your products' own pages: a title and a language, a page that works both ways up, a skip link, the same navigation and help in the same place, more than one way of finding a page, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
 - Walks a flow for real when you ask it to: each step filled in and sent, so a field asked twice is a finding and not a question. It never types a password or a card number, and stops before a step that pays, signs or deletes.
 - Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
@@ -136,6 +141,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine check the accessibility of our pages and flows` | What belongs to a page, tried across your product's own pages |
 | `/rms-design-system-engine walk our checkout flow and check nothing is asked twice` | The flow filled in and sent step by step, with what it asks for again |
 | `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
+| `/rms-design-system-engine judge the wordings of our components` | The headings, labels, links and error messages a person should look at first |
 
 ## Lint your codebase rules
 
@@ -248,6 +254,10 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes each component's accessibility spec into Figma.
 - Pins accessibility problems on the layers of your designed screens.
 - Links each component to its code file in Dev Mode.
+- Writes into each token's and component's Figma description what it is for and where to use it, so an agent reading Figma knows where it belongs; never over one a designer wrote.
+- Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
+- Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
+- Comes as a Figma plugin too, so a designer reviews the change and applies it inside Figma, with an Undo.
 - Shows you every change first. Nothing changes until you say yes.
 
 ## Publish a living style guide
@@ -318,6 +328,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - With no code yet, lists what to build, in order, instead of failing.
 - Gives Claude Figma's exact names and values before it writes the code.
+- Writes each component's starting file from what is exact in Figma, as a patch you apply, with what Figma does not say listed in the file.
 - Checks every piece once it is built.
 
 ## Turn code into Figma
@@ -326,6 +337,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Draws a component that exists only in code as a Figma component: its props as properties and variants, its tokens as variables, its parts as layers.
 - Starts from the components the style guide marks Only in the code.
+- Draws a template or a pattern too, as a frame made of the system's own components.
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.
 
@@ -340,6 +352,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Works in a product file too: the system's variables come from its published library, imported by the key the Figma MCP finds for each.
 - Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
 - Grows the component set to hold new variants, so none is clipped.
+- Builds a pattern, a template, a page or a flow from your own one it is like, and a foundation as a new variable beside the one it is like.
+- Says when a layer runs beyond a box of a fixed size, instead of choosing a new size.
+- Asks what a new bigger size changes, which part a new setting shows, and what makes a copy different, instead of building the literal reading.
 - Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
 - Writes nothing until someone signs it off and you say yes, then checks the result.
@@ -462,7 +477,7 @@ Your tools stay as they are, and the engine fits around them.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
 - Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
-- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
+- Answers agents that have no terminal, such as prototyping tools, through MCP.
 
 ## What you can count on
 

@@ -54,6 +54,8 @@ How soon it is worked on:
 
 A fix reaches you the day after it is merged: every install updates itself once a day.
 
+**You can be thanked for it.** Each form ends with a box: tick it, and the notes of the release that fixes your issue thank you by your GitHub handle. Leave it unticked and the release says nothing of you.
+
 ## Pull requests
 
 Pull requests are not accepted, a typo fix included: open an issue instead, and it is fixed here. A pull request is closed with a link to this page. Nothing about it is personal.

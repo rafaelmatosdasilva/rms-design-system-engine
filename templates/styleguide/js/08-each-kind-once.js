@@ -71,11 +71,11 @@
   // every kind, written or not; the Status page only the ones still to write, under the same numbers.
   // Every place the engine reads it from, any one of them: the page shows each under its source.
   var GUIDE_HINT = 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section with that title (When to use, When not to use…); ' : '') +
-    'its description in Figma, as a line that starts with that title (When to use: …); the comment above its rule in the code, the same way; or contract.authored.json under guidance.';
+    'its description in Figma, as a line that starts with that title (When to use: …), the comment above its rule in the code, the same way, or contract.authored.json under guidance.';
   var WRITE_HOW = {
     'What it is': 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer (an Intent or Overview section), ' : '') + 'its description in Figma, or its note in the code.',
-    'Do and don\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\'t:, with the markup when it helps: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section titled Do and don\'t; ' : '') + 'its description in Figma; the comment above its rule in the code; or contract.authored.json under guidance.doDont. Agents read it there; pictures in Figma (frames named under examples in contract.authored.json) are for people, beside it.',
-    Role: 'Write it in its page in the intent layer, as a rule that starts with Role: (Role: button). Agents read it there; an annotation in Figma says the same to people and is checked against it.'
+    'Do and don\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\'t:, with the markup when it helps: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section titled Do and don\'t, ' : '') + 'its description in Figma, the comment above its rule in the code, or contract.authored.json under guidance.doDont. Agents read it there, and pictures in Figma (frames named under examples in contract.authored.json) are for people, beside it.',
+    Role: 'Write it in its page in the intent layer, as a rule that starts with Role: (Role: button). Agents read it there, and an annotation in Figma says the same to people and is checked against it.'
   };
   // Its tokens: how many say what they are for (Figma's variable descriptions, what an agent reads to pick the right
   // token), each one that does not by name, and those that do with what they say.
@@ -115,12 +115,12 @@
       var listed = k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ');
       var publish = 'Publish the contracts again from the code project (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request.';
       var row = !k.shared && !DATA.intentLayer
-        ? mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, ' + where + ', which the engine generates from Figma and the code on every run: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '')
+        ? mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, ' + where + ', which the engine generates from Figma and the code on every run: ' + listed + '. Agents read them there, so there is nothing to write.</p>', 'done', '')
         : !k.shared
         ? mk('props', 'Properties', '<p class="pg-missing">Its properties are only in the engine\'s local contract, ' + where + ', which nobody else reads.</p>', 'todo', 'Publish the contracts to the intent layer (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request, so everybody reads the same one.')
         : (k.drift || []).length
           ? mk('props', 'Properties', '<p class="pg-missing">Its contract in the intent layer, ' + where + ', is out of date: ' + k.drift.map(esc).join('; ') + '.</p>', 'todo', publish)
-          : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '');
+          : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there, so there is nothing to write.</p>', 'done', '');
       rows.push(Object.assign(row, { src: ['Its contract (' + k.file + ')'] }));
     }
     // What each of its props is for: how many say it, each one that says nothing with where its description goes (the
@@ -159,7 +159,7 @@
       var needs = Object.keys(inv.needs || {}), WRITE = { example: 'an example of it in use (the engine writes one from the product\'s own code with --intent-changes)', fields: 'what each item of its lists holds, in its code comment', page: 'its page in the intent layer' };
       rows.push(mk('invented', 'What agents got wrong', '<p' + (needs.length ? ' class="pg-missing"' : '') + '>' + inv.count + (inv.count === 1 ? ' mistake' : ' mistakes') + ' in prototypes' + (needs.length ? ', because ' + needs.map(function (n) { return esc(inv.needs[n].why); }).join(', and ') : ', with what they needed written') + ':</p>' +
         '<ul>' + (inv.last || []).map(function (l) { return '<li>' + esc(l.message) + ' <span class="pg-dim">(' + esc(l.page) + ')</span></li>'; }).join('') + '</ul>',
-        needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join('; and ') + '.' : 'What agents needed is written, and they still got it wrong: say it more plainly, or higher on its page.'));
+        needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join(', and ') + '.' : 'What agents needed is written, and they still got it wrong: say it more plainly, or higher on its page.'));
       rows[rows.length - 1].src = ['The prototypes\' checks'];
     }
     // What an agent cannot learn about it (its props, events, slots and lists no comment and no page explains).

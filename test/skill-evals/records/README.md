@@ -262,5 +262,21 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-merge-main-the-batch-is` | The 24 guide tasks on Haiku (engine df790fa) | "Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA" |
 | `2026-11-12-merge-origin-main-into-parity` | The 24 guide tasks on Haiku (engine 0029a14) | "Figma's anatomy held against the code's, on the latest main" |
 | `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci" |
+| `2026-11-12-code-into-figma` | The 24 guide tasks on Haiku (engine 84f012d) | "Code into Figma, templates as frames and code from a spec" |
+| `2026-11-12-layout-faults` | The 24 guide tasks on Haiku (engine 3f231b9) | "Layout faults, construction check annotations and the skill file" |
+| `2026-11-12-code-into-figma-on-main` | The 24 guide tasks on Haiku (engine 44b2c48) | "Code into Figma, on main with the layout faults" |
+| `2026-11-12-everything-the-system-holds` | The 24 guide tasks on Haiku (engine 7efa620) | "Everything the system holds, generated, and a kept benchmark for Figma builds" |
+| `2026-11-12-a-description-a-designer-wrote` | The 24 guide tasks on Haiku (engine d20790c) | "A description a designer wrote is put to the person, with both texts" |
+| `2026-11-12-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 7050066) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/written-back" |
+| `2026-11-13-everything-the-system-holds-on-main` | The 24 guide tasks on Haiku (engine 6859d53) | "Everything the system holds, generated, on main" |
+| `2026-11-13-starting-files-from-what-is` | The 24 guide tasks on Haiku (engine 479ebc8) | "Starting files from what is exact in Figma, and the way back from a Figma write in the guide" |
+| `2026-11-13-route-benchmark` | The route benchmark run again, after the routed block named each command's MCP tool (engine a9d1c3c), Haiku 5.5 | "Route benchmark, run again" |
+| `2026-11-13-testimony-judgement-and-browsers-on` | The 24 guide tasks on Haiku (engine 5ed611f) | "A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion" |
+| `2026-11-13-merge-main-this-batch-lands` | The 24 guide tasks on Haiku (engine fcc5d31) | "A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion, on main" |
+| `2026-11-13-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine ba70b55) | "Merge remote-tracking branch 'origin/main' into figma/findings-reach-designers" |
+| `2026-11-14-figma-builder-asks-and-benchmark-on-real-library` | The 24 guide tasks on Haiku (engine 5f1e378) | "The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too" |
+| `2026-11-14-a-layout-part-is-a` | The 24 guide tasks on Haiku (engine 7cfcaf8) | "A layout part is a class named after a layout, never one that only ends in its word" |
+| `2026-11-14-figma-builder-asks-on-main` | The 24 guide tasks on Haiku (engine 253ad7b) | "The Figma builder asks, and its benchmark on a real library, on main" |
+| `2026-11-14-the-status-cards-measured-on` | The 24 guide tasks on Haiku (engine f7ce0c9) | "The Status cards' measured-on line taken out, at the owner's word" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

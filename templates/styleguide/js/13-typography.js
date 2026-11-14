@@ -13,7 +13,7 @@
     foundationLead(ts, plural((TOKENS.typography || []).length, 'text style', 'text styles') + ' of the system, each at every breakpoint.');
     if (TYPE_FAMILY && TYPE_FAMILY.differs) {
       var fd = document.createElement('div'); fd.className = 'sg-pending sg-type-family';
-      fd.innerHTML = '<b>The family differs.</b> Figma\'s text styles use ' + esc(TYPE_FAMILY.figma || '') + (TYPE_FAMILY.variable ? ' (' + esc(TYPE_FAMILY.variable) + ')' : '') + ', the code ' + esc(TYPE_FAMILY.code || 'none') + (TYPE_FAMILY.var && /^--/.test(TYPE_FAMILY.var) ? ' (' + esc(TYPE_FAMILY.var) + ')' : '') + '. It is on the Status page; the styles below are drawn in the code\'s family.';
+      fd.innerHTML = '<b>The family differs.</b> Figma\'s text styles use ' + esc(TYPE_FAMILY.figma || '') + (TYPE_FAMILY.variable ? ' (' + esc(TYPE_FAMILY.variable) + ')' : '') + ', the code ' + esc(TYPE_FAMILY.code || 'none') + (TYPE_FAMILY.var && /^--/.test(TYPE_FAMILY.var) ? ' (' + esc(TYPE_FAMILY.var) + ')' : '') + '. It is on the Status page. The styles below are drawn in the code\'s family.';
       ts.appendChild(fd);
     } else if (TYPE_FAMILY) {
       var fc = document.createElement('div'); fc.className = 'sg-token-cards sg-type-family';

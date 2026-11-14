@@ -56,3 +56,12 @@ body:
       description: Existing options, other tools, a workaround, and why each falls short.
     validations:
       required: false
+
+  - type: checkboxes
+    id: credit
+    attributes:
+      label: When it is fixed
+      description: Leave it unticked and the release says nothing of you.
+      options:
+        - label: Thank me in the release notes, by my GitHub handle, in the release that fixes this.
+          required: false

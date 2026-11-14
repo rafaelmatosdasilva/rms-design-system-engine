@@ -1,0 +1,24 @@
+name: Design system construction check
+description: >-
+  Fails a pull request on a component that breaks a construction rule the team decided (in its authored contract, or in
+  its own linter), and warns on every other rule a component does not follow, each as an annotation on the pull request.
+  It reads the project's committed Figma capture and its component files; it changes nothing.
+inputs:
+  working-directory:
+    description: The folder that holds ds-config.json.
+    required: false
+    default: .
+  node-version:
+    description: The Node.js version to run the engine with.
+    required: false
+    default: '22'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    # The engine is this action's own checkout: nothing is installed or fetched.
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: node "${{ github.action_path }}/../../../audit.mjs" --construction-check --github

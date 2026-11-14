@@ -8,6 +8,8 @@ How the engine tests the accessibility of every component, and of your products'
   - [Pages and flows](#pages-and-flows)
   - [Beyond A and AA](#beyond-a-and-aa)
   - [Video and sound](#video-and-sound)
+  - [Judgement calls, pre-sorted](#judgement-calls-pre-sorted)
+  - [Which browser answered it](#which-browser-answered-it)
 
 ## Test accessibility
 
@@ -128,6 +130,45 @@ Why apart: an icon that disappears in high contrast mode used to be reported as 
 
 A component that plays video or sound runs the media criteria (1.2.1 to 1.2.5, 1.4.2) and no other component does. A video with no captions track (1.2.2) and sound that starts by itself (1.4.2) are found in the browser; what only a person can judge — whether a transcript is accurate, whether live captions keep up, whether what the picture shows is described — is a row with the steps to check it. A component that plays nothing leaves all of these out.
 
+### Judgement calls, pre-sorted
+
+Three criteria are a person's to settle and no machine's: whether a heading or a label says what follows it (2.4.6),
+whether an error message says how to put it right (3.3.3), and whether a link's own words say where it goes (2.4.4).
+The checks find what a pattern can find — an empty heading, a name that says little, a "click here" — and the rest is
+a reading. An auditor goes through every heading and every message in turn, and most of them are fine.
+
+Ask for it and a model reads the words first:
+
+```bash
+rms-design-system-engine --judge-a11y
+```
+
+- **It reads words, nothing else.** Each component's own code gives its headings and labels, its link words and what
+  it shows as an error. The model sees those lines and the question each criterion asks — not the component, not its
+  props, not its look.
+- **It decides nothing.** Every wording comes back *likely*, *unclear* or *fine*, with one short reason. No criterion
+  passes or fails on it: the row keeps the status the checks gave it, and the list sits under it as what to look at
+  first. *Unclear* is a real answer — a label that reads oddly on its own may be clear beside what it labels.
+- **It never writes the words.** The reason says what it read, never a replacement: the words are the team's.
+- **It runs only when you ask, and once per wording.** It spends your model tokens through your own command
+  (`a11yJudgement.cmd`), and an answer is kept by the words themselves, so the same heading is never paid for twice.
+
+### Which browser answered it
+
+Every browser check runs in Chrome, through its DevTools protocol. Engines differ in layout, fonts, form controls and
+focus rings, so a run in one browser answers some criteria for all of them and others for Chrome alone. Each criterion
+says which it is, and its row says so under what was found:
+
+| What it depends on | Criteria | What the row says |
+|---|---|---|
+| The code, the markup or your own values | A missing alternative text, contrast from the tokens, an orientation lock in the page's CSS, a title, a language | *Same in every browser* |
+| The browser | What Tab reaches, where the focus shows and whether anything hides it, reflow at 320px, zoom, text spacing, what an input does when it changes, dragging, target size | *Tried in Chrome*, and which other engines are not set up here |
+| Chrome's accessibility tree | What a screen reader hears (4.1.2) | *Chrome only* — no other engine exposes one, and a tool that works it out itself reads the same everywhere |
+
+The passes in Firefox and WebKit are not built yet. What is built is the accounting: a run that found only Chrome says
+so, a browser that is not installed is named as missing rather than passed over, and the criteria a browser decides are
+never presented as answered for engines nobody ran.
+
 ### How sure each finding is
 
 - **Blocker.** Measured on the page against WCAG 2.1 A or AA.
@@ -177,6 +218,13 @@ look at, **how to look at it**, and keeps the answer only while it is still true
   VoiceOver says nothing about NVDA, and the page no longer lets one stand for the other.
 - **It expires on its own.** The record keeps the component as it was (its CSS rules, its contract entry, its source
   file). Change any of them and the row reads *To check again*, saying who checked it before and with what.
+- **It is their word, and the page says so.** Nothing confirms the screen reader was running, or that it said what
+  the person reports. The row reads *Done* — their word is what the criterion asks for — and says whose word it is,
+  what they checked with (or that they did not say), and that the engine measured none of it. Where every other row
+  names the measurement it came from, this one reads *A person's word (QA, 5 Nov)*.
+- **What meeting the standard rests on.** When a component meets WCAG 2.2 at A and AA, the badge adds how many of
+  its criteria rest on a person's word, so nobody reads the claim as measured throughout. A conformance report has to
+  know the difference, and this is where it comes from.
 
 ### Only what changed is tried again
 

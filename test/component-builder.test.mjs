@@ -61,14 +61,15 @@ test('every operation is checked against the system: a value, an unknown variabl
 test('new names are written the way the system writes them; what adds to the system is held, what removes is breaking', () => {
   const g = ground([
     { op: 'addOption', axis: 'size', option: 'XL', like: 'l' },
-    { op: 'addProperty', name: 'show badge', kind: 'boolean', default: false, layer: 'Content' },
+    { op: 'addProperty', name: 'show label', kind: 'boolean', default: false, layer: 'Content/Label' },
     { op: 'removeProperty', name: 'labelContent' },
     { op: 'rename', what: 'layer', from: 'Content/Label', to: 'Text' },
+    { op: 'bind', layer: 'Content', field: 'gap', variable: 'spacing/s', where: { size: 'XL' } },
   ], { captures, grammar, target: 'chipFilter' });
   assert.deepEqual(g.questions, []);
-  assert.deepEqual(g.ops.map((o) => o.option ?? o.name ?? o.to), ['xl', 'showBadge', 'labelContent', 'Text']);
-  assert.deepEqual(g.named.map((n) => `${n.from} → ${n.to}`), ['XL → xl', 'show badge → showBadge']);
-  assert.deepEqual(g.held.map((h) => h.what), ['a new option, size=xl, on chipFilter', 'a new boolean property, showBadge, on chipFilter']);
+  assert.deepEqual(g.ops.map((o) => o.option ?? o.name ?? o.to), ['xl', 'showLabel', 'labelContent', 'Text', undefined]);
+  assert.deepEqual(g.named.map((n) => `${n.from} → ${n.to}`), ['XL → xl', 'show label → showLabel']);
+  assert.deepEqual(g.held.map((h) => h.what), ['a new option, size=xl, on chipFilter', 'a new boolean property, showLabel, on chipFilter']);
   assert.match(g.breaking[0].what, /property labelContent removed/);
   // A layer the person did not name the system's way would be; an option it is like must exist.
   assert.match(ground([{ op: 'addOption', axis: 'size', option: 'm', like: 'xs' }], { captures, grammar, target: 'chipFilter' }).questions[0].ask, /like \(s, l\)/);
@@ -102,9 +103,25 @@ test('a spec from a description: the component it is like, its name, and what it
   assert.ok(x.questions.some((q) => /chipFilter binds 1 variable made for it \(chipFilter\/label\/color\)/.test(q.ask)));
   assert.ok(x.questions.some((q) => /description/.test(q.ask)));
   assert.ok(x.notes.some((n) => /2 values bound to no variable/.test(n)));
-  const answered = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar, ops: [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'describe', text: 'A tag.' }] }).spec;
+  // A copy that changes nothing of how it is built is a twin, which this system's chips show it does not allow.
+  assert.ok(x.questions.some((q) => /tag would be built the same as chipFilter and take the same properties: a twin, which this system's rules do not allow \(no-twins\)/.test(q.ask)));
+  const answered = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar, ops: [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'removeProperty', name: 'showCount' }, { op: 'describe', text: 'A tag.' }] }).spec;
   assert.deepEqual(answered[EXT].questions, []);
   assert.ok(specLines(answered).some((l) => /How it differs from chipFilter/.test(l)));
+});
+
+test('a step on a scale copied from another is asked what it changes; a boolean named for a part goes on that part', () => {
+  const xl = ground([{ op: 'addOption', axis: 'size', option: 'xl', like: 'l' }], { captures, grammar, target: 'chipFilter' });
+  assert.match(xl.questions[0].ask, /xl would be a copy of l and look the same as it: what does xl change\?/);
+  assert.deepEqual(xl.ops, [], 'nothing built on a guess');
+  // An option that is no step on a scale (a tone, a kind) is a copy to start from, as before.
+  assert.deepEqual(ground([{ op: 'addAxis', axis: 'tone', options: ['neutral', 'brand'] }, { op: 'addOption', axis: 'tone', option: 'danger', like: 'brand' }], { captures, grammar, target: 'chipFilter' }).questions, []);
+  const badge = ground([{ op: 'addProperty', name: 'showBadge', kind: 'boolean', default: false, layer: 'Content' }], { captures, grammar, target: 'chipFilter' });
+  assert.match(badge.questions[0].ask, /showBadge would show or hide Content, and chipFilter has no badge for it to show: add one first/);
+  // The part the name says, when the component has it, is proposed.
+  assert.match(ground([{ op: 'addProperty', name: 'hasIcon', kind: 'boolean', default: false, layer: 'Content/Label' }], { captures, grammar, target: 'chipFilter' }).questions[0].ask, /hasIcon would show or hide Content\/Label, which is not the icon: Content\/icon is/);
+  // A state names no part (isActive), and a part added in the same change is the part (an addLayer first).
+  assert.deepEqual(ground([{ op: 'addLayer', parent: 'Content', layer: { type: 'instance', name: 'badge', of: 'icon' } }, { op: 'addProperty', name: 'showBadge', kind: 'boolean', default: false, layer: 'Content/Badge' }], { captures, grammar, target: 'chipFilter' }).questions, []);
 });
 
 test('an option or axis named loosely is the one the component has: "L", "large" and "Size" are l and size', () => {
@@ -112,9 +129,10 @@ test('an option or axis named loosely is the one the component has: "L", "large"
     { op: 'addOption', axis: 'Size', option: 'XL', like: 'L' },
     { op: 'removeOption', axis: 'size', option: 'small' },
     { op: 'bind', layer: 'Content', field: 'gap', variable: 'spacing/s', where: { Size: 'large' } },
+    { op: 'bind', layer: 'Content', field: 'gap', variable: 'spacing/s', where: { Size: 'XL' } },
   ], { captures, grammar, target: 'chipFilter' });
   assert.deepEqual(g.questions, []);
-  assert.deepEqual(g.ops.map((o) => [o.axis ?? null, o.like ?? o.option ?? o.where?.size]), [['size', 'l'], ['size', 's'], [null, 'l']]);
+  assert.deepEqual(g.ops.map((o) => [o.axis ?? null, o.like ?? o.option ?? o.where?.size]), [['size', 'l'], ['size', 's'], [null, 'l'], [null, 'xl']]);
   // An option it has already is not added again.
   assert.match(ground([{ op: 'addOption', axis: 'size', option: 'large', like: 's' }], { captures, grammar, target: 'chipFilter' }).questions[0].ask, /already has l/);
 });
@@ -286,17 +304,18 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   assert.match(cli('--spec', 'something for filters'), /Which of the system's components is it like\? .*chipFilter/s);
   const first = cli('--spec', 'a tag like chipFilter, called tag');
   assert.match(first, /tag: a spec built like chipFilter, 2 variants/);
-  assert.match(first, /To answer before it is built \(2\)/);
+  assert.match(first, /To answer before it is built \(3\)/);
+  assert.match(first, /a twin, which this system's rules do not allow/);
   assert.match(cli('--figma-build', 'tag'), /not built while something is unanswered/);
   assert.match(cli('--spec', 'a tag like chipFilter with sparkles, called sparkle'), /What was asked and not read: "add sparkles"/);
   assert.match(cli('--spec', 'a tag like chipFilter, called shared', '--shared'), /every binding of chipFilter\/label\/color moved to text\/default/);
   const opsFile = join(root, 'ops.json');
-  writeFileSync(opsFile, JSON.stringify([{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'describe', text: 'A tag.' }]));
+  writeFileSync(opsFile, JSON.stringify([{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'removeProperty', name: 'showCount' }, { op: 'describe', text: 'A tag.' }]));
   assert.match(cli('--spec', '--name', 'tag', '--ops', opsFile), /--figma-build tag --signed-off/);
   assert.match(cli('--figma-build', 'tag'), /waits for someone to sign it off/);
   assert.ok(!existsSync(join(root, '.design-system-engine-out/handback/figma-apply.js')));
   const built = cli('--figma-build', 'tag', '--signed-off', 'the system owner');
-  assert.match(built, /Building tag in Figma \(3 steps\), signed off by the system owner/);
+  assert.match(built, /Building tag in Figma \(4 steps\), signed off by the system owner/);
   assert.match(built, /only when they say yes, run the script .*use_figma \(fileKey KEY\)/);
   const script = readFileSync(join(root, '.design-system-engine-out/handback/figma-apply.js'), 'utf8');
   assert.match(script, /"op": "clone"/);

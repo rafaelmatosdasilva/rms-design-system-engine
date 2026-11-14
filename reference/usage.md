@@ -179,7 +179,7 @@ node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --list     
 
 A project whose code has no design tokens yet starts in **build mode** (`ds-config.json` → `"build": true`): setup
 chooses it when the code's folder has no stylesheet of tokens and a Figma file is given, or when it runs with `--build`. The engine still writes no code; it says what to build and
-checks each piece once it exists.
+checks each piece once it exists, and hands back the starting files when asked (`--scaffold`), as a patch a person applies.
 
 - **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
   Figma has and the code does not yet, a component after the ones it nests. NEXT names the next item with its commands.
@@ -215,8 +215,34 @@ checks each piece once it exists.
 - **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
 - **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
+- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react] [--folder <folder>]` writes each
+  component still to build (all of them in build order, or the ones named) from what is exact in Figma, as one patch
+  that adds the files: `.design-system-engine-out/handback/scaffold.patch`, for a person to apply with `git apply`.
+  Each is the component file and a stylesheet of its own beside it (`Button.vue` or `Button.jsx` with `button.css`):
+  its element by its role (a `<button type="button">`), its props as the catalog names them (a variant of True and
+  False a boolean), a modifier class for each value that has one and the element's `disabled` where a value is
+  `:disabled`, its text props as text, the system's components it holds as their tags, and every rule of its build
+  sheet as CSS, in `box-sizing: border-box` as Figma sizes a frame, a variant's own height included. What the sheet
+  says and Figma does not give exactly (what a state is wired to, `aria-pressed`, a focus ring the design does not
+  draw, a border whose width the capture does not hold) is never filled in: the file lists it as still yours to
+  write. What the files are written in and where they go come from the flags, `ds-config.json` (`framework`,
+  `componentFiles`) or `package.json`, and are asked otherwise, never chosen. A file the code already has is left out,
+  and a project not in build mode has nothing to scaffold. Once applied, `--component <name>` checks each one.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
   before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
+### The way back from a Figma write
+
+Every write the engine makes in Figma (`--figma-build`, `--figma-change`, `--figma-edits`, `--figma-fix`) goes
+through one script, and each step of it records the value it is about to replace. When the script has run, the guard
+reads that record from the tool's own answer and writes the way back beside the change:
+`.design-system-engine-out/handback/figma-undo.json` (the steps) and `figma-undo.js` (a script that puts each back,
+newest first). It is run like the change, with the Figma MCP's `use_figma` and only when the person says yes, and it
+touches nothing else. A step Figma keeps no copy of (a variant, a layer or a property the change removed) has no way
+back: the record says so, and the script refuses to run rather than put the file half back, since a person who
+believes a change is gone when part of it stays is worse off than one who knows. The file's version history is then
+the only way. `--change-report <component>` says, after a refresh, whether the way back ran and whether the read
+after is the same as the read before.
 
 ### Where the engine may write
 
@@ -411,7 +437,8 @@ accessibility check found broken (by WCAG criterion). The code file it names mus
 calls a deprecated component stable is wrong. **Out of date**: the component's props (names, and the values each
 takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
-history dates its file too). **Twins**: two components' pages that say the same (their own names aside, lines a template
+history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
+prop it does not have, or a literal value the prop does not take. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
@@ -971,7 +998,9 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
 
 - **`contract.authored.json`** (project root, **committed**) — the AUTHORED hub: per component,
   `bindings` (Figma prop → `{ attribute: "codeName" }` for a rename, `{ slot: "slotName" }` for a slot),
-  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, and optional
+  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, `holds` (what a
+  property may hold, as the team chose it: `{ "label": "words" }`, or `anything`, `one component`, `one of`; where
+  Figma and the code differ, the contract's `differences` names the side to change as `right`), and optional
   **agent guidance** — `whenNotToUse` (string), `useInstead` (a name or a list) and `neverCombineWith`
   (a list) — so an AI knows when not to reach for a component and what pairings are invalid — and an
   optional **decision status**: `status` (`current` | `deprecated` | `experimental`), `supersededBy`
@@ -1480,7 +1509,8 @@ own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the sys
 model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
 collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
 Three rules come of it, each a place (a token) rather than a component: a token of a layer points at the layer it goes
-through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
+through, never past it, up, elsewhere or across at another component's token, read from the library's component names
+(`token-layer-<layer>`); a base token never points at a layer above it (`token-base-<layer>`); an alias reaches its value in no more steps than most of
 the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
 names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
 With both, four more on what a component binds: never a base token (one in the layer others go through), where the
@@ -1548,7 +1578,11 @@ its own dot, and a list for the area and for the side, each saying how many rows
   instance swap as most of that name are (`slot-or-swap`), a hover or press shown by the frame's fill, a layer shown
   over it or its opacity, as most components show theirs (`state-one-way`), the library's size scale - at each size
   option, the minimum height and the icon size most components have there (`size-scale-height`, `size-scale-icon`) - and two parts side by side spaced by the variable most
-  frames holding them bind at the same size (`part-gap`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
+  frames holding them bind at the same size (`part-gap`); what the boxes say (`layout-faults.mjs`, `layout-faults`):
+  text over text or an icon, a text or an instance cut off by a frame that clips or outside one of a fixed size, each with
+  its layer and variant, always to fix (a fault is never put to the team), read from the places the capture keeps (a
+  box of a fixed size whose parts run beyond it, `looks[...].box`, and a layer placed by hand), and waiting on a capture
+  that keeps them (`boxes` in `_keeps`); and, where `ds-config.json` declares `tiers`, each token that points where its tier may not
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
@@ -1570,7 +1604,11 @@ beside its own rules): the run's summary has a **Construction** line with each d
 a rule. Beside those errors it says the **warnings**: a rule nobody has decided yet that components already break, said
 and never failing the run, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on
 both; `--json` writes the same as data (`errors`, `warnings`, `counts`, each rule with what breaks it and where the team
-decided it), for a job that posts it.
+decided it), for a job that posts it. `--github` prints each place that breaks a rule as an annotation a pull request
+shows (`annotationsOf`). The ready-made GitHub Action runs it in one line of a team's workflow (`uses:
+rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`, after `actions/checkout`;
+`working-directory` names the folder with `ds-config.json`); it runs the engine from its own checkout, installs nothing
+and changes nothing.
 
 #### A component built in Figma (`--spec`, `--figma-build`)
 
@@ -1605,11 +1643,68 @@ drives, and a removed layer takes with it the property that drove only it. The o
   paddingX, paddingY, paddingTop…, radius, fontSize, strokeWeight, width, height; where: `{ size: "l" }` for some
   variants), `rebind { from, to }` (every binding of one variable moved to another)
 - `describe { text }`, `place { page?, section? }`; and to start one, `clone { from, name }` (what `--like` writes) or
-  `create { name, axes?, layout? }` when no component is like it
+  `create { name, axes?, layout?, kind?, as? }` when no component is like it (`kind: "frame"` a plain frame, `as` which of
+  the system's kinds it is)
+- `addVariable { name, like, alias? | byMode? | value? }`: a foundation, a new variable in the collection of the one it
+  is like, of its type and scopes, pointing at one of the system's variables (`byMode: { light: …, dark: … }` when the
+  one it is like points at a different one in each mode), or holding a value only where the one it is like holds its
+  own (a primitive); a name without a group is put in the group of the one it is like
 
 A layer is named by its path inside the component (`Content/Label`).
 
-**--figma-build.** `--figma-build <name> [--signed-off "<who>"]` checks the spec again against the capture as it is now,
+What is built makes sense, not only exists, so three readings that would be built literally are asked instead: an
+option on a size scale copied from another step (`xl` like `l`) is asked what it changes, unless the operations that
+follow bind something where it is that option; a boolean named for a part (`showBadge`, `hasIcon`) put on a layer that
+is not that part is asked which part it shows (the part, when the component has it, is proposed) or to add it first;
+and a copy that changes nothing of how it is built or what it takes, in a system that holds `no-twins`, is asked what
+makes it different.
+
+Not only components (`system-kinds.mjs`): what the description makes decides what is built, by the intent layer's own
+kinds. "Make a template like settings", "a settings page", "a pattern for bulk actions" and "a checkout flow" build a
+frame (`create { kind: "frame", as }`) of the system's own components; "a spacing token like spacing/32" builds a
+variable; anything else is a component, as above. `--kind <component | pattern | template | page | flow | foundation>`
+says it when the words do not. A template, a page or a pattern starts from the system's own of that kind it is like (by
+its name, with or without its kind's word): the Figma templates (`templates`, their snapshot) and the intent layer's
+pages of that kind, each with the components it names. From those it reads how the system builds that kind, as the
+construction grammar reads components: a component every one holds is a rule and one most hold a fix (with three or
+more), and the one every one opens with a rule. The request's "with a toast" adds one of the system's components and
+"without the toolbar" drops one; a rule the new one breaks is asked (and what most hold, when it starts from nothing),
+never added behind the person's back. A flow is its pages side by side, each as the system composes it, from the flow
+it is like or the pages it names ("from orders to settings"). Every one is held for sign-off and asked where it goes, as
+a component is. `--code-build` writes a template, a pattern or a page in code too, its tags nested as the spec nests
+them and no props of its own, in the folder the code keeps its templates (`templates[].file`); a foundation reaches the
+code as every token does.
+
+**--spec-from-code.** `--spec-from-code <component>` writes the spec of a component only the code has from what the
+engine reads of it (`code-to-figma.mjs`): `create` with a variant axis for each prop of options, `describe` from its
+own comment, an `addLayer` for each part in markup order (another of the system's components an instance, a part that
+writes a prop's words a text in the text style its text is set in, any other a frame), an `addProperty` boolean for a
+part a prop shows and text for a prop a part writes, and a `bind` for each value of its own base rule written with a
+custom property, named as the Figma variable it stands for (the naming convention, read backwards). Its operations go to
+`.design-system-engine-out/specs/<name>.from-code.ops.json` and through `--spec --ops`, so what the code cannot ground (a
+value written by hand, a text with no text style, a nested component Figma lacks) is a question, and the new component
+is held for sign-off. Figma already having the component, or the code not having it, stops it with the one to use.
+
+Given a file instead (`--spec-from-code src/templates/Settings.vue`: a path, or a name ending in `.vue`, `.svelte`,
+`.jsx`, `.tsx` or `.html`), it draws a template or a pattern as a plain frame (`create { kind: "frame" }`, which takes no
+axes and is never combined as variants): an `addLayer` for each element in markup order, an element that holds others a
+frame in the direction its own rule lays it out, a tag the system has an instance of its Figma component, a text element
+a text in the text style its class sets, and a `bind` for each gap, padding, background and corner its rule writes with
+a custom property. A tag is the component the file itself imports it from (`import HeaderPage from '@/…/headers/Page'`
+is `<header-page>`), paired with Figma's the way the code reading pairs them, or the Figma component of its own name;
+one Figma lacks is a question. Its spec is named after the file (`settings`).
+
+**--code-build.** `--code-build <name>` writes the component a spec describes in code, the way the system writes one
+(`spec-to-code.mjs`): its framework (Vue or JSX), folder, file name case, part classes and prop case from the code's
+construction rules, an axis as a prop with its options, a property as a prop of its kind, a part as an element (another
+of the system's components its own tag, a text the prop that writes it, set in the text style the system sets it with:
+its mixin or its class), each bound variable the custom property the naming convention gives it. Nothing is written to
+the code: the file goes to `.design-system-engine-out/handback/code-build-<name>.patch`, a patch that adds it, which a
+person applies with `git apply`. It is read back with the code's own reader and held against the spec (every layer a
+part, every property a prop), and exits 1 when it falls short. A spec that still asks a question, or a file the code
+already has, stops it with the one to use.
+
+**--figma-build.** `--figma-build <name> [--signed-off "<who>"]` (a foundation's name with `-` for `/`: `spacing-40`) checks the spec again against the capture as it is now,
 and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the
 system and waits for a named person to sign it off; `--signed-off` records who and when in the spec. It then writes the
 steps to `.design-system-engine-out/handback/figma-build.json` and the Figma script to `handback/figma-apply.js` (the one
@@ -2057,6 +2152,58 @@ border or corner, a typed number, a text with no style, a shape and a component 
 the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
 in `prototypes/` is kept unless `--force`.
 
+#### --figma-descriptions (what each token and component is for, written into Figma)
+
+`rms-design-system-engine --figma-descriptions` writes into Figma's own description of each token and component what
+it is for and where to use it, so an agent reading the file through a Figma tool knows where each one belongs
+(`figma-descriptions.mjs`). Every line is the team's approved words or a fact the engine read: for a token, what it is
+for and when to use it and not (the intent layer), which components use it (their contracts), what it points at (its
+alias) and its name in the code; for a component, what it is for, when to use it and not, what to use instead (its
+contract) and its file in the code. Never a draft, nothing written at the point of writing, no line that repeats one
+already said or only leads into a list, and no description for a token with nothing to say but its code name. A line that is the same sentence on many pages of its kind with only the name changed is left out and
+listed: it is judged as the layer's reading judges it (`lineShape` in `doc-source-dsds.mjs`), but without the
+exception that keeps a token's templated line for the agents, since a designer learns nothing from it. A token is
+found in Figma by the system's naming (`tokenToVar`), a component by the intent layer's own pairing
+(`matchComponents`); one that pairs with nothing is said. A description Figma already holds is never written over
+unasked: one that already holds every line is left; one that says something else is put to the person in the list
+under "For a person to decide", with both texts. Where the engine has only facts (no words of the team's), or Figma
+already holds the team's very sentence, the suggestion keeps the designer's words and adds the facts below them;
+otherwise it is the team's approved words instead of the designer's. `--replace <name …>` writes the ones the person
+chose, `--replace-all` every one, and only where Figma still holds exactly the text that was listed, so one a
+designer changed again since is left. The script checks each one again in the file, so one a designer typed after the list was made is
+left too. It is written as the hand-back script (`handback/figma-apply.js`), run with the Figma tool only once the
+person says yes, each value it replaces recorded for the way back (`variableDescription`, `description` in
+`figma-undo.mjs`). A file of thousands of variables goes 300 a run: `--chunk 2`, `--chunk 3`, and so on, each run
+saying which part comes next.
+
+#### --figma-specs (each component's spec, drawn in Figma beside its component set)
+
+`rms-design-system-engine --figma-specs [component …]` draws each component's spec as a frame beside its component set,
+from its contract alone (`spec-frames.mjs`): the anatomy (an instance of the default variant with a numbered marker
+on each part, placed on the layer of the part's own name, the parts listed by number with their tokens), each property
+with its options and default, the states, every token it uses, its sizes per variant as Figma's capture has them, and
+its accessibility (element, role, what names it, its keys) as the code and the browser give it. A part with no layer
+of its name is listed with no marker, and said. Each frame keeps its contract's fingerprint: one drawn from the
+contract as it is now is left as it is, a stale one is drawn afresh. Written as the hand-back script, run only once the
+person says yes; the frames are the engine's own output, recorded for the way back. A system's specs go 40 a run
+(`--chunk 2`, …). Not yet: drawing them in the system's own documentation template when the file has one.
+
+#### --figma-tokens-back (a token the code changed first, written back to Figma's variables)
+
+`rms-design-system-engine --figma-tokens-back` writes back into Figma's variables a token the code changed first
+(`code-led-tokens.mjs`). A difference alone never says which side moved, so the engine reads the code as it was when
+Figma was last read: the theme stylesheet at that moment from git, else the code's values the engine kept at that read
+(`code-at-figma-read.json`, written each time Figma's variables are read). Per variable and mode: the code held then
+what Figma holds and has moved since → its value is written back; the two differed already when Figma was read →
+drift, listed in `handback/figma-tokens-back.json` and never written, since nobody can tell who is right; the past
+cannot be read → listed, never written, until the next Figma read keeps it. Two numbers that differ only by a unit
+(Figma writes `500px` for a font weight the code writes `500`) are the same value. A token the code added since Figma
+was read is made as a new variable, in the collection most of its layer's variables are in. A value that replaces an
+alias in Figma names the alias it breaks. Written as the hand-back script, run only once the person says yes: each
+value is read again in the file, and one changed in Figma since is a conflict, left for a person, never written over.
+Each value it replaces, and each variable it makes, is recorded for the way back (`variableValue`, `deleteVariable`).
+A long list goes 300 a run (`--chunk 2`, …).
+
 #### --figma-edits (Figma brought in line with the code, once the person says yes)
 
 `rms-design-system-engine --figma-edits` lists what the code already states that Figma does not, as edits the engine
@@ -2104,6 +2251,16 @@ as it is, keeps every annotation a person wrote, and returns `{ changed, skipped
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Descriptions, missing components and layout are never written: they stay in `changes-in-Figma.md`.
+
+Every hand-back that changes something also writes the same script as a Figma development plugin
+(`handback/figma-plugin/`: `manifest.json`, `code.js`, `ui.html`, from `figma-plugin.mjs`), so a designer can review
+and apply it inside Figma without an agent. A designer imports it once (Plugins › Development › Import plugin from
+manifest…) and runs "Design system hand-back": it lists what the change does, in the words the engine prints, and
+changes nothing until they press Apply, which is their yes. The apply is `figma-apply.js` as written, never a second
+copy of its logic. What it replaced is kept in the file itself (plugin data), so "Undo last change" puts it back from
+any computer, the same way the engine's own way back does (`undoScript` in `figma-undo.mjs`): newest first, refused
+whole when part of it has no way back. Each later hand-back rewrites the plugin's files, so running it again shows the
+latest list. It asks for no network access. Decisions left for a person are never in it.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
@@ -2458,6 +2615,23 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
 - **A name that changes with content** ("3 items") is compared as written, so it is reported as a difference.
   Describe such names in prose instead.
+- **Which browser answered it** — every browser check runs in Chrome (`cdp.mjs`). Each criterion says what it
+  depends on (`wcag21.mjs` `browser`): `same`, decided by the code, the markup or the system's own values and true in
+  every browser; `each`, decided by the browser (what Tab reaches, where the focus shows, reflow, zoom, text spacing,
+  what an input does, dragging, target size), tried in Chrome and in no other engine today; `chrome`, what a screen
+  reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. The style guide says
+  which under each row, the run names a browser that is not installed rather than passing over it (`browsers.mjs`),
+  and the result records which were here (`browsers` in `a11y.json`, names only). The passes in Firefox and WebKit
+  are not built yet.
+- **Judgement calls, pre-sorted** (`--judge-a11y`) — a model reads the words a component's own code shows and marks
+  the ones a person should look at first for 2.4.6, 3.3.3 and 2.4.4, each likely, unclear or fine with one short
+  reason. Advisory and asked for only (`a11yJudgement.cmd`): no criterion passes or fails on it, and the answer is
+  kept by the words, so the same wording is never paid for twice.
+- **A check made by hand is testimony** — `--checked` records what a person says they looked at and what with. Nothing
+  confirms the screen reader was running, or that it said what they report, so the row reads Done on their word and
+  says so: whose word it is, what they checked with (or that they did not say), and that the engine measured none of
+  it. Where a row names the measurement it came from, this one reads "A person's word (QA, 5 Nov)", and the badge for
+  meeting WCAG 2.2 at A and AA counts how many of its criteria rest on one.
 - **Reduced motion** — under `prefers-reduced-motion: reduce`, anything that still transitions or
   animates (`motion`). Its own row, beyond WCAG 2.2 at A and AA, advisory: the standard asks for this nowhere at
   those levels, so no criterion is marked as failing for it.

@@ -183,6 +183,11 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), keeping one on purpose (`--keep`, or editing `design-system-engine-kept.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
 - **A lesson's answer is yours.** `--lesson-answer`, or an edit to `design-system-engine-lessons.json`, waits for your yes or no.
 - **A change to the system waits for a sign-off.** An edit that adds a token to the theme or an option to a component is held until someone signs it off. The agent that made it never does: see [A second reviewer](#a-second-reviewer).
+- **A shared token keeps its value until someone decides.** An agent fixing one button can change a token's value and recolour every card that uses it. An edit that gives an existing token another value is held too, and the hold says:
+  - what the token reaches: the components the last style guide build saw using it, directly or through another token, and the products that use those;
+  - the way out for one component: the component's own token, when it has one, so the shared one stays as it is;
+  - how to sign it off when the change is meant for all of them.
+- **What passes.** A value Figma gives that token (the parity fix the audit asks for), and a token one component at most uses. Before the first style guide build the engine cannot say what a token reaches, so it holds the edit and says so.
 
 ### A second reviewer
 
@@ -410,6 +415,31 @@ A project that says never gets the list of Figma changes and no script to run. A
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
 
 Put tokens in a `.env` in the folder you run the engine from.
+
+### Looking without leaving anything behind
+
+Deciding whether to use the engine means running it on your own system to see what it says. That read used to put three files in your project's root before printing a word — the prop check's result, the parity check's result, the GitLab history — and clear two of them first. On a folder with no git behind it there is nothing to undo that with.
+
+```bash
+rms-design-system-engine --prototype --catalog --read-only
+```
+
+Every write **and every delete** inside your project is skipped, and the run says at the end what a full one would have written:
+
+```
+👁  READ ONLY  nothing was written into this project. A full run would have written 3 file(s):
+   component-prop-result.json
+   design-system-engine-check-result.json
+   .gitlab-history.json
+   Run it again without --read-only to let it write them.
+```
+
+Two details worth knowing:
+
+- **Deleting counts.** The audit clears its last results before the gates run. Skipping only the writes would have taken two of your files away and put nothing back — worse than the problem.
+- **Caches outside your project still work.** What is protected is your project, not the engine's own folder; a cache rebuilt on every look would make looking slow enough that nobody does it twice.
+
+It is a property of the run, not of the project, so it is a flag rather than a setting in `ds-config.json` — `writes` says what this project lets the engine change, and this says this particular run changes nothing whatever the project allows.
 
 ### When a host refuses
 

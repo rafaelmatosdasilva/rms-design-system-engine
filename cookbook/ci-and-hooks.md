@@ -58,6 +58,11 @@ is no new blocker (or no base kept yet), exit 2 that this run measured nothing. 
 engine's `docs/accessibility.md`, under *Accessibility never gets worse*; the options are in `--reference usage`.
 
 
+**The construction rules on every pull request, in one line.** After `actions/checkout@v4`, add
+`- uses: rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`. It fails on a component
+that breaks a rule the team decided and warns on the rest, each as an annotation on the pull request; it reads the
+committed Figma capture and the component files, needs no token, and changes nothing.
+
 To run the engine on every PR/push via GitHub Actions, add `.github/workflows/design-system-engine.yml` to your project:
 
 ```yaml

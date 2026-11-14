@@ -79,7 +79,7 @@ test('the rest of the findings: kept ones leave the open list; a decision not fo
   const md = differencesMarkdown({ total: 1, fresh: 0, groups: [{ component: 'tag', items: [{ check: 'Values', what: 'tag radius: Figma 6px, rendered 8px', side: 'decide' }] }],
     kept: [{ component: 'chip', check: 'Values', what: 'chip height: Figma 32px, rendered 36px', reason: 'tap target', by: 'QA', at: '2026-01-01T00:00:00Z', truth: 'code' }],
     keptGone: [{ component: 'tag', check: 'Values', what: 'tag radius: Figma 4px, rendered 8px', reason: 'brand' }] });
-  assert.match(md, /## Kept on purpose \(1\)\n\nThe team decided to keep these\. They never fail a run while their values stay as they are\.\n\n- \*\*chip\*\* Values: chip height: Figma 32px, rendered 36px\. _tap target; kept by QA; on 2026-01-01; the code is right\._/);
+  assert.match(md, /## Kept on purpose \(1\)\n\nThe team decided to keep these\. They never fail a run while their values stay as they are\.\n\n- \*\*chip\*\* Values: chip height: Figma 32px, rendered 36px\. _tap target · kept by QA · on 2026-01-01 · the code is right\._/);
   assert.match(md, /## Kept on purpose, no longer found \(1\)/);
   assert.match(md, /keep a difference the team decided on \(`--keep`, with its reason\)/);
 });

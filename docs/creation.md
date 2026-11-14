@@ -6,6 +6,10 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 - [Design themes over your system](#design-themes-over-your-system)
 - [Prototype with your real components](#prototype-with-your-real-components)
+- [Turn Figma into code](#turn-figma-into-code)
+- [Turn code into Figma](#turn-code-into-figma)
+- [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt)
+- [Generate in code from a prompt](#generate-in-code-from-a-prompt)
 
 ## Design themes over your system
 
@@ -31,10 +35,18 @@ The theme editor is built into every style guide the engine builds, and needs no
 The panel shows the form on the left and a preview on the right, in a frame of its own. Only that frame takes the theme while you work, so the rest of the guide stays as your system draws it.
 
 - **Name** and **font family**: the families your system uses, common web fonts, or any other by name. A font your computer lacks is loaded from Google Fonts, so what you pick is what you see.
-- **Primary and secondary colours**, the **app background**, and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
-- **Button and card roundness**, **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
+- **Primary and secondary colours**, the **app background**, the **header background** (every header's own background token, one setting for them all), and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
+- **Button and card roundness** (the card's also reaches the other surfaces with corners of their own: a bar, a panel, a sheet, a modal), **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
 
 Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
+
+- **Only what the screens use.** A setting is listed only when the screens on show draw with its token, so every setting changes something you see.
+- **Spacing says what it changes.** Under its percentage, a list of each spacing token the screens use, its size now and at the percentage chosen (`spacing/gap/l 16px → 20px`), in whole pixels. Hovering one outlines what draws with it.
+- **A shadow colour** for every shadow at once (the system gives each component its own), and the shadow settings locked while shadows are off.
+- **Shadows off reaches every component with a shadow**: components draw their shadow from its colour token, never from the system's on-off switch, so off sets every shadow's colour to transparent, besides the switch.
+- **Shadows on shows every shadow**: turned on, every shadow takes the shadow colour and blur, since the system draws some transparent or with no blur (a button's, a white card's).
+- **Undo and reset.** Each colour, and each slider's number, has a reset arrow back to where it started, shown only while the value differs from it, and **Reset changes**, in the panel's top bar, puts the whole editor back as it opened. It stays disabled until something changes, and asks before it resets.
+- **Number fields** have − and + on either side, and take whole pixels.
 
 ### The preview
 
@@ -42,8 +54,11 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 - **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
-- **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back.
+- **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back. It is for trying the screens: nothing is outlined or named there, and a click does what it does in the app.
+- **No scroll bars.** A screen still scrolls, as a phone does, but shows no bar of its own.
+- **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview keeps its size and its screens scroll inside it, so the form beside it scrolls as before. Hold the space bar, or the middle button, and drag to move it.
 - **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
+- **Screens side by side.** A page built for showing the editor can ask for its screens in a row, with no list to choose from (`row: true` in its data, as `enabled` is): phone screens shown together, centred, the panel's own background around them.
 
 ### Light and dark
 
@@ -54,14 +69,17 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 ### One component's tokens
 
-Click a component on the screen. It is picked the way Figma picks: the outermost first, then each click goes a level deeper, layer by layer toward where you clicked (a table, its rows, a row, a cell, its text).
+Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a Showroom screen marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
 
-- **What you edit stays marked.** The picked part keeps its outline and a label with its name. The head of the card shows the path to it, each step a click back, and lists the components inside it, each a click away.
-- **Only its own tokens.** The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
+- **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card starts at the component clicked, even one inside another (a tag in a table is the tag), and goes down through the layers picked in it, each step a click back to that level.
+- **Text of its own.** A text in no component is picked by its text style, named on hover.
+- **Only its own tokens.** A layer picked (a card's text) shows only what that layer draws with, never its component's other tokens. The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
 - **Values as they are now.** Each token shows its value with the theme on it, in light and dark, and follows as you change the theme.
 - **Units from how a token is used.** A token its rules use as `calc(var(…) * 1%)` reads as a percentage, an opacity from 0 to 1 as a percentage, a size in pixels as px, and anything else as a plain number.
-- **Corner radius and text style.** A picked part shows its corner radius, and a text shows which of your text styles it is drawn in. Changing either changes that part in every copy of the component. A text style keeps changing per breakpoint as yours do, since it is set through the style's own variables.
-- **The app background.** Clicking where no component is picks the screen itself.
+- **Linked tokens, as Figma shows them.** A token that follows another shows that token's name in its field (a colour's with its swatch) instead of a value, and a button to detach it. Detached, it takes a value of its own, and a reset in its field links it again. A token linked to another of its own component (its corners on one radius) follows it as it changes.
+- **The system's colours.** A colour's chip, or the button beside a detached colour, opens every base, semantic and primitive colour of the system, searchable, each swatch as this theme draws it. The list opens over the panel, below its field or above it when there is more room, and only the list scrolls; a click outside it, or Escape, closes it. One chosen links the token to it, its dark value following that colour's own.
+- **Only real tokens.** Everything a part offers is one of the system's own tokens: its corners are its radius tokens, never a value of the editor's own.
+- **Text style.** A text shows the text style it is drawn in, and that style's own size and line height at the breakpoints the screens on show are at (phones: Phone), its breakpoint named under each value. The values are the token's own breakpoint modes. A change is the style's token's, so every text in that style follows.
 - A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 
 ### Where a theme is kept
@@ -199,6 +217,60 @@ A composition already says how something moves inside a page: a part carries `op
 Tabs, segmented controls, steppers, side rails, accordions and pagination all count. **One choice is not navigation** and says nothing.
 
 **What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
+
+### What a prototype still owes a developer
+
+Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.
+
+At the end of a run, the engine says what is left:
+
+```
+🤝 BEFORE A DEVELOPER TAKES "Orders" FORWARD  4 of 4 thing(s) the product does,
+   that this page does not yet:
+   • a route — the product declares its pages with a router (src/router), and nothing
+     here registers this page: a developer has to wire it before anyone can reach it
+   • its data from the store — the product keeps state in a store (src/stores), and
+     this page carries its own: the numbers on screen are the ones somebody typed
+   • its words as translations — the product has translated words (src/locales), and
+     the words here are written into the page: they would ship in one language
+   • a test — the product has tests, and this page has none
+```
+
+**Every convention is read from your product, never assumed.** No router in your dependencies and nothing asks for a route. No translations and nobody mentions hardcoded words. A list of good practice your project never adopted would be noise — and worse, it would read as your team's own rules.
+
+Two more limits worth knowing:
+
+- **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
+- **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+### The shapes a flow comes in
+
+Ask for a multi-step operation — sign in, a one-time code, a confirmation, a success page — and the engine used to check only that the pages linked. It knew nothing of the shapes, so a code step with no way to ask for another code passed, and so did a journey that quietly stopped halfway.
+
+Four shapes are read from the pages themselves — their name, their title, the words on their parts — and each owes something:
+
+| The page looks like | and owes |
+|---|---|
+| A sign-in step | a way out for somebody who cannot get in |
+| A one-time code step | a way to ask for another code, and a way back to change where it was sent |
+| A destructive step | a way out that is not the destructive one |
+| A success page | a way on to whatever comes after it |
+
+```
+⚠️  "code" is a one-time code step and is missing a way to ask for another code:
+    a person who needs it here has nowhere to go. Add it from the system, or say
+    why this flow does not need it
+```
+
+**It also settles a question nothing else could answer.** `--prototype --flow` names the pages a journey ends on and has to leave it open — *"the end of a flow, or a page that needs a way on"*. A shape decides it:
+
+```
+⚠️  the journey ends on "code", which is a one-time code step and not an ending:
+    the page after it was never drawn
+```
+
+A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
+
+Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
 
 ### Did what you asked for come out whole
 
@@ -436,3 +508,104 @@ The page review measures what it can: one main action, nothing destructive in fr
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
 - **In the style guide.** Each component's rating sits in its Documentation area.
+
+## Turn Figma into code
+
+A system that exists only in Figma, built in code piece by piece, each piece checked against Figma once it exists.
+
+### What it does with no code yet
+
+- **Says what to build, in order.** Your tokens first, then each component after the ones it holds. Something still to build is never a failure.
+- **Gives the exact lines.** Each component's build sheet names its class, its sizes and variables, the selector of each state and option, its role and its props, as the checks will read them.
+- **Writes the starting files, when you ask.** Each component as a file and a stylesheet of its own, written from those exact lines, and handed back as a patch for you to apply.
+
+### What a starting file holds
+
+- **Its element and its props.** A button is a real `<button>`, and its props are named as Figma names them.
+- **Every rule of its build sheet.** Its sizes, spacing and colours as your variables, a class for each option that changes its look, and its own height where an option changes it.
+- **What is still yours.** What Figma does not say exactly, such as what a state is wired to or a focus ring the design does not draw, is listed at the top of the file, never made up.
+
+### What it never does
+
+- **Write into your code.** The files come back as a patch, and a file you already have is left out.
+- **Choose for you.** What your components are written in, and where they go, come from your project or are asked.
+
+The full options are in [the reference](../reference/usage.md) (*Build mode*, `--scaffold`).
+
+## Turn code into Figma
+
+A component that exists only in your code, drawn into Figma from what the engine reads of it.
+
+### What it reads
+
+- **Its props.** Each prop with options becomes a variant axis with the same options.
+- **Its parts.** Each part becomes a layer, in the order your markup writes them: another of your components becomes an instance of it, a part that writes a prop's words becomes a text layer, anything else a frame.
+- **What each prop drives.** A part a prop shows or hides becomes a boolean property on that layer, and a prop whose words a part writes becomes a text property.
+- **Its look.** Its own base rule's background, padding, gap, border and corners, each bound to the variable it is written with. A hover's or an option's value belongs to that variant, so it is not the component's own.
+- **What it is for.** Its own comment becomes its description in Figma.
+
+### What it never does
+
+- **Make up a value.** A size written by hand, a part's text with no text style of your system's, or a nested component Figma doesn't have is a question for you, never a guess.
+- **Write without you.** It goes through the same path as a component described in words: the spec is checked against your system, held for someone to sign it off, and built in Figma only through the script you say yes to.
+
+### A template or a pattern too
+
+Give it a file instead of a component name, and it draws that page as a Figma frame made of your components.
+
+- **Its layout.** Each element that holds others becomes a frame, laid out in the direction its own style sets.
+- **Your components.** Each one the page uses becomes an instance of it, found through what the file itself imports.
+- **Its texts.** Each one is set in the text style its class uses.
+- **Its spacing.** Each gap, padding, background and corner is bound to the variable it is written with.
+- **A frame, not a component.** It takes no variants. A component the page uses that Figma doesn't have is a question.
+
+The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
+## Generate in Figma from a prompt
+
+You describe what you need, and the engine draws it in Figma from your system's own rules.
+
+### Not only components
+
+- **A component.** Started from the one it is most like ("a tag like the chip").
+- **A pattern, a template or a page.** A frame made of your components, started from your own one it is like ("a template like settings").
+- **A flow.** Its pages side by side, each made the way your system makes it.
+- **A foundation.** A new variable beside the one it is like, pointing at one of your variables.
+
+The kinds are your intent layer's own, so nothing new is invented to say what a thing is.
+
+### Your rules for each kind
+
+- **Read from your own.** What every one of your templates holds is a rule, and what most hold is a fix, the way the engine reads how you build components.
+- **Asked, never assumed.** A new one that lacks what every one of yours holds is a question for you.
+- **A box that is too small.** A layer that runs beyond a box of a fixed size is said, for you to decide: grow the box, or shorten the layer.
+- **Asked, not built literally.** A bigger size copied from a smaller one is asked what it changes, a setting for a part the component lacks is asked which part, and a copy that changes nothing is asked what makes it different, where your rules allow no twins.
+
+### Measured every time
+
+- **A kept set of requests.** The same build and change requests run again whenever the builder or its guide changes, some in the builder's words and some in a person's own.
+- **Separate counts, never one number.** Whether the script runs, whether what was asked is there, whether anything else changed, whether only your components and variables are used, and whether it made a layout fault.
+- **Whether it makes sense.** A setting named for a part shows that part, and a bigger size is bigger, not only there.
+- **Your rules.** Each result is held to how your system builds components, and it can run on your own library, its results kept on your computer.
+- **Checked by a person, in Figma.** A sample is built in a Figma file, before and after, for someone to say whether the counts hold.
+
+The full options are in [the reference](../reference/usage.md) (`--spec`).
+
+## Generate in code from a prompt
+
+The same spec Figma is built from, written as a component file the way your own components are.
+
+### What it follows
+
+- **Your construction rules.** Your framework, the folder and file name, how parts and options are named, and how props are written, all read from your own code.
+- **Your tokens.** Each value is the custom property your naming convention gives the variable.
+- **Your text styles.** Each text is set the way your components set it, with your mixin or your class.
+- **Your components.** A part that is another of your components is written as its own tag.
+
+### What it never does
+
+- **Change your code.** The file comes back as a patch for you to apply, never written straight into your project.
+- **Skip the check.** What it wrote is read back with the code's own reader and held against the spec, so the two start out matching.
+
+The full options are in [the reference](../reference/usage.md) (`--code-build`).
+

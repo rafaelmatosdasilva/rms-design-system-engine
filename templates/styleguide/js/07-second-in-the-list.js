@@ -60,10 +60,10 @@
     var applyAll = function (r) {
       var cs = comps(r), n = cs.length, f = (r.toFix[0] || {}).fix || {};
       var lead = 'Make every ' + (byComponent(r) ? 'component' : 'place') + ' follow the system\'s construction rule "' + r.says + '" (' + n + ' ' + unit(r, n) + ' to change: ' + cs.join(', ') + '). ';
-      if (r.side === 'code') return lead + (r.status === 'decide' ? 'Give me one list with each one and the choice it takes, for me to decide; change no code.' : 'Hand each change back as a patch for a person to apply; change no code yourself.');
+      if (r.side === 'code') return lead + (r.status === 'decide' ? 'Give me one list with each one and the choice it takes, for me to decide, and change no code.' : 'Hand each change back as a patch for a person to apply, and change no code yourself.');
       if (f.what) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ', then apply the script it writes.';
       if (f.layers) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ': read in Figma what each unnamed layer holds, propose one list of names, and once I approve it run it again with --names and apply the script it writes.';
-      if (r.status === 'decide') return lead + 'Give me one list with each one and the choice it takes, for me to decide; change nothing in Figma yet.';
+      if (r.status === 'decide') return lead + 'Give me one list with each one and the choice it takes, for me to decide, and change nothing in Figma yet.';
       return lead + 'The engine does not change layout or variable bindings: give me one list of what to change in Figma, component by component, in the order to do it.';
     };
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
@@ -86,7 +86,7 @@
     var panel = function (i, from) {
       var r = rows[i]; if (!r) return;
       var m = panelShell('sg-cx-panel', 'Rules'); m._key = cxKey(r);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var cs = comps(r), byC = {}, n = cs.length;
       r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
       var WAY_HEAD = { own: 'Variables made for each component', shared: 'Shared variables' };
@@ -101,11 +101,11 @@
       }
       else if (r.ways) {
         var best = r.ways[0], other = r.ways[1];
-        suggest = '<p class="sg-il-line"><strong>' + esc(WAY_HEAD[best.way]) + '</strong>: ' + esc(best.follows + ' of ' + r.of + ' components already do this (' + lower(best.says) + ').') + '</p><p class="sg-il-line"><span class="pg-par-val">' + esc(other.follows + ' go the other way (' + lower(other.says) + '). Choose one; the others are then changed to match.') + '</span></p>';
+        suggest = '<p class="sg-il-line"><strong>' + esc(WAY_HEAD[best.way]) + '</strong>: ' + esc(best.follows + ' of ' + r.of + ' components already do this (' + lower(best.says) + ').') + '</p><p class="sg-il-line"><span class="pg-par-val">' + esc(other.follows + ' go the other way (' + lower(other.says) + '). Choose one, and the others are then changed to match.') + '</span></p>';
         decide = '<div class="sg-decide-grid">' + r.ways.map(function (w, k) { return copyBtn(k ? 'change' : 'approve', (k ? '' : 'Suggested: ') + WAY_HEAD[w.way], 'The system\'s construction rule: "' + w.says + '". Run ' + cmd + ' --construction ' + r.id + ' ' + w.way + '.'); }).join('') + '</div>';
       }
       else if (r.status === 'decide') {
-        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line">' + (pct >= 50 ? '<strong>' + esc('Suggested: make it the rule, and change the ' + n + ' that don\'t.') + '</strong>' : esc('Fewer than half do: make it the rule only if it is how the system should be built; then ' + n + ' are to change.')) + '</p>';
+        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' ' + unit(r, r.of) + ' (' + pct + '%) already do this.') + '</p><p class="sg-il-line">' + (pct >= 50 ? '<strong>' + esc('Suggested: make it the rule, and change the ' + n + ' that don\'t.') + '</strong>' : esc('Fewer than half do: make it the rule only if it is how the system should be built. Then ' + n + ' are to change.')) + '</p>';
         decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Make it the rule', 'Make it a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' yes.') + copyBtn('drop', 'Not a rule', 'It is not a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' no.') + '</div>';
       }
       else {
@@ -213,7 +213,7 @@
     var panel = function (i, from) {
       var x = FCH[i]; if (!x) return;
       var m = panelShell('sg-fc-panel', 'Changes in Figma'); m._key = fcKey(x);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var lines = function (l) { return (l || []).map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); };
       var u = x.usedBy, lib = u && u.library;
       var used = u ? lines([u.products.length ? 'The code of ' + u.products.join(', ') : '', u.inside.length ? 'Inside ' + u.inside.join(', ') : '', u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
@@ -298,10 +298,13 @@
     // The components a change affects: links the table turns into pills (pillLinks), the first five shown, the rest one
     // click away ("9 more").
     var PILLS_SHOWN = 5;
+    // A list's "N more": a pill with a chevron before its count, so it reads as opening the rest. History's and a task's alike.
+    var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
+    var pillsMore = function (n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; };
     var pillsHTML = function (names, area) {
       return names.map(function (n, i) { return '<a href="#' + esc(cid(n)) + (area ? '/' + area : '') + '"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</a>'; }).join(' ') +
         // The rest one click away, a pill as the ones beside it (their height, their words' size).
-        (names.length > PILLS_SHOWN ? ' <button type="button" class="sg-link-pill sg-link-pill--table" data-pills-more>' + (names.length - PILLS_SHOWN) + ' more</button>' : '');
+        (names.length > PILLS_SHOWN ? ' ' + pillsMore(names.length - PILLS_SHOWN) : '');
     };
     // What changed in Figma, said plainly: a property's name without the word, a text's old and new words quoted.
     var figmaChange = function (t) {
@@ -539,7 +542,11 @@
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
       var all = e.target.closest('[data-list-more]'); if (all) { var list = all.nextElementSibling; if (list) list.hidden = false; all.remove(); return; }
-      var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove();
+    });
+    // Any "N more" pill on the page shows the rest of its list, History's and a task's alike: one handler for all.
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-pills-more]'); if (!b) return;
+      Array.prototype.forEach.call(b.parentNode.querySelectorAll(':scope > [hidden]'), function (p) { p.hidden = false; }); b.remove();
     });
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
   }
@@ -695,7 +702,7 @@
     var ilSec = section('documentation', 'System', 'Documentation', '');
     fillDocs = function () {
     var ilSrc = IL.source || {};
-    var ilLink = function (p) { return (p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file)) + '<span class="pg-par-val">' + esc(p.file || '') + '</span>'; };
+    var ilLink = function (p) { return (p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file)) + '<span class="pg-par-val sg-panel-only">' + esc(p.file || '') + '</span>'; };   // the file's path in the panel only: the table names the page (the owner's, 14 November 2026)
     // What a page is for: the component it names; a template, the component built from the same code file, else
     // "Template" and its file; any other page, its layer (a foundation, a pattern). Never the page's own kind field.
     var IL_LAYER = { templates: 'Template', foundations: 'Foundation', patterns: 'Pattern', flows: 'Flow', pages: 'Page' };
@@ -709,7 +716,7 @@
       if (p.layer === 'components') return '<span class="pg-missing">No component</span>';
       if (p.layer === 'templates') {
         var built = p.code && COMPONENTS.filter(function (c) { return ((c.api && c.api.file) || '') === p.code; })[0];
-        return built ? compLink(built.name) : 'Template' + (p.code ? '<span class="pg-par-val">' + esc(String(p.code).split('/').pop()) + '</span>' : '');
+        return built ? compLink(built.name) : 'Template' + (p.code ? '<span class="pg-par-val sg-panel-only">' + esc(String(p.code).split('/').pop()) + '</span>' : '');
       }
       return esc(IL_LAYER[p.layer] || capital(String(p.layer || '').replace(/s$/, '')));
     };
@@ -724,7 +731,7 @@
     // Every proposal not answered yet: an item of the page's review, decided with its other changes (ilChanges).
     var ilOpen = function (p) { return ilOwn(p).filter(function (x) { return !x.answer; }); };
     // Its first line in bold, unless plain: under the proposed changes' own heading, which is bold.
-    var ilTodo = function (p, plain) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i || plain ? '' : '<strong>') + esc(t) + (i || plain ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    var ilTodo = function (p, plain) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i || plain ? '' : '<strong>') + pillNamesIn(t, ilNamesOf(p)) + (i || plain ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + '<span class="sg-il-text">' + (f.line ? '\u201c' + esc(f.line) + '\u201d' : esc(f.says)) + '</span><span class="sg-il-label">What the system has</span><span class="sg-il-text">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
@@ -829,49 +836,105 @@
     var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
     // Where a draft comes from (draft-sources.mjs): each prop it names as the code has it, a name only Figma has (never
     // a prop the code takes: said as a warning), and the line it says again, wherever it is written.
-    var ilDraftFrom = function (d, p) {
-      // A drafted example says where its code is from in its own line.
-      var f = d.from; if (!f) return d.code != null ? '' : '<span class="sg-il-source">' + esc('Source: none found on the page, in Figma or in the code.') + '</span>';
+    // A draft's words with each `name` in it a pill, as names are everywhere on the page.
+    var ilPillText = function (t) { return esc(String(t || '')).replace(/`([^`]+)`/g, function (m, n) { return '<code class="sg-name">' + n + '</code>'; }); };
+    // The names a page's sentences carry (its component, the one it lives inside, its own), each a pill wherever it is
+    // said, as every name in the guide is (the owner's, 14 November 2026). Only this page's names: a word like "table"
+    // in a sentence stays a word.
+    var ilNamesOf = function (p) { return [p.component, p.partOf, p.missingFor, p.recheckFor, p.name].filter(function (n) { return n && String(n).length > 1; }); };
+    var pillNamesIn = function (t, names) {
+      names = (names || []).slice().sort(function (a, b) { return b.length - a.length; });
+      var s = String(t || ''), out = [], i = 0, word = /[A-Za-z0-9_-]/;
+      next: while (i < s.length) {
+        if (s.charAt(i) === '`') { var e = s.indexOf('`', i + 1); if (e > i) { out.push('<code class="sg-name">' + esc(s.slice(i + 1, e)) + '</code>'); i = e + 1; continue; } }
+        for (var k = 0; k < names.length; k++) {
+          var n = names[k];
+          if (s.substr(i, n.length) === n && !word.test(s.charAt(i - 1) || '') && !word.test(s.charAt(i + n.length) || '')) { out.push('<code class="sg-name">' + esc(n) + '</code>'); i += n.length; continue next; }
+        }
+        out.push(esc(s.charAt(i))); i++;
+      }
+      return out.join('');
+    };
+    // Where a draft's words come from (draft-sources.mjs), in parts: each prop it names as the code has it, the line it
+    // says again, and what is wrong with it (a name only Figma has, with the wording offered instead).
+    var ilDraftParts = function (d, p) {
+      var f = d.from; if (!f) return { out: [], figmaOnly: [], rewrite: null, code: null };
       var file = function (x) { return String(x || '').split('/').pop(); };
       var code = file(p.code || ((f.props || []).filter(function (x) { return x.file; })[0] || {}).file) || 'the code';
       var tick = function (x) { return '`' + x + '`'; };
       var out = (f.props || []).filter(function (x) { return x.from !== 'Figma'; }).map(function (x) { return 'The code: ' + tick(x.name) + ', a prop of ' + (file(x.file) || code) + (x.options && x.options.length ? ', takes ' + x.options.map(tick).join(', ') : '') + '.'; });
-      var carries = function (n) { var k = (f.carriers || {})[n]; return k ? ' The code carries it in ' + (k.field ? 'the ' + tick(k.field) + ' field of ' + tick(k.prop) : tick(k.prop)) + '.' : ''; };
-      var warn = (f.figmaOnly || []).map(function (n) { return 'Figma: ' + tick(n) + ' is a property of the Figma component, not a prop ' + code + ' takes.' + carries(n) + ' Change the draft to say what the code does, or name it as Figma\'s.'; });
-      // The rewrite offered (draft-sources.mjs → rewriteOf), for the person to take to Claude Code or edit.
-      if (f.rewrite && f.rewrite !== d.text) warn.push('Proposed instead: ' + f.rewrite);
       if (f.line) out.push('Says again: “' + f.line.text + '” (' + f.line.from + ').');
-      return warn.map(function (t) { return '<span class="sg-il-source sg-il-source--warn">' + esc(t) + '</span>'; }).join('') + out.map(function (t) { return '<span class="sg-il-source">' + esc(t) + '</span>'; }).join('');
+      var carries = function (n) { var k = (f.carriers || {})[n]; return k ? ' The code carries it in ' + (k.field ? 'the ' + tick(k.field) + ' field of ' + tick(k.prop) : tick(k.prop)) + '.' : ''; };
+      return { out: out, code: code, rewrite: f.rewrite && f.rewrite !== d.text ? f.rewrite : null,
+        figmaOnly: (f.figmaOnly || []).map(function (n) { return tick(n) + ' is a property of the Figma component, not a prop of ' + code + '.' + carries(n); }) };
     };
+    // A draft's notes: what is wrong with it, in a box with its fix and a button to take it (the owner's, 12 November
+    // 2026), then where its words come from, less what the card already said once over every draft (skip).
+    var ilDraftFrom = function (d, p, skip, fixCmd) {
+      var x = ilDraftParts(d, p), box = '';
+      if (x.figmaOnly.length || x.rewrite) {
+        box = '<div class="sg-il-fix"><strong>' + esc(x.figmaOnly.length ? 'This names something the code doesn\'t have.' : 'This could say it better.') + '</strong> ' + x.figmaOnly.map(ilPillText).join(' ')
+          + (x.rewrite ? '<span class="sg-il-fix-use">Use instead: “' + ilPillText(x.rewrite) + '”</span>' + (fixCmd ? '<span class="sg-il-fix-act">' + sysButton('button', 'Use the suggested wording', ' data-il-copy="' + esc(fixCmd(x.rewrite)) + '" data-il-said="Paste it in Claude Code"', 'sg-il-act', null, decideMark('approve')) + '<span class="sg-decide-said" role="status"></span></span>' : '')
+            : '<span class="sg-il-fix-use">' + esc('Change the draft to say what the code does, or name it as Figma\'s.') + '</span>') + '</div>';
+      }
+      return box + x.out.filter(function (t) { return !(skip && skip[t]); }).map(function (t) { return '<span class="sg-il-source">' + ilPillText(t) + '</span>'; }).join('');
+    };
+    // How many drafts need a fix before they are approved.
+    var ilDraftsToFix = function (drafts, p) { return drafts.filter(function (d) { var x = ilDraftParts(d, p); return x.figmaOnly.length || x.rewrite; }).length; };
     // One item: what it is and its body, with the words each answer adds to its group's decision (steps: approve,
     // change, drop). Its callers' other words (changeTo, opt) are not used: the panel edits nothing in place.
     var ilItem = function (head, body, steps) {
       var said = function (k) { return steps[k] ? ' data-il-' + k + '="' + esc(steps[k]) + '"' : ''; };
-      return '<div class="sg-il-line sg-il-change sg-il-item" data-il-item' + said('approve') + said('change') + said('drop') + '><strong>' + esc(head) + '</strong>' + body + '</div>';
+      // Every item a bullet, the list read at a glance (the owner's, 12 November 2026); its head, when the card has not
+      // said it already, its first words.
+      return '<li class="sg-il-line sg-il-change sg-il-item" data-il-item' + said('approve') + said('change') + said('drop') + '>' + (head ? '<strong>' + esc(head) + '</strong>' : '') + body + '</li>';
     };
     // A group: its heading and count, its items, those the engine has no ground for (quiet: shown like the rest, under a
     // line saying so, and left as they are by its actions), then its three actions below them all: Approve all, Change,
     // Drop all. Each copies its decision on the items above that line, never on those.
     var IL_DO = [['approve', 'Approve all', 'Approve'], ['change', 'Change', 'Change'], ['drop', 'Drop all', 'Drop']];
-    var ilGroup = function (key, head, items, all, quiet) {
+    // bare: the group's heading left out, when the card's own sentence already says what it is (the drafts alone).
+    // intro: what every item shares (where their words come from), said once under the heading, over them.
+    var ilGroup = function (key, head, items, all, quiet, bare, intro) {
       quiet = quiet || []; var n = items.length + quiet.length; if (!n) return '';
       all = all || {};
       var said = function (k) { return all[k] ? ' data-il-all-' + k + '="' + esc(all[k]) + '"' : ''; };
-      var acts = items.length ? '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head) + '">' + IL_DO.map(function (d) {
+      var acts = items.length && !all.none ? '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head) + '">' + IL_DO.map(function (d) {
         return sysButton('button', items.length === 1 || d[0] === 'change' ? d[2] : d[1] + ' ' + items.length, ' data-il-all="' + key + '" data-il-do="' + d[0] + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark(d[0]));
       }).join('') + '<span class="sg-decide-said" role="status"></span></div>' : '';
-      return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + said('change') + said('drop') + '><div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong></div>' + items.join('')
-        + (quiet.length ? '<div class="sg-il-quiet"><p class="sg-il-quiet-head">' + esc(quiet.length === 1 ? 'The engine has no ground for the change below: No, unless you say otherwise.' : 'The engine has no ground for the ' + quiet.length + ' changes below: No to each, unless you say otherwise.') + '</p>' + quiet.join('') + '</div>' : '') + acts + '</div>';
+      return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + said('change') + said('drop') + '>' + (bare ? '' : '<div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong></div>') + (intro || '') + (items.length ? '<ul class="sg-il-points">' + items.join('') + '</ul>' : '') + acts
+        + (quiet.length ? '<div class="sg-il-quiet"><ul class="sg-il-points">' + quiet.join('') + '</ul>'
+          // its own way to say yes, a button as the group's: it copies the decision on these alone
+          + '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head + ', optional') + '">' + sysButton('button', quiet.length === 1 ? 'Turn it on' : 'Turn all ' + quiet.length + ' on', ' data-il-all="' + key + '" data-il-do="approve" data-il-quiet title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark('approve')) + '<span class="sg-decide-said" role="status"></span></div></div>' : '') + '</div>';
     };
     // A group's decision, in the person's words: the group's own words for it when it has them (all: "Approve all 3
     // drafts"), else each item's in turn (steps: those the group proposes, never one it has no ground for).
     // → the decision to copy, or '' when there is nothing to decide.
     var ilGroupDecision = function (on, all, steps) {
       var said = all ? [all] : steps.filter(Boolean);
-      return said.length ? on + capital(said.join('; then ')) + '.' : '';
+      return said.length ? on + capital(said.join(', then ')) + '.' : '';
     };
     // open: the page's proposals not answered yet. Its rule changes are Changes to rules; the others (a page to write, a
     // name to keep, a part's page, a page to review again) Decisions about the page, each with the same three actions.
+    // A long list of names: the first five as pills, the rest behind one button to open (the owner's, 12 November 2026).
+    var namesShown = function (list) {
+      // The rest one click away, a pill as History's ("1,061 more"), the same button and the same handler.
+      return '<span class="sg-il-codes">' + list.map(function (m, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(m) + '</code>'; }).join('')
+        + (list.length > PILLS_SHOWN ? pillsMore(list.length - PILLS_SHOWN) : '') + '</span>';
+    };
+    // A draft as a person reads it: a role is written "Role: cell" (a reader keeps it as a line, and lists it under
+    // Rules), said here as what it means. "none" is no role at all, never a role called none.
+    var ilDraftShown = function (t) {
+      var role = /^Role:\s*([\w-]+)\.?$/i.exec(String(t));
+      if (!role) return { text: String(t) };
+      return { where: 'Role', text: /^(none|presentation)$/i.test(role[1]) ? 'It has no role of its own. A screen reader reads only what is inside it.' : 'A screen reader announces it as a `' + role[1] + '`.' };
+    };
+    // Where each draft's words come from (the code's prop, a line it says again), in a card of its own under What to do.
+    var ilDraftSources = function (p) {
+      if (p.missingFor || (p._part && p._part !== 'drafts')) return '';
+      // A role is one word: another line holding that word ("Slots: none") is not saying it again.
+      return (p.drafts || []).map(function (d) { var out = ilDraftParts(d, p).out.filter(function (t) { return !(ilDraftShown(d.text).where && /^Says again/.test(t)); }); return out.length ? '<p class="sg-il-line"><strong>' + esc(ilDraftShown(d.text).where || d.where) + ':</strong> ' + out.map(ilPillText).join(' ') + '</p>' : ''; }).join('');
+    };
     var ilChanges = function (p, write, notes, task, open) {
       var seen = {}, drafts = [];
       (p.missingFor ? [] : p.drafts || []).forEach(function (d) {
@@ -882,7 +945,19 @@
       var rules = open.filter(isRuleChange), asks = open.filter(function (x) { return !isRuleChange(x); });
       var off = notes.filter(function (n) { return /^yes/i.test(n.remove || ''); }), fix = notes.filter(function (n) { return off.indexOf(n) < 0; });
       var parts = write.filter(function (x) { return x.part; }), toWrite = write.filter(function (x) { return !x.part; });
-      var nd = drafts.length, n = nd + open.length + write.length + notes.length;
+      // A page that only lives inside another component's: its move is a decision with its buttons too, as a part's page
+      // under Other changes is (the owner's, 12 November 2026: no task without a way to act on it).
+      var moveTo = p.partOf && p.component && !write.some(function (x) { return x.part; }) ? { root: p.partOf, name: p.component } : null;
+      // A row that is one of a page's decisions (ilSplit) holds that decision alone: the others are rows of their own.
+      if (p._part) {
+        if (p._part !== 'drafts') drafts = [];
+        if (p._part !== 'move') moveTo = null;
+        if (p._part !== 'rules') rules = [];
+        if (p._part !== 'asks') asks = [];
+        if (p._part !== 'other') { write = []; notes = []; off = []; fix = []; parts = []; toWrite = []; }
+        open = rules.concat(asks);
+      }
+      var nd = drafts.length, n = nd + open.length + write.length + notes.length + (moveTo ? 1 : 0);
       if (!n) return '';
       var noteOf = function (x) { return capital(x.what || x.text); }, q = function (x) { return '"' + x + '"'; };
       var noteBody = function (x, why) { return '<span class="pg-par-val">“' + esc(noteOf(x)) + '”</span><span class="sg-il-text">' + esc(why) + '</span>'; };
@@ -890,20 +965,38 @@
       // a file or a flag: Claude Code finds the page and runs the rest.
       var on = ENGINE + ' on ' + ilOn(p) + ', ', from = ilTaskOf(p.missingFor ? [] : p.drafts);
       var noFile = function (w) { return String(w || '').replace(/^[^,]*\.(?:md|json)\b,?\s*/i, ''); };
+      // What every draft shares is said once, in the card's own sentence (the owner's, 12 November 2026): the section they
+      // go in. With the drafts alone, that sentence is the group's heading too, and each draft a bullet.
+      var oneWhere = nd > 1 && drafts.every(function (d) { return d.where === drafts[0].where; }) ? drafts[0].where : null;
+      var onlyDrafts = nd > 0 && !open.length && !write.length && !notes.length;
+      // Where the drafts' words come from, said once over them all when several share it, never under each.
+      var seenOut = {}; drafts.forEach(function (d) { ilDraftParts(d, p).out.forEach(function (t) { seenOut[t] = (seenOut[t] || 0) + 1; }); });
       var draftItems = drafts.map(function (d) {
         var t = String(d.text);
-        return ilItem(d.where, '<span class="pg-par-val">' + esc(t) + '</span>' + (d.code != null ? '<pre class="sg-il-example"><code>' + esc(String(d.code)) + '</code></pre>' : '') + ilDraftFrom(d, p),
+        // One line a draft: its section as its label, on the same line (none when the card's sentence says it).
+        // A role is written "Role: cell" (a reader keeps it as a line), and read under Rules: said here as what it means.
+        var shown = ilDraftShown(t), label = oneWhere || (onlyDrafts && nd === 1) ? '' : '<strong class="sg-il-say">' + esc(shown.where || d.where) + ':</strong> ';
+        // One style a line: its section and its words, the same colour (the owner's, 14 November 2026). Where its words
+        // come from is a card of its own under What to do (ilDraftSources), never a grey note on the line.
+        return ilItem('', '<span class="pg-par-val">' + label + ilPillText(shown.text) + '</span>' + (d.code != null ? '<pre class="sg-il-example"><code>' + esc(String(d.code)) + '</code></pre>' : '') + ilDraftFrom(d, p, seenOut, function (to) { return on + 'Change the draft ' + q(t) + ' to ' + q(to) + '.'; }),
           { approve: 'Approve the draft ' + q(t), change: 'Change the draft ' + q(t) + ': ask me for my words', changeTo: 'Change the draft ' + q(t) + ' to "{to}"', drop: 'Drop the draft ' + q(t) },
-          null, { edit: t, tips: { approve: 'Agents use it as written from the next run.', drop: 'It is deleted; no agent ever gets it.' } });
+          null, { edit: t, tips: { approve: 'Agents use it as written from the next run.', drop: 'It is deleted, and no agent ever gets it.' } });
       });
+      // A line that needs a fix comes first, on its own, with no Approve all: the rest are ready, and approved together.
+      // With one set apart, the rest's decision names each of them (an "all" would take the one to fix with it).
+      var needsFix = drafts.map(function (d) { var x = ilDraftParts(d, p); return !!(x.figmaOnly.length || x.rewrite); });
+      var fixItems = draftItems.filter(function (h, i) { return needsFix[i]; }), okItems = draftItems.filter(function (h, i) { return !needsFix[i]; }), nok = okItems.length;
       // A proposal's answers: its own (options) when it lists them, else yes and no; approve is the first, drop the other.
       var answers = function (x) { var o = (x.options && x.options.length) ? x.options : [{ answer: 'yes', does: x.yes || '' }, { answer: 'no', does: x.no || '' }]; return [o[0], o[1] || o[0]]; };
       var says = function (a, x) { var w = String(a.answer).toLowerCase(); return (w === 'yes' ? 'Yes' : w === 'no' ? 'No' : q(a.answer)) + ' to ' + q(x.proposal); };
       var ruleItem = function (x, def) {
         var to = x.kind === 'rewrite' ? x.rewrite : String(x.proposal).replace(/^[\s\S]*?as a check: /, '');
         var yes = ((x.candidates || []).filter(function (c) { return c.answer === 'yes'; })[0] || {}).evidence || [], a = answers(x);
-        var why = x.quiet ? 'Only the engine\'s own reading of the rule speaks for it: nothing the team wrote or decided does.' : yes.map(function (e) { return e.says; }).join(' ');
-        return ilItem(x.kind === 'rewrite' ? 'Rewrite the rule' : 'Hold the rule as a check', '<span class="pg-par-val">“' + esc(x.rule || '') + '”</span><span class="sg-il-label">' + esc(x.kind === 'rewrite' ? 'As' : 'With the check') + '</span><span class="sg-il-text">' + esc(to) + '</span>' + (why ? '<span class="sg-il-source">' + esc(why) + '</span>' : '') + ilAnsweredBy(x),
+        // A quiet one's reason is its group's note already, never said again on it.
+        var why = x.quiet ? '' : yes.map(function (e) { return e.says; }).join(' ');
+        // Said as what a person does: an option when only the engine's reading backs it (the owner's, 12 November 2026).
+        var head = x.kind === 'rewrite' ? (x.quiet ? 'Also rewrite this rule (optional)' : 'Rewrite this rule') : (x.quiet ? 'Also check this rule (optional)' : 'Check this rule');
+        return ilItem(head, '<span class="pg-par-val">“' + esc(x.rule || '') + '”</span><span class="sg-il-text">' + esc((x.kind === 'rewrite' ? 'It would then read: ' : 'The engine would then check that ') + (x.kind === 'rewrite' ? to : to.charAt(0).toLowerCase() + to.slice(1))) + '</span>' + (why ? '<span class="sg-il-source">' + esc(why) + '</span>' : '') + ilAnsweredBy(x),
           { approve: says(a[0], x), change: 'Change ' + q(x.proposal) + ': ask me for my words', changeTo: 'Change ' + q(x.proposal) + ' to "{to}"', drop: says(a[1], x) }, def, { edit: to, tips: { approve: a[0].does, drop: a[1].does } });
       };
       var askItem = function (x) {
@@ -915,11 +1008,29 @@
         .concat(parts.map(function (x) { return ilItem(x.what, x.html, { approve: 'copy what this page says into Component ' + x.part.root + '\'s page, under Parts, as ### ' + x.part.name + ', then delete this page', change: 'ask me what to copy into Component ' + x.part.root + '\'s page' }, null, { tips: { drop: 'The page stays as it is.' } }); }))
         .concat(off.map(function (x) { return ilItem('Remove · ' + capital(x.from || 'a note'), noteBody(x, x.why || x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.'), { approve: 'remove ' + q(noteOf(x)) + ' where it lives', change: 'for ' + q(noteOf(x)) + ', ask me what to change', changeTo: 'change ' + q(noteOf(x)) + ' to "{to}" where it lives' }, null, { edit: noteOf(x), tips: { drop: 'The note stays as it is.' } }); }))
         .concat(fix.map(function (x) { return ilItem('Change · ' + capital(x.from || 'a note'), noteBody(x, [x.why, x.fix].filter(Boolean).join(' ')), { approve: 'for ' + q(noteOf(x)) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'), change: 'for ' + q(noteOf(x)) + ', ask me what to change', changeTo: 'change ' + q(noteOf(x)) + ' to "{to}" where it lives' }, null, { edit: noteOf(x), tips: { drop: 'The note stays as it is.' } }); }));
-      var html = ilGroup('drafts', 'New text for the page', draftItems, { approve: (nd === 1 ? 'Approve its draft' : 'Approve all ' + nd + ' drafts') + from, change: nd === 1 ? 'Change its draft: ask me for my words' : 'Change the drafts: ask me which, and for my words', drop: (nd === 1 ? 'Drop its draft' : 'Drop all ' + nd + ' drafts') + from })
-        + ilGroup('rules', 'Changes to rules', rules.filter(function (x) { return !x.quiet; }).map(function (x) { return ruleItem(x); }), null, rules.filter(function (x) { return x.quiet; }).map(function (x) { return ruleItem(x, 'drop'); }))
-        + ilGroup('asks', 'Decisions about the page', asks.map(askItem), null)
-        + ilGroup('other', 'Other changes', otherItems, { drop: 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') });
-      var lead = (task && !/pg-missing/.test(task) ? task : '') + '<p class="sg-il-line">' + esc('Approve all, Change or Drop all under a group copies its decision; paste it into Claude Code. What you leave stays as it is.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you approve.' : '')) + '</p>';
+      // Sections: one alone has no heading (the card's sentence says what it is), several each keep theirs.
+      var moveItems = moveTo ? [ilItem('', '<span class="pg-par-val">' + esc('It only lives inside it, so what it says becomes a section there, under Parts.') + '</span>',
+        { approve: 'copy what this page says into Component ' + moveTo.root + '\'s page, under Parts, as ### ' + moveTo.name + ', then delete this page', change: 'ask me what to copy into Component ' + moveTo.root + '\'s page', drop: 'keep ' + moveTo.name + '\'s page as a page of its own' }, null, { tips: { drop: 'The page stays as it is.' } })] : [];
+      var sections = [fixItems.length, nok, rules.length, asks.length, otherItems.length, moveItems.length].filter(Boolean).length, alone = sections === 1;
+      var html = ilGroup('fix', 'Fix first', fixItems, nd > 1 ? { none: true } : null, null, alone)
+        + ilGroup('drafts', fixItems.length ? 'Ready to approve' : 'New text for the page', okItems, fixItems.length ? {} : { approve: (nok === 1 ? 'Approve its draft' : 'Approve all ' + nok + ' drafts') + from, change: nok === 1 ? 'Change its draft: ask me for my words' : 'Change the drafts: ask me which, and for my words', drop: (nok === 1 ? 'Drop its draft' : 'Drop all ' + nok + ' drafts') + from }, null, alone)
+        + ilGroup('move', 'Move this page', moveItems, null, null, alone)   // the page's own task first, before any rule it holds
+        + ilGroup('rules', 'Changes to rules', rules.filter(function (x) { return !x.quiet; }).map(function (x) { return ruleItem(x); }), null, rules.filter(function (x) { return x.quiet; }).map(function (x) { return ruleItem(x, 'drop'); }), alone)
+        + ilGroup('asks', 'Decisions about the page', asks.map(askItem), null, null, alone)
+        + ilGroup('other', 'Other changes', otherItems, { drop: 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') }, null, alone);
+      // The task alone: how the actions work is said on each action (its title), never as a line of its own (the owner's, 12 November 2026).
+      var page = /^the /.test(ilOn(p)) ? ilOn(p) : ilOn(p) + '\'s page', toFix = ilDraftsToFix(drafts, p), names = ilNamesOf(p);
+      var said = function (t) { return '<p class="sg-il-line"><strong>' + pillNamesIn(t, names) + '</strong></p>'; };
+      var nr = rules.length, quietOnly = nr && rules.every(function (x) { return x.quiet; }), no = otherItems.length;
+      // The panel's title names the page, so its task never names it again: it says only what to do (the owner's,
+      // 14 November 2026), each name once.
+      var onlyMove = moveTo && !nd && !open.length && !write.length && !notes.length;
+      var lead = onlyDrafts ? said('Review ' + (nd === 1 ? 'one new line' : nd + ' new lines') + (oneWhere || nd === 1 && drafts[0].where ? ' for ' + (oneWhere || drafts[0].where) : ' for this page') + '. Once approved, agents use ' + (nd === 1 ? 'it' : 'them') + '.' + (toFix ? ' ' + toFix + (toFix === 1 ? ' needs' : ' need') + ' a fix before you approve.' : ''))
+        : onlyMove ? said('Move this page into ' + moveTo.root + '.')
+        : p._part === 'rules' ? said(quietOnly ? 'The engine can check ' + (nr === 1 ? 'one of this page\'s rules' : nr + ' of this page\'s rules') + ' for you. Turn on the ' + (nr === 1 ? 'check' : 'ones') + ' you want.' : 'Decide whether the engine checks ' + (nr === 1 ? 'this rule' : 'these ' + nr + ' rules') + '.')
+        : p._part === 'asks' ? said('Decide ' + (asks.length === 1 ? 'one thing' : asks.length + ' things') + ' about this page.')
+        : p._part === 'other' ? said('Make ' + (no === 1 ? 'one change' : no + ' changes') + ' to this page.')
+        : task && !/pg-missing/.test(task) ? task : '';
       return lead + '<div class="sg-il-draft" data-il-review data-il-on="' + esc(on) + '"><div class="sg-il-draft-text">' + html + '</div></div>';
     };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong><span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
@@ -975,7 +1086,7 @@
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
     // A page whose component changed since it was written: its review is that, whatever else it waits on.
     var isStale = function (p) { return (p.wrong || []).some(function (f) { return f.kind === 'stale'; }); };
-    var reviewTopic = function (p) { return isStale(p) && p.action === 'review' ? 'Changed since written' : p.recheck && p.action === 'review' ? 'Decision to review again' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    var reviewTopic = function (p) { return p._part ? IL_PART_TOPIC[p._part] : isStale(p) && p.action === 'review' ? 'Changed since written' : p.recheck && p.action === 'review' ? 'Decision to review again' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
     // Who a row waits on (ds-config.json owners, decided-by.mjs): its page's, else its component's, else the system's.
     var deciderOf = function (p) { var d = p.decider || (docComp(p) || {}).decider || (p.absent ? IL.systemDecider : null); return d && d.name ? d.name : null; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
@@ -1002,6 +1113,7 @@
     // review is "Drafts", the others their decision: Move, Fix, Add…).
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
     // component, a name not in the system, a component with no page, drafts…
+    var IL_PART_TOPIC = { move: 'Part of a component', drafts: 'Drafts', rules: 'Rule checks', asks: 'Decisions', other: 'Other changes' };
     var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
     // A page with nothing left to do reads Done here (the intent layer's own decision for it is Keep).
     var labelOf = function (k) { if (k === 'keep') return 'Done'; if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
@@ -1031,7 +1143,7 @@
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          write: tm.length ? [{ what: 'Their descriptions (' + tm.length + ')', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for. Agents read it to pick the right token. A line that only repeats the token\'s name, its modes or what it points to does not count.</span><span class="sg-il-label">Where</span><span class="sg-il-text">In Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ', or a text style\'s own Description' : '') + '. Or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span>' }] : [],
+          write: tm.length ? [{ what: 'Their descriptions (' + tm.length + ')', html: '<span class="sg-il-text">One sentence on what each token is for, so an agent picks the right one. A line that only repeats the token\'s name, its modes or what it points to does not count. Write it in Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ' or a text style\'s own Description' : '') + ', or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span>' + namesShown(tm)}] : [],
           todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
@@ -1052,10 +1164,27 @@
     var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '" data-f-area="' + esc(ilArea(p)) + '"' + (p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ' data-f-pagesToWrite="1"' : '') + '><td>' + c.forWhat + '</td><td>' + esc(ilArea(p)) + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + firstLine(c.decision) + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '" data-f-area="' + esc(ilArea(p)) + '"' + (p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ' data-f-pagesToWrite="1"' : '') + '><td>' + firstLine(c.forWhat) + '</td><td>' + esc(ilArea(p)) + '</td>' + (NO_LAYER ? '' : '<td>' + firstLine(c.file) + '</td>') + '<td>' + ilSources(p) + '</td><td>' + firstLine(c.decision) + (p._part ? '<span class="pg-par-val sg-il-part">' + esc(IL_PART_WORD[p._part]) + '</span>' : '') + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
-    var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
+    var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i) + (p._part ? ':' + p._part : ''); };
+    // One decision a row (the owner's, 14 November 2026): a page that asks for several (to move it, new text, rule
+    // checks, other decisions, other changes) is a row for each, so each can be done, by whoever it is for, on its own.
+    // They are independent: a line approved before the move travels with the page into its new home.
+    // Which of a page's decisions a row is, under its status in the table: the owner's choice (14 November 2026), the
+    // For column naming the component alone.
+    var IL_PART_WORD = { move: 'Move', drafts: 'New text', rules: 'Rule checks', asks: 'Decisions', other: 'Other changes' };
+    var ilPartsOf = function (p) {
+      if (p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) return [];
+      var c = ilCellsOf(p), open = ilOpen(p), write = c.write || [], notes = c.notes || [], out = [];
+      if (p.partOf && p.component && !write.some(function (x) { return x.part; })) out.push('move');
+      if ((p.drafts || []).length) out.push('drafts');
+      if (open.some(isRuleChange)) out.push('rules');
+      if (open.some(function (x) { return !isRuleChange(x); })) out.push('asks');
+      if (write.length || notes.length) out.push('other');
+      return out;
+    };
+    rows = rows.reduce(function (all, p) { var ks = ilPartsOf(p); return all.concat(ks.length > 1 ? ks.map(function (k) { return Object.assign({}, p, { _part: k, _parts: ks }); }) : [p]); }, []);
     var ilLaterFailed = false;
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
@@ -1064,13 +1193,13 @@
       if (!ilLaterFailed && needLater('intentLayer', function (ok) { if (!ok) ilLaterFailed = true; ilPanel(i, from); })) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
       // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
       // page is and why.
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo, ilOpen(p)), task = own ? ilTodo(own) : c.todo;
-      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var body = card('What to do', todo || task) + card('Where the new lines come from', ilDraftSources(p)) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       // A group's Approve all, Change or Drop all copies its decision on what it proposes (not what it has no ground for), said
       // beside them once copied.
       var detail = m.querySelector('.sg-row-detail');
@@ -1078,17 +1207,18 @@
         var box = e.target.closest('[data-il-review]');
         var all = e.target.closest('[data-il-all]');
         if (all && box) {
-          var k = all.getAttribute('data-il-do'), g = all.closest('[data-il-group]'), shown = Array.prototype.filter.call(g.querySelectorAll('[data-il-item]'), function (it) { return !it.closest('.sg-il-quiet'); });
-          copyText(ilGroupDecision(box.getAttribute('data-il-on'), g.getAttribute('data-il-all-' + k), shown.map(function (it) { return it.getAttribute('data-il-' + k); })), all, all.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code');
+          var k = all.getAttribute('data-il-do'), g = all.closest('[data-il-group]'), q = all.hasAttribute('data-il-quiet'), shown = Array.prototype.filter.call(g.querySelectorAll('[data-il-item]'), function (it) { return !!it.closest('.sg-il-quiet') === q; });
+          copyText(ilGroupDecision(box.getAttribute('data-il-on'), q ? null : g.getAttribute('data-il-all-' + k), shown.map(function (it) { return it.getAttribute('data-il-' + k); })), all, all.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code');
           return;
         }
         var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said'));
       };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.name || p.file || p.component || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.component || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
     // A link to a page's panel (panel=doc:<file>) opens it.
-    ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
+    // A page's link with no decision named (doc:<file>, as a component's area gives it) opens its first decision.
+    ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i < 0) i = rows.findIndex(function (p, j) { return ilKey(p, j).indexOf(key + ':') === 0; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     // The rows to review, by who they wait on, as a filter of its own ("Waiting on Cards team"): a row that waits on
     // nobody answers it with nothing, so the chip offers only the teams there are.
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
@@ -1117,7 +1247,7 @@
       if (list.some(function (r) { return r.st === 'todo'; })) return 'fix';
       return list.some(isOpen) ? 'check' : 'done';
     };
-    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; })); }).join(''));
+    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; })); }).join(''));
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };

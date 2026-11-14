@@ -150,7 +150,7 @@ export const Chip = ({ size = 'md', disabled = false }: ChipProps) => null;`;
   const a = typescriptComponentApi(TS, 'Chip.tsx', tsx, 'Chip');
   assert.deepEqual(a.props.size, { options: ['sm', 'md', 'lg'], required: false, default: 'md' });
   assert.deepEqual(a.props.disabled, { type: 'boolean', required: false, default: 'false' });
-  assert.deepEqual(a.props.label, { required: true });
+  assert.deepEqual(a.props.label, { required: true, holds: { kind: 'words' } }, 'a string holds words');
   const vue = `<script setup lang="ts">
 const props = withDefaults(defineProps<{ tone?: 'info' | 'warn'; dense?: boolean }>(), { tone: 'info' });
 </script>`;
