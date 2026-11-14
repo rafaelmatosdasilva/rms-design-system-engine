@@ -107,7 +107,6 @@
   var varOf = function (v) { return v.var || '--' + String(v.figma).split('/').join('-').replace(/\s+/g, ''); };
   var SHADOW = (function () { var v = VARS.filter(function (x) { return /shadow/i.test(x.figma) && /display/i.test(x.figma); }).sort(function (x, y) { return x.figma.length - y.figma.length; })[0]; return v ? { v: varOf(v), figma: v.figma, values: v.values } : null; })();
   // Every shadow's own switch: all follow the theme's choice, so what reads them (Identity) sees shadows on or off.
-  var OWN = '*:not([class^="sg-"], [class*=" sg-"], [class^="pg-"], [class*=" pg-"])';   // the system's elements, not the guide's own
   var SHADOW_ALL = VARS.filter(function (x) { return /shadow/i.test(x.figma) && /display$/i.test(x.figma); }).map(varOf);
   var SHADOW_COLOURS = VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /colou?r$/i.test(v.figma); });
   var shadowsOn = SHADOW ? String(SHADOW.values[0]) === 'true' : true;
@@ -115,6 +114,12 @@
     var v = VARS.filter(function (x) { return x.var && /(app|page|canvas)[\s_/-]*background|background[\s_/-]*(app|page)/i.test(x.figma) && hexOf(x.values && x.values[0]); })
       .sort(function (x, y) { return x.figma.length - y.figma.length; })[0];
     return v ? { v: v.var, hex: hexOf(v.values[0]) } : null;
+  })();
+  // The headers' background: every header's own background colour token (…header…/background[/default]/color), one
+  // setting for them all, as the system gives each header its own. The shortest named gives its value.
+  var HEADER_BG = (function () {
+    var all = VARS.filter(function (x) { return x.var && /header[^/]*\/background(\/default)?\/colou?r$/i.test(x.figma); }).sort(function (x, y) { return x.figma.length - y.figma.length; });
+    return all.length ? { v: all[0].var, vars: all.map(function (x) { return x.var; }), hex: (function (v, n) { while (v && n--) { var h = hexOf(v.values && v.values[0]); if (h) return h; var to = v.aliases && v.aliases[0]; v = to && VARS.filter(function (x) { return x.figma === to; })[0]; } return null; })(all[0], 8) } : null;   // its value, through what it links to
   })();
   var mostFollowed = function (test) {
     var cands = VARS.filter(function (v) { return v.var && test(v.figma) && !(v.aliases && v.aliases[0]) && /^[\d.]+px$/.test(String(v.values && v.values[0]).trim()); });
@@ -141,8 +146,11 @@
   // A colour in dark, for a token the system draws lighter or darker in dark: moved by as much as the system moves it.
   var tokenDark = function (st, hex) { var v = BYVAR[st.v]; if (!v) return hex6(hex); var n = toLch(hex), shift = toLch(shown(v, 'dark')).l - toLch(shown(v, 'light')).l; return fromLch(Math.min(0.99, Math.max(0.01, n.l + shift)), n.c, n.h); };
   var BTN = radiusNamed(/button/i) || radiusNamed(/control/i) || radii[0] || null, CARD = radiusNamed(/card/i) || radiusNamed(/container|surface/i) || radii[radii.length - 1] || null;
+  // The other surfaces' own corners: a bar, a panel, a sheet, a modal (the navigation bar, say), with a radius of their
+  // own that follows no token. The card's roundness reaches them too, as the surfaces they are.
+  var SURFACE_R = CARD ? VARS.filter(function (v) { return v.var && v.var !== CARD.v && /\/radius(\/|$)/i.test(v.figma) && !(v.aliases && v.aliases.some(Boolean)) && /(bar|panel|sheet|modal|dialog|drawer|navigation)/i.test(v.figma) && !/button|tab|badge|input|chip|toggle|switch|scroll|progress|loader|card/i.test(v.figma); }).map(function (v) { return v.var; }) : [];
   var start = {
-    name: '', fontFamily: families[0] || '', primary: PRIMARY ? PRIMARY.hex : '#2563eb', secondary: SECONDARY ? SECONDARY.hex : '#64748b', appBg: APP_BG ? APP_BG.hex : '#ffffff',
+    name: '', fontFamily: families[0] || '', primary: PRIMARY ? PRIMARY.hex : '#2563eb', secondary: SECONDARY ? SECONDARY.hex : '#64748b', appBg: APP_BG ? APP_BG.hex : '#ffffff', headerBg: HEADER_BG ? HEADER_BG.hex : '#ffffff',
     shadowColour: SHADOW_COLOURS[0] ? (hex6(SHADOW_COLOURS[0].values && SHADOW_COLOURS[0].values[0]) || '#000000') : '#000000',
     buttonRadius: BTN ? BTN.px : 8, cardRadius: CARD ? CARD.px : 16, borderWidth: BORDER ? BORDER.px : 1, shadowBlur: BLUR ? BLUR.px : 16, spacing: 100, shadows: shadowsOn
   };
@@ -239,9 +247,12 @@
   // A class names its component with what is around the name taken off (has-, is-, data-; -wrapper, -container…):
   // data-table-wrapper is the table's.
   var compKey = function (c) { var a = String(c).replace(/^(has|is)-/, '').replace(/-(wrapper|container|styles|root|wrap)$/, ''), k = normN(a); if (COMP_TOK[k]) return k; var b = normN(a.replace(/^(data|ds|ui|app|c)-/, '')); return COMP_TOK[b] ? b : k; };
+  // An element's Figma name (a Showroom screen marks each component with it) and the families that name sits in: a
+  // set's path, navigation/MenuBar, is the navigation's, whose tokens are its family's.
+  var figNames = function (n) { var fig = n.getAttribute('data-figma') || '', path = fig.split('/'), out = [fig]; for (var pl = path.length - 1; pl > 0; pl--) out.push(path.slice(0, pl).join('/')); return out; };
   var compOf = function (el) {
     for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
-      var cls = [n.getAttribute('data-figma') || ''].concat(String(n.getAttribute('class') || '').split(/\s+/));   // its Figma name first (a Showroom screen marks each component with it), then its classes
+      var cls = figNames(n).concat(String(n.getAttribute('class') || '').split(/\s+/));   // its Figma name first (a Showroom screen marks each component with it), then its classes
       for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k]) return { el: n, key: k }; }
     }
     return null;
@@ -418,22 +429,35 @@
       (named.length ? named : [BYVAR[tok.v] || { var: tok.v }]).forEach(function (v) { set[v.var] = px + 'px'; });
     };
     if (APP_BG && b.appBg && (b.appBg !== (live.appBg || APP_BG.hex) || (mode !== 'light' && (b.dark || {}).appBg))) set[APP_BG.v] = mode === 'light' ? hex6(b.appBg) : ((b.dark || {}).appBg || bgDark(b.appBg));
+    // The headers' background: every header's token, in dark as set by hand, else moved as the system moves its own.
+    if (HEADER_BG && b.headerBg && (hex6(b.headerBg) !== hex6(live.headerBg || HEADER_BG.hex) || (mode !== 'light' && (b.dark || {}).headerBg))) HEADER_BG.vars.forEach(function (v) { set[v] = mode === 'light' ? hex6(b.headerBg) : ((b.dark || {}).headerBg || tokenDark({ v: v }, b.headerBg)); });
     // Shadows through the system's own tokens: its switch, and on, each shadow in the system's own colour for this mode
     // (a brand that hides them draws them transparent).
+    // The components draw their shadows from their own colour tokens, never from the switch, so off is every shadow's
+    // colour transparent: one switch for every component with a shadow.
+    if (b.shadows === false) SHADOW_COLOURS.forEach(function (v) { set[v.var] = 'transparent'; });
     if (SHADOW && (b.shadows !== shadowsOn || b.shadows)) {
       set[SHADOW.v] = b.shadows ? 'true' : 'false';
       if (b.shadows) SHADOW_COLOURS.forEach(function (v) { var own = hexOf(v.values && v.values[m]); if (own) set[v.var] = own; });
       // One colour for every shadow: the system has no shared shadow colour, only each component's, so all of them take
       // it (each keeping its own see-through); in dark, as set by hand, else moved as the system moves its own.
-      if (b.shadows && b.shadowColour && hex6(b.shadowColour) !== hex6(start.shadowColour || '')) SHADOW_COLOURS.forEach(function (v) {
+      // Turned on by the theme, every shadow takes it too, and the blur: the system draws some transparent or with no blur
+      // (a button's, a white card's), and those would stay unseen with the switch alone.
+      var turnedOn = b.shadows && !shadowsOn;
+      if (b.shadows && b.shadowColour && (turnedOn || hex6(b.shadowColour) !== hex6(start.shadowColour || ''))) SHADOW_COLOURS.forEach(function (v) {
         var hex = mode === 'light' ? hex6(b.shadowColour) : ((b.dark || {}).shadowColour || tokenDark({ v: v.var }, b.shadowColour));
-        set[v.var] = withAlpha(hex6(hex), alphaOf(shown(v, mode) || hexOf(v.values && v.values[m])));
+        var a = alphaOf(shown(v, mode) || hexOf(v.values && v.values[m]));
+        set[v.var] = withAlpha(hex6(hex), a > 0 ? a : alphaOf(b.shadowColour));
       });
+      if (turnedOn && b.shadowBlur != null) VARS.forEach(function (v) { if (v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma)) set[v.var] = b.shadowBlur + 'px'; });
+      // A shadow's offset and spread the system has in Figma but never wrote to its CSS: one missing part and the browser
+      // draws no shadow at all, so they are declared with Figma's own value.
+      if (b.shadows) (SG.allVars || []).forEach(function (v) { if (v.var || !/shadow/i.test(v.figma) || !/\/(x|y|spread|blur)$/i.test(v.figma)) return; var x = String(v.values && v.values[m] != null ? v.values[m] : (v.values || [])[0]).trim(); if (/^-?[\d.]+(px)?$/.test(x)) set[varOf(v)] = /blur$/i.test(v.figma) && turnedOn && b.shadowBlur != null ? b.shadowBlur + 'px' : parseFloat(x) + 'px'; });
     }
     // The button's radius reaches every token that follows it (buttons, the menu's items…); the card's only the cards'.
     STOPS.forEach(function (st) { var hex = (b.grad || {})[st.v]; if (!hex) return; var hand = ((b.dark || {}).grad || {})[st.v]; if (hex6(hex) === hex6((live.grad || {})[st.v] || st.hex) && !(mode !== 'light' && hand)) return; set[st.v] = mode === 'light' ? hex6(hex) : (hand || tokenDark(st, hex)); });
     if (BTN && b.buttonRadius !== BTN.px) radiusFor(BTN, /./, b.buttonRadius);
-    if (CARD && b.cardRadius !== CARD.px) radiusFor(CARD, /card/i, b.cardRadius);
+    if (CARD && b.cardRadius !== CARD.px) { radiusFor(CARD, /card/i, b.cardRadius); SURFACE_R.forEach(function (v) { set[v] = b.cardRadius + 'px'; }); }
     if (BORDER && b.borderWidth != null && b.borderWidth !== BORDER.px) set[BORDER.v] = b.borderWidth + 'px';
     // Spacing: every gap, padding and margin of the system scaled alike, from the size the screen shows it at.
     if (b.spacing && b.spacing !== 100) SPACES.forEach(function (v) { var x = SPACE_NOW[v.var]; if (x) set[v.var] = Math.round(x.n * b.spacing / 100) + x.unit; });
@@ -456,16 +480,12 @@
         return best;
       };
       var bgs = menuStops.map(function (st) { return now(st.v); }).filter(Boolean);
-      // The brand on a gradient (its logo, drawn in the primary) reads at 3:1 on it, both ways round: the side edited
-      // last leads. A background just set stays, and the logo takes the nearest shade of the primary that reads on it; a
-      // colour just set stays, and the gradient's background moves only as far as it must.
+      // The primary on a gradient reads at 3:1 on it: a colour just set stays, and the gradient's own background tokens
+      // move only as far as they must.
       var brand = PRIMARY && now(PRIMARY.v);
       if (brand && b.menuLead === 'content') {
         menuStops.forEach(function (st) { var bg = now(st.v), moved = reach(bg, [brand], 3); if (moved) set[st.v] = withAlpha(moved, alphaOf(bg)); });
         bgs = menuStops.map(function (st) { return now(st.v); }).filter(Boolean);
-      } else {
-        var logo = brand && reach(brand, bgs, 3);
-        if (logo) extra += '\n' + scope + ' [class*="logo"] { color: ' + logo + ' !important; }';
       }
       GRADIENTS.forEach(function (g) {
         var on = g.stops.filter(function (st) { return BYVAR[st.v]; }).map(function (st) { return now(st.v); }).filter(Boolean), re = stemRe(g.stem); if (!on.length) return;
@@ -493,28 +513,6 @@
     SHADOW_ALL.forEach(function (v) { set[v] = b.shadows ? 'true' : 'false'; });   // every switch, whatever the default
     applyTok();   // a component's own change wins over the theme's wider ones (its shadow on, say)
     var decl = Object.keys(set).map(function (k) { return k + ': ' + set[k]; }).concat(lines);
-    // Shadows on: each component's own shadow, from its shadow tokens (X, Y, blur, spread, colour), on the elements
-    // named for it (card-primary, has-card-primary, card-primary-wrapper…). Its CSS draws it only on the classes its
-    // code adds when it renders, which a screen's drawing does not carry.
-    var shadowRules = '';
-    if (b.shadows && SHADOW) {
-      var val = function (figma) { var v = BY[figma], n = 0; while (v && !set[v.var] && v.aliases && v.aliases[m] && BY[v.aliases[m]] && n++ < 12) v = BY[v.aliases[m]]; return v ? String(set[v.var] || v.values[m]) : null; };
-      var groups = {};
-      VARS.forEach(function (v) { var g = String(v.figma).match(/^(.*)\/shadow\/(x|y|blur|spread|colou?r)$/i); if (g) (groups[g[1]] = groups[g[1]] || {})[g[2].toLowerCase().replace('colour', 'color')] = v; });
-      Object.keys(groups).forEach(function (path) {
-        var g = groups[path], name = path.split('/').pop(); if (!g.color || !/^[a-z][A-Za-z0-9]+$/.test(name)) return;
-        var kebab = name.replace(/([A-Z])/g, '-$1').toLowerCase();
-        var px = function (t, d) { var x = t && val(t.figma); return x && /^-?[\d.]+(px)?$/.test(x.trim()) ? (parseFloat(x) + 'px') : d; };
-        var colour = set[g.color.var] || shown(g.color, mode) || hexOf(val(g.color.figma)); if (!colour) return;
-        // Never on a wrapper: a wrapper is a square box round the component, and its shadow showed as a square glow behind
-        // a round button. The component itself (its own class, its container) carries its corners.
-        var sel = ['.' + kebab, '.has-' + kebab, '.has-' + kebab + '-styles', '.' + kebab + '-container'].map(function (c) { return scope + ' ' + c; }).join(', ');
-        shadowRules += '\n' + sel + ' { box-shadow: ' + [px(g.x, '0px'), px(g.y, '2px'), b.shadowBlur != null ? b.shadowBlur + 'px' : px(g.blur, '16px'), px(g.spread, '0px'), colour].join(' ') + ' !important; }';
-      });
-    }
-    // A text given another of the system's text styles: its size, weight and line height from that style's own variables,
-    // so it changes with each breakpoint as the system's text does.
-    Object.keys(tk.radius || {}).forEach(function (sel) { extra += '\n' + scope + ' ' + sel + ' { border-radius: ' + (+tk.radius[sel] || 0) + 'px !important; }'; });
     // A text style's token at a breakpoint: declared where the screen is at that breakpoint (its mode's attribute, on
     // the screen or inside it), so each breakpoint keeps its own size.
     var BP_AXIS = (SG.axes || []).filter(function (a) { return !a.colour && a.attr && (a.values || []).some(function (x) { return /^(desktop|laptop|tablet|phone|mobile)$/i.test(x.label); }); })[0] || null;
@@ -525,12 +523,8 @@
         extra += '\n' + scope + '[' + BP_AXIS.attr + '="' + av.value + '"], ' + scope + ' [' + BP_AXIS.attr + '="' + av.value + '"] { ' + v + ': ' + val + '; }';
       });
     });
-    Object.keys(tk.text || {}).forEach(function (sel) {
-      var st = TEXT_STYLES.filter(function (x) { return x.scale === tk.text[sel]; })[0]; if (!st) return;
-      var val = function (p) { return p ? (p.var ? 'var(' + p.var + ')' : p.value) : null; }, props = [['font-size', val(st.size)], ['font-weight', val(st.weight)], ['line-height', val(st.lh)]].filter(function (p) { return p[1]; });
-      extra += '\n' + scope + ' ' + sel + ' { ' + props.map(function (p) { return p[0] + ': ' + p[1] + ' !important'; }).join('; ') + '; }';
-    });
-    return scope + ' { ' + decl.join('; ') + (decl.length ? ';' : '') + ' }' + shadowRules + extra + (b.shadows ? '' : '\n' + [' ', '::before', '::after'].map(function (p) { return scope + ' ' + OWN + p.trim(); }).join(', ') + ' { box-shadow: none !important; }') + '\n' + scope + ' { font-family: var(' + ((T.typeFamily && T.typeFamily.var) || '--x') + ', inherit); }';
+    // Only the system's own tokens, never a rule of the editor's: everything a theme says is a token's value.
+    return scope + ' { ' + decl.join('; ') + (decl.length ? ';' : '') + ' }' + extra;
   };
 
   // The controls, in the page's own rows (a name on the left, its control on the right).
@@ -613,6 +607,7 @@
         row('Primary colour', 'ts-primary', colour('ts-primary', brief.primary, (brief.dark || {}).primary)) +
         row('Secondary colour', 'ts-secondary', colour('ts-secondary', brief.secondary, (brief.dark || {}).secondary)) +
         (APP_BG ? row('App background', 'ts-bg', colour('ts-bg', brief.appBg, (brief.dark || {}).appBg)) : '') +
+        (HEADER_BG ? row('Header background', 'ts-hbg', colour('ts-hbg', brief.headerBg || start.headerBg, (brief.dark || {}).headerBg)) : '') +
         STOPS.map(function (st) { return row(st.label, st.id, colour(st.id, (brief.grad || {})[st.v] || st.hex, ((brief.dark || {}).grad || {})[st.v])); }).join('') +
         row('Button roundness', 'ts-btn-r', slider('ts-btn-r', brief.buttonRadius, 'Button roundness')) +
         row('Card roundness', 'ts-card-r', slider('ts-card-r', brief.cardRadius, 'Card roundness')) +
@@ -642,7 +637,7 @@
   var editing = null;   // the saved theme being edited, else null (a new one)
   var open = function (from, kind, theme) {
     editing = theme || null;
-    var tokOver = { light: {}, dark: {}, all: {}, text: {}, radius: {}, bp: {}, detached: {}, alias: {} }, picked = null;
+    var tokOver = { light: {}, dark: {}, all: {}, text: {}, bp: {}, detached: {}, alias: {} }, picked = null;
     if (theme) { source = 'scratch'; brief = Object.assign({}, start, theme.brief || {}, { name: theme.name }); baseTheme = theme.base || ''; }
     else {
       if (kind) source = kind;
@@ -727,6 +722,8 @@
       fullBtn.addEventListener('click', function () { if (document.fullscreenElement === pvBox) document.exitFullscreen(); else pvBox.requestFullscreen().catch(function () { /* refused: it stays in the panel */ }); });
       document.addEventListener('fullscreenchange', function () {
         var on = document.fullscreenElement === pvBox;
+        // Trying the screens: the outlines and names off while it lasts, back after.
+        Array.prototype.forEach.call(pvBox.querySelectorAll('.sg-ts-frame'), function (fr) { var d = fr.contentDocument; if (!d) return; d.documentElement.classList.toggle('ts-testing', on); Array.prototype.forEach.call(d.querySelectorAll('.ts-hover'), function (x) { x.classList.remove('ts-hover'); }); });
         fullBtn.setAttribute('aria-pressed', String(on)); fullBtn.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); fullBtn.title = on ? 'Exit full screen' : 'Full screen';
         fullBtn.innerHTML = on ? EXIT_ICON : FULL_ICON;
         requestAnimationFrame(fit);
@@ -757,16 +754,19 @@
       // would on its own (a link, a field, a button).
       // Drawn inside the element's own edge: outside it, a tile's clipping or the cell beside it cut its sides off.
       /* What is picked is named above it, never outlined: an outline sat on what was being judged. */
-      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } #ts-screen .ts-hover:not(.ts-picked) { outline: 2px dashed var(--sg-accent, #2563eb) !important; outline-offset: -2px !important; } #ts-screen .ts-picked, #ts-screen .ts-picked-part { outline: none !important; } #ts-screen .ts-tok-hit { outline: 3px dashed var(--sg-accent, #2563eb) !important; outline-offset: -3px !important; } #ts-hover-label, #ts-pick-label { position: absolute; z-index: 2147483646; pointer-events: none; padding: 2px 8px; border-radius: 4px; background: var(--sg-text, #111); color: var(--sg-bg, #fff); box-shadow: var(--sg-shadow-lift, none); font: 600 11px/1.5 system-ui, sans-serif; white-space: nowrap; } #ts-pick-label { z-index: 2147483647; }'; /* the guide's own tooltip (its text colour behind its background colour): it reads whatever the brand */ hl.textContent += ''; fdoc.head.appendChild(hl);
-      var hovered = null, stop = function (e) { e.preventDefault(); e.stopPropagation(); };
+      var hl = fdoc.createElement('style'); hl.textContent = '#ts-screen, #ts-screen * { cursor: pointer; } .ts-testing #ts-screen, .ts-testing #ts-screen * { cursor: revert; } .ts-testing #ts-hover-label, .ts-testing #ts-pick-label { display: none !important; } #ts-screen .ts-picked, #ts-screen .ts-picked-part { outline: none !important; } #ts-hover-label, #ts-pick-label { position: absolute; z-index: 2147483646; pointer-events: none; padding: 2px 8px; border-radius: 4px; background: var(--sg-text, #111); color: var(--sg-bg, #fff); box-shadow: var(--sg-shadow-lift, none); font: 600 11px/1.5 system-ui, sans-serif; white-space: nowrap; } #ts-pick-label { z-index: 2147483647; } html, html * { scrollbar-width: none; } html::-webkit-scrollbar, html *::-webkit-scrollbar { display: none; }'; /* a screen scrolls as a phone does, with no bar of its own */ /* the guide's own tooltip (its text colour behind its background colour): it reads whatever the brand */ hl.textContent += ''; fdoc.head.appendChild(hl);
+      // Full screen is for trying the screens: nothing outlined or named, and the screen does what it does on its own.
+      var testing = function () { var f = document.fullscreenElement; return !!(f && f.classList.contains('sg-ts-preview')); };
+      fdoc.documentElement.classList.toggle('ts-testing', testing());
+      var hovered = null, stop = function (e) { if (testing()) return; e.preventDefault(); e.stopPropagation(); };
       ['mousedown', 'mouseup', 'submit', 'keydown', 'dblclick', 'contextmenu'].forEach(function (t) { fdoc.addEventListener(t, stop, true); });
       // What the next click picks is outlined and named (the component, and the layer when it is one), never a tooltip.
-      fdoc.addEventListener('mouseover', function (e) { var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.node || n.el; if (hovered) hovered.classList.add('ts-hover'); tagOn('ts-hover-label', hovered, n ? nameOf(n) + (n.part ? ' › ' + n.part : '') : ''); }, true);
+      fdoc.addEventListener('mouseover', function (e) { if (testing()) return; var n = nextPick(e.target); if (hovered) hovered.classList.remove('ts-hover'); hovered = !n ? null : n.node || n.el; if (hovered) hovered.classList.add('ts-hover'); boxes('hover', hovered && !hovered.classList.contains('ts-picked') && !hovered.classList.contains('ts-picked-part') ? [hovered] : []); tagOn('ts-hover-label', hovered, n ? nameOf(n) + (n.part ? ' › ' + n.part : '') : ''); }, true);
       // Scrolled (the screen in its frame, or the stage around it): the labels move with what they name.
       fdoc.defaultView.addEventListener('scroll', function () { placeLabel(); }, { passive: true });
       if (box.parentNode && !box.parentNode._tagScroll) { box.parentNode._tagScroll = true; box.parentNode.addEventListener('scroll', function () { placeLabel(); }, { passive: true }); }
       tagOn('ts-hover-label', null, '');
-      fdoc.addEventListener('mouseleave', function () { if (hovered) hovered.classList.remove('ts-hover'); hovered = null; tagOn('ts-hover-label', null, ''); }, true);
+      fdoc.addEventListener('mouseleave', function () { if (hovered) hovered.classList.remove('ts-hover'); hovered = null; boxes('hover', []); tagOn('ts-hover-label', null, ''); }, true);
       // Panning: the space bar held (never while typing in the form) or the middle button, and a drag moves the stage;
       // a drag never picks.
       var pan = null, panned = false, stageEl = box.parentNode;
@@ -777,7 +777,7 @@
       fdoc.addEventListener('mousemove', move, true); document.addEventListener('mousemove', move, true);
       fdoc.addEventListener('mouseup', end, true); document.addEventListener('mouseup', end, true);
       fdoc.addEventListener('keydown', function (e) { if (e.code === 'Space') window._tsSpace = true; }, true); fdoc.addEventListener('keyup', function (e) { if (e.code === 'Space') window._tsSpace = false; }, true);
-      fdoc.addEventListener('click', function (e) { if (panned || spaceOn()) { stop(e); panned = false; return; } stop(e); var n = nextPick(e.target); if (n) pick(n, n.same); }, true);
+      fdoc.addEventListener('click', function (e) { if (testing()) return; if (panned || spaceOn()) { stop(e); panned = false; return; } stop(e); var n = nextPick(e.target); if (n) pick(n, n.same); }, true);
       if (picked) { var again = picked.cls ? screenEl.querySelector(picked.cls) : null; if (again) { again.classList.add('ts-picked'); picked.el = again; picked.node = null; picked.part = null; } }
       ['dark', 'light'].forEach(function (md) { setMode(md); readLive(screenEl, md); }); setMode(mode);
       if (FONT) live.font = firstFamily(fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(FONT.v));
@@ -788,7 +788,7 @@
       fit();
     };
     var tokSaved = (brief.tokens && typeof brief.tokens === 'object') ? brief.tokens : {};   // a theme being edited keeps its own
-    ['light', 'dark', 'all', 'text', 'radius', 'bp', 'detached', 'alias'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
+    ['light', 'dark', 'all', 'text', 'bp', 'detached', 'alias'].forEach(function (k) { tokOver[k] = Object.assign({}, tokSaved[k] || {}); });
     var pickCard = root.querySelector('.sg-ts-pick');
     var tokKind = function (v) { var x = String((v.values || [])[0] == null ? '' : v.values[0]).trim(); return /^(true|false)$/i.test(x) ? 'bool' : hexOf(x) ? 'colour' : /^-?[\d.]+(px)?$/.test(x) ? 'size' : null; };
     var nowOf = function (v) { var raw = screenEl ? fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(v.var).trim() : ''; return raw || String((v.values || [])[modeIndex(mode)] || ''); };
@@ -889,7 +889,7 @@
       if (!screenEl || !fdoc) return;
       var used = USED = usedOnScreen(), any = function (vs) { return vs.some(function (v) { return v && used[v]; }); };
       var rowOf = function (id) { var x = $(id) || root.querySelector('[data-sw="' + id + '"]'); return x && x.closest('.pg-ctl'); };
-      var set = [['ts-primary', [PRIMARY && PRIMARY.v]], ['ts-secondary', [SECONDARY && SECONDARY.v]], ['ts-bg', [APP_BG && APP_BG.v]], ['ts-btn-r', [BTN && BTN.v].concat(BTN ? followers(BTN.v).map(function (v) { return v.var; }) : [])], ['ts-card-r', [CARD && CARD.v].concat(CARD ? followers(CARD.v).map(function (v) { return v.var; }) : [])], ['ts-space', SPACES.map(function (v) { return v.var; })], ['ts-border', [BORDER && BORDER.v]], ['ts-blur', VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; })], ['shadows', SHADOW_ALL.concat(SHADOW_COLOURS.map(function (v) { return v.var; }), VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; }))], ['ts-shc', SHADOW_COLOURS.map(function (v) { return v.var; })]];   // the switch has no CSS of its own: shown with the shadows it turns on
+      var set = [['ts-primary', [PRIMARY && PRIMARY.v]], ['ts-secondary', [SECONDARY && SECONDARY.v]], ['ts-bg', [APP_BG && APP_BG.v]], ['ts-hbg', HEADER_BG ? HEADER_BG.vars : []], ['ts-btn-r', [BTN && BTN.v].concat(BTN ? followers(BTN.v).map(function (v) { return v.var; }) : [])], ['ts-card-r', [CARD && CARD.v].concat(CARD ? followers(CARD.v).map(function (v) { return v.var; }) : [], SURFACE_R)], ['ts-space', SPACES.map(function (v) { return v.var; })], ['ts-border', [BORDER && BORDER.v]], ['ts-blur', VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; })], ['shadows', SHADOW_ALL.concat(SHADOW_COLOURS.map(function (v) { return v.var; }), VARS.filter(function (v) { return v.var && /shadow/i.test(v.figma) && /blur$/i.test(v.figma); }).map(function (v) { return v.var; }))], ['ts-shc', SHADOW_COLOURS.map(function (v) { return v.var; })]];   // the switch has no CSS of its own: shown with the shadows it turns on
       STOPS.forEach(function (st) { set.push([st.id, [st.v]]); });
       set.forEach(function (x) { var r = rowOf(x[0]); if (r) r.hidden = !any(x[1]); });
     };
@@ -967,8 +967,8 @@
     var compChain = function (el) {
       var out = [];
       for (var n = el; n && n.nodeType === 1 && n.id !== 'ts-screen'; n = n.parentElement) {
-        var cls = [n.getAttribute('data-figma') || ''].concat(String(n.getAttribute('class') || '').split(/\s+/));   // its Figma name first (a Showroom screen marks each component with it), then its classes
-        for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: i === 0 ? '[data-figma="' + cls[0].replace(/"/g, '') + '"]' : '.' + CSS.escape(cls[i]) }); break; } }
+        var fn = figNames(n), cls = fn.concat(String(n.getAttribute('class') || '').split(/\s+/));   // its Figma name first (a Showroom screen marks each component with it), then its classes
+        for (var i = 0; i < cls.length; i++) { var k = compKey(cls[i]); if (k && COMP_TOK[k] && !out.some(function (x) { return x.key === k; })) { out.unshift({ el: n, key: k, cls: i < fn.length ? '[data-figma="' + fn[0].replace(/"/g, '') + '"]' : '.' + CSS.escape(cls[i]) }); break; } }
       }
       return out;
     };
@@ -986,6 +986,21 @@
       if (top < stage.scrollTop) top = y0 + r.bottom * k + gap;
       lab.style.top = Math.round(top) + 'px'; lab.style.left = Math.round(Math.max(stage.scrollLeft, x0 + r.left * k)) + 'px';
     };
+    // The dashed box over a part, drawn above the preview (as the names are), so a part's own paint never hides it:
+    // key 'hover' the part under the pointer, 'tok' the parts a token's row draws with.
+    var placeBox = function (b) {
+      var stage = tagLayer(), el = b._for; if (!stage || !frame || !el || !el.isConnected) { b.hidden = true; return; }
+      var fr = frame.getBoundingClientRect(), sr = stage.getBoundingClientRect(), k = frame.offsetWidth ? fr.width / frame.offsetWidth : 1, r = el.getBoundingClientRect();
+      var x0 = fr.left - sr.left + stage.scrollLeft, y0 = fr.top - sr.top + stage.scrollTop;
+      b.hidden = !(r.width && r.height);
+      b.style.left = (x0 + r.left * k) + 'px'; b.style.top = (y0 + r.top * k) + 'px'; b.style.width = (r.width * k) + 'px'; b.style.height = (r.height * k) + 'px';
+    };
+    var boxes = function (key, els) {
+      var stage = tagLayer(); if (!stage) return;
+      Array.prototype.forEach.call(stage.querySelectorAll('.sg-ts-hitbox[data-box="' + key + '"]'), function (b) { b.remove(); });
+      (els || []).forEach(function (el) { if (!el) return; var b = document.createElement('div'); b.className = 'sg-ts-hitbox' + (key === 'tok' ? ' is-tok' : ''); b.setAttribute('data-box', key); b.setAttribute('aria-hidden', 'true'); b._for = el; stage.appendChild(b); placeBox(b); });
+    };
+    var tokBoxes = function () { boxes('tok', fdoc ? Array.prototype.slice.call(fdoc.querySelectorAll('.ts-tok-hit')) : []); };
     var tagOn = function (id, el, text) {
       var stage = tagLayer(); if (!stage) return;
       var lab = document.getElementById(id);
@@ -1003,7 +1018,7 @@
         var num = row.querySelector('input[data-kind="size"]');
         if (num) { var raw = fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(cssVar).trim(), sc = +num.getAttribute('data-scale') || 1, n = parseFloat(raw); if (!isNaN(n)) num.value = num.getAttribute('data-px') ? Math.round(n) : Math.round(n * sc * 100) / 100; }
         Array.prototype.forEach.call(row.querySelectorAll('input[data-kind="colour-hex"]'), function (h) { var md = h.getAttribute('data-mode'), val = md === 'dark' ? darkOf(v) : lightOf(v), sw = h.parentNode.querySelector('[data-kind="colour"]'); h.value = val; if (sw) sw.value = hex6(val); });
-        var chip = row.querySelector('.sg-ts-chip-swatch'); if (chip) chip.style.background = lightOf(v);
+        Array.prototype.forEach.call(row.querySelectorAll('.sg-ts-chip-mode'), function (f) { var sw = f.querySelector('.sg-ts-chip-swatch'), val = f.getAttribute('data-mode') === 'dark' ? darkOf(v) : lightOf(v); if (sw) { sw.style.background = val; sw.title = hex6(val); } });
         var sw2 = row.querySelector('.pg-switch[data-kind="bool"]'); if (sw2) sw2.setAttribute('aria-checked', String(/^true$/i.test(fdoc.defaultView.getComputedStyle(screenEl).getPropertyValue(cssVar).trim())));
       });
     };
@@ -1014,6 +1029,7 @@
       if (picked.part && picked.node) picked.node.classList.add('ts-picked-part');
       tagOn('ts-pick-label', (picked.part && picked.node) || picked.el, nameOf(picked) + (picked.part ? ' › ' + picked.part : ''));
       var hv = document.getElementById('ts-hover-label'); if (hv && hv._for) placeTag(hv, hv._for);
+      var st = tagLayer(); if (st) Array.prototype.forEach.call(st.querySelectorAll('.sg-ts-hitbox'), placeBox);
     };
     // The text style a picked text is drawn in: the system's style whose own variables, read where the text is (so at the
     // screen's breakpoint), give its size, weight and line height; and a choice of the others, for this text in every
@@ -1032,15 +1048,6 @@
     };
     // A token's unit as its rules use it (usedBy), else as its value is written (px when it says px, none when not).
     var unitOf = function (v, cur) { var u = picked && picked.units && picked.units[v.var]; return u || (/px$/.test(String(cur).trim()) ? { unit: 'px', scale: 1 } : { unit: '', scale: 1 }); };
-    // Its corners: the radius it is drawn with now, changed for this component in every copy (its own rule over it),
-    // whether its radius is a token of its own or the system's shared one.
-    var radiusRow = function (c) {
-      if (c.key === '__app' || c.key === '__text') return '';
-      var el = c.node || c.el, sel = (c.cls || '') + (el === c.el ? '' : ' ' + nodeSel(el));
-      var now = parseFloat(fdoc.defaultView.getComputedStyle(el).borderTopLeftRadius) || 0, set = tokOver.radius[sel];
-      return '<p class="sg-ts-tok-group">Corners</p><div class="pg-ctl sg-ts-tok"><span class="sg-mode-label">Corner radius</span><div class="sg-ts-field sg-ts-tok-field"><label class="sg-ts-num sg-input sg-ts-tok-num"><input type="number" class="sg-ts-hex" data-kind="radius" data-orig="' + esc(Math.round(now)) + '" data-sel="' + esc(sel) + '" min="0" step="1" value="' + esc(set != null ? set : Math.round(now * 10) / 10) + '" aria-label="Corner radius in px"><span class="sg-ts-mode-tag" aria-hidden="true">px</span></label>' +
-        '<button type="button" class="sg-icon-btn sg-ts-auto" data-radius-reset="' + esc(sel) + '" title="Back to the component\'s own" aria-label="Back to the component\'s own corner radius"' + (set != null ? '' : ' hidden') + '>' + RESET + '</button></div></div>';
-    };
     // The text style a picked text is drawn in (named, not changed: a text keeps its style), and that style's own tokens
     // to change: its size and its line height at each breakpoint the system gives them. A change is the token's, so it
     // reaches every text in that style, breakpoint by breakpoint.
@@ -1069,9 +1076,10 @@
         if (!c.chain) c.chain = compChain(c.el);
         c.cls = c.cls || (c.chain.filter(function (x) { return x.el === c.el; })[0] || {}).cls || '';
       }
-      picked = c; focusMode(true);
+      picked = c; focusMode(true); boxes('hover', []);   // what is picked carries its name, not the dashed box
       var comp = COMP_TOK[c.key] || { name: nameOf(c), toks: [] }, groups = {}, used = usedBy(c);
-      (used || comp.toks).forEach(function (v) { var kind = tokKind(v); if (!kind) return; var p = String(v.figma).split('/'), rest = p.slice(2), g = (OWNER[v.var] !== c.key ? p[1] + ' · ' : '') + (rest.length > 1 ? rest[0] : 'other'); (groups[g] = groups[g] || []).push({ v: v, kind: kind, label: rest.slice(rest.length > 1 ? 1 : 0).join(' / ') || rest.join(' / ') }); });
+      // A layer picked (a card's text) shows only what that layer draws with, never its component's other tokens.
+      (used || (c.part && c.node ? [] : comp.toks)).forEach(function (v) { var kind = tokKind(v); if (!kind) return; var p = String(v.figma).split('/'), rest = p.slice(2), g = (OWNER[v.var] !== c.key ? p[1] + ' · ' : '') + (rest.length > 1 ? rest[0] : 'other'); (groups[g] = groups[g] || []).push({ v: v, kind: kind, label: rest.slice(rest.length > 1 ? 1 : 0).join(' / ') || rest.join(' / ') }); });
       var colourOf = function (x, md) {
         var dark = md === 'dark', val = dark ? darkOf(x.v) : lightOf(x.v), hand = dark ? !!tokOver.dark[x.v.var] : !!tokOver.light[x.v.var];
         return '<label class="sg-ts-colour sg-input"><input type="color" data-tok="' + esc(x.v.var) + '" data-kind="colour" data-mode="' + md + '" value="' + esc(hex6(val)) + '" aria-label="' + esc(x.label + (dark ? ' in dark' : ' in light')) + '"><input type="text" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="colour-hex" data-mode="' + md + '" value="' + esc(val) + '" spellcheck="false" aria-label="' + esc(x.label + (dark ? ' in dark, hex' : ' in light, hex')) + '">' +
@@ -1091,20 +1099,29 @@
         if (src && own) tokOver.detached[x.v.var] = 1;
         var linked = src && !tokOver.detached[x.v.var];
         if (linked) {
-          var sw = x.kind === 'colour' ? '<span class="sg-ts-chip-swatch" style="background:' + esc(lightOf(x.v)) + '"></span>' : x.kind === 'size' ? '<span class="sg-ts-chip-icon" aria-hidden="true">#</span>' : '';
+          var sw = x.kind === 'colour' ? '' : x.kind === 'size' ? '<span class="sg-ts-chip-icon" aria-hidden="true">#</span>' : '';
           ctl = '<div class="sg-ts-chipfield sg-input">' + (x.kind === 'colour' ? '<button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours">' : '<span class="sg-ts-alias-chip" title="' + esc(src.figma) + '">') + '<span class="sg-ts-chip">' + sw + '<span>' + esc(shortName(src)) + '</span></span>' + (x.kind === 'colour' ? '</button>' : '</span>') + '<button type="button" class="sg-icon-btn sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button></div>';
+          // A colour: its light and its dark apart, side by side as an own value's pair is, each the name it follows with
+          // that mode's swatch and the mode under it; the detach button after them.
+          if (x.kind === 'colour') {
+            var modeChip = function (md) { var val = md === 'dark' ? darkOf(x.v) : lightOf(x.v); return '<div class="sg-ts-chipfield sg-input sg-ts-chip-mode" data-mode="' + md + '"><button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours"><span class="sg-ts-chip"><span class="sg-ts-chip-swatch" style="background:' + esc(val) + '" title="' + esc(hex6(val)) + '"></span><span>' + esc(shortName(src)) + '</span></span></button><span class="sg-ts-mode-tag">' + (md === 'dark' ? 'Dark' : 'Light') + '</span></div>'; };
+            ctl = '<div class="sg-ts-pair">' + modeChip('light') + (COLOUR_AXIS ? modeChip('dark') : '') + '</div><button type="button" class="sg-icon-btn sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button>';
+          }
         }
         // Detached: its own value, and a reset in its field that links it again to what it followed. A colour also offers
         // the system's own colours to point at.
-        var link = src && !linked ? '<span class="sg-ts-alias">Own value, was ' + esc(shortName(src)) + '</span>' : '';
+        var link = '';   // detached says nothing under its name: the reset in its field, titled with what it followed, is the way back
         if (src && !linked) ctl += '<button type="button" class="sg-icon-btn sg-ts-auto sg-ts-relink" data-relink="' + esc(x.v.var) + '" title="Back to ' + esc(shortName(src)) + '" aria-label="' + esc(x.label) + ' back to ' + esc(shortName(src)) + '">' + RESET + '</button>';
         if (!linked && x.kind === 'colour') ctl += '<button type="button" class="sg-icon-btn sg-ts-auto sg-ts-lib-btn" data-lib="' + esc(x.v.var) + '" title="Use one of the system\'s colours" aria-label="Use one of the system\'s colours for ' + esc(x.label) + '">' + LIB + '</button>';
         if (linked) over = null;
         return '<div class="pg-ctl sg-ts-tok' + (linked ? ' is-linked' : '') + '" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + link + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
-          (x.kind !== 'size' ? '' : '<button type="button" class="sg-icon-btn sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
+          (x.kind !== 'size' || (src && !linked) ? '' : '<button type="button" class="sg-icon-btn sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
       };
       // Its head stays in view: the components it sits in (each a click away), the one picked, and Done.
-      var trail = (c.chain && c.chain.length ? c.chain : [c]).map(function (x, i) { var name = nameOf(x.key === c.key ? c : x); return x.key === c.key && !c.part ? '<span class="sg-ts-trail-now" aria-current="true">' + esc(name) + '</span>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + i + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
+      // The path starts at the component picked: one clicked inside another (a tag in a table in a card) is the first
+      // level, never under the ones it sits in. What follows it is its layers, picked by clicking again.
+      var own = (c.chain || []).map(function (x) { return x.el; }).lastIndexOf(c.el);
+      var trail = (own > -1 ? c.chain.slice(own) : [c]).map(function (x, i) { var name = nameOf(x.key === c.key ? c : x); return x.key === c.key && !c.part ? '<span class="sg-ts-trail-now" aria-current="true">' + esc(name) + '</span>' : x.key === c.key ? '<button type="button" class="sg-ts-trail" data-tok-part-clear>' + esc(name) + '</button>' : '<button type="button" class="sg-ts-trail" data-tok-chain="' + (i + Math.max(own, 0)) + '">' + esc(name) + '</button>'; }).join('<span class="sg-ts-trail-sep" aria-hidden="true">›</span>');
       // The layers from the component down to the one picked, each a click back to it (a pass-through wrapper left out).
       c.layers = [];
       if (c.part && c.node) { for (var q = c.node; q && q !== c.el; q = q.parentElement) if (!(q !== c.node && q.children.length === 1 && !ownText(q) && sameBox(q, q.children[0]))) c.layers.unshift(q); }
@@ -1114,9 +1131,14 @@
       var PART = { icon: /icon/i, text: /text|label|title|font|typo/i };
       var shownG = Object.keys(groups).filter(function (g) { return !c.part || (c.node && used) || !PART[c.part] || PART[c.part].test(g.split(' · ').pop()); });   // a layer's own rules already chose
       if (!shownG.length) shownG = Object.keys(groups);
-      html += radiusRow(c) + textRow(c);
+      html += textRow(c);
       shownG.sort().forEach(function (g) { html += '<p class="sg-ts-tok-group">' + esc(g) + '</p>' + groups[g].map(function (x) { n++; return rowOf(x); }).join(''); });
+      // Redrawn for the same pick (a reset, a link, a value), the panel stays where it was scrolled: its own list and the
+      // panel round it alike. A new pick starts at the top.
+      var scrolled = [], sc0 = pickCard.querySelector('.pg-controls'), inner = keep && sc0 ? sc0.scrollTop : 0;
+      if (keep) for (var up = pickCard; up && up !== document.documentElement; up = up.parentElement) if (up.scrollTop) scrolled.push([up, up.scrollTop]);
       pickCard.innerHTML = html + (n || c.key === '__text' ? '' : '<p class="sg-ts-hint">Nothing to change here: its tokens are not colours, sizes or switches.</p>') + '</div>';
+      if (keep) { var sc1 = pickCard.querySelector('.pg-controls'); if (sc1) sc1.scrollTop = inner; scrolled.forEach(function (x) { x[0].scrollTop = x[1]; }); }
       placeLabel(); dropdowns(pickCard); steppers(pickCard);
       // Its head stays just under the panel's own; picked, the panel scrolls to the card's top.
       var ph = panel.el.querySelector('.sg-panel-head'), col = root.querySelector('.sg-ts'), own = col && getComputedStyle(col).overflowY === 'auto', sc = own ? col : panel.el.querySelector('.sg-tk-detail'), off = own ? 0 : (ph ? ph.offsetHeight : 0);
@@ -1186,17 +1208,16 @@
     root.addEventListener('mouseover', function (e) {
       var li = e.target.closest && e.target.closest('.sg-ts-affects [data-hit]'); if (!fdoc) return;
       Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-tok-hit'), function (x) { x.classList.remove('ts-tok-hit'); });
-      if (!li) return;
+      if (!li) { tokBoxes(); return; }
       var v = li.getAttribute('data-hit');
-      tokRules().forEach(function (r) { if (!r.decls.some(function (d) { return d.vars.indexOf(v) >= 0 && !/^--/.test(d.prop); })) return; r.sels.forEach(function (x) { try { Array.prototype.forEach.call(screenEl.querySelectorAll(x.s), function (el) { el.classList.add('ts-tok-hit'); }); } catch (er) { /* a selector this browser does not read */ } }); });
+      tokRules().forEach(function (r) { if (!r.decls.some(function (d) { return d.vars.indexOf(v) >= 0 && !/^--/.test(d.prop); })) return; r.sels.forEach(function (x) { try { Array.prototype.forEach.call(screenEl.querySelectorAll(x.s), function (el) { el.classList.add('ts-tok-hit'); }); } catch (er) { /* a selector this browser does not read */ } }); }); tokBoxes();
     });
     pickCard.addEventListener('input', function (e) {
       e.stopPropagation();
-      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v && k !== 'radius') return;
+      var t = e.target, v = t.getAttribute('data-tok'), k = t.getAttribute('data-kind'), md = t.getAttribute('data-mode'); if (!v) return;
       if (k === 'colour') { t.parentNode.querySelector('[data-kind="colour-hex"]').value = t.value; showMode(md); setTok(v, 'colour', t.value, md); }
       else if (k === 'colour-hex') { var hx = hexOf(t.value); if (hx) { t.parentNode.querySelector('[data-kind="colour"]').value = hex6(hx); showMode(md); setTok(v, 'colour', hx, md); } }
       else if (k === 'size') { var n = parseFloat(t.value); if (!isNaN(n)) { if (t.getAttribute('data-px')) { n = Math.round(n); if (String(n) !== t.value) t.value = n; } n = n / (+t.getAttribute('data-scale') || 1); setTok(v, 'size', String(Math.round(n * 10000) / 10000) + (t.getAttribute('data-px') ? 'px' : '')); } }
-      else if (k === 'radius') { var r = Math.round(parseFloat(t.value)); if (!isNaN(r)) { var same = r === +t.getAttribute('data-orig'); if (same) delete tokOver.radius[t.getAttribute('data-sel')]; else tokOver.radius[t.getAttribute('data-sel')] = Math.max(0, r); var rb = pickCard.querySelector('[data-radius-reset]'); if (rb) rb.hidden = same; changed(); repaint(); } }
     });
     pickCard.addEventListener('change', function (e) {
       e.stopPropagation();
@@ -1212,7 +1233,7 @@
       var row = e.target.closest && e.target.closest('[data-hit]');
       if (row && fdoc) { var on = t === 'mouseover' || t === 'focusin', els = (picked && picked.who && picked.who[row.getAttribute('data-hit')]) || [];
         Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-tok-hit'), function (x) { x.classList.remove('ts-tok-hit'); });
-        if (on) (els.length ? els : [picked && (picked.node || picked.el)]).forEach(function (x) { if (x) x.classList.add('ts-tok-hit'); }); }
+        if (on) (els.length ? els : [picked && (picked.node || picked.el)]).forEach(function (x) { if (x) x.classList.add('ts-tok-hit'); }); tokBoxes(); }
     }); });
     pickCard.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -1221,7 +1242,6 @@
       var pa = e.target.closest('[data-pick-alias]'); if (pa) { var tv = pa.getAttribute('data-for'); closeLib(); tokOver.alias[tv] = pa.getAttribute('data-pick-alias'); delete tokOver.detached[tv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][tv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var dt = e.target.closest('[data-detach]'); if (dt) { tokOver.detached[dt.getAttribute('data-detach')] = 1; changed(); pick(picked, true); return; }
       var rl = e.target.closest('[data-relink]'); if (rl) { var rv = rl.getAttribute('data-relink'); delete tokOver.detached[rv]; delete tokOver.alias[rv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][rv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
-      var rr = e.target.closest('[data-radius-reset]'); if (rr) { delete tokOver.radius[rr.getAttribute('data-radius-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       if (e.target.closest('[data-tok-done]')) { picked = null; focusMode(false); placeLabel(); Array.prototype.forEach.call(fdoc.querySelectorAll('.ts-picked'), function (x) { x.classList.remove('ts-picked'); }); pickCard.innerHTML = ''; return; }
       var ch = e.target.closest('[data-tok-chain]'); if (ch && picked && picked.chain) { var ci = +ch.getAttribute('data-tok-chain'), x = picked.chain[ci]; if (x) pick({ el: x.el, key: x.key, cls: x.cls, chain: picked.chain.slice(0, ci + 1) }); return; }   /* that level becomes the end of the path: the ones below it go */
@@ -1234,11 +1254,11 @@
     var byHand = function (id) { var f = $(id + '-hex'); return f && f.dataset.hand === '1' ? hexOf(f.value) : null; };
     var current = function () {
       var fam = $('ts-font').value === 'other' ? $('ts-font-other').value.trim() : $('ts-font').value;
-      return { fontFamily: fam || start.fontFamily, primary: hexOf($('ts-primary-hex').value) || start.primary, secondary: hexOf($('ts-secondary-hex').value) || start.secondary, appBg: ($('ts-bg-hex') && hexOf($('ts-bg-hex').value)) || start.appBg,
+      return { fontFamily: fam || start.fontFamily, primary: hexOf($('ts-primary-hex').value) || start.primary, secondary: hexOf($('ts-secondary-hex').value) || start.secondary, appBg: ($('ts-bg-hex') && hexOf($('ts-bg-hex').value)) || start.appBg, headerBg: ($('ts-hbg-hex') && hexOf($('ts-hbg-hex').value)) || start.headerBg,
         buttonRadius: Math.max(0, Math.round(+$('ts-btn-r-num').value || 0)), cardRadius: Math.max(0, Math.round(+$('ts-card-r-num').value || 0)), spacing: $('ts-space-num') ? Math.max(0, +$('ts-space-num').value || 100) : 100, borderWidth: $('ts-border-num') ? Math.max(0, Math.round(+$('ts-border-num').value || 0)) : start.borderWidth, shadowColour: ($('ts-shc-hex') && hexOf($('ts-shc-hex').value)) || start.shadowColour, shadowBlur: $('ts-blur-num') ? Math.max(0, +$('ts-blur-num').value || 0) : start.shadowBlur,
         grad: STOPS.reduce(function (o, st) { var f = $(st.id + '-hex'); if (f && hexOf(f.value)) o[st.v] = hexOf(f.value); return o; }, {}),
         menuLead: lastSide, tokens: JSON.parse(JSON.stringify(tokOver)),
-        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), shadowColour: byHand('ts-shc-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: swVal('shadows') !== 'false' };
+        dark: { primary: byHand('ts-primary-d'), secondary: byHand('ts-secondary-d'), appBg: byHand('ts-bg-d'), headerBg: byHand('ts-hbg-d'), shadowColour: byHand('ts-shc-d'), grad: STOPS.reduce(function (o, st) { var d = byHand(st.id + '-d'); if (d) o[st.v] = d; return o; }, {}) }, shadows: swVal('shadows') !== 'false' };
     };
     var paint = function () {
       if (!box) return;
@@ -1259,6 +1279,7 @@
         var d = x[1] === APP_BG ? bgDark(x[2]) : inMode(x[1], x[2], 'dark'); if (!d) return;
         if (document.activeElement !== f) f.value = d; pick.value = hex6(d);
       });
+      (function () { var f = $('ts-hbg-d-hex'), pk = $('ts-hbg-d'); if (!f || !HEADER_BG || !b.headerBg || f.dataset.hand === '1') return; var d = tokenDark({ v: HEADER_BG.v }, b.headerBg); if (document.activeElement !== f) f.value = d; pk.value = hex6(d); })();
       (function () { var f = $('ts-shc-d-hex'), pk = $('ts-shc-d'); if (!f || !SHADOW_COLOURS[0] || f.dataset.hand === '1') return; var d = tokenDark({ v: SHADOW_COLOURS[0].var }, b.shadowColour); if (document.activeElement !== f) f.value = d; pk.value = hex6(d); })();
       STOPS.forEach(function (st) { var f = $(st.id + '-d-hex'), pick = $(st.id + '-d'), hex = (b.grad || {})[st.v]; if (!f || !hex || f.dataset.hand === '1') return; var d = tokenDark(st, hex); if (document.activeElement !== f) f.value = d; pick.value = hex6(d); });
       // What the spacing percentage changes, token by token: each spacing token the screens draw with, its size now and at
@@ -1280,14 +1301,17 @@
     // The colours the theme starts from, as the screen shows them; written into the fields when asked (a theme just
     // opened, or another one chosen to start from).
     var seed = function (fill) {
-      live = { font: live.font, primary: PRIMARY && LIVE.light[PRIMARY.v], secondary: SECONDARY && LIVE.light[SECONDARY.v], appBg: APP_BG && LIVE.light[APP_BG.v], grad: STOPS.reduce(function (o, st) { if (LIVE.light[st.v]) o[st.v] = LIVE.light[st.v]; return o; }, {}) };
+      live = { font: live.font, primary: PRIMARY && LIVE.light[PRIMARY.v], secondary: SECONDARY && LIVE.light[SECONDARY.v], appBg: APP_BG && LIVE.light[APP_BG.v], headerBg: HEADER_BG && LIVE.light[HEADER_BG.v], grad: STOPS.reduce(function (o, st) { if (LIVE.light[st.v]) o[st.v] = LIVE.light[st.v]; return o; }, {}) };
       if (fill) STOPS.forEach(function (st) { var x = live.grad[st.v]; if (x && $(st.id)) { $(st.id).value = hex6(x); $(st.id + '-hex').value = x; } });
-      var FIELD = { primary: 'ts-primary', secondary: 'ts-secondary', appBg: 'ts-bg' };
+      var FIELD = { primary: 'ts-primary', secondary: 'ts-secondary', appBg: 'ts-bg', headerBg: 'ts-hbg' };
       if (fill && live.font) {   // the font the screen draws: chosen, and offered when the system's list lacks it
         var fs = $('ts-font');
         if (fs && !Array.prototype.some.call(fs.options, function (o) { return o.value.toLowerCase() === live.font.toLowerCase(); })) { var op = document.createElement('option'); op.value = op.textContent = live.font; fs.insertBefore(op, fs.firstChild); }
         if (fs) { fs.value = Array.prototype.filter.call(fs.options, function (o) { return o.value.toLowerCase() === live.font.toLowerCase(); })[0].value; if (fs._dd) fs._dd.refresh(); $('ts-font-other').hidden = true; }
       }
+      // The header background, still where it started: the colour the screen draws its header in (the header token it
+      // uses, which the code may draw otherwise than the token's own value).
+      (function () { var f = $('ts-hbg-hex'), sw = $('ts-hbg'); if (!f || !HEADER_BG || f.dataset.hand === '1' || hex6(f.value) !== hex6(start.headerBg || '')) return; var hv = HEADER_BG.vars.filter(function (v) { return USED[v]; })[0] || HEADER_BG.v, hc = hexOf(nowColour({ var: hv, values: [] })); if (!hc) return; live.headerBg = hc; f.value = hc; f.dataset.orig = hc; if (sw) sw.value = hex6(hc); start.headerBg = hc; })();
       if (fill) Object.keys(FIELD).forEach(function (k) { var id = FIELD[k]; if (live[k] && $(id)) { $(id).value = hex6(live[k]); $(id + '-hex').value = live[k]; } });
     };
     if (box) {
@@ -1684,7 +1708,7 @@
     var el = d.createElement('div'); el.className = 'sg-showroom sg-showroom-screen'; d.body.appendChild(el);
     ['dark', 'light'].forEach(function (md) { var v = axisValue(md); if (COLOUR_AXIS && v != null) d.documentElement.setAttribute(COLOUR_AXIS.attr, v); readLive(el, md); });
     live.font = FONT ? firstFamily(d.defaultView.getComputedStyle(el).getPropertyValue(FONT.v)) : null;
-    live = { font: live.font, primary: PRIMARY && LIVE.light[PRIMARY.v], secondary: SECONDARY && LIVE.light[SECONDARY.v], appBg: APP_BG && LIVE.light[APP_BG.v], grad: STOPS.reduce(function (o, st) { if (LIVE.light[st.v]) o[st.v] = LIVE.light[st.v]; return o; }, {}) };
+    live = { font: live.font, primary: PRIMARY && LIVE.light[PRIMARY.v], secondary: SECONDARY && LIVE.light[SECONDARY.v], appBg: APP_BG && LIVE.light[APP_BG.v], headerBg: HEADER_BG && LIVE.light[HEADER_BG.v], grad: STOPS.reduce(function (o, st) { if (LIVE.light[st.v]) o[st.v] = LIVE.light[st.v]; return o; }, {}) };
     try { done(); } finally { f.remove(); }
   };
   var refreshOld = function () {
