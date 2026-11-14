@@ -124,8 +124,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-btn.sg-comp-panel-close { position: absolute; top: var(--sg-space-xxl); left: 0; z-index: 20; transform: translateX(-50%); justify-content: center; width: var(--sg-control-h); height: var(--sg-control-h); padding: 0; }   /* the page's own button, square, solid, centred on the panel's edge */
 .sg-comp-panel-close > svg { width: var(--sg-mark); height: var(--sg-mark); }
 @media (max-width: 720px) { .sg-comp-panel-box { width: 100vw; } .sg-comp-panel-close { left: auto; right: var(--sg-space-s); } }
-.sg-panel-open { overflow: hidden; }
-html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel stops the page scrolling, so nothing under it moves */
+html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing moves as pages grow and shrink */
+/* While a panel is open the page stops scrolling and gives its scroll bar's room back, so the panel runs to the window's
+   edge with no empty track beside it (the owner's, 14 November 2026). The page keeps its place: the room the bar took
+   (--sg-gutter, measured as the page loads) is added to its right instead. */
+.sg-panel-open { overflow: hidden; scrollbar-gutter: auto; }
+.sg-panel-open body { padding-right: var(--sg-gutter, 0); }
 .sg-embed .sg-sidebar, .sg-embed .sg-topbar, .sg-embed .sg-controlbar, .sg-embed .sg-scrim, .sg-embed .sg-nav-close { display: none; }   /* opened in the panel: the page alone */
 .sg-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); }
 .sg-chip-menu > .sg-chip-label { color: var(--sg-muted); }
@@ -1041,7 +1045,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-shared { margin: 0 0 var(--sg-space-s); }   /* what every draft shares, said once over the groups */   /* a draft's section, its label on its own line */
 .sg-row-detail-body .sg-il-quiet { margin-top: var(--sg-space-m); }
 .sg-row-detail-body .sg-il-quiet-head { margin: 0 0 var(--sg-space-s); color: var(--sg-muted); font-size: var(--sg-s); }   /* what the engine has no ground for says so over the items themselves: nothing is folded away */
-.sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
+:is(.sg-row-detail-body, .sg-log-also + *) .sg-il-codes, .sg-log-also + .sg-il-codes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }   /* a list of names on its own line under what it counts, the same everywhere: a panel's, History's */
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
 .sg-row-detail-body .sg-il-group:last-child { margin-bottom: 0; }
@@ -1073,8 +1077,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .pg-par-table.sg-log tr.sg-log-more > td:first-child { padding-left: var(--sg-space-m); }   /* a row under a shared date starts with What and ends with Affects: their own columns' padding, not the table's first and last */
 .pg-par-table.sg-log tr.sg-log-more > td:last-child { padding-right: var(--sg-space-m); }
 .pg-par-table.sg-log td > .sg-log-stick { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--sg-log-head-h, 0px)); }   /* a date, type and person shared by rows of one moment stay in view under the head while those rows scroll */
-.sg-log-list { display: block; margin-top: var(--sg-space-xs); }   /* every name of what is not in the guide yet, shown when asked for (Show all) */
-.sg-log-list[hidden] { display: none; }   /* until then: the line's own display (.pg-par-val) never shows it */
 .pg-par-table.sg-log :is(th, td):nth-child(1) { width: 9.5em; min-width: 0; white-space: nowrap; }   /* its day and time on one line, its release under them */
 .pg-par-table.sg-log :is(th, td):nth-child(2) { width: 9em; min-width: 0; white-space: nowrap; }   /* its source on one line: Intent layer, Decisions */
 .pg-par-table.sg-log :is(th, td):nth-child(4) { width: 22%; word-break: normal; }   /* Affects */

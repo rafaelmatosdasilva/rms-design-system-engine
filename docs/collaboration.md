@@ -100,6 +100,7 @@ A full build tries every component's accessibility in a browser, so it takes min
   - **Only the pages it left behind.** A page built by the new engine already, or with `"hooks": false` in its project, stays as it is.
   - **Its own list.** The engine keeps the folders where it built a page in `~/.claude/.rms-design-system-engine-pages.json`, on this computer only. A folder that is gone leaves the list. Pages built in a temporary folder, by a test or on CI are never on it.
   - **The installed engine only.** The engine's own git hook does it, and it is written only into the copy Claude Code runs, on `main`. A clone you develop the engine in never builds your pages.
+  - **Your own scripts too.** A page you build with a script of your own, and not with the engine, is never on its list. Put the script, executable, in `~/.config/rms-engine/after-update.d/`, and it runs each time as well, with `RMS_ENGINE` set to the engine that moved on. The folder stays on your computer.
 - **Never published.** A quick page carries a mark, and no store takes it. Build the full guide (`--styleguide`) before you publish.
 - **Its times are kept apart.** `--timing` says where the time went, and `timing.json` keeps them under `styleguide --quick`, so they never replace the full build's.
 
