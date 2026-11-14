@@ -177,6 +177,34 @@ Two things it will not do:
 
 A shell your documentation says nothing about still appears, and says it has none — being undocumented is worth seeing, not worth hiding.
 
+### Documentation that is there and says nothing
+
+An empty description is visibly empty. A sentence that restates the name is not — and an agent choosing between those components has exactly what the names gave it.
+
+So the catalog names them:
+
+```
+📝 DOCUMENTED IN NAME ONLY  2 of 275 component(s): cardTile, fileWell
+   Their description repeats the name and the words every description here shares, so it says nothing about
+   what they are for: choosing between them gives an agent what the name gives and no more.
+   One sentence each, saying when to use it, is what this asks for.
+```
+
+This is not a house-style opinion. It reads whether a sentence carries anything past three things:
+
+- **The component's own name**, however it is spelled — `fileWell` and "file well" are the same word here.
+- **The words your own descriptions share.** These are read from your system, never configured: if half of them open "Use for … content", then "use" and "content" are your house phrasing and say nothing about any one component. Your library's name, your framework's and your team's turn of phrase differ per system, and nothing outside your system knows them.
+- **The language every design system's documentation uses** — component, library, element, widget.
+
+What is left has to be two words of its own. One is usually the name said again in other letters.
+
+Two things it leaves alone:
+
+- **A field with nothing in it.** That is already shown as empty, and asking twice for the same sentence helps nobody.
+- **A small system.** Under eight written descriptions, a shared word is a coincidence rather than a pattern, so nothing is taken away.
+
+On a real system of 275 components this found two. It is meant to: a check that flags a tenth of your library is measuring your writing style, not finding a gap.
+
 ### A prototype is the journey, not a screen
 
 You take a prototype to a user test, hand it to a development team and show it to a client. Isolated pages fail all three — so a folder of pages that do not link is a failure, not a partial success.
