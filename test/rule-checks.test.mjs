@@ -258,3 +258,21 @@ test('a rule that says when to use a chart is never rewritten as a rule about it
   assert.equal(rewriteOf('Shares of a total that add up to a meaningful whole: use the ring chart with its key.', { component: 'ringChartKey' }, ctx), 'ringChartKey\'s `label` says what it does in three words at most, starting with a verb.', 'what the template alone would say');
   assert.equal(r.rewrite, undefined, 'its shares, total and whole are not in it: no rewrite');
 });
+
+// A rule that says what to do, or holds only in some cases, is never turned into a check that forbids it outright: a
+// "Do:" line became "never takes `disabled`" (the opposite of what it says), and "don't use it in a table that only
+// displays data" became "a table never contains it", in every table.
+test('a rule that says what to do, or holds in some cases only, never becomes a check that forbids', () => {
+  const ctx = CTX({ components: { ...COMPONENTS, Button: { props: { state: { options: ['default', 'disabled'], optionsFrom: 'Figma' } } }, Table: { props: {} }, Grid: { props: {} } } });
+  for (const t of [
+    'Button: Do: set `disabled` on rows that can\'t be chosen.',
+    'Button: Hiding the cell when a row can\'t be chosen. Set `disabled` instead.',
+    'Rows: Don\'t use it in a Table that only displays data.',
+    'Rows: Don\'t use it as a field in place of the Grid layout.',
+    'Rows: Do not use it when the records have no Card to group by.',
+    'Tile: Pass `title` to show a heading. Without it, no heading is shown.',
+  ]) assert.equal(on(t, 'Tile', ctx).status, 'judgment', t);
+  // Said always, they still are checks.
+  assert.equal(on('Never put a Button inside a Tile.', 'Tile', ctx).proposal.text, 'Tile never contains Button.');
+  assert.equal(on('Never use `state="disabled"` on a Button.', 'Tile', ctx).proposal.text, 'Button never takes state="disabled".');
+});

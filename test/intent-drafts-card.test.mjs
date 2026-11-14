@@ -19,7 +19,7 @@ const loadReview = () => {
   const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
   const isRuleChange = new Function(`return (${/var isRuleChange = (function \(x\) \{[^\n]*\});/.exec(tpl)[1]})`)();
-  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
+  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom, ilDraftSources: ilDraftSources };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
 };
 const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';
@@ -52,11 +52,13 @@ test('the drafts are in the What to do card under New text for the page, each on
   assert.doesNotMatch(html, /Approve all, Change or Drop all under a group/, 'how the actions work is on each action, never a line of its own');
   const g = groupsOf(html);
   assert.deepEqual(g.map((x) => x.head), [null], 'the drafts alone: the card\'s own sentence is their heading');
-  assert.match(html, /^<p class="sg-il-line"><strong>Review the 3 drafted lines for Component tileBar's page\. Agents won't use them until you decide\.<\/strong><\/p>/);
+  assert.match(html, /^<p class="sg-il-line"><strong>Review 3 new lines for this page\. Once approved, agents use them\.<\/strong><\/p>/);
   assert.deepEqual(g[0].items.map((x) => x.head), ['Limitations', 'Limitations', 'Do and don\'t'], 'drafts for different sections each say theirs');
   assert.equal((html.match(/<\/strong> Does not show loading/g) ?? []).length, 1, 'the same draft once');
   assert.deepEqual(g[0].actions, ['approve:Approve all 3', 'change:Change', 'drop:Drop all 3'], 'three actions for the group, its count on them');
   assert.ok(g[0].actionsLast, 'below its proposals');
+  // Decided as a batch, never line by line (the owner's, 14 November 2026): no line has buttons of its own.
+  assert.doesNotMatch(html, /data-il-one/);
   assert.deepEqual(g[0].items[1].steps, { approve: 'Approve the draft "Takes at most two buttons."', change: 'Change the draft "Takes at most two buttons.": ask me for my words', drop: 'Drop the draft "Takes at most two buttons."' });
   assert.doesNotMatch(html, /data-il-choose|data-il-edit|<textarea/, 'no action, and nothing to edit, on an item');
   assert.equal((html.match(/data-il-do="/g) ?? []).length, 3, 'three actions, once');
@@ -76,13 +78,18 @@ test('each of the group\'s actions copies its decision on every draft the group 
 });
 
 test('each draft shows where it comes from: the code\'s prop, a name only Figma has, the line it says again', () => {
-  const html = loadChanges()({ name: 'Draft Saver', component: 'draftSaver', code: 'src/saver/DraftSaver.vue', file: 'specs/draft-saver.dsds.json', drafts: [
+  const page = { name: 'Draft Saver', component: 'draftSaver', code: 'src/saver/DraftSaver.vue', file: 'specs/draft-saver.dsds.json', drafts: [
     { where: 'When to use', text: 'Use `draftSaver` with `state` moving from `idle` to `busy`.', from: { props: [{ name: 'state', from: 'the code', file: 'src/saver/DraftSaver.vue', options: ['idle', 'busy', 'done'] }], line: { from: 'The intent layer · When to use', text: 'Show progress with `state`.' } } },
     { where: 'Limitations', text: 'It shows the time only when `showClock` is set.', from: { props: [{ name: 'showClock', from: 'Figma' }], figmaOnly: ['showClock'] } },
     { where: 'Limitations', text: 'It does not submit.' },
-  ] });
-  const [a, b, c] = groupsOf(html)[0].items;
-  assert.match(a.body, /<span class="sg-il-source">The code: <code class="sg-name">state<\/code>, a prop of DraftSaver\.vue, takes <code class="sg-name">idle<\/code>, <code class="sg-name">busy<\/code>, <code class="sg-name">done<\/code>\.<\/span><span class="sg-il-source">Says again: “Show progress with <code class="sg-name">state<\/code>\.” \(The intent layer · When to use\)\.<\/span>/);
+  ] }, html = loadChanges()(page);
+  // The one to fix comes first, in a group of its own: the others follow in theirs.
+  const all = groupsOf(html).flatMap((g) => g.items), [a, b, c] = [all[1], all[0], all[2]];
+  assert.deepEqual(groupsOf(html).map((g) => g.key), ['fix', 'drafts'], 'the draft that needs a fix first, apart');
+  // Where its words come from is a card of its own under What to do, never a grey note on the line (the owner's, 14 November 2026).
+  assert.doesNotMatch(html, /sg-il-source/);
+  assert.match(loadReview().ilDraftSources(page), /<p class="sg-il-line"><strong>When to use:<\/strong> The code: <code class="sg-name">state<\/code>, a prop of DraftSaver\.vue, takes <code class="sg-name">idle<\/code>, <code class="sg-name">busy<\/code>, <code class="sg-name">done<\/code>\. Says again: “Show progress with <code class="sg-name">state<\/code>\.” \(The intent layer · When to use\)\.<\/p>/);
+  assert.match(tpl, /card\('What to do', todo \|\| task\) \+ card\('Where the new lines come from', ilDraftSources\(p\)\)/);
   // A problem is a box of its own: what is wrong, then what to do about it.
   assert.match(b.body, /<div class="sg-il-fix"><strong>This names something the code doesn't have\.<\/strong> <code class="sg-name">showClock<\/code> is a property of the Figma component, not a prop of DraftSaver\.vue\.<span class="sg-il-fix-use">Change the draft to say what the code does, or name it as Figma's\.<\/span><\/div>/);
   assert.doesNotMatch(c.body, /sg-il-source/, 'a draft found nowhere says nothing more: the card calls it a draft');
@@ -164,7 +171,7 @@ test('every other change a page asks for is in What to do too, under Other chang
   assert.equal(decision(html, 1, 'drop'), '/rms-design-system-engine-acme on Component tileBar, Write nothing new and leave its notes as they are.');
   assert.equal(approved(html, 1), '/rms-design-system-engine-acme on Component tileBar, Write "When to use it, not a sibling" under ## When to use as drafts I review, then remove "A copy of its description" where it lives, then for "Save flow pattern available here: a link", write in words what to take from it.');
   // The page's task first, in plain words.
-  assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line"><strong>Review the drafted line under Purpose for Component a's page\. Agents won't use it until you decide\.<\/strong><\/p><div class="sg-il-draft"/);
+  assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line"><strong>Review one new line for Purpose\. Once approved, agents use it\.<\/strong><\/p><div class="sg-il-draft"/);
   // Nothing to change: no card.
   assert.equal(loadChanges()({ name: 'chip', file: 'c.json' }, [], []), '');
 });
@@ -231,7 +238,7 @@ test('the drafts alone: one sentence says what and where, each draft a bullet, n
     { where: 'Rules', text: 'Use only the components of the system.' },
     { where: 'Rules', text: 'Ask before building one.' },
   ] });
-  assert.match(html, /^<p class="sg-il-line"><strong>Review the 2 drafted rules for Component tileBar's page\. Agents won't use them until you decide\.<\/strong><\/p>/);
+  assert.match(html, /^<p class="sg-il-line"><strong>Review 2 new lines for Rules\. Once approved, agents use them\.<\/strong><\/p>/);
   assert.match(html, /<ul class="sg-il-points"><li class="sg-il-line sg-il-change sg-il-item"[^>]*><span class="pg-par-val">Use only the components of the system\.<\/span><\/li>/);
   assert.doesNotMatch(html, /sg-il-group-head|<strong>Rules<\/strong>|Source: none found/, 'no heading the sentence already says, no section or source on each');
 });
