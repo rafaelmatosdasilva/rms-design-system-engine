@@ -75,5 +75,5 @@ test('one draft a part: a second line for the same part is not kept, nor one tha
 
 test('the drafter is asked for one line a part', () => {
   assert.match(draftPrompt([]), /"whenToUse": "<line>", "whenNotToUse": "<line>"/);
-  assert.match(draftPrompt([]), /\(one line each, the most useful one, never a second for the same part; only the parts asked; never a line the page already says\)/);
+  assert.match(draftPrompt([]), /\(one line each, the most useful one, never a second for the same part, never a semicolon: two thoughts are two sentences; only the parts asked; never a line the page already says\)/);
 });
