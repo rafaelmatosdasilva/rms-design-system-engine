@@ -9,18 +9,23 @@ import { codeGrammarOf } from '../lib/code-grammar.mjs';
 const css = `.l-stack { display: flex; flex-direction: column; gap: var(--space-m); }
 .l-stack--tight { gap: 4px; }
 .o-cluster { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.ds-grid { display: grid; gap: 16px; }
+.grid { display: grid; gap: 16px; }
 .row-label { display: flex; }
-.cardTile { display: flex; }`;
+.table-row { display: flex; flex-direction: column; }
+.cardTile { display: flex; }
+.ds-stack { display: flex; flex-direction: column; }`;
 
 test('the code\'s layout parts are its classes named after a layout, each with what it sets', () => {
   const parts = layoutPartsOf([{ file: 'src/layout.css', text: css }]);
   assert.deepEqual(parts.map(({ name, class: c, dir, wrap }) => [name, c, dir, wrap]), [
-    ['Stack', 'l-stack', 'VERTICAL', false], ['Cluster', 'o-cluster', 'HORIZONTAL', true], ['Grid', 'ds-grid', 'GRID', false]]);
+    ['Stack', 'l-stack', 'VERTICAL', false], ['Cluster', 'o-cluster', 'HORIZONTAL', true], ['Grid', 'grid', 'GRID', false]]);
   assert.equal(parts[0].gap, 'var(--space-m)');
   assert.equal(parts[1].align, 'CENTER');
-  // A modifier is the part's (stack--tight), and a class whose last word is no layout's (row-label) is no part.
-  assert.ok(!parts.some((p) => /tight|label|cardTile/.test(p.class)));
+  // A modifier is the part's (stack--tight), a class that only ends in a layout's word is a component's own part
+  // (table-row), and one whose last word is no layout's (row-label) is no part either.
+  assert.ok(!parts.some((p) => /tight|label|cardTile|table-row|ds-stack/.test(p.class)));
+  // A component named after a layout is one, by its root class.
+  assert.deepEqual(layoutPartsOf([{ file: 'src/layout.css', text: css }], { '.ds-stack': 'Stack' }).map((p) => p.class), ['l-stack', 'o-cluster', 'grid', 'ds-stack']);
 });
 
 // One component: a vertical frame nobody named, a wrapping row named after the code's part, an instance's own layers.
