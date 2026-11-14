@@ -5,8 +5,11 @@ version: 2
 # fix upstream included. Dependabot is the other half of that trade: it watches the actions these workflows pin and
 # opens one pull request when any of them has moved, carrying the new commit and its version comment.
 #
-# Only the workflows are watched. The engine has no runtime dependencies and `package.json` declares none, so there
-# is no npm ecosystem here to update; the test tools install from their own committed lockfiles under `test/`.
+# The engine has no runtime dependencies and `package.json` declares none. The test tools install from their own
+# committed lockfiles under `test/`, and those are watched too: a security advisory against one of them counts against
+# the repository's OpenSSF Scorecard (Vulnerabilities) as much as one in the engine would. Each folder gets at most one grouped
+# pull request a day; a security fix is opened at once, whatever the schedule. Every Dependabot pull request turns on auto-merge (dependabot-auto-merge.yml), so it merges
+# itself once the full suite is green, as any other pull request here does.
 updates:
   - package-ecosystem: github-actions
     directory: /
@@ -24,5 +27,86 @@ updates:
     # Every pull request here carries exactly one release label; an action bump is internal work.
     labels:
       - 'release: patch'
+      - 'after: nothing'
     commit-message:
       prefix: actions
+  - package-ecosystem: npm
+    directory: /test/.ci-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      ci-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.eval-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      eval-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.nuxt-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      nuxt-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.vue-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      vue-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.vue-cli-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      vue-cli-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools

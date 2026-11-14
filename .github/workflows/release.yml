@@ -1,4 +1,4 @@
-# Publishes a version once 25 commits on main are in no release yet (CLAUDE.md, Releases; lib/release-due.mjs holds
+# Publishes a version once 15 commits on main are in no release yet (CLAUDE.md, Releases; lib/release-due.mjs holds
 # the number), and at once for a security fix or a fix for a problem that stops people, started by Claude. It tags the
 # next version and creates a GitHub Release whose notes list the pull requests merged since the previous one.
 # How big the step is (patch, minor or major) comes from the release labels on those pull requests

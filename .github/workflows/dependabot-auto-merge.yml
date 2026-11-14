@@ -1,0 +1,25 @@
+name: Dependabot auto-merge
+
+# Every pull request this repository opens merges itself once its checks are green (CLAUDE.md), and Dependabot's are no
+# exception: a security fix for a test tool used to wait until somebody noticed it, while the OpenSSF Scorecard counted
+# the advisory against the repository. This turns auto-merge on for Dependabot's pull requests only. It never merges
+# anything itself: GitHub merges when the required checks (the full suite among them) pass, and a red one holds it.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: read-all
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - run: gh pr merge "$PR" --auto --squash --repo "$REPO"
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
