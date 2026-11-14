@@ -93,7 +93,7 @@ const target = after.findChild((n) => n.type === 'COMPONENT_SET' || n.type === '
 const __NODES__ = Object.fromEntries([...(system ? system.children : []), ...after.children].filter((n) => n.type === 'COMPONENT_SET' || n.type === 'COMPONENT').map((n) => [n.name, n.id]));
 const had = new Set(Object.keys((target && (target.type === 'COMPONENT_SET' || target.parent?.type !== 'COMPONENT_SET') ? target.componentPropertyDefinitions : null) ?? {}));
 const result = await (async () => {
-${body.replace(/__NODES__/g, '__NODES__').replace(/__AFTER__/g, 'target')}
+${body.replace(/__AFTER__/g, 'target')}
 })();
 // A new boolean is off unless set, so what it shows is hidden: one instance with each new one on, to be seen.
 const defs = (target && (target.type === 'COMPONENT_SET' || target.parent?.type !== 'COMPONENT_SET') ? target.componentPropertyDefinitions : null) ?? {};
