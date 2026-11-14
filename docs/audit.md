@@ -227,6 +227,7 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 
 - Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
 - Two components whose own rules are nearly the same.
+- Colour tokens a person cannot tell apart, in every mode they share, offered as one merge each: which one stays, which would point at it, and the components the merge reaches. Two neighbouring steps of a grey scale stay apart, and a token that already points at another is that one.
 - Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
 - Aliases to a removed token, with the commit that removed it.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.

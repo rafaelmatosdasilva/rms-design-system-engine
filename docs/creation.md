@@ -397,7 +397,14 @@ When you correct what an AI made, the correction is usually said once, in a chat
 | A step agents read | It is about how the agent works, such as asking before adding a token | Said to the agent with every request in Claude Code, and in the engine's section of `AGENTS.md` and the other instruction files that have it |
 | A rule for your guidelines | Anything else | One sentence a reviewer can check, drafted on the component's page or the System page of your intent layer, for your team to approve |
 
-Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same guard is not proposed again. `--rule "<sentence>"` gives a step or a rule in your own words. Only your answer writes anything: the hooks ask you first.
+Answer with `--lesson-answer <id> yes` or `no`. `--rule "<sentence>"` gives a step or a rule in your own words. Only your answer writes anything: the hooks ask you first.
+
+- Each proposal shows what it rests on: the screens, files or edits it was seen in, and when.
+- It also shows where a yes would write it: a check, a step in the agent rules, or a rule for your guidelines.
+- A proposal with no recorded cases can't be approved yet. The engine says what is missing.
+- When you say no, you can also say what would change your mind with `--would-accept more`, `new` or `narrower`: more cases, a new kind of case, or a narrower wording (given with `--rule`).
+- The proposal then waits until that is there, and comes back telling you what changed since your no.
+- A no with nothing added is final, and the same proposal is not made again.
 
 **Where corrections come from.**
 
