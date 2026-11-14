@@ -4,8 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
+import { tempDir } from './helpers.mjs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -135,14 +135,14 @@ test('Safari through its WebDriver: a session, the page drawn at the width asked
 test('safaridriver is waited for until it answers, and given up on with a reason', async () => {
   const fake = await fakeSafari();
   try {
-    const sh = join(mkdtempSync(join(tmpdir(), 'fake-sd-')), 'safaridriver');
+    const sh = join(tempDir('fake-sd-'), 'safaridriver');
     writeFileSync(sh, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
     const port = Number(new URL(fake.base).port);
     const b = await launchSafari(sh, { port, timeoutMs: 3000 });
     assert.equal(b.base, fake.base);
     b.kill();
   } finally { await fake.close(); }
-  const sh = join(mkdtempSync(join(tmpdir(), 'fake-sd-')), 'safaridriver');
+  const sh = join(tempDir('fake-sd-'), 'safaridriver');
   writeFileSync(sh, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
   await assert.rejects(launchSafari(sh, { timeoutMs: 600 }), /did not answer within/);
 });
@@ -151,7 +151,7 @@ const FIREFOX = findFirefox();
 const CHROME = findChrome();
 
 test('in Firefox and Chrome alike: one page opened, measured in each scheme, and the difference said', { skip: !FIREFOX && 'Firefox not installed', timeout: 180000 }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cross-browser-'));
+  const dir = tempDir('cross-browser-');
   try {
     mkdirSync(join(dir, 'app'));
     // A rule only Firefox follows, so the two browsers draw it differently whatever their versions.
