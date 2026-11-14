@@ -197,7 +197,7 @@ test('a shared token given another value is held, with what it reaches and the c
   });
   // What an edit changes: a token the theme had, given another value, in any of its modes; a new token is not one.
   assert.deepEqual(valueChangesOf({ file: 'src/theme.css', before: theme, after: theme.replace('#eeeeee', '#dddddd'), cfg, root }).map((c) => [c.token, c.from, c.to]), [['--neutral-100', '#eeeeee', '#dddddd']]);
-  assert.deepEqual(valueChangesOf({ file: 'src/theme.css', before: theme, after: theme.replace('}', '  --chip-gap: 4px;\n}'), cfg, root }), []);
+  assert.deepEqual(valueChangesOf({ file: 'src/theme.css', before: theme, after: theme.replace(/\}\n$/, '  --chip-gap: 4px;\n}\n'), cfg, root }), []);
   assert.deepEqual(valueChangesOf({ file: 'src/Chip.vue', before: theme, after: theme.replace('#eeeeee', '#dddddd'), cfg, root }), []);
   writeTokenUses(root, {
     '--neutral-100': { direct: [], via: [{ name: 'button', through: '--button-background' }, { name: 'card', through: '--card-surface' }, { name: 'navItem', through: '--card-surface' }] },
