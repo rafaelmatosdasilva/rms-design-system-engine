@@ -165,9 +165,10 @@ says which it is, and its row says so under what was found:
 | The browser | What Tab reaches, where the focus shows and whether anything hides it, reflow at 320px, zoom, text spacing, what an input does when it changes, dragging, target size | *Tried in Chrome*, and which other engines are not set up here |
 | Chrome's accessibility tree | What a screen reader hears (4.1.2) | *Chrome only* — no other engine exposes one, and a tool that works it out itself reads the same everywhere |
 
-The passes in Firefox and WebKit are not built yet. What is built is the accounting: a run that found only Chrome says
-so, a browser that is not installed is named as missing rather than passed over, and the criteria a browser decides are
-never presented as answered for engines nobody ran.
+The accessibility passes in Firefox and WebKit are not built yet. Rendered parity is already drawn in them (see
+[Measure Figma-code parity](audit.md#in-the-browser)), through the same drivers they will use. What is built here is the
+accounting: a run that found only Chrome says so, a browser that is not installed is named as missing rather than passed
+over, and the criteria a browser decides are never presented as answered for engines nobody ran.
 
 ### How sure each finding is
 
