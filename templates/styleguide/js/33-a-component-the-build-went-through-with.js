@@ -125,15 +125,6 @@
         // tried by running it again.
         var why = ch && ch.notRead ? ch.why || '' : null;
         note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : why != null ? (/no markup/.test(why) ? 'Build ' + c.name + ' in the code: the audit tries this once the page draws it from the code.' : 'The last audit could not try ' + c.name + ': ' + plainWhy(why) + '. Run it again once that is fixed.') : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'The last audit did not try ' + c.name + ' 320 pixels wide. Run it again.' : 'The last audit did not get to ' + c.name + '. Run it again.';
-      // What a real screen reader said on this component (--hear), on the row for name, role and value: a measurement
-      // of one reader on one computer, with the controls it said apart from the browser, each with what it left out.
-      var heard = r.k.sc === '4.1.2' && WCAG && WCAG.heard ? WCAG.heard[c.name] : null;
-      if (heard) {
-        var hWho = heard.reader + (heard.version ? ' (' + heard.version + ')' : '') + ' on ' + heard.at;
-        todos.push('<p class="pg-a11y-heard">' + esc(heard.stale ? 'Heard with ' + hWho + ', before ' + c.name + ' last changed. Hear it again: ' : heard.apart.length ? 'Heard with ' + hWho + ': ' + heard.same + ' of ' + heard.heard + ' controls said as the browser says them, a measurement of one reader (it decides nothing).' : 'Heard with ' + hWho + ': every control said as the browser says it, a measurement of one reader (it decides nothing).') +
-          (heard.stale ? '<code>rms-design-system-engine --hear --component ' + esc(c.name) + '</code>' : '') + '</p>' +
-          (heard.apart.length && !heard.stale ? '<ul class="pg-a11y-listed-list">' + heard.apart.map(function (l) { return '<li><b>' + esc(l.desc) + '</b> ' + esc('- the browser says "' + l.want + '" and ' + heard.reader + ' said "' + (l.said || 'nothing') + '"') + (l.why ? ' · ' + esc(l.why) : '') + '</li>'; }).join('') + '</ul>' : ''));
-      }
       } else if (k.ran && live && !k.ran.some(function (r) { return live.ran[r]; }) && !its.length) st = null;   // nothing in it that this asks about
       else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried on ' + c.name + ' when its Accessibility area is open.'; }
       else {
@@ -223,6 +214,15 @@
         listed.map(function (w) { return '<li><b>' + esc('"' + w.text + '"') + '</b> ' + esc('(' + w.where + (w.verdict === 'unclear' ? ', unclear from the words alone' : '') + ')') + (w.why ? ' - ' + esc(w.why) : '') + '</li>'; }).join('') + '</ul>');
       // What is still to be tried once the audit runs in a browser: running it is what to do.
       if (!todos.length && r.st === 'check' && r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) todos.push(esc('Run the audit, it tries this on ' + c.name + ' in a browser.'));
+      // What a real screen reader said on this component (--hear), on the row for name, role and value: a measurement
+      // of one reader on one computer, with the controls it said apart from the browser, each with what it left out.
+      var heard = r.k.sc === '4.1.2' && WCAG && WCAG.heard ? WCAG.heard[c.name] : null;
+      if (heard) {
+        var hWho = heard.reader + (heard.version ? ' (' + heard.version + ')' : '') + ' on ' + heard.at;
+        todos.push('<p class="pg-a11y-heard">' + esc(heard.stale ? 'Heard with ' + hWho + ', before ' + c.name + ' last changed. Hear it again: ' : heard.apart.length ? 'Heard with ' + hWho + ': ' + heard.same + ' of ' + heard.heard + ' controls said as the browser says them, a measurement of one reader (it decides nothing).' : 'Heard with ' + hWho + ': every control said as the browser says it, a measurement of one reader (it decides nothing).') +
+          (heard.stale ? '<code>rms-design-system-engine --hear --component ' + esc(c.name) + '</code>' : '') + '</p>' +
+          (heard.apart.length && !heard.stale ? '<ul class="pg-a11y-listed-list">' + heard.apart.map(function (l) { return '<li><b>' + esc(l.desc) + '</b> ' + esc('- the browser says "' + l.want + '" and ' + heard.reader + ' said "' + (l.said || 'nothing') + '"') + (l.why ? ' · ' + esc(l.why) : '') + '</li>'; }).join('') + '</ul>' : ''));
+      }
       var open = r.its.filter(function (it) { return it.st !== 'done'; });
       // Who acts: the code's when the code fails it (a role not stated in Figma beside it waits its turn), else the first
       // finding's own, else how the criterion is known.
