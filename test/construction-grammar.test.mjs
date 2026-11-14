@@ -146,7 +146,7 @@ test('the variant axes already used are a vocabulary, and the grammar reads in a
   assert.ok(lines.includes('- A component is named in camelCase: 4 of 5 follow it, 1 to fix.'));
   assert.ok(lines.includes('- A variant option is written in camelCase (default, inProgress): the rule, every component follows it.'));
   assert.ok(lines.some((l) => /carries a description in Figma: 3 of 5 follow it; the team decides whether it is the rule \(then 2 to fix\)/.test(l)));
-  assert.ok(lines.some((l) => /^- Variant axes it already uses: size \(s \| m \| l\); state \(default \| selected \| inProgress \| error\)/.test(l)));
+  assert.ok(lines.some((l) => /^- Variant axes it already uses: size \(s \| m \| l\) · state \(default \| selected \| inProgress \| error\)/.test(l)));
   assert.deepEqual(grammarLines({}), []);
 });
 
@@ -194,7 +194,7 @@ test('architecture, from the skeleton: styles, wiring, nesting, layout, placemen
   assert.equal(fam.says, 'A button is built as horizontal auto layout: a component? → text');
   assert.deepEqual([fam.follows, fam.of, fam.toFix.map((t) => t.component)], [2, 4, ['buttonGhost', 'buttonLink']]);
   assert.deepEqual(g.figma.families.map(({ shapes, ...f }) => f), [{ family: 'button', components: 4, shape: 'horizontal auto layout: a component? → text', follow: 2, depths: [1, 1, 1, 1] }]);
-  assert.match(fixOf(fam, fam.toFix[0]).say, /^Rebuild it as the family is built \(horizontal auto layout: a component\? → text\); now /);
+  assert.match(fixOf(fam, fam.toFix[0]).say, /^Rebuild it as the family is built \(horizontal auto layout: a component\? → text\), where now /);
 });
 
 test('a yes/no is named by one case rule whether Figma makes it a boolean or a variant of true and false; "show" stays a boolean\'s', () => {
@@ -213,7 +213,7 @@ test('on the Construction page each row is a rule, a decision included: never a 
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
   assert.doesNotMatch(page, /shared, or made for each component\?/);
   // The two ways a family is built are said as what most of it does, with the other beside it: the panel suggests one.
-  assert.match(page, /Choose one; the others are then changed to match\./);
+  assert.match(page, /Choose one, and the others are then changed to match\./);
   assert.match(page, /copyBtn\(k \? 'change' : 'approve', \(k \? '' : 'Suggested: '\) \+ WAY_HEAD\[w\.way\]/);
   // Five areas, each holding more than a row or two, and none of them a side: Code and Products are gone, a Figma
   // variable and a style are both Tokens, and the rest of how a component is built inside is Structure.

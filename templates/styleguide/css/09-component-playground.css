@@ -255,7 +255,6 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 /* A task that follows another person's: which step it is, so a row read on its own still says so. */
 .sg-issues .sg-todo-step { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted);
   border: var(--sg-line); border-radius: var(--sg-radius-pill); padding: 0 var(--sg-space-xs); margin-right: var(--sg-space-xs); vertical-align: 1px; white-space: nowrap; }
-.sg-todo-scope { display: block; color: var(--sg-muted); margin-bottom: var(--sg-space-xxs); }   /* local or shared, and on whom a shared one waits: its reason on hover and in the row's panel */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues td { overflow-wrap: break-word; }
 .sg-issues .sg-todo-area { white-space: normal; }
@@ -888,7 +887,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
 .sg-link-pill[hidden] { display: none; }   /* a pill past the first ten of a list stays out of view until its More asks for it */
-.sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }   /* a link in a table, as a pill: several in one cell sit apart */
+.sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }
+.sg-il-codes > .sg-link-pill--table { margin: 0; }   /* in a list of names, the list's own gap sets it apart */
+.sg-pills-more > svg { width: var(--sg-mark, 1rem); height: var(--sg-mark, 1rem); flex: none; }   /* the chevron before the count: it opens the rest */   /* a link in a table, as a pill: several in one cell sit apart */
 table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: var(--sg-text); }   /* never underlined, as a pill is not */
 table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where else a commit changed things: quieter than a component */
 .sg-link-pill > .sg-link-words > code { font-size: inherit; }
@@ -950,6 +951,27 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
 .sg-doc-notes { margin: var(--sg-space-xs) 0 var(--sg-space-s); padding-inline-start: 1.2em; }   /* the points to cover, for this component */
 .sg-doc-notes li + li { margin-top: var(--sg-space-xxs); }
+/* A name or a value inside a task's words (a property, a layer, a variable, what each side says): a pill of its own, so
+   it never reads as part of the sentence (the owner's, 12 November 2026). The template's own surface, line and radius. */
+.sg-name { display: inline-flex; align-items: center; max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); overflow-wrap: anywhere; }   /* a name or a value, set apart: the box of a link pill (its padding, line, corners and words' size), so names and a list's "N more" sit together at one height. One style for every list of names on the page */
+.sg-name[hidden] { display: none; }
+/* Inside a sentence, a name keeps the line's own size and height. */
+:is(.sg-il-line, .sg-il-text, .pg-par-val, .sg-il-source, .sg-il-fix, .sg-il-fix-use) .sg-name:not(.sg-il-codes > .sg-name), .sg-row-detail-body > p .sg-name { display: inline; padding: 0 var(--sg-space-xxs); font-size: inherit; line-height: inherit; }   /* inside a sentence, a name is a pill the size of its words: it never makes its line taller */
+/* A row's panel opens with what to do, in its card as every other: its words larger and bold in the text's own colour,
+   whatever writes them (the owner's, 12 November 2026). Size and weight only, the template's own. */
+.pg-inspect.sg-lead-card { --sg-line-colour: color-mix(in srgb, var(--sg-text) 45%, transparent); --sg-line-solid: color-mix(in srgb, var(--sg-text) 45%, var(--sg-bg)); border-color: var(--sg-line-solid); border-width: calc(2 * var(--sg-line-width, 1px)); }   /* its box in a stronger line than the others, its corners with it */
+.pg-inspect.sg-lead-card > .pg-inspect-head { position: static; background: none; border-bottom: 0; box-shadow: none; padding: var(--sg-cell-x) var(--sg-cell-x) 0; }   /* no head: a small label over the sentence */
+.pg-inspect.sg-lead-card > .pg-inspect-head::before, .pg-inspect.sg-lead-card > .pg-inspect-head::after { content: none; }
+:is(#sg-row-panel, #sg-il-panel, #sg-cx-panel, #sg-fc-panel) .pg-inspect.sg-lead-card > .pg-inspect-head { box-shadow: none; }   /* its label never sticks, so it paints no strip over the card's top border (by the panel's id, as the theme editor does) */
+.pg-inspect.sg-lead-card > .sg-row-detail-body { padding: var(--sg-space-xs) var(--sg-cell-x) var(--sg-cell-x); }
+.pg-inspect.sg-lead-card > .sg-row-detail-body :last-child { margin-bottom: 0; }
+.pg-inspect.sg-lead-card { background: var(--sg-bg-2); }   /* a slight grey under it, the template's own second ground (a card head's), so the task stands apart from the cards after it */   /* the last thing in it (its buttons) ends on the card's own padding, never on a margin of its own: the same space all round */   /* the same space all round: the sides' on top and at the bottom */
+.pg-inspect.sg-lead-card > .sg-row-detail-body { font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-text); }   /* one structure in every What to do: its sentence, its bullets, a quieter note, names in pills */
+.pg-inspect.sg-lead-card > .sg-row-detail-body > .sg-il-line:first-child, .pg-inspect.sg-lead-card > .sg-row-detail-body > p:first-child, .pg-inspect.sg-lead-card > .sg-row-detail-body > .sg-il-line:first-child :is(.sg-il-text, strong) { font-size: var(--sg-xl); line-height: var(--sg-lh-read); font-weight: var(--sg-heading-weight); color: var(--sg-text); }   /* its sentence, the task itself, one step up the template's scale */
+.pg-inspect.sg-lead-card .sg-il-points :is(.pg-par-val, .sg-il-text, .sg-il-label) { display: block; font-size: inherit; line-height: inherit; font-weight: var(--sg-text-weight); color: var(--sg-text); margin: 0; }   /* a bullet: one size, one weight, one colour */
+.pg-inspect.sg-lead-card .sg-il-points .sg-il-item > strong:first-child { display: block; font-size: inherit; line-height: inherit; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }   /* its head bold, the size of its words */
+.pg-inspect.sg-lead-card :is(.sg-il-source, .sg-il-quiet-head) { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }   /* the one quieter style: a note on a bullet or over a list */
+.pg-inspect.sg-lead-card .sg-il-group-head > strong { font-size: var(--sg-m); font-weight: var(--sg-heading-weight); color: var(--sg-text); }   /* a section's heading, where a card has several */
 .sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 /* One style in every panel: running text muted; what names something (a title, a label, a table's heading, a link, a
    code name, a status) in the text colour. A line's leading title is a step larger (below). */
@@ -972,6 +994,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-text { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-weight: var(--sg-text-weight); }
 .sg-row-detail-body .sg-il-points { margin: var(--sg-space-xxs) 0 0; padding-left: var(--sg-space-l); color: var(--sg-muted); font-weight: var(--sg-text-weight); }
 .sg-row-detail-body .sg-il-points li + li { margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body .sg-il-points > li.sg-il-item { display: list-item; list-style: disc; margin: 0 0 var(--sg-space-xs); }   /* each draft a bullet, when the card's sentence already says what they are */
 .sg-row-detail-body .sg-il-cmd { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; margin-top: var(--sg-space-xs); }   /* the answer's command, Copy beside it on the right, however long the command */
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
@@ -1000,16 +1023,23 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-group-decide + .sg-il-group-decide { margin-top: var(--sg-space-xl); }   /* New text for the page, Changes to rules, Other changes: each its own block */
 .sg-row-detail-body .sg-il-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }   /* its heading and count, Approve all at the other end */
-.sg-row-detail-body .sg-il-group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-space-m); }   /* the group's three actions, under its proposals */
+.sg-row-detail-body .sg-il-group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-cell-x); }   /* the group's three actions, under its proposals */
 .sg-row-detail-body .sg-il-group-actions [data-il-do] { padding: var(--sg-space-m) var(--sg-space-l); font-size: var(--sg-m); gap: var(--sg-space-s); }   /* large enough to find and hit */
 .sg-row-detail-body [data-il-do="approve"] { --sg-decide-hue: #2e7d32; } .sg-row-detail-body [data-il-do="change"] { --sg-decide-hue: #b26a00; } .sg-row-detail-body [data-il-do="drop"] { --sg-decide-hue: var(--sg-danger); }
 :where(:root)[data-sg-scheme="dark"] .sg-row-detail-body [data-il-do="approve"] { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-row-detail-body [data-il-do="change"] { --sg-decide-hue: #f0b35a; }
 .sg-row-detail-body [data-il-do] .sg-decide-mark { color: var(--sg-decide-hue); }   /* each action's mark in its hue */
 .sg-row-detail-body .sg-il-source { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); font-weight: var(--sg-text-weight); }   /* where a draft comes from */
 .sg-row-detail-body .sg-il-source--warn { color: var(--sg-text); padding-left: var(--sg-space-s); border-left: 2px solid var(--sg-danger); }   /* a name only Figma has, written as a prop */
+/* A draft that needs a fix: what is wrong with it, the wording offered instead and a button to take it, in a box of
+   the template's own yellow (its Review dot's), so a problem reads as one at a glance (the owner's, 12 November 2026). */
+.sg-row-detail-body .sg-il-fix { display: block; margin: var(--sg-space-xs) 0 var(--sg-space-xxs); padding: var(--sg-space-s) var(--sg-space-m); border: var(--sg-line-width, 1px) solid var(--sg-warning-ink); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-warning-ink) 12%, var(--sg-bg)); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-text); line-height: var(--sg-lh-read); }
+.sg-row-detail-body .sg-il-fix > strong { font-weight: var(--sg-heading-weight); }
+.sg-row-detail-body .sg-il-fix-use { display: block; margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body .sg-il-fix-act { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-space-s); }
+.pg-inspect.sg-lead-card .sg-il-points .sg-il-say { font-weight: var(--sg-heading-weight); }   /* a draft's section, its label on its own line */
 .sg-row-detail-body .sg-il-quiet { margin-top: var(--sg-space-m); }
 .sg-row-detail-body .sg-il-quiet-head { margin: 0 0 var(--sg-space-s); color: var(--sg-muted); font-size: var(--sg-s); }   /* what the engine has no ground for says so over the items themselves: nothing is folded away */
-.sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
+.sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
 .sg-row-detail-body .sg-il-group:last-child { margin-bottom: 0; }
