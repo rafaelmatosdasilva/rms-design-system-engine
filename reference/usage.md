@@ -997,7 +997,9 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
 
 - **`contract.authored.json`** (project root, **committed**) — the AUTHORED hub: per component,
   `bindings` (Figma prop → `{ attribute: "codeName" }` for a rename, `{ slot: "slotName" }` for a slot),
-  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, and optional
+  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, `holds` (what a
+  property may hold, as the team chose it: `{ "label": "words" }`, or `anything`, `one component`, `one of`; where
+  Figma and the code differ, the contract's `differences` names the side to change as `right`), and optional
   **agent guidance** — `whenNotToUse` (string), `useInstead` (a name or a list) and `neverCombineWith`
   (a list) — so an AI knows when not to reach for a component and what pairings are invalid — and an
   optional **decision status**: `status` (`current` | `deprecated` | `experimental`), `supersededBy`

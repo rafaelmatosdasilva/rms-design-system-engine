@@ -19,6 +19,23 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 105k, in 3.5 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-figma-builder-asks-and-benchmark-on-real-library`.
+## 2026-11: A layout part is a class named after a layout, never one that only ends in its word (continuous evaluation)
+
+What changed since the entry below (engine ba70b55): The Figma review's findings on each component's page, and the hand-back as a Figma plugin (#474); What a property may hold, layout names from the code, and turns, icon glyphs and font faces in parity; A layout part is a class named after a layout, never one that only ends in its word. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `7ded2357c8ef` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 5db4a181` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md d9a409a4` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 05cd0e7a` `reference/personality.md 7f1584bf` `reference/usage.md 07b34185` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 7cfcaf8 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.059 | 0.058 |
+| Input a run | 105k | 99k |
+| Turns a run | 3.7 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 105k, in 3.5 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-a-layout-part-is-a`.
 
 ## 2026-11: Merge remote-tracking branch 'origin/main' into figma/findings-reach-designers (continuous evaluation)
 

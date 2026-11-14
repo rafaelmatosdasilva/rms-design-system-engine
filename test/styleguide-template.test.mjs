@@ -1695,7 +1695,7 @@ test('a property Figma and the code name differently is a difference to fix, not
   assert.equal(size.status, 'differs'); assert.equal(size.renamed, true); assert.equal(size.code.name, 'buttonSize');
   assert.equal(disabled.status, 'match', 'the same name in both is a match');
   const tpl = templateText();
-  assert.match(tpl, /else if \(r\.renamed \|\| r\.defaultDiffers\) \{/);
+  assert.match(tpl, /else if \(r\.renamed \|\| r\.defaultDiffers \|\| r\.holdsDiffers\) \{/);
   assert.deepEqual(size.defaultDiffers, { figma: 's', code: 'm' }, 'its default differs too');
   assert.equal(disabled.defaultDiffers, undefined);
 });

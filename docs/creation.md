@@ -35,14 +35,16 @@ The theme editor is built into every style guide the engine builds, and needs no
 The panel shows the form on the left and a preview on the right, in a frame of its own. Only that frame takes the theme while you work, so the rest of the guide stays as your system draws it.
 
 - **Name** and **font family**: the families your system uses, common web fonts, or any other by name. A font your computer lacks is loaded from Google Fonts, so what you pick is what you see.
-- **Primary and secondary colours**, the **app background**, and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
-- **Button and card roundness**, **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
+- **Primary and secondary colours**, the **app background**, the **header background** (every header's own background token, one setting for them all), and each **gradient** your system gives in stops (a part's `background/start` and `background/end` tokens).
+- **Button and card roundness** (the card's also reaches the other surfaces with corners of their own: a bar, a panel, a sheet, a modal), **spacing** (every gap, padding and margin, scaled together), **border thickness**, **shadows** on or off and their **blur**.
 
 Each setting reaches the tokens named for it and every token that follows them, so the whole chain changes and nothing else does.
 
 - **Only what the screens use.** A setting is listed only when the screens on show draw with its token, so every setting changes something you see.
 - **Spacing says what it changes.** Under its percentage, a list of each spacing token the screens use, its size now and at the percentage chosen (`spacing/gap/l 16px → 20px`), in whole pixels. Hovering one outlines what draws with it.
 - **A shadow colour** for every shadow at once (the system gives each component its own), and the shadow settings locked while shadows are off.
+- **Shadows off reaches every component with a shadow**: components draw their shadow from its colour token, never from the system's on-off switch, so off sets every shadow's colour to transparent, besides the switch.
+- **Shadows on shows every shadow**: turned on, every shadow takes the shadow colour and blur, since the system draws some transparent or with no blur (a button's, a white card's).
 - **Undo and reset.** Each colour, and each slider's number, has a reset arrow back to where it started, shown only while the value differs from it, and **Reset changes**, in the panel's top bar, puts the whole editor back as it opened. It stays disabled until something changes, and asks before it resets.
 - **Number fields** have − and + on either side, and take whole pixels.
 
@@ -52,7 +54,8 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 - **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
-- **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back.
+- **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back. It is for trying the screens: nothing is outlined or named there, and a click does what it does in the app.
+- **No scroll bars.** A screen still scrolls, as a phone does, but shows no bar of its own.
 - **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview scrolls; hold the space bar, or the middle button, and drag to move it.
 - **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
 - **Screens side by side.** A page built for showing the editor can ask for its screens in a row, with no list to choose from (`row: true` in its data, as `enabled` is): phone screens shown together, centred, the panel's own background around them.
@@ -68,14 +71,14 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a Showroom screen marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
 
-- **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card shows the path to it, ending at the level picked, each step above it a click back to that level.
+- **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card starts at the component clicked, even one inside another (a tag in a table is the tag), and goes down through the layers picked in it, each step a click back to that level.
 - **Text of its own.** A text in no component is picked by its text style, named on hover.
-- **Only its own tokens.** The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
+- **Only its own tokens.** A layer picked (a card's text) shows only what that layer draws with, never its component's other tokens. The form shows the tokens that part really draws with, as the browser's cascade decides, its hover, focus and press included. Hovering a token outlines the parts that draw with it.
 - **Values as they are now.** Each token shows its value with the theme on it, in light and dark, and follows as you change the theme.
 - **Units from how a token is used.** A token its rules use as `calc(var(…) * 1%)` reads as a percentage, an opacity from 0 to 1 as a percentage, a size in pixels as px, and anything else as a plain number.
 - **Linked tokens, as Figma shows them.** A token that follows another shows that token's name in its field (a colour's with its swatch) instead of a value, and a button to detach it. Detached, it takes a value of its own, and a reset in its field links it again. A token linked to another of its own component (its corners on one radius) follows it as it changes.
 - **The system's colours.** A colour's chip, or the button beside a detached colour, opens every base, semantic and primitive colour of the system, searchable, each swatch as this theme draws it. The list opens over the panel, below its field or above it when there is more room, and only the list scrolls; a click outside it, or Escape, closes it. One chosen links the token to it, its dark value following that colour's own.
-- **Corner radius.** A picked part shows its corner radius; changing it changes that part in every copy of the component.
+- **Only real tokens.** Everything a part offers is one of the system's own tokens: its corners are its radius tokens, never a value of the editor's own.
 - **Text style.** A text shows the text style it is drawn in, and that style's own size and line height at the breakpoints the screens on show are at (phones: Phone), its breakpoint named under each value. The values are the token's own breakpoint modes. A change is the style's token's, so every text in that style follows.
 - A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 

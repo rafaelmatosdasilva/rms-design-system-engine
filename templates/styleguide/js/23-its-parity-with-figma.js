@@ -46,10 +46,13 @@
       if (x) { var d = diffRow(x); row.st = d.st; row.who = d.who; row.todo = d.todo; row.fresh = d.fresh; }
       else if (kx) { var kr = keptRow(kx); row.st = kr.st; row.who = kr.who; row.todo = kr.todo; row.rel = kr.rel; row.at = kr.at || row.at; }
       else if (r.status === 'match') row.st = 'done';
-      else if (r.renamed || r.defaultDiffers) {
-        // Its name, its default, or both, said in one task: make them the same, in Figma or in the code.
-        var said = (r.renamed ? 'Figma calls it ' + nm(r.figma.name) + ', and the code calls it ' + nm(r.code.name) + '. ' : '') + (r.defaultDiffers ? 'Figma says its default is ' + nm(r.defaultDiffers.figma) + ', and the code says ' + nm(r.defaultDiffers.code) + '. ' : '');
-        row.st = 'todo'; row.who = WHO.both; row.todo = said + esc((r.renamed && r.defaultDiffers ? 'Use one name and one default in both' : r.renamed ? 'Use one name in both' : 'Use one default in both') + ': change it in Figma or in the code.');
+      else if (r.renamed || r.defaultDiffers || r.holdsDiffers) {
+        // Its name, its default, what it may hold, or more than one, said in one task: make them the same, in Figma or
+        // in the code.
+        var said = (r.renamed ? 'Figma calls it ' + nm(r.figma.name) + ', and the code calls it ' + nm(r.code.name) + '. ' : '') + (r.defaultDiffers ? 'Figma says its default is ' + nm(r.defaultDiffers.figma) + ', and the code says ' + nm(r.defaultDiffers.code) + '. ' : '')
+          + (r.holdsDiffers ? 'Figma says ' + nm(r.figma.name) + ' takes ' + nm(r.holdsDiffers.figma) + ', and the code says ' + nm(r.holdsDiffers.code) + '. ' : '');
+        var same = [r.renamed ? 'one name' : '', r.defaultDiffers ? 'one default' : '', r.holdsDiffers ? 'one kind of content' : ''].filter(Boolean);
+        row.st = 'todo'; row.who = WHO.both; row.todo = said + esc('Use ' + (same.length > 1 ? same.slice(0, -1).join(', ') + ' and ' + same[same.length - 1] : same[0]) + ' in both: change it in Figma or in the code.');
       }
       else if (r.status === 'paired') { row.st = 'skip'; row.todo = r.why ? esc(capital(r.why) + '.') : ''; }
       else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = 'Figma has the ' + nm(nb) + ' property, but the code does not. ' + esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }

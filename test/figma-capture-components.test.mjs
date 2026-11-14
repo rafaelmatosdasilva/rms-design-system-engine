@@ -507,7 +507,7 @@ test('components: the commands write each script and import the answers saved', 
 // The form before the compressed one: each component's items as the recipes' functions give them in Figma, sent as they
 // are, 14,000 bytes of items an answer (a larger component alone in one), each answer with its components' checksums.
 async function fullForm(f, pass) {
-  const head = componentsScript('read', { ids: [] }).split("if(CALL==='sums'){")[0];
+  const head = componentsScript('sums').split("if(CALL==='sums'){")[0];   // what every call shares, before its own part
   const per = await new AsyncFunction('figma', `${head}return Promise.all(all.map(async (r) => [r.id, await itemsOf(r)]));`)(standin.asComponentsFigma(f));
   const answers = [];
   let cur = [], size = 0;
@@ -628,7 +628,7 @@ test('components: a nested instance Figma fills in lazily reads alike whatever t
     page.findAllWithCriteria = () => [menu, header];
     return { page, vars: { 'v-text': { id: 'v-text', name: 'text/color' } } };
   };
-  const head = componentsScript('read', { ids: [] }).split("if(CALL==='sums'){")[0];
+  const head = componentsScript('sums').split("if(CALL==='sums'){")[0];   // what every call shares, before its own part
   const read = async (body) => new AsyncFunction('figma', `${head}const byName=(n)=>all.find((x)=>x.name===n);${body}`)(standin.asComponentsFigma(make()));
   const alone = await read(`return JSON.stringify(await itemsOf(byName('sideNavHeader')));`);
   const after = await read(`await itemsOf(byName('sideNav'));return JSON.stringify(await itemsOf(byName('sideNavHeader')));`);

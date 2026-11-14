@@ -65,6 +65,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the style guide's Rules page, beside the code's.
 - Fixes a component's construction, such as renaming its layers, after you say yes.
 - Compares components of one kind, so every button sets its states and names its options the same way.
+- Names each auto-layout frame after the code's own layout part it is laid out as (a stack, a cluster), so `Frame 47` comes back into code as what it is.
 - Says when the file is not reliable enough to compare, before any result.
 
 ### What to ask
@@ -85,6 +86,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
 - Finds the code file of each Figma component on its own, so nobody writes a map.
 - Checks icons, slots and the parts inside each component.
+- Compares what each property may hold, so a Figma text that takes words and a code prop that takes anything are a difference, not a match.
+- Compares a turned part at its angle, an icon's box and its glyph as two sizes, and a font by its face, however each side names it.
 - Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
 - Checks that a brand changes only values, never which parts a component draws or how they are laid out.
 - Warns when a Figma frame changed since the version you approved.

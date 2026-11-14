@@ -185,3 +185,49 @@ test('--second-review finds what the change gets wrong, and then it waits for a 
   assert.equal(gone.code, 1);
   assert.match(gone.out, /it is hard to undo \(a removal, a rename or a breaking change\): a person signs it off/);
 });
+
+test('a shared token given another value is held, with what it reaches and the component\'s own layer', async () => {
+  const { valueChangesOf, writeTokenUses, heldOf } = await import('../lib/sign-off.mjs');
+  const theme = ':root {\n  --neutral-100: #eeeeee;\n  --button-background: var(--neutral-100);\n  --card-surface: var(--neutral-100);\n  --badge-radius: 4px;\n}\n';
+  const root = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'src/theme.css' } },
+    'src/theme.css': theme,
+    'src/figma-vars.snapshot.json': { color: { light: { 'neutral/100/color': '#f4f4f4' } } },
+    'contracts/catalog.json': { components: { button: { livesIn: { products: [{ name: 'Acme Shop' }, { name: 'Acme Admin' }] } }, card: { livesIn: { products: [{ name: 'Acme Shop' }] } } } },
+  });
+  // What an edit changes: a token the theme had, given another value, in any of its modes; a new token is not one.
+  assert.deepEqual(valueChangesOf({ file: 'src/theme.css', before: theme, after: theme.replace('#eeeeee', '#dddddd'), cfg, root }).map((c) => [c.token, c.from, c.to]), [['--neutral-100', '#eeeeee', '#dddddd']]);
+  assert.deepEqual(valueChangesOf({ file: 'src/theme.css', before: theme, after: theme.replace(/\}\n$/, '  --chip-gap: 4px;\n}\n'), cfg, root }), []);
+  assert.deepEqual(valueChangesOf({ file: 'src/Chip.vue', before: theme, after: theme.replace('#eeeeee', '#dddddd'), cfg, root }), []);
+  writeTokenUses(root, {
+    '--neutral-100': { direct: [], via: [{ name: 'button', through: '--button-background' }, { name: 'card', through: '--card-surface' }, { name: 'navItem', through: '--card-surface' }] },
+    '--button-background': { direct: ['button'], via: [] },
+    '--card-surface': { direct: ['card', 'navItem'], via: [] },
+    '--badge-radius': { direct: ['badge'], via: [] },
+  });
+  const edit = (from, to, userText) => judge({ tool_name: 'Edit', cwd: root, session_id: 'agent-1', tool_input: { file_path: join(root, 'src/theme.css'), old_string: from, new_string: to } }, { cfg, userText });
+  const held = edit('--neutral-100: #eeeeee;', '--neutral-100: #dddddd;', 'the button background is too light, fix it');
+  assert.equal(held.decision, 'deny');
+  assert.match(held.reason, /^This edit changes the value of --neutral-100, a token the design system shares, from #eeeeee to #dddddd\./);
+  assert.match(held.reason, /It reaches 3 components \(button, card, navItem\) in 2 products \(Acme Shop, Acme Admin\), and every one of them changes with it\./);
+  assert.match(held.reason, /If the change is for button alone, make it at button's own layer: change --button-background instead, which button alone is drawn with, and leave --neutral-100 as it is\./);
+  assert.match(held.reason, /--sign-off "the value of --neutral-100, #dddddd" --by "<who>"/);
+  assert.equal(heldOf(root, 'the value of --neutral-100, #dddddd').author.session, 'agent-1');
+  // A component whose only way to the token is shared with another has no layer of its own to change.
+  assert.match(edit('--neutral-100: #eeeeee;', '--neutral-100: #dddddd;', 'make the card lighter').reason, /card has no token of its own between it and --neutral-100/);
+  // Not named: the way out said in general.
+  assert.match(edit('--neutral-100: #eeeeee;', '--neutral-100: #dddddd;', 'tweak the grey').reason, /If the change is for one component, make it at that component's own layer/);
+  // Passed: the value Figma gives that token (the parity fix), a token one component alone uses, and a signed-off value.
+  assert.equal(edit('--neutral-100: #eeeeee;', '--neutral-100: #F4F4F4;', 'update it to match figma'), null);
+  assert.equal(edit('--badge-radius: 4px;', '--badge-radius: 6px;', 'make the badge rounder'), null);
+  assert.equal(edit('--button-background: var(--neutral-100);', '--button-background: #dddddd;', 'change the button background'), null);
+  recordSignOff(root, { what: 'the value of --neutral-100, #dddddd', by: 'the system owner' });
+  assert.equal(edit('--neutral-100: #eeeeee;', '--neutral-100: #dddddd;', 'the button background is too light, fix it'), null);
+});
+
+test('a token value changed before any build saw what uses it is held, and says the reach is unknown', () => {
+  const root = makeFixture({ 'ds-config.json': { paths: { themeCSS: 'src/theme.css' } }, 'src/theme.css': ':root {\n  --space-m: 16px;\n}\n' });
+  const r = judge({ tool_name: 'Edit', cwd: root, tool_input: { file_path: join(root, 'src/theme.css'), old_string: '16px', new_string: '20px' } }, { cfg, userText: 'more space' });
+  assert.equal(r.decision, 'deny');
+  assert.match(r.reason, /The engine has not seen which components use it \(no style guide build yet\), so it cannot say this stays in one of them\./);
+});
