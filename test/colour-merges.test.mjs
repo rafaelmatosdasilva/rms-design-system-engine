@@ -25,6 +25,8 @@ test('tokens that look the same in every mode they share are one group, the most
   // Alike in light and apart in dark is two colours; a scale's steps are apart; a pointer is already one colour;
   // a different see-through is another colour.
   const all = g.flatMap((x) => [x.keep, ...x.merge]);
+  // Two jobs that look the same on purpose stay two colours.
+  assert.deepEqual(colourMerges(colourTokens([{ text: ':root{--action-primary-text:#fff;--surface-base:#fff;--surface-raised:#fefefe}' }])).map((x) => [x.keep, x.merge]), [['--surface-base', ['--surface-raised']]]);
   // A component's own token is never kept over a shared one, however much it is used.
   const own = colourMerges(colourTokens([{ text: ':root{--chip-text:#1b2433;--text-primary:#1b2433}' }]), { uses: { '--chip-text': { direct: ['chip', 'tag'] } }, components: ['Chip'] });
   assert.deepEqual(own.map((x) => [x.keep, x.merge]), [['--text-primary', ['--chip-text']]]);
