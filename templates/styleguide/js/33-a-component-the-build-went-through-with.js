@@ -214,6 +214,16 @@
         listed.map(function (w) { return '<li><b>' + esc('"' + w.text + '"') + '</b> ' + esc('(' + w.where + (w.verdict === 'unclear' ? ', unclear from the words alone' : '') + ')') + (w.why ? ' - ' + esc(w.why) : '') + '</li>'; }).join('') + '</ul>');
       // What is still to be tried once the audit runs in a browser: running it is what to do.
       if (!todos.length && r.st === 'check' && r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) todos.push(esc('Run the audit, it tries this on ' + c.name + ' in a browser.'));
+      // What a real screen reader said on this component (--hear), on the row for name, role and value: a measurement
+      // of one reader on one computer, said with what the check found, each control it said apart from the browser
+      // with what it left out. Once the component has changed, hearing it again is what to do.
+      var heard = r.k.sc === '4.1.2' && WCAG && WCAG.heard ? WCAG.heard[c.name] : null;
+      if (heard) {
+        var hDay = new Date(heard.at + 'T12:00:00Z'), hWho = heard.reader + (heard.version ? ' (' + heard.version + ')' : '') + ' on ' + (isNaN(hDay) ? heard.at : hDay.getUTCDate() + ' ' + MONTHS[hDay.getUTCMonth()]);
+        if (heard.stale) todos.push(esc('Hear ' + c.name + ' again with ' + heard.reader + ', it changed after ' + hWho + ':') + ' <code>rms-design-system-engine --hear --component ' + esc(c.name) + '</code>');
+        else found += '<div class="pg-a11y-item pg-a11y-heard">' + esc('Heard with ' + hWho + ': ' + (heard.apart.length ? heard.same + ' of ' + heard.heard + ' controls said as the browser says them.' : 'every control said as the browser says it.') + ' A measurement of one reader, it decides nothing.') +
+          (heard.apart.length ? '<ul class="pg-a11y-listed-list">' + heard.apart.map(function (l) { return '<li>' + esc(l.desc + ': the browser says "' + l.want + '" and ' + heard.reader + ' said "' + (l.said || 'nothing') + '"' + (l.why ? ', ' + l.why : '')) + '</li>'; }).join('') + '</ul>' : '') + '</div>';
+      }
       var open = r.its.filter(function (it) { return it.st !== 'done'; });
       // Who acts: the code's when the code fails it (a role not stated in Figma beside it waits its turn), else the first
       // finding's own, else how the criterion is known.
