@@ -279,5 +279,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-14-figma-builder-asks-on-main` | The 24 guide tasks on Haiku (engine 253ad7b) | "The Figma builder asks, and its benchmark on a real library, on main" |
 | `2026-11-14-required-states-and-nobody-named` | The 24 guide tasks on Haiku (engine 2ec80b6) | "The states a component must have, from the team's pages, and where nobody is named to decide" |
 | `2026-11-14-the-status-cards-measured-on` | The 24 guide tasks on Haiku (engine f7ce0c9) | "The Status cards' measured-on line taken out, at the owner's word" |
+| `2026-11-14-merge-main` | The 24 guide tasks on Haiku (engine b5889c4) | "Merge main" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

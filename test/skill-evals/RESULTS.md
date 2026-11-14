@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Merge main (continuous evaluation)
+
+What changed since the entry below (engine 2ec80b6): Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); Gate 14 says nothing of owed states where there are none, a page's intent carries them only when it has some, and the evaluation's secret check reads token names as design tokens. The guide changed in `reference/usage.md`.
+
+Guide set measured: `b1388b79a8c4` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 6be5d597` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md d38302e3` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine b5889c4 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 76/79 |
+| Mean cost a run | 0.057 | 0.056 |
+| Input a run | 93k | 95k |
+| Turns a run | 3.3 | 3.3 |
+| Rule violations | 0 | 3 |
+
+**Reading.** Haiku: 3 of 79 runs failed, fewer passes than the entry below, 3 rule violations. Failed: accept-radius #2: the run finished (no result ()); accept-radius #2: reports in the chat, not in a file (no reply); fix-first #0: the run finished (no result ()); fix-first #0: reports in the chat, not in a file (no reply); accept-radius-pt #0: the run finished (no result ()); accept-radius-pt #0: reports in the chat, not in a file (no reply). no task changed state; 3 runs moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-14-merge-main`.
+
 ## 2026-11: The states a component must have, from the team's pages, and where nobody is named to decide (continuous evaluation)
 
 What changed since the entry below (engine 253ad7b): Test tools kept current by themselves, a major is the owner's call, and a version every 15 commits (#480); test-tools: bump the vue-cli-tools group (#484); test-tools: bump vue in /test/.nuxt-tools in the nuxt-tools group (#481); test-tools: bump @anthropic-ai/claude-agent-sdk (#482); The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too (#479); Three things a real system found that a fixture could not (#469); The states a component must have, from the team's pages, and where nobody is named to decide. The guide changed in `reference/config.md`, `reference/usage.md`.
