@@ -58,3 +58,23 @@ test('with no documentation read, nothing is held to a rule', () => {
 test('an element that is not a system component is not the system\'s to rule', () => {
   assert.deepEqual(unruledBehaviours([{ system: null, line: 1, attrs: [{ kind: 'model', name: 'selected' }] }], ctx()), []);
 });
+
+// A product rule that merely names a component is not a rule about it. Found on a real system: one pattern rule
+// ran to fifteen hundred characters, named one of them once, and mentioned sorting, selection and expansion about
+// other things entirely - so every component that rule happened to name came back documented for all four.
+test('a long rule gives a component only the sentences that name it', async () => {
+  const { ruledBehaviours, sentencesNaming } = await import('../lib/prototype-context.mjs');
+  const rule = [
+    'Use the narrowed-list pattern when a list is cut down by active criteria.',
+    'SieveDrawer opens, and filters the list by every criterion in it.',
+    'Select users mode preserves selected rows through sorting and pagination.',
+    'Rows expand to show their detail inline.',
+  ].join('\n');
+  const ctx = { components: { SieveDrawer: {}, GridOfRows: {} }, rules: [{ title: 'Narrowed list (patterns, intent layer)', text: rule }] };
+  // SieveDrawer is named in one sentence, about filters. Not sorting, selection or expansion, which are about rows.
+  assert.deepEqual([...ruledBehaviours(ctx, 'SieveDrawer')], ['filters']);
+  // A component the rule never names takes nothing from it.
+  assert.deepEqual([...ruledBehaviours(ctx, 'GridOfRows')], []);
+  assert.equal(sentencesNaming(rule, 'SieveDrawer').split('\n').length, 1);
+  assert.equal(sentencesNaming(rule, 'Nothing'), '');
+});
