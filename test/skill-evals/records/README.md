@@ -274,5 +274,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-13-testimony-judgement-and-browsers-on` | The 24 guide tasks on Haiku (engine 5ed611f) | "A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion" |
 | `2026-11-13-merge-main-this-batch-lands` | The 24 guide tasks on Haiku (engine fcc5d31) | "A check by hand said to be a person's word; the judgement calls pre-sorted; which browser answered each criterion, on main" |
 | `2026-11-13-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine ba70b55) | "Merge remote-tracking branch 'origin/main' into figma/findings-reach-designers" |
+| `2026-11-14-figma-builder-asks-and-benchmark-on-real-library` | The 24 guide tasks on Haiku (engine 5f1e378) | "The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
