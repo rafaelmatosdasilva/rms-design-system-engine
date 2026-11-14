@@ -682,7 +682,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Last checked; what is written, what to do and each source's file in the row's panel), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
-  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
+  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), colour tokens the code
+  mixes at 0%, so they never show (Colour never shows, Claude in the code), the same value written by
   hand in two tokens (You decide), each one row with its first names (a token one component uses is the system's own
   choice, not a row). A token belongs to every component that uses it: in its code, named after it, bound on its
   Figma component (the structure snapshot), or pointed at by one of those; its missing description shows on each of
@@ -1586,7 +1587,7 @@ its own dot, and a list for the area and for the side, each saying how many rows
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
-- **Code**: values written by hand (the census), aliases to a token declared nowhere, a font family written by hand,
+- **Code**: values written by hand (the census), aliases to a token declared nowhere, a colour mixed at 0%, a font family written by hand,
   modes that fail together, the comparison's gates that lint the code (tokens a screen binds exist in CSS, every mode
   covered, no invented variables or text casing, no hand-built component, clean CSS: read from the last full audit's
   `findings.json`) and a product's near copy of a component, to decide.
