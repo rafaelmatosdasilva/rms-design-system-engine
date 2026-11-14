@@ -64,9 +64,9 @@ Every pull request carries exactly one, and it decides the version the release w
 |---|---|
 | `release: patch` | a fix, docs or internal work |
 | `release: minor` | a new capability |
-| `release: major` | something that works differently for people already using the engine |
+| `release: major` | people already using the engine have to do something to keep working, such as change a setting or a command. The owner decides it, and behaving differently alone is not one |
 
-A version is published once 50 merged changes are in no release yet, never on a date, and the biggest label in that group sets the step. So a label decides the step of the group a change lands in, not a release of its own, and a change can wait for the group to fill. People do not wait for it either way: an install follows the latest code once a day.
+A version is published once 15 merged changes are in no release yet, never on a date, and the biggest label in that group sets the step. So a label decides the step of the group a change lands in, not a release of its own, and a change can wait for the group to fill. People do not wait for it either way: an install follows the latest code once a day.
 
 ## What a release asks of you
 
