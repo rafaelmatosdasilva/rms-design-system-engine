@@ -255,7 +255,19 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
 - Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
 - Comes as a Figma plugin too, so a designer reviews the change and applies it inside Figma, with an Undo.
-- Shows you every change first. Nothing changes until you say yes.
+- Shows you every change first, and asks about each kind of change on its own. Nothing changes until you say yes.
+- Keeps a way back for every change, so you can take it back.
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine bring Figma in line with the code` | Every change the code says Figma is missing, by kind, each kind asked on its own before anything is written |
+| `/rms-design-system-engine write the spec pages into Figma` | Each component's spec drawn beside it, shown first and drawn once you say yes |
+| `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, never over one a designer wrote |
+| `/rms-design-system-engine write the token values the code changed into Figma` | Each value the code changed first, written into its variable once you say yes |
+| `/rms-design-system-engine pin the accessibility problems on the screens in Figma` | Each problem pinned on its layer, with a summary on each screen |
+| `/rms-design-system-engine take back the last change in Figma` | What the way back puts back, and once you say yes, the file as it was before |
 
 ## Publish a living style guide
 
