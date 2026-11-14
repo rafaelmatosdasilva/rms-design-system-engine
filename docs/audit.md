@@ -559,3 +559,17 @@ Thirteen checks change behaviour with a setting in `ds-config.json`, and the two
 Every other check always fails on its fault, and nothing in your configuration excuses it.
 
 **Why this is written down.** A check nobody tried against a fault is a promise, not a check — and a check whose strength nobody recorded is a promise of unknown size. Teams plan around what a gate will stop; the honest answer is sometimes "advice, until you ask for more". The table is read from the code itself, so a new setting cannot be added without appearing here.
+
+### The rails an agent meets while it works
+
+The checks above judge a run. The rails judge an agent's edit as it is made, and each one is tried the same way: an edit that is right, which must pass, and one built to break it.
+
+| Rail | What it is | Tried against | Gone around by |
+|---|---|---|---|
+| The guard | **Holds the edit** before it is made, until a person answers | a token the theme did not declare · an option a component does not have · a shared token's value changed · a Figma capture written by hand | `hooks: false` |
+| The edit check | **Notices**, once the edit is made | a colour no token holds · a prop value no component takes · a check switched off in a comment | `hooks: false` · `editCheck: false` |
+| Its accessibility rules | **Notices** | a button with only an icon and no name | the two above · `a11yStatic: false` |
+| Its copies | **Notices** | a component copied rather than used | the two above · `systemHealth: false` |
+| The stop check | **Notices**, before the agent's answer goes out, twice at most | a value the system does not have left in a changed file | `hooks: false` |
+
+Only the guard stops anything. The rest tell the agent at once, and the edit is already in the file. The settings that go around a rail are read from the rails' own code too, so a new one cannot be added without appearing here.
