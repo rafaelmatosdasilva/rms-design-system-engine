@@ -304,6 +304,8 @@ Every build writes the page's twin in text beside it, from the same object the p
 
 One row for each component, with one word per state. The cards above the table and the filter chips use the same words.
 
+- **Each card says what it was measured on.** Under its number, `Measured on 40 of 109 components`: every component, less those its check cannot apply to (N/A) and those not tried yet (Untested). A share of a third of the system is not a share of the system, so the two are never shown apart.
+
 | Column | States |
 |---|---|
 | Figma | Found, Missing |

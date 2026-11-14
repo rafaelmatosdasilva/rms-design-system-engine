@@ -70,3 +70,21 @@ test('layers kept inside one collection as groups of names are read as layers; o
   const perComponent = { collections: [{ name: 'Sizes', modes: ['M'] }], tokens: ['button', 'chip', 'card', 'tab', 'tag', 'menu', 'list', 'modal'].flatMap((c, i) => [tok('Sizes', `${c}/height`), tok('Sizes', `${c}/gap`, i ? 'button/height' : null)]) };
   assert.deepEqual(tokenLayers(perComponent).collections.map((c) => c.name), ['Sizes']);
 });
+
+// The two ways a reference points the wrong way that the layers alone let through: a base token pointing up at a
+// layer that sits on it, and a component token pointing across at another component's.
+test('a reference points down its layers: never up from the base, never across at another component\'s', () => {
+  const s = system();
+  s.tokens.push(tok('Primitives', 'primitives/brand', 'semantic/action/default'), tok('Component', 'chip/bg', 'card/bg'), tok('Semantic', 'semantic/text/muted', 'semantic/surface'));
+  const rules = Object.fromEntries(tokenRules(s, { components: ['Button', 'Card', 'Chip'] }).map((r) => [r.id, r]));
+  const off = (id) => rules[id].items.filter((i) => !i.fits).map((i) => [i.where, i.value]);
+  assert.equal(rules['token-base-primitives'].says, 'A Primitives token points at no token of a layer above it');
+  assert.deepEqual(off('token-base-primitives'), [['primitives/brand', 'semantic/action/default (Semantic, up)']]);
+  assert.deepEqual(off('token-layer-component'), [['chip/text', 'primitives/gray/900 (Primitives, past it)'], ['chip/bg', 'card/bg (Component, another component\'s)']]);
+  assert.equal(off('token-layer-semantic').length, 0, 'one semantic group pointing at another is no component\'s');
+  // Without the library's component names nothing is read as a component's.
+  assert.deepEqual(Object.fromEntries(tokenRules(s).map((r) => [r.id, r]))['token-layer-component'].items.filter((i) => !i.fits).map((i) => i.where), ['chip/text']);
+  const g = grammarOf({ tokens: s, structure: { Button: {}, Card: {}, Chip: {} } });
+  const base = g.figma.rules.find((x) => x.id === 'token-base-primitives');
+  assert.match(fixOf(base, base.toFix[0]).say, /^Give it its value here, and point the layer above at it, instead of semantic\/action\/default/);
+});
