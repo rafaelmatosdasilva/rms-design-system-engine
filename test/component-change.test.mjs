@@ -141,7 +141,7 @@ test('--figma-change: local or shared, who made it, never signed off by its auth
   const cli = (env, ...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '', ...env } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   const asked = 'add xl to size like l, then rename Label layer to Text';
   const first = cli(person, '--figma-change', 'chipFilter', asked);
-  assert.match(first, /\nShared: chipFilter's Figma component is the system's: 1 product uses it \(Checkout\); [^\n]*It waits on Chips team\./);
+  assert.match(first, /\nShared: chipFilter's Figma component is the system's: 1 product uses it \(Checkout\), [^\n]*It waits on Chips team\./);
   assert.match(first, /Ask who \(Chips team decides for it in ds-config\.json owners; never your own name/);
   const file = join(root, '.design-system-engine-out/changes/chipFilter.change.json');
   assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).author, { kind: 'person', name: 'Design lead' });

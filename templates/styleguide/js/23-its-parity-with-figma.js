@@ -20,6 +20,15 @@
       var todo = esc(capital(k.reason) + (/[.!?]$/.test(k.reason) ? '' : '.') + side) + (k.due ? ' ' + esc('Look at it again: keep it with a new review date, or fix it.') : k.review ? ' ' + esc('Look again on ' + k.review + '.') : '');
       return { st: k.due ? 'check' : 'kept', who: k.by ? 'Kept by ' + k.by : 'Kept', todo: todo, rel: k.due ? 'Kept on purpose' : '', at: k.at || null };
     };
+    // What each side says, said first in every task about a value both have: "Figma says font weight is 700, and the code
+    // says 400." (the owner's, 12 November 2026). Nothing when either side has no value, or they say the same.
+    // A name or a value in a task's words is set apart in a pill (sg-name), never run into the sentence. → HTML
+    var nm = function (x) { return '<code class="sg-name">' + esc(String(x)) + '</code>'; };
+    var bothSay = function (r) {
+      var f = r.figma, k = r.code; if (!f || !k || f.value == null || k.value == null || f.value === '' || k.value === '' || String(f.value) === String(k.value)) return '';
+      var same = String(f.name).toLowerCase() === String(k.name).toLowerCase();
+      return 'Figma says ' + nm(f.name) + ' is ' + nm(f.value) + ', and the code says ' + (same ? '' : nm(k.name) + ' is ') + nm(k.value) + '. ';
+    };
     var names = function (x, r) { var w = String(x.what || '').toLowerCase(); return (r.figma && w.indexOf(lname + ' ' + String(r.figma.name).toLowerCase() + ':') === 0) || (r.type === 'Token' && r.code && w.indexOf(String(r.code.name).toLowerCase()) >= 0); };
     ((c.parity && c.parity.rows) || []).forEach(function (r, i) {
       var name = (r.figma && r.figma.name) || (r.code && r.code.name) || '';
@@ -39,15 +48,16 @@
       else if (r.status === 'match') row.st = 'done';
       else if (r.renamed || r.defaultDiffers) {
         // Its name, its default, or both, said in one task: make them the same, in Figma or in the code.
-        var said = (r.renamed ? 'Figma names it ' + r.figma.name + ', the code ' + r.code.name + '. ' : '') + (r.defaultDiffers ? 'By default Figma has it ' + r.defaultDiffers.figma + ', the code ' + r.defaultDiffers.code + '. ' : '');
-        row.st = 'todo'; row.who = WHO.both; row.todo = esc(said + (r.renamed && r.defaultDiffers ? 'Use one name and one default in both' : r.renamed ? 'Use one name in both' : 'Use one default in both') + ': change it in Figma or in the code.');
+        var said = (r.renamed ? 'Figma calls it ' + nm(r.figma.name) + ', and the code calls it ' + nm(r.code.name) + '. ' : '') + (r.defaultDiffers ? 'Figma says its default is ' + nm(r.defaultDiffers.figma) + ', and the code says ' + nm(r.defaultDiffers.code) + '. ' : '');
+        row.st = 'todo'; row.who = WHO.both; row.todo = said + esc((r.renamed && r.defaultDiffers ? 'Use one name and one default in both' : r.renamed ? 'Use one name in both' : 'Use one default in both') + ': change it in Figma or in the code.');
       }
       else if (r.status === 'paired') { row.st = 'skip'; row.todo = r.why ? esc(capital(r.why) + '.') : ''; }
-      else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = esc('Build the ' + nb + ' property of ' + c.name + ' in the code, remove it from Figma, or keep it as a known exception.'); }
-      else if (r.status === 'figma') { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }
-      else if (r.status === 'code') { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Add it to Figma, remove it from the code, or keep it as a known exception.'); }
+      else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = 'Figma has the ' + nm(nb) + ' property, but the code does not. ' + esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }
+      else if (r.status === 'figma') { row.st = 'todo'; row.who = WHO.both; row.todo = 'Figma has ' + nm(name) + ', but the code does not. ' + esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }
+      else if (r.status === 'code') { row.st = 'todo'; row.who = WHO.both; row.todo = 'The code has ' + nm(name) + ', but Figma does not. ' + esc('Add it to Figma, remove it from the code, or keep it as a known exception.'); }
       else if (r.why) { row.st = 'todo'; row.who = WHO.figma; row.todo = esc(capital(r.why) + '. Take the library update in this Figma file.'); }
-      else { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
+      else { row.st = 'todo'; row.who = WHO.both; row.todo = esc(bothSay(r) ? 'Decide which one is right, then change the other, or keep it as a known exception.' : 'Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
+      if (row.todo && row.st !== 'done' && !r.renamed && !r.defaultDiffers && bothSay(r)) row.todo = bothSay(r) + row.todo;
       out.push(row);
     });
     // A pair its contract suggests (a Figma property and a code prop only the code has, one name holding the other): a

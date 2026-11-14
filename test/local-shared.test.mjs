@@ -24,7 +24,7 @@ test('a removal from a component three products use is shared, hard to undo, hig
   assert.equal(s.reach, 3, 'the system\'s own pages are not a product');
   assert.equal(s.risk, 'high');
   assert.equal(s.decider.name, 'Cards lead');
-  assert.equal(s.reason, "Shared: cardTile's size=xs is the system's: 3 products use it (Northwind, Acme shop, Acme admin); hard to undo, high risk.");
+  assert.equal(s.reason, "Shared: cardTile's size=xs is the system's: 3 products use it (Northwind, Acme shop, Acme admin), hard to undo, high risk.");
   // An addition nothing uses yet is still the system's, only easier to undo.
   const add = scopeOf({ home: 'system', kind: 'token', change: 'add', what: 'the token --gap-xl' }, { usage, owners });
   assert.equal(add.scope, 'shared');
@@ -36,7 +36,7 @@ test('one product\'s own screen is local: no decider, whoever owns the rest, and
   const s = scopeOf({ home: 'product', kind: 'page', change: 'fix', what: 'src/pages/Checkout.vue', product: 'Northwind' }, { usage, owners });
   assert.equal(s.scope, 'local');
   assert.equal(s.decider, null);
-  assert.equal(s.reason, 'Local: src/pages/Checkout.vue stays in Northwind: no other product gets it; easy to undo, low risk.');
+  assert.equal(s.reason, 'Local: src/pages/Checkout.vue stays in Northwind: no other product gets it, easy to undo, low risk.');
   // What the engine cannot place is shared until someone says.
   const unsure = scopeOf({ what: 'the spacing scale' }, { owners });
   assert.equal(unsure.scope, 'shared');
@@ -46,7 +46,7 @@ test('one product\'s own screen is local: no decider, whoever owns the rest, and
 
 test('the Tasks list: a product\'s page or version is local, the system\'s tokens are shared, a retired token by who acts', () => {
   assert.equal(todoScope({ area: 'Products', type: 'Northwind, version', kind: 'Version', who: 'code', product: 'Northwind', team: 'Northwind team' }, { owners }).scope, 'local');
-  assert.equal(todoScope({ area: 'Products', type: 'Acme shop, accessibility', kind: 'Accessibility', who: 'code' }, { owners }).reason, "Local: Acme shop's accessibility stays in Acme shop: no other product gets it; easy to undo, low risk.");
+  assert.equal(todoScope({ area: 'Products', type: 'Acme shop, accessibility', kind: 'Accessibility', who: 'code' }, { owners }).reason, "Local: Acme shop's accessibility stays in Acme shop: no other product gets it, easy to undo, low risk.");
   assert.equal(todoScope({ area: 'Accessibility', type: 'Pages, 2.4.2 Page Titled', kind: 'Accessibility', who: 'code' }, { owners }).scope, 'local');
   const tok = todoScope({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Text style' }, { owners });
   assert.equal(tok.scope, 'shared');
@@ -57,7 +57,7 @@ test('the Tasks list: a product\'s page or version is local, the system\'s token
   assert.equal(open.undo, 'hard');
   const sum = scopeSummary([{ scope: tok }, { scope: open }, { scope: todoScope({ area: 'Products', type: 'Northwind, screen', kind: 'Screen', who: 'code' }) }]);
   assert.deepEqual(sum, { shared: 2, local: 1, waiting: [{ name: 'Design system team', n: 2 }] });
-  assert.equal(scopeLine(sum), "2 shared, waiting on Design system team (2); 1 local, each product team's own");
+  assert.equal(scopeLine(sum), "2 shared, waiting on Design system team (2) · 1 local, each product team's own");
   assert.equal(scopeLine({ shared: 1, local: 0, waiting: [] }), '1 shared, with no owner named (ds-config.json owners)');
 });
 
@@ -88,7 +88,7 @@ test('a change in Figma is the system\'s component: breaking when it breaks some
   assert.equal(s.reach, 2);
   assert.equal(s.undo, 'hard');
   ch.scope = s;
-  assert.match(changeLines(ch).join('\n'), /Shared: cardTile's Figma component is the system's: 2 products use it \(Northwind, Acme shop\); hard to undo, high risk\. It waits on Cards lead\./);
+  assert.match(changeLines(ch).join('\n'), /Shared: cardTile's Figma component is the system's: 2 products use it \(Northwind, Acme shop\), hard to undo, high risk\. It waits on Cards lead\./);
 });
 
 const CARD = `<template>\n  <div class="card-tile"><slot /></div>\n</template>\n<style>\n.card-tile { gap: 4px; }\n</style>\n`;
@@ -105,9 +105,9 @@ test('the edit check tells the agent whether what it changed is local or shared,
   const root = project();
   assert.equal(usageFrom(root, cfg).cardTile.products.length, 4, 'the usage map as the contracts keep it');
   const own = editCheck({ tool_name: 'Edit', tool_input: { file_path: join(root, 'src/pages/Promo.vue'), old_string: '<div class="promo"></div>', new_string: '<div class="promo" style="color: #123456"></div>' } }, { root, cfg, headOf: () => null });
-  assert.match(own, /\nLocal: src\/pages\/Promo\.vue stays in one product: no other product gets it; easy to undo, low risk\. It is this product team's to fix: nothing here waits on the system's owner\.$/);
+  assert.match(own, /\nLocal: src\/pages\/Promo\.vue stays in one product: no other product gets it, easy to undo, low risk\. It is this product team's to fix: nothing here waits on the system's owner\.$/);
   const sys = editCheck({ tool_name: 'Edit', tool_input: { file_path: join(root, 'src/CardTile.vue'), old_string: '.card-tile { gap: 4px; }', new_string: '.card-tile { gap: 4px; color: #123456; }' } }, { root, cfg, headOf: () => null });
-  assert.match(sys, /\nShared: cardTile's code is the system's: 3 products use it \(Northwind, Acme shop, Acme admin\); can be undone, high risk\. Every product that uses it gets this edit; what it adds to the system waits on Cards lead to sign it off\.$/);
+  assert.match(sys, /\nShared: cardTile's code is the system's: 3 products use it \(Northwind, Acme shop, Acme admin\), can be undone, high risk\. Every product that uses it gets this edit; what it adds to the system waits on Cards lead to sign it off\.$/);
 });
 
 test('the guard holds an addition with why it is shared and who decides it, and writes down the session that made it', () => {
@@ -115,7 +115,7 @@ test('the guard holds an addition with why it is shared and who decides it, and 
   const edit = { tool_name: 'Edit', cwd: root, session_id: 'session-one', tool_input: { file_path: join(root, 'src/theme.css'), old_string: '  --card-gap: 4px;\n', new_string: '  --card-gap: 4px;\n  --card-gap-xl: 12px;\n' } };
   const held = judge(edit, { cfg, userText: 'add a larger gap token' });
   assert.equal(held.decision, 'deny');
-  assert.match(held.reason, /Shared: the token --card-gap-xl is the system's: every product that uses it gets the change; easy to undo, low risk\./);
+  assert.match(held.reason, /Shared: the token --card-gap-xl is the system's: every product that uses it gets the change, easy to undo, low risk\./);
   assert.match(held.reason, /ask who signs it off \(Design system team decides for it in ds-config\.json owners\)/);
   assert.match(held.reason, /Never your own name: the agent that made a change never signs it off\./);
   assert.doesNotMatch(held.reason, /--second-review/, 'by default only a person signs off');
@@ -124,18 +124,15 @@ test('the guard holds an addition with why it is shared and who decides it, and 
   assert.equal(judge({ tool_name: 'Write', cwd: root, tool_input: { file_path: join(root, '.design-system-engine-out/held-for-sign-off.json'), content: '{}' } }, { cfg, userText: 'yes' }).decision, 'deny');
 });
 
-test('the style guide shows local or shared beside who acts, never counts them in a line of its own, and says it on a change in Figma', () => {
+test('What to do says only what to do: who acts and local or shared are not repeated in it, and a change in Figma says it', () => {
+  // The owner's (12 November 2026): "Figma names it iconContent, the code icon. Use one name in both" is the whole cell.
   const tpl = templateText();
-  const fn = (name) => new RegExp(`function ${name}\\(x\\) \\{[^\\n]*\\}`).exec(tpl)[0];
-  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const scopeHTML = new Function('esc', `${fn('scopeWords')}\n${fn('scopeHTML')}\nreturn scopeHTML;`)(esc);
-  assert.equal(scopeHTML({ scope: 'shared', reason: 'Shared: why.', decider: { name: 'Cards lead' } }), '<span class="sg-todo-scope" data-scope="shared" title="Shared: why.">Shared, waits on Cards lead</span>');
-  assert.equal(scopeHTML({ scope: 'local', reason: 'Local: why.' }), '<span class="sg-todo-scope" data-scope="local" title="Local: why.">Local, waits on no one</span>');
-  assert.match(tpl, /esc\(r\.who\) \+ '<\/span>' : ''\) \+ \(isOpen\(r\) \? scopeHTML\(rowScope\(r\)\) : ''\)/, 'beside who acts, on every open task');
-  // An accessibility task says who acts in a column of its own, so Local or shared sits beside that column instead.
-  assert.match(tpl, /r\.who && r\.area !== 'Accessibility'/, 'who acts has its own column there, and is not said twice');
+  assert.doesNotMatch(tpl, /scopeHTML|rowScope|sg-todo-scope/, 'no local or shared line in a task\'s What to do, in the table or its panel');
+  assert.match(tpl, /todo: function \(r\) \{ return '<td>' \+ \(r\.steps > 1/, 'the cell starts with what to do');
+  assert.match(tpl, /if \(k === 'todo'\) return card\(col\[0\], \(r\.todo \?/, 'and so does its panel');
+  // Who acts keeps its own column where a table has one.
   assert.match(tpl, /whoCell: function \(r\) \{ return '<td class="sg-todo-whocell">'/);
-  assert.doesNotMatch(tpl, /sg-todo-scope-line|' shared' \+ \(onList/, 'no line on the Tasks page counting them: each task says it beside who acts');
+  assert.doesNotMatch(tpl, /sg-todo-scope-line|' shared' \+ \(onList/, 'no line on the Tasks page counting them');
   assert.match(tpl, /card\('Local or shared', x\.scope \? lines\(\[x\.scope\.reason\]\) : ''\)/, 'a change in Figma says it');
   assert.match(tpl, /scope: \{ scope: 'local', reason: 'Local: ' \+ x\.product/, 'a product\'s near copy is that product\'s');
 });
@@ -146,11 +143,11 @@ test('an intent-layer proposal is shared for a component\'s page and local for a
   const comp = proposalScope({ kind: 'fix', subject: 'tileRow', page: 'Card Tile' }, { page: { name: 'Card Tile', layer: 'components', component: 'cardTile' } }, { usage, owners });
   assert.equal(comp.scope, 'shared');
   assert.equal(comp.decider.name, 'Cards lead');
-  assert.equal(comp.reason, "Shared: Card Tile's page is the system's: 3 products use it (Northwind, Acme shop, Acme admin); easy to undo, medium risk.");
+  assert.equal(comp.reason, "Shared: Card Tile's page is the system's: 3 products use it (Northwind, Acme shop, Acme admin), easy to undo, medium risk.");
   const flow = proposalScope({ kind: 'fix', subject: 'cardTile', page: 'Checkout' }, { page: { name: 'Checkout', layer: 'flows' } }, { usage, owners });
   assert.deepEqual([flow.scope, flow.decider], ['local', null]);
-  assert.equal(flow.reason, "Local: Checkout's page stays in one product: no other product gets it; easy to undo, low risk.");
-  assert.equal(proposalScope({ kind: 'review', subject: 'x' }, { page: { name: 'Orders', layer: 'pages', product: 'Northwind' } }).reason, "Local: Orders's page stays in Northwind: no other product gets it; easy to undo, low risk.");
+  assert.equal(flow.reason, "Local: Checkout's page stays in one product: no other product gets it, easy to undo, low risk.");
+  assert.equal(proposalScope({ kind: 'review', subject: 'x' }, { page: { name: 'Orders', layer: 'pages', product: 'Northwind' } }).reason, "Local: Orders's page stays in Northwind: no other product gets it, easy to undo, low risk.");
   const add = proposalScope({ kind: 'add', subject: 'tileTwo' }, {}, { owners });
   assert.equal(add.scope, 'shared');
   assert.match(add.reason, /^Shared: tileTwo's page is the system's: /);
@@ -161,10 +158,10 @@ test('an intent-layer proposal is shared for a component\'s page and local for a
 test('a component only in Figma is shared; one only in one product\'s code is local; one the system\'s code has is shared', () => {
   const fig = sideScope({ name: 'tileTwo', side: 'figma' }, { usage, owners });
   assert.equal(fig.scope, 'shared');
-  assert.equal(fig.reason, "Shared: tileTwo is the system's: no product's code uses it yet, every new one gets it; easy to undo, low risk.");
+  assert.equal(fig.reason, "Shared: tileTwo is the system's: no product's code uses it yet, every new one gets it, easy to undo, low risk.");
   const one = sideScope({ name: 'promoBar', file: 'src/PromoBar.vue' }, { usage: { promoBar: { products: [{ name: 'Northwind', files: 1 }] } } });
   assert.deepEqual([one.scope, one.decider], ['local', null]);
-  assert.equal(one.reason, 'Local: promoBar (src/PromoBar.vue) stays in Northwind: no other product gets it; can be undone, low risk.');
+  assert.equal(one.reason, 'Local: promoBar (src/PromoBar.vue) stays in Northwind: no other product gets it, can be undone, low risk.');
   assert.equal(sideScope({ name: 'cardTile', file: 'src/CardTile.vue' }, { usage, owners }).scope, 'shared', 'several products use it');
   assert.equal(sideScope({ name: 'loneTile' }, {}).scope, 'shared', 'unknown use: the system\'s until someone says');
   // The Tasks page counts them: their rows carry the scope the page reads.
@@ -175,8 +172,8 @@ test('a component only in Figma is shared; one only in one product\'s code is lo
 
 // What an issue's body says: a finding about a product's screen is local, any other the system's.
 test('a finding is local when it is a product\'s own screen, else shared; the issue line names who it waits on', () => {
-  assert.equal(issueScopeLine(findingScope({ check: 'Structure', component: 'cardTile' }, { usage, owners })), "Shared: waits on Cards lead — cardTile is the system's: 3 products use it (Northwind, Acme shop, Acme admin); easy to undo, medium risk.");
-  assert.equal(issueScopeLine(findingScope({ check: 'Markup', product: 'Northwind' })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it; easy to undo, low risk.");
+  assert.equal(issueScopeLine(findingScope({ check: 'Structure', component: 'cardTile' }, { usage, owners })), "Shared: waits on Cards lead — cardTile is the system's: 3 products use it (Northwind, Acme shop, Acme admin), easy to undo, medium risk.");
+  assert.equal(issueScopeLine(findingScope({ check: 'Markup', product: 'Northwind' })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it, easy to undo, low risk.");
   assert.equal(issueScopeLine(null), '');
 });
 
@@ -196,7 +193,7 @@ test('a finding names its product by the files it names; a system file or two pr
   assert.equal(findingScope(own, { usage, owners }).scope, 'local');
   assert.equal(findingScope(sys, { usage, owners }).scope, 'shared');
   // An older record with no product is placed the same way, from its evidence.
-  assert.equal(issueScopeLine(findingScope({ check: 'Clean CSS', evidence: 'x (apps/northwind/a.css:1)' }, { productOf })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it; easy to undo, low risk.");
+  assert.equal(issueScopeLine(findingScope({ check: 'Clean CSS', evidence: 'x (apps/northwind/a.css:1)' }, { productOf })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it, easy to undo, low risk.");
   // A task whose file is one product's is that product's.
   assert.equal(todoScope({ kind: 'Token', area: 'Tokens', file: 'apps/acme/src/x.css' }, { productOf }).scope, 'local');
   assert.equal(todoScope({ kind: 'Token', area: 'Tokens', file: 'src/theme.css' }, { productOf }).scope, 'shared');

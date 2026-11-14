@@ -574,7 +574,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens', 'Stage'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*( check)?$/, 'what is to write first, then what is to check, what is written after; its stage, not counted, last');
     // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
-    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*You in Figma[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
+    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
@@ -1250,7 +1250,7 @@ test('the playground and the preview stay linked: a part\'s state set on the par
   assert.deepEqual(r.controls[0].options, [{ label: 'Default' }, { label: 'Selected', add: [], attrs: { checked: '' }, target: '.radioButton-input' }, { label: 'Unselected', unbuilt: true }]);
   const tpl = templateText();
   assert.match(tpl, /if \(!field\.value \|\| !leaf \|\| !cur \|\| !cur\.isConnected \|\| !cur\.contains\(leaf\)\) \{ refresh\(\); return; \}/, 'a label edit writes into its part, the rest as it is');
-  assert.match(tpl, /o\.unbuilt \? 'Figma has this option; the code does not build it yet'/);
+  assert.match(tpl, /o\.unbuilt \? 'Figma has this option, but the code does not build it yet'/);
 });
 
 test('links and changelog: Figma, the code and the team\'s pages; each commit that changed the component, by its release and pull request', async () => {
@@ -1783,7 +1783,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   assert.match(text(fns.dateCell('2026-10-20T08:00:00Z')), /^2026-10-2[01] \d\d:\d\d$/, 'a moment: its day and its time, as the reader\'s clock says it');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
   assert.equal((many.match(/ hidden>/g) ?? []).length, 9, 'the first five shown');
-  assert.match(many, /<button type="button" class="sg-link-pill sg-link-pill--table" data-pills-more>9 more<\/button>$/, 'the rest one click away, a pill as the ones beside it');
+  assert.match(many, /<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more><svg [^>]*><path d="m4 6 4 4 4-4"\/><\/svg>9 more<\/button>$/, 'the rest one click away, a pill as the ones beside it, a chevron before its count');
   assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
 });
 

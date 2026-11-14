@@ -59,7 +59,7 @@ test('--query says where a component lives, and the differences list says it und
   assert.ok(lines.includes('  lives in: The Shop (2 files, 5 uses)'), lines.join('\n'));
   assert.ok(lines.includes('  inside: panel'));
   const md = differencesMarkdown({ total: 1, fresh: 0, groups: [{ component: 'btn', items: [{ check: 'Token values', what: 'btn: height 32px, Figma 36px', side: 'decide' }] }] }, { livesIn: { btn: livesIn } });
-  assert.match(md, /## btn \(1\)\n\n_Lives in The Shop \(2 files\); inside panel\._\n\n- Token values: btn: height 32px/);
+  assert.match(md, /## btn \(1\)\n\n_Lives in The Shop \(2 files\) · inside panel\._\n\n- Token values: btn: height 32px/);
 });
 
 test('every product has a name: ds-config.json products, else its folder, else this project; a package of the system is the system\'s', () => {

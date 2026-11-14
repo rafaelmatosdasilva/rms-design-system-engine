@@ -42,7 +42,7 @@
   --sg-border-hover: var(--sg-a4);   /* a line under the pointer: a step brighter, never a heavy one, over any background */
   /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. The page has
      two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
-  --sg-xs: 0.75rem; --sg-s: 0.8125rem; --sg-s-weight: 500; --sg-m: 0.875rem; --sg-m-weight: 500; --sg-l: 0.9375rem; --sg-l-weight: 800;
+  --sg-xs: 0.75rem; --sg-s: 0.8125rem; --sg-s-weight: 500; --sg-m: 0.875rem; --sg-m-weight: 500; --sg-l: 0.9375rem; --sg-l-weight: 800; --sg-xl: calc(var(--sg-l) * 1.2);
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4; --sg-lh-read: 1.6;
   /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
      names in its heading weight. */

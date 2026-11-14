@@ -76,7 +76,7 @@ test('a component\'s Rules area lists the Figma rules it breaks, and says what e
   assert.match(page, /\(a\[0\] !== 'rules' \|\| ruleRows\(c\)\.length\)/);
   // Who acts, and the link to Figma, once above the table: never a column, and never on each row.
   assert.match(table, /Rules: \[\['Task nr', 'no'\], \['Rule', 'kind'\], \['What to do', 'todo'\], \['Status', 'status'\], \['Last checked', 'updated'\]\]/);
-  assert.match(table, /r\.area !== 'Rules' \? '<span class="sg-todo-who">'/);
+  assert.doesNotMatch(table.match(/todo: function \(r\) \{[^\n]*/)[0], /sg-todo-who/, 'What to do never says who acts');
   assert.match(tasks, /function rulesLead\(c\)[\s\S]*?sg-cx-figma[\s\S]*?FIGMA_SVG/);
   assert.match(tasks, /area: 'Rules', kind: r\.says, figma: '', code: ''/);
 });
