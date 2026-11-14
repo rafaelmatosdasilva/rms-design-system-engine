@@ -2629,6 +2629,11 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   the ones a person should look at first for 2.4.6, 3.3.3 and 2.4.4, each likely, unclear or fine with one short
   reason. Advisory and asked for only (`a11yJudgement.cmd`): no criterion passes or fails on it, and the answer is
   kept by the words, so the same wording is never paid for twice.
+- **What a screen reader actually says** (`--hear [--reader voiceover|nvda] [--component a,b]`) — VoiceOver (a Mac) or
+  NVDA (Windows), through Guidepup, moved through each control of each component the style guide draws, and what it
+  said held against the browser's name, role and states in that reader's words (`screen-reader.mjs`). It speaks aloud
+  and opens a browser window. Advisory and asked for only: shown on the 4.1.2 row with the reader and the day, to hear
+  again once the component changes. A reader that cannot be driven is said with what to turn on, never turned on.
 - **A check made by hand is testimony** — `--checked` records what a person says they looked at and what with. Nothing
   confirms the screen reader was running, or that it said what they report, so the row reads Done on their word and
   says so: whose word it is, what they checked with (or that they did not say), and that the engine measured none of

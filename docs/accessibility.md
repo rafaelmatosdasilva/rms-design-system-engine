@@ -9,6 +9,7 @@ How the engine tests the accessibility of every component, and of your products'
   - [Beyond A and AA](#beyond-a-and-aa)
   - [Video and sound](#video-and-sound)
   - [Judgement calls, pre-sorted](#judgement-calls-pre-sorted)
+  - [What a screen reader actually says](#what-a-screen-reader-actually-says)
   - [Which browser answered it](#which-browser-answered-it)
 
 ## Test accessibility
@@ -152,6 +153,30 @@ rms-design-system-engine --judge-a11y
 - **It never writes the words.** The reason says what it read, never a replacement: the words are the team's.
 - **It runs only when you ask, and once per wording.** It spends your model tokens through your own command
   (`a11yJudgement.cmd`), and an answer is kept by the words themselves, so the same heading is never paid for twice.
+
+### What a screen reader actually says
+
+What a screen reader says is read from Chrome's accessibility tree on every run. That is what the browser hands over,
+not what a person hears. Ask for it and the engine listens with a real one:
+
+```bash
+rms-design-system-engine --hear
+```
+
+- **The computer's own reader.** VoiceOver on a Mac, NVDA on Windows, driven through Guidepup. `--reader nvda` or
+  `--reader voiceover` names one, and `--component menu` hears one component.
+- **Each control, as Tab reaches it.** Each component the style guide draws opens in a browser window in front. The
+  focus moves to each control in turn, and what the reader said is recorded.
+- **Held against the browser.** The name, the role and every state the browser gives must be in what was said, in
+  that reader's own words ("dimmed" is VoiceOver's "unavailable"). A state it drops, or a name it never says, is
+  listed with what it left out.
+- **A measurement, and advisory.** It is shown on the component's 4.1.2 row with the reader and the day. No criterion
+  passes or fails on it, since a reader's quirk is not the component's failure. Once the component changes, the row
+  says to hear it again.
+- **It speaks aloud and changes nothing.** The reader talks while it runs. A reader that cannot be driven yet is said
+  with what to turn on (on a Mac: "Allow VoiceOver to be controlled with AppleScript" in VoiceOver Utility), and the
+  engine never turns it on itself.
+- **Kept in one file.** `.design-system-engine-out/heard-by-reader.json`, which the style guide reads.
 
 ### Which browser answered it
 
