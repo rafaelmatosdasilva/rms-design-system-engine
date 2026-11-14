@@ -17,6 +17,9 @@ Newest first.
 **Guess ruled out.** That the question itself was unreadable: the other two runs of the task passed whole, asking the person and building nothing.
 
 **What changed.** Only the check's false positive. Left open: the engine's question names the system's variables an answer must be one of (those L binds, and the other steps of their scale), so an agent has names to ask with and none to invent; and a check that fails a reply proposing a raw size the engine did not give.
+
+---
+
 ## Four runs that did their task and failed "the run finished"
 
 **Found** 14 November 2026, measuring the screen reader change. **Fixed in** nothing in the engine: the measurement was run again, alone.
