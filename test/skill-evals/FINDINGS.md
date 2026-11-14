@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## Four runs that did their task and failed "the run finished"
+
+**Found** 14 November 2026, measuring the screen reader change. **Fixed in** nothing in the engine: the measurement was run again, alone.
+
+**Evidence.** 68 of 72 runs passed. The four that did not were `accept-radius` and `accept-radius-pt`, each failing one check, "the run finished". Their transcripts show the work done (the baseline written, the two differences accepted) and the summary started, then nothing: no result event. The full suite was running in the same checkout at the time, and another session's suite on the same computer. Run again with neither of this session's runs beside it, all 79 passed, those four with them.
+
+**Guess ruled out.** That the change broke accepting a difference. Nothing it touched is on that path (the new request words were checked against the task's words), and the same tasks passed unchanged once the computer was not busy.
+
+**What changed.** Nothing in the engine. A skill evaluation is run on its own, never beside a full suite: a run cut off by a busy computer reads as a run that failed, and the check that names it ("the run finished") says so. The measurement was also stopped once by a commit made while it ran, since it measures one commit: commit first, then measure.
+
+---
+
 ## The counts were true and the result was still useless
 
 **Found** 14 November 2026, the owner's review of the Figma build benchmark's first sample, each result built in a Figma file to be seen rather than read. **Fixed in** `lib/figma-ops.mjs` and `lib/component-spec.mjs` (three questions the builder now asks), `test/figma-bench/` (the counts sense, asks and rules, requests in a person's own words, `--source` on a team's own library, the sample built in Figma).
