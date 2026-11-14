@@ -183,6 +183,11 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), keeping one on purpose (`--keep`, or editing `design-system-engine-kept.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
 - **A lesson's answer is yours.** `--lesson-answer`, or an edit to `design-system-engine-lessons.json`, waits for your yes or no.
 - **A change to the system waits for a sign-off.** An edit that adds a token to the theme or an option to a component is held until someone signs it off. The agent that made it never does: see [A second reviewer](#a-second-reviewer).
+- **A shared token keeps its value until someone decides.** An agent fixing one button can change a token's value and recolour every card that uses it. An edit that gives an existing token another value is held too, and the hold says:
+  - what the token reaches: the components the last style guide build saw using it, directly or through another token, and the products that use those;
+  - the way out for one component: the component's own token, when it has one, so the shared one stays as it is;
+  - how to sign it off when the change is meant for all of them.
+- **What passes.** A value Figma gives that token (the parity fix the audit asks for), and a token one component at most uses. Before the first style guide build the engine cannot say what a token reaches, so it holds the edit and says so.
 
 ### A second reviewer
 

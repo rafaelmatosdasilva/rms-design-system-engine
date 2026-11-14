@@ -122,6 +122,9 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     const made = kept.find((x) => x.name === 'Coral Reef');
     assert.ok(made && made.brief.primary === '#e11d48' && /data-ts-theme="/.test(made.css), 'kept with what was chosen, and its CSS worked out');
     assert.deepEqual(kept.map((x) => x.name), ['Harbour', 'Coral Reef'], 'beside the one from the folder');
+    // The editor never invents a rule: every declaration a theme makes is one of the system's tokens given a value.
+    const decls = [...made.css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\{([^{}]*)\}/g)].flatMap((m) => m[1].split(';').map((d) => d.trim()).filter(Boolean));
+    assert.deepEqual(decls.filter((d) => !d.startsWith('--')), [], 'only tokens, never a property of the editor\'s own');
     assert.equal(await until(`document.documentElement.getAttribute('data-ts-theme')`, (v) => v === made.id), made.id, 'applied at once');
     assert.equal(await run(`new URL(location.href).searchParams.get('theme')`), 'coral-reef', 'and named in the link, so it opens the same page');
     assert.equal(await run(`document.getElementById('sg-theme-panel').hidden || !document.getElementById('sg-theme-panel').classList.contains('is-open')`), true, 'the panel closed');

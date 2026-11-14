@@ -1,13 +1,267 @@
 {
-  "about": "The kept requests the Figma builder is measured against, every time the builder or its guide changes: each as a person asks it, the answers a person gives to what it asks (as operations), and what it must hold once built. Add a request when a new kind of request is built; never change one to make a run pass.",
+  "about": "The kept requests the Figma builder is measured against, every time the builder or its guide changes: each as a person asks it (some in the builder's words, some in a person's own), the answers a person gives to what it asks (as operations), and what it must hold once built. Add a request when a new kind of request is built; never change one to make a run pass.",
   "requests": [
-    { "id": "copy", "kind": "build", "ask": "make a tag like chip, called tag", "answers": [{ "op": "rebind", "from": "chip/label/color", "to": "text/default" }, { "op": "describe", "text": "A tag." }], "expect": { "component": "tag", "variants": 2, "layers": ["Content/Label", "Content/icon"], "properties": ["showIcon", "labelContent"] } },
-    { "id": "copy-with-option", "kind": "build", "ask": "make a badge like chip with a size xl like l, called badge", "answers": [{ "op": "rebind", "from": "chip/label/color", "to": "text/default" }, { "op": "describe", "text": "A badge." }], "expect": { "component": "badge", "variants": 3, "options": { "size": ["s", "l", "xl"] } } },
-    { "id": "copy-without", "kind": "build", "ask": "make a pill like chip without the icon, called pill", "answers": [{ "op": "rebind", "from": "chip/label/color", "to": "text/default" }, { "op": "describe", "text": "A pill." }], "expect": { "component": "pill", "noLayers": ["Content/icon"], "noProperties": ["showIcon"] } },
-    { "id": "change-option", "kind": "change", "target": "chip", "ask": "add xl to size like l", "expect": { "component": "chip", "options": { "size": ["s", "l", "xl"] } } },
-    { "id": "change-property", "kind": "change", "target": "chip", "ask": "add a boolean showBadge on Content", "expect": { "component": "chip", "properties": ["showBadge"] } },
-    { "id": "change-layer-in-a-fixed-box", "kind": "change", "target": "tile", "ask": "add a caption under the title", "answers": [{ "op": "addLayer", "parent": "", "layer": { "type": "text", "name": "Caption", "style": "body/m", "text": "A caption that runs on" } }], "expect": { "component": "tile", "layers": ["Caption"] } },
-    { "id": "template", "kind": "build", "ask": "make a template like settings with a toast, called billing", "answers": [{ "op": "place", "page": "Templates" }], "expect": { "component": "billing", "instances": ["headerPage", "dataTable", "actionBar", "toast"] } },
-    { "id": "foundation", "kind": "build", "ask": "add a spacing token like spacing/32, called 40, pointing at size/40", "expect": { "variable": { "name": "spacing/40", "alias": "size/40" } } }
+    {
+      "id": "copy",
+      "kind": "build",
+      "ask": "make a tag like chip, called tag",
+      "answers": [
+        {
+          "op": "rebind",
+          "from": "chip/label/color",
+          "to": "text/default"
+        },
+        {
+          "op": "describe",
+          "text": "A tag."
+        }
+      ],
+      "expect": {
+        "component": "tag",
+        "variants": 2,
+        "layers": [
+          "Content/Label",
+          "Content/icon"
+        ],
+        "properties": [
+          "showIcon",
+          "labelContent"
+        ]
+      }
+    },
+    {
+      "id": "copy-with-option",
+      "kind": "build",
+      "ask": "make a badge like chip with a size xl like l, called badge",
+      "answers": [
+        {
+          "op": "bind",
+          "layer": "",
+          "field": "height",
+          "variable": "size/40",
+          "where": {
+            "size": "xl"
+          }
+        },
+        {
+          "op": "rebind",
+          "from": "chip/label/color",
+          "to": "text/default"
+        },
+        {
+          "op": "describe",
+          "text": "A badge."
+        }
+      ],
+      "expect": {
+        "component": "badge",
+        "variants": 3,
+        "options": {
+          "size": [
+            "s",
+            "l",
+            "xl"
+          ]
+        },
+        "bigger": {
+          "axis": "size",
+          "option": "xl",
+          "than": "l"
+        }
+      }
+    },
+    {
+      "id": "copy-without",
+      "kind": "build",
+      "ask": "make a pill like chip without the icon, called pill",
+      "answers": [
+        {
+          "op": "rebind",
+          "from": "chip/label/color",
+          "to": "text/default"
+        },
+        {
+          "op": "describe",
+          "text": "A pill."
+        }
+      ],
+      "expect": {
+        "component": "pill",
+        "noLayers": [
+          "Content/icon"
+        ],
+        "noProperties": [
+          "showIcon"
+        ]
+      }
+    },
+    {
+      "id": "change-option",
+      "kind": "change",
+      "target": "chip",
+      "ask": "add xl to size like l",
+      "expect": {
+        "component": "chip",
+        "options": {
+          "size": [
+            "s",
+            "l",
+            "xl"
+          ]
+        },
+        "bigger": {
+          "axis": "size",
+          "option": "xl",
+          "than": "l"
+        },
+        "asks": [
+          "what does xl change"
+        ]
+      },
+      "answers": [
+        {
+          "op": "addOption",
+          "axis": "size",
+          "option": "xl",
+          "like": "l"
+        },
+        {
+          "op": "bind",
+          "layer": "",
+          "field": "height",
+          "variable": "size/40",
+          "where": {
+            "size": "xl"
+          }
+        }
+      ]
+    },
+    {
+      "id": "change-property",
+      "kind": "change",
+      "target": "chip",
+      "ask": "add a boolean showBadge on Content",
+      "expect": {
+        "component": "chip",
+        "properties": [
+          "showBadge"
+        ],
+        "layers": [
+          "Content/Badge"
+        ],
+        "asks": [
+          "showBadge would show or hide Content, and chip has no badge"
+        ]
+      },
+      "answers": [
+        {
+          "op": "addLayer",
+          "parent": "Content",
+          "layer": {
+            "type": "instance",
+            "name": "Badge",
+            "of": "icon"
+          }
+        },
+        {
+          "op": "addProperty",
+          "name": "showBadge",
+          "kind": "boolean",
+          "default": false,
+          "layer": "Content/Badge"
+        }
+      ]
+    },
+    {
+      "id": "change-layer-in-a-fixed-box",
+      "kind": "change",
+      "target": "tile",
+      "ask": "add a caption under the title",
+      "answers": [
+        {
+          "op": "addLayer",
+          "parent": "",
+          "layer": {
+            "type": "text",
+            "name": "Caption",
+            "style": "body/m",
+            "text": "A caption that runs on"
+          }
+        }
+      ],
+      "expect": {
+        "component": "tile",
+        "layers": [
+          "Caption"
+        ]
+      }
+    },
+    {
+      "id": "template",
+      "kind": "build",
+      "ask": "make a template like settings with a toast, called billing",
+      "answers": [
+        {
+          "op": "place",
+          "page": "Templates"
+        }
+      ],
+      "expect": {
+        "component": "billing",
+        "instances": [
+          "headerPage",
+          "dataTable",
+          "actionBar",
+          "toast"
+        ]
+      }
+    },
+    {
+      "id": "foundation",
+      "kind": "build",
+      "ask": "add a spacing token like spacing/32, called 40, pointing at size/40",
+      "expect": {
+        "variable": {
+          "name": "spacing/40",
+          "alias": "size/40"
+        }
+      }
+    },
+    {
+      "id": "own-words-size",
+      "kind": "change",
+      "target": "chip",
+      "ask": "add a size xl to the chip",
+      "expect": {
+        "component": "chip",
+        "asks": [
+          "Which of chip's size options is the new xl like"
+        ]
+      }
+    },
+    {
+      "id": "own-words-badge",
+      "kind": "change",
+      "target": "chip",
+      "ask": "put a little badge on the chip",
+      "expect": {
+        "component": "chip",
+        "asks": [
+          "not read: put a little badge on the chip"
+        ]
+      }
+    },
+    {
+      "id": "own-words-hide",
+      "kind": "change",
+      "target": "chip",
+      "ask": "hide the icon on the chip",
+      "expect": {
+        "component": "chip",
+        "asks": [
+          "not read: hide the icon"
+        ]
+      }
+    }
   ]
 }

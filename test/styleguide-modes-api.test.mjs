@@ -43,7 +43,7 @@ test('a Vue prop\'s type, the values its comment lists, and never a binding in i
 defineProps({ label: String, icon: String, buttonSize: { type: String, default: 'm' }, disabled: Boolean, value: [String, Number], alignment: String, params: Object })
 </script>`;
   const api = textComponentApi('Button.vue', vue);
-  assert.deepEqual(api.props.icon, { type: 'string' }, ':icon="icon" is a binding, not a default');
+  assert.deepEqual(api.props.icon, { type: 'string', holds: { kind: 'words' } }, ':icon="icon" is a binding, not a default (a String holds words)');
   assert.deepEqual(api.props.disabled, { type: 'boolean' });
   assert.deepEqual(api.props.buttonSize, { default: 'm', description: 'the size', options: ['s', 'm', 'l'], type: 'string' }, 'the words before "can be" describe it');
   assert.deepEqual(api.props.alignment, { options: ['left', 'center', 'right'], type: 'string' });

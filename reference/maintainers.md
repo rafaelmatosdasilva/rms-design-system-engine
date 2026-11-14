@@ -169,19 +169,45 @@ as `ISOLATION FIX`.
 
 ## Figma build benchmark - the builder measured against the same requests every time
 
-`test/figma-bench/` keeps a set of build and change requests (`requests.json`: each as a person asks it, the answers a
-person gives to what it asks, as operations, and what it must hold once built) and an invented system to run them on
-(`system.json`). `node test/figma-bench/bench.mjs` runs each through the engine's own path (the spec, the change, a
-template, a foundation) and its script on a stand-in for Figma that lays out auto layout (`standin.mjs`), and scores
-it on separate counts, never one number: the script runs, what was asked is there, nothing else changed, only the
-system's components and variables are used, no layout fault the result did not have before (`layout-faults.mjs`) and
-none the script left unsaid; with the questions asked and the time it took. No model is asked on this path, so it
-spends no tokens: an agent's turns and tokens on the same requests are the skill evaluation's. The kept results
-(`results.json`) are what `test/figma-bench.test.mjs` holds every run to, so a change to the builder or its guide that
-scores worse on any count fails the suite; `--keep` writes them again only when a change is meant. `--sample <n>`
-writes a sheet (`review/<date>.md`) of what was asked, what was built and the counts, with a line for a person (QA,
-the system's owner) to say whether the counts hold; the run reads the sheets back and says on how many they did. A new
-kind of request gets a request here when it is built; a request is never changed to make a run pass.
+`test/figma-bench/` keeps a set of build and change requests (`requests.json`: each as a person asks it, in the
+builder's words or in a person's own, the answers a person gives to what it asks, as operations, and what it must hold
+once built) and an invented system to run them on (`system.json`). `node test/figma-bench/bench.mjs` runs each through
+the engine's own path (the spec, the change, a template, a foundation) and its script on a stand-in for Figma that lays
+out auto layout and sizes a layer by the variable bound to it (`standin.mjs`), and scores it on separate counts, never
+one number:
+
+- **runs, asked:** the script runs, and what was asked is there.
+- **sense:** what was built makes sense, not only exists: a boolean named for a part (`showBadge`) shows or hides that
+  part, and a larger step on a size scale is larger than the one it was copied from.
+- **asks:** each question the request owes was asked. Nothing is built while a question is open, as `--figma-build`
+  and `--figma-change` refuse to, so a request in a person's words that the builder cannot read is scored on what it
+  asked, never on a guess it built.
+- **untouched, system:** nothing else changed, and only the system's components and variables are used.
+- **rules:** the construction rules (`construction-grammar.mjs`, read again with the result in) the result breaks that
+  what it was built from did not.
+- **layout, unsaid:** no layout fault the result did not have before (`layout-faults.mjs`), and none the script left
+  unsaid; with the questions asked and the time it took.
+
+No model is asked on this path, so it spends no tokens: an agent's turns and tokens on the same requests are the skill
+evaluation's. The kept results (`results.json`) are what `test/figma-bench.test.mjs` holds every run to, so a change to
+the builder or its guide that scores worse on any count fails the suite; `--keep` writes them again only when a change
+is meant.
+
+**On a team's own library.** `node test/figma-bench/bench.mjs --source <project>` draws the same kinds of request from a
+project's own Figma capture (a step past the largest on a size scale, a boolean for a part a component lacks and one for
+a part it has, a bare copy and a copy that drops a property, a variable beside one that points at another), runs them on
+a stand-in built from that capture, and scores them on the same counts, held to the rules the engine reads from that
+library. A team's library is private: the results stay on the computer that ran it
+(`DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT`, else `~/.config/rms-engine/figma-bench`), held to the run before, and nothing
+of it is written here.
+
+**Checked by a person.** `--sample <n>` writes a sheet (`review/<date>.md`) of what was asked, what was built and the
+counts, with a line for a person (QA, the system's owner) to say whether the counts hold, and beside it the scripts that
+build the sample in Figma (`review/<date>/figma-0.js` for the system, then one a request, run in order on an empty file
+with the Figma MCP's `use_figma`): each request a section with its component Before and After, the engine's own script
+run on After and every new boolean shown on, so the person judges what they see, never only what the run says it did.
+The run reads the sheets back and says on how many the counts held. A new kind of request gets a request here when it
+is built; a request is never changed to make a run pass.
 
 ## Skill evaluation - a guide change is measured before it ships
 

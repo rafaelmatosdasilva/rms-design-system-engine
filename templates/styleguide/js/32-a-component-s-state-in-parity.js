@@ -33,7 +33,7 @@
   // A word whose reason is not plain, said in a tip beside it: N/A, and Untested while the browser tests it.
   var STATE_WHY = {
     'N/A': 'Not applicable: only Figma or only the code has this component, or it has nothing of this kind to check.',
-    Untested: 'Being tested in the background in this browser; this updates as soon as its results are in.'
+    Untested: 'Being tested in the background in this browser. This updates as soon as its results are in.'
   };
   // The word with its coloured dot (N/A has no state to colour: the word alone).
   function statePill(cls, say) { return '<span class="pg-par-status pg-par--' + cls + (say === 'Untested' ? ' is-untested' : '') + '">' + (say === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(say) + '</span>'; }
@@ -85,7 +85,7 @@
     var sug = suggestedStage(c), team = c.status;
     if (!sug || (team && team.kind === sug.kind)) return [];
     var why = sug.why.join('; ');
-    var said = team ? 'Its stage says ' + team.status + '; what the page measures makes it ' + sug.status + ' (' + why + ').' : 'No stage yet: what the page measures makes it ' + sug.status + ' (' + why + ').';
+    var said = team ? 'Its stage says ' + team.status + ', but what the page measures makes it ' + sug.status + ' (' + why + ').' : 'No stage yet: what the page measures makes it ' + sug.status + ' (' + why + ').';
     var how = team ? 'Keep ' + team.status + ', or change its status in contract.authored.json.' : 'Set its status in contract.authored.json (' + sug.kind + ').';
     return [{ key: c.name + '\u0000stage', area: 'System', kind: 'Stage', figma: '', code: '', todo: esc(said) + '<span class="pg-todo">' + esc(how + (sug.instead ? ' Use ' + sug.instead + ' instead.' : '')) + '</span>',
       who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,

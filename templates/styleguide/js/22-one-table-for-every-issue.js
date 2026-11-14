@@ -41,12 +41,6 @@
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
   // what Figma states and what was found, Documentation a kind with what is written, and the rest where it is and what
   // to do. A component's own Parity, Accessibility and Documentation areas show the same tables as the Status page.
-  // Local or shared (local-shared.mjs): a row's own, else its component's (what changes a system component every
-  // product using it gets). Said beside who acts, its reason on hover and in the row's panel; only a shared one waits.
-  // A Rules row's scope is its component's, said once above its table (rulesLead), never on each row.
-  function rowScope(r) { if (r.area === 'Rules') return null; if (r.scope) return r.scope; if (r.from && r.from.scope) return r.from.scope; var c = HAS_PAGE[String(r.key || '').split('\u0000')[0]]; return (c && c.scope) || null; }
-  function scopeWords(x) { return x ? (x.scope === 'shared' ? 'Shared' + (x.decider && x.decider.name ? ', waits on ' + x.decider.name : '') : 'Local, waits on no one') : ''; }
-  function scopeHTML(x) { return x ? '<span class="sg-todo-scope" data-scope="' + esc(x.scope) + '" title="' + esc(x.reason || '') + '">' + esc(scopeWords(x)) + '</span>' : ''; }
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
@@ -57,8 +51,9 @@
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
     code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
-    // A Rules row says neither who acts nor its scope: they are the same on every row, said once above the table.
-    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' && r.area !== 'Rules' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
+    // What to do says only what to do: who acts, and whether it is local or shared, are not repeated in it (the owner's,
+    // 12 November 2026).
+    todo: function (r) { return '<td>' + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
     // Who acts, in a column of its own: an accessibility task says the person, so a team can see its own work without
     // opening every row.
     whoCell: function (r) { return '<td class="sg-todo-whocell">' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + '</td>'; },
@@ -124,7 +119,7 @@
     // Its task number, as the table and the Status page number it.
     var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
-    var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+    var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
     // A source in the intent layer opens there: the component's own page, or the layer itself when no page is written yet.
     var ilHref = function (x) { if (!/intent layer/i.test(x)) return null; var own = HAS_PAGE[comp] && HAS_PAGE[comp].intentLayer; return (own && own.url) || (DATA.intentLayer && DATA.intentLayer.source && DATA.intentLayer.source.url) || null; };
     var ilFile = function (url) { var m = /\/-\/blob\/[^/]+\/(.+)$/.exec(url); return m ? decodeURIComponent(m[1]) : url.replace(/^https?:\/\//, ''); };
@@ -133,13 +128,11 @@
     var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
     var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
     var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
-    // An open task opens with what to do (and, for something still to write, where); what it is and why come after.
-    var taskOpen = r.st && r.st !== 'done', order = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
-    if (taskOpen) order = order.filter(function (col) { return col[1] === 'todo'; }).concat(order.filter(function (col) { return col[1] !== 'todo'; }));
-    // Who acts has a column of its own only where the table has one (Accessibility); everywhere else it is said in
-    // what to do, which is then the only place it appears.
-    var whoCol = order.some(function (c) { return c[1] === 'whoCell'; });
-    var body = order.map(function (col) {
+    // A panel always opens with what to do (and, for something still to write, where); what it is, what it affects and
+    // why come after (the owner's, 12 November 2026). Who acts is a card of its own where the table has its column.
+    var order = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
+    order = order.filter(function (col) { return col[1] === 'todo'; }).concat(order.filter(function (col) { return col[1] !== 'todo'; }));
+    var cards = order.map(function (col) {
       var k = col[1];
       // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
       if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
@@ -147,13 +140,15 @@
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
       // Who acts has a column of its own, so it is its own card below, never inside this one.
       if (k === 'whoCell') return card(col[0], r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '');
-      if (k === 'todo') return card(col[0], (!whoCol && r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (isOpen(r) && rowScope(r) ? '<p class="sg-il-line">' + esc(rowScope(r).reason) + (rowScope(r).scope === 'shared' && rowScope(r).decider ? ' It waits on ' + esc(rowScope(r).decider.name) + '.' : '') + '</p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
+      if (k === 'todo') return card(col[0], (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
-    }).join('');
+    });
+    var firstTodo = order.length && order[0][1] === 'todo' && cards[0] ? 1 : 0;   // what it affects goes under what to do
+    var body = cards.join('');
     // What it affects, for an accessibility check: each place the check found, in a table of what it is (the part, what
     // of it, its element), the words on it, the state and mode it was seen in, and its measure against what it needs.
     // What it affects: each place its findings carry (placesTag), in a table of the part, what of it, its element, the
@@ -171,7 +166,8 @@
       var used = COLS.filter(function (cc) { return hits.some(function (x) { return cc[1](x); }); });
       // A list: the panel opens from a row of an issue table.
       var tbl = kvList(hits.map(function (x) { return used.map(function (cc) { return [cc[0], cc[1](x)]; }); }), 'sg-affects');
-      body = '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects</div>' + tbl + '</div>' + body;
+      cards.splice(firstTodo, 0, '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects</div>' + tbl + '</div>');
+      body = cards.join('');
     }
     var det = m.querySelector('.sg-row-detail');
     var trail = trailHere(from);

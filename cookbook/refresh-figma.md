@@ -554,7 +554,12 @@ function prop(node, key) { try { return node != null && typeof node === 'object'
 each one when present:
 - sizing per axis, a fixed width, min and max width, how auto layout lines children up on each axis, and wrap
 - the gap, the stroke width on each side, whether the stroke is dashed, and opacity
-- the text node's family, line height (px, % or auto), letter spacing, text case, decoration, italic and alignment
+- the text node's family and style (Semi Bold Italic: its weight, and italic, read from it), line height (px, % or auto),
+  letter spacing, text case, decoration and alignment; the code's font is compared by its face, so Figma's Inter in
+  Semi Bold is the code's Inter-SmBld
+- the icon's box (`iconSize`) and its glyph (`iconGlyph`, the box its drawn shapes fill), compared as two sizes
+- each layer turned (`turns`, its angle by its name), against the part the contract names for it, turned the other way
+  in the code (Figma's angles run counter-clockwise, CSS's clockwise)
 - the fill, text and stroke colour tokens with their paint opacity, compared in every mode
 - one entry per variant (height, padding, gap, radius, font size, colours, visible layers); only what a
   variant changes from the default is compared, against the state the code capture produced. A variant
@@ -648,11 +653,11 @@ async function deepFacts(node, set) {
     const lh = text.lineHeight, ls = text.letterSpacing, fn = text.fontName;
     out.text = {
       fontFamily: fn && fn !== figma.mixed ? fn.family : null,
+      fontStyle: fn && fn !== figma.mixed ? fn.style : null,
       lineHeight: lh && lh !== figma.mixed ? (lh.unit === 'AUTO' ? { unit: 'AUTO' } : { unit: lh.unit, value: n(lh.value) }) : null,
       letterSpacing: ls && ls !== figma.mixed ? { unit: ls.unit, value: n(ls.value) } : null,
       textCase: text.textCase !== figma.mixed ? text.textCase : null,
       textDecoration: text.textDecoration !== figma.mixed ? text.textDecoration : null,
-      italic: fn && fn !== figma.mixed ? /italic|oblique/i.test(fn.style) : null,
       textAlign: text.textAlignHorizontal,
     };
   }
@@ -1071,6 +1076,12 @@ async function componentFacts(root, idToVar) {
   // The first bound radius: on the frame, then on its Background child.
   const radiusOf = async (x) => { for (const k of ['topLeftRadius', 'cornerRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius']) { const id = x?.boundVariables?.[k]?.id; if (id) return varName(id); } return null; };
   const icon = node.findOne?.((x) => x.type === 'INSTANCE' && /icon/i.test(x.name) && shown(x)) ?? null;
+  // The icon's glyph: the box its drawn shapes fill inside the icon's own (a 16 glyph in a 24 box is two sizes, not one).
+  const art = icon ? (icon.findAll?.((x) => /^(VECTOR|BOOLEAN_OPERATION|ELLIPSE|RECTANGLE|POLYGON|STAR|LINE)$/.test(x.type) && shown(x)) ?? []).map((x) => x.absoluteBoundingBox).filter(Boolean) : [];
+  const span = (a, b) => n(Math.max(...art.map((r) => r[a] + r[b])) - Math.min(...art.map((r) => r[a])));
+  // Each layer turned, by its name, at Figma's angle (counter-clockwise, in degrees): the code turns the other way.
+  const turns = {};
+  for (const x of node.findAll?.((x) => Math.abs(x.rotation || 0) >= 0.5 && shown(x)) ?? []) turns[x.name] ??= n(x.rotation);
   const notes = [...(prop(root, 'annotations') ?? []), ...(node !== root ? prop(node, 'annotations') ?? [] : [])].map((a) => a.label ?? a.labelMarkdown ?? '');
   const out = {
     nodeId: root.id,
@@ -1087,7 +1098,8 @@ async function componentFacts(root, idToVar) {
     layout: node.layoutMode ?? 'NONE',
     slot: !!node.findOne?.((x) => x.type === 'SLOT'),
     minH: n(node.minHeight),
-    ...(icon ? { iconSize: n(icon.width) } : {}),
+    ...(icon ? { iconSize: n(icon.width), ...(art.length ? { iconGlyph: [span('x', 'width'), span('y', 'height')] } : {}) } : {}),
+    ...(Object.keys(turns).length ? { turns } : {}),
     ...childFrames(node, idToVar),
   };
   if (set) {

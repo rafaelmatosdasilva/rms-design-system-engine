@@ -439,7 +439,8 @@ accessibility check found broken (by WCAG criterion). The code file it names mus
 calls a deprecated component stable is wrong. **Out of date**: the component's props (names, and the values each
 takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
-history dates its file too). **Twins**: two components' pages that say the same (their own names aside, lines a template
+history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
+prop it does not have, or a literal value the prop does not take. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
@@ -999,7 +1000,9 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
 
 - **`contract.authored.json`** (project root, **committed**) — the AUTHORED hub: per component,
   `bindings` (Figma prop → `{ attribute: "codeName" }` for a rename, `{ slot: "slotName" }` for a slot),
-  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, and optional
+  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, `holds` (what a
+  property may hold, as the team chose it: `{ "label": "words" }`, or `anything`, `one component`, `one of`; where
+  Figma and the code differ, the contract's `differences` names the side to change as `right`), and optional
   **agent guidance** — `whenNotToUse` (string), `useInstead` (a name or a list) and `neverCombineWith`
   (a list) — so an AI knows when not to reach for a component and what pairings are invalid — and an
   optional **decision status**: `status` (`current` | `deprecated` | `experimental`), `supersededBy`
@@ -1508,7 +1511,8 @@ own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the sys
 model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
 collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
 Three rules come of it, each a place (a token) rather than a component: a token of a layer points at the layer it goes
-through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
+through, never past it, up, elsewhere or across at another component's token, read from the library's component names
+(`token-layer-<layer>`); a base token never points at a layer above it (`token-base-<layer>`); an alias reaches its value in no more steps than most of
 the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
 names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
 With both, four more on what a component binds: never a base token (one in the layer others go through), where the
@@ -1649,6 +1653,13 @@ drives, and a removed layer takes with it the property that drove only it. The o
   own (a primitive); a name without a group is put in the group of the one it is like
 
 A layer is named by its path inside the component (`Content/Label`).
+
+What is built makes sense, not only exists, so three readings that would be built literally are asked instead: an
+option on a size scale copied from another step (`xl` like `l`) is asked what it changes, unless the operations that
+follow bind something where it is that option; a boolean named for a part (`showBadge`, `hasIcon`) put on a layer that
+is not that part is asked which part it shows (the part, when the component has it, is proposed) or to add it first;
+and a copy that changes nothing of how it is built or what it takes, in a system that holds `no-twins`, is asked what
+makes it different.
 
 Not only components (`system-kinds.mjs`): what the description makes decides what is built, by the intent layer's own
 kinds. "Make a template like settings", "a settings page", "a pattern for bulk actions" and "a checkout flow" build a

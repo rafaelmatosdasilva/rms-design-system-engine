@@ -138,7 +138,7 @@
     return (c.copies || []).map(function (x) {
       return { key: c.name + '\u0000copy:' + x.product + ':' + x.cls, area: 'Products', kind: 'Near copy', figma: '', code: '<code>.' + esc(x.cls) + '</code><span class="pg-par-val">' + esc(x.product + ', ' + x.file + ':' + x.line) + '</span>',
         where: esc(x.product) + '<span class="pg-par-val"><code>.' + esc(x.cls) + '</code> ' + esc(x.file + ':' + x.line) + '</span>',
-        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ' (' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? '; it differs in ' + x.differ.slice(0, 4).join(', ') : '') + ').') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Your team decides which.') + '</span>',
+        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ' (' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? ', and it differs in ' + x.differ.slice(0, 4).join(', ') : '') + ').') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Your team decides which.') + '</span>',
         who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });

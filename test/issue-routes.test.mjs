@@ -71,5 +71,5 @@ test('each routed issue is local or shared, and the list counts them with who th
   const issues = findings.map((f, i) => ({ key: keyOf(f), iid: i + 1, title: f.evidence }));
   const plan = routePlan(issues, findings, { keyOf, ctx: { owners: { cardTile: 'Cards team' } } });
   assert.deepEqual(plan.map((x) => [x.scope.scope, x.scope.decider?.name ?? null]), [['shared', 'Cards team'], ['local', null]]);
-  assert.match(routeLines(plan)[0], /by the fix each one needs \(1 shared, waiting on Cards team \(1\); 1 local, each product team's own\):$/);
+  assert.match(routeLines(plan)[0], /by the fix each one needs \(1 shared, waiting on Cards team \(1\) · 1 local, each product team's own\):$/);
 });

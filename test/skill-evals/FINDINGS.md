@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## The counts were true and the result was still useless
+
+**Found** 14 November 2026, the owner's review of the Figma build benchmark's first sample, each result built in a Figma file to be seen rather than read. **Fixed in** `lib/figma-ops.mjs` and `lib/component-spec.mjs` (three questions the builder now asks), `test/figma-bench/` (the counts sense, asks and rules, requests in a person's own words, `--source` on a team's own library, the sample built in Figma).
+
+**Evidence.** The owner said all three counts held, and that the benchmark tested neither the real library nor its rules. Looking at the results in Figma showed what the counts could not: a boolean asked for a badge was put on the chip's content row, so turning it off would hide the whole chip's inside, with no badge anywhere; an extra-large size was large, copied and left the same size. Both scored full marks. The first sheet only described the results, so a person could not have judged them at all: the owner asked where to see them before answering.
+
+**Run on the owner's own library** (results kept on that computer), the new counts found a third: a component copied with nothing changed is a twin, which that library's own rules forbid (`no-twins`), and the builder built it without a word.
+
+**Guess ruled out.** That the requests were badly written: they were the builder's own phrasing, and the builder did exactly what they said. What was missing was the builder asking when the literal reading cannot be what a person wants, and a score for whether the result makes sense.
+
+**What changed.** The builder asks in the three cases (a size step's change, which part a boolean shows, what makes a copy different where twins are not allowed), and builds nothing until answered. The benchmark scores sense, the questions owed and the rules a result breaks, runs requests in a person's words, runs on a team's library privately, and builds its sample in Figma with each new boolean shown on.
+
+---
+
 ## An agent with only the server no longer tries the shell first
 
 **Found** 30 October 2026, in the first route benchmark; **settled** 13 November 2026, running it again. **Fixed in** engine #290 (the routed block names each command's MCP tool beside it).

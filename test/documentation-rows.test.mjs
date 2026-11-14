@@ -107,7 +107,7 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
     assert.equal(role, 'done|Code', 'its root a plain span: no role, read from the code');
   } finally { close(); c.kill(); }
   const tpl = templateText();
-  assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma; the comment above its rule in the code; or contract\.authored\.json under guidance\.doDont\./);
+  assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma, the comment above its rule in the code, or contract\.authored\.json under guidance\.doDont\./);
 });
 
 // A component's markup is whatever its file holds, so markup written to be slow must not be. Before a comment's body

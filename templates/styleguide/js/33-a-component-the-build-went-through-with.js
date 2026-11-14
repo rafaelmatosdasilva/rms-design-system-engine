@@ -337,7 +337,7 @@
     // the description (else the note is what it is, above).
     var docRows = (figNotes.length ? '<div><dt>From Figma</dt><dd>' + figNotes.map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
       (c.slots ? '<div><dt>Slots</dt><dd>' + c.slots.map(function (sl) {
-        var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content; suggested ' + sl.preferred.join(', ') : 'Takes any content the product puts in it');
+        var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content, with ' + sl.preferred.join(', ') + ' suggested' : 'Takes any content the product puts in it');
         var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
         return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
@@ -724,7 +724,7 @@
         variantRows(c).forEach(function (p) {
           html += '<div class="pg-inspect pg-variant-group"><div class="pg-inspect-head"><h3>' + esc(p.label) + '</h3></div>';
           (p.options || []).forEach(function (o) {
-            if (o.unbuilt) { html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + '</div><p class="pg-empty">Figma has it; the code does not build it yet.</p></div>'; return; }
+            if (o.unbuilt) { html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + '</div><p class="pg-empty">Figma has it, but the code does not build it yet.</p></div>'; return; }
             var val = 'value' in o ? o.value : o.label;
             state[p.label] = val; refresh();
             var src = preview.firstElementChild, copy = src ? src.cloneNode(true) : null;
@@ -814,7 +814,7 @@
       // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
       var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
       // Figma draws it in the mode its frame uses there; the page's own mode switch brings the code to the same one.
-      var larger = '<p class="pg-empty">' + (k > 1 ? 'Both drawn ' + k + ' times larger. ' : '') + 'Figma\'s image is in the mode its frame uses in Figma; switch ' + esc((AXES.find(function (a) { return a.attr !== 'data-size'; }) || { label: 'the mode' }).label) + ' in the playground to match it.</p>';
+      var larger = '<p class="pg-empty">' + (k > 1 ? 'Both drawn ' + k + ' times larger. ' : '') + 'Figma\'s image is in the mode its frame uses in Figma. Switch ' + esc((AXES.find(function (a) { return a.attr !== 'data-size'; }) || { label: 'the mode' }).label) + ' in the playground to match it.</p>';
       if (compareMode === 'side') {
         body.innerHTML = larger + '<div class="pg-compare-row"><div class="pg-compare-fig"><div class="pg-ctl-label">Figma</div><div class="pg-compare-stage"><div class="pg-compare-layer">' + img + '</div></div></div><div class="pg-compare-fig"><div class="pg-ctl-label">Code</div><div class="pg-compare-stage"><div class="pg-compare-layer pg-compare-code"></div></div></div></div>';
         body.querySelector('.pg-compare-code').appendChild(copy);
@@ -1520,7 +1520,7 @@
       } else {
         var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.unbuilt || (o.live && !o.state && !(o.add || []).length && !Object.keys(o.attrs || {}).length), unbuilt: o.unbuilt }; })
           : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !p.part && !renderedWith(c, p, true), drawn: p.part && !hasPart(c, p.part) }];   // a part no instance holds is drawn from the code's CSS
-        var titleOf = function (o) { return o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.unbuilt ? 'Figma has this option; the code does not build it yet' : o.off ? 'Shown live, not as a style the page can set' : '' ; };
+        var titleOf = function (o) { return o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.unbuilt ? 'Figma has this option, but the code does not build it yet' : o.off ? 'Shown live, not as a style the page can set' : '' ; };
         var choose = function (v) { var next = p.type === 'VARIANT' ? v : v === 'true'; if (next === state[p.label]) return; state[p.label] = next; sync(); refresh(); };
         var sync;
         if (p.type !== 'VARIANT') {
@@ -1550,7 +1550,7 @@
     // Figma's props the code does not build yet: listed with the rest, offered but not drawn.
     (c.unbuilt || []).forEach(function (u) {
       var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (u.at != null) ctl.dataset.at = u.at;
-      ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div><span class="pg-ctl-none" title="Figma has this prop; the code does not build it yet">Not in code</span>';
+      ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div><span class="pg-ctl-none" title="Figma has this prop, but the code does not build it yet">Not in code</span>';
       controlsEl.appendChild(ctl);
     });
     // In Figma's order (its panel's: variants first, then the rest as Figma lists them), built or not.

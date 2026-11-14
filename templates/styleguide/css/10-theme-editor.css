@@ -2,6 +2,8 @@
 .sg-ts-split { display: grid; grid-template-columns: minmax(20rem, 30rem) minmax(0, 1fr); gap: var(--sg-space-xl); align-items: start; }
 .sg-ts-preview { position: sticky; top: var(--sg-space-l); min-width: 0; }
 .sg-ts-preview-head { display: flex; align-items: center; gap: var(--sg-space-m); flex-wrap: wrap; }
+/* The editor's card heads one height, the preview's: a control's height and 4px above and below it, whatever they hold. */
+#sg-theme-panel :is(.sg-ts-preview-head, .sg-ts-pick-head) { box-sizing: border-box; min-height: calc(var(--sg-control-h) + 2 * var(--sg-space-xs) + var(--sg-line-width, 1px)); padding-block: var(--sg-space-xs); display: flex; align-items: center; }
 .sg-ts-preview-head > span:first-child { flex: 1 1 auto; }
 .sg-ts-preview-head .sg-ts-dd { width: auto; min-width: 16rem; }
 .sg-ts-preview-head .sg-ts-seg { width: auto; }
@@ -275,3 +277,14 @@ button.sg-ts-alias-chip:hover .sg-ts-chip > span:last-child { text-decoration: u
 #sg-theme-panel .sg-ts .sg-ts-pick:empty { display: none; }   /* nothing picked: no card, the preview itself is the invitation */
 
 .sg-ts .pg-controls > .pg-ctl { flex-shrink: 0; }   /* in a card that scrolls, a row as tall as its label and field, never squeezed under them */
+/* The dashed box over the part under the pointer, and over what a token draws, above the preview so nothing in a part hides it. */
+.sg-ts-hitbox { position: absolute; z-index: 4; box-sizing: border-box; pointer-events: none; outline: 2px dashed var(--sg-accent); outline-offset: -2px; }
+.sg-ts-hitbox.is-tok { outline-width: 3px; outline-offset: -3px; }
+.sg-ts-hitbox[hidden] { display: none; }
+.sg-ts-tok-field > .sg-ts-pair { flex: 1 1 0; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* a token's light and dark always side by side, whatever buttons share its row */
+.sg-ts-chipfield.sg-input.sg-ts-chip-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-width: 0; height: auto; }   /* a linked colour's mode: the name it follows, the mode under it */
+.sg-ts-chip-mode > .sg-ts-alias-chip { max-width: 100%; }
+.sg-ts-tok-field > .sg-ts-link-btn { flex: none; align-self: center; }
+
+/* Full screen is for trying the screens: no outline over what is hovered or picked. */
+.sg-ts-preview:fullscreen .sg-ts-hitbox { display: none !important; }
