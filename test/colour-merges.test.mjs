@@ -25,6 +25,9 @@ test('tokens that look the same in every mode they share are one group, the most
   // Alike in light and apart in dark is two colours; a scale's steps are apart; a pointer is already one colour;
   // a different see-through is another colour.
   const all = g.flatMap((x) => [x.keep, ...x.merge]);
+  // A component's own token is never kept over a shared one, however much it is used.
+  const own = colourMerges(colourTokens([{ text: ':root{--chip-text:#1b2433;--text-primary:#1b2433}' }]), { uses: { '--chip-text': { direct: ['chip', 'tag'] } }, components: ['Chip'] });
+  assert.deepEqual(own.map((x) => [x.keep, x.merge]), [['--text-primary', ['--chip-text']]]);
   for (const n of ['--brand', '--link', '--gray-100', '--gray-150', '--text-alias', '--overlay', '--scrim']) assert.ok(!all.includes(n), n);
 });
 
@@ -36,7 +39,7 @@ test('a chain of small steps is never one colour, and the line says what to do',
   for (const g of steps) assert.ok(![g.keep, ...g.merge].includes('--a') || ![g.keep, ...g.merge].includes('--d'), 'the two ends never merge');
   const lines = mergeLines(colourMerges(colourTokens([{ file: 'theme.css', text: css }])));
   assert.match(lines[0], /^5 colour tokens look the same as another in every mode they share, in 2 groups/);
-  assert.equal(lines[1], '   · keep --text-title, point --text-heading, --text-strong at it', 'with no record of use, the shortest name stays');
+  assert.equal(lines[1], '   · keep --text-strong, point --text-heading, --text-title at it', 'with no record of use, the one a token already points at stays');
   assert.ok(!lines.join('\n').includes(';'), 'no semicolons in its words');
   assert.deepEqual(mergeLines([]), []);
 });
