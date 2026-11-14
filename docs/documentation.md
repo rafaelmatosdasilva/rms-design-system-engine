@@ -394,6 +394,15 @@ Everything that waits on a person names the person: from `owners` in `ds-config.
 - **On the Documentation page,** each row to review says "Waits on" and the name. A chip for each person shows only theirs: "Waiting on Cards team 3".
 - **In the audit,** one line counts them: "3 waiting on Cards team, 1 waiting on QA lead".
 - **An answer records who gave it.** When that is not the owner, the page and the command say so. The answer still stands; nothing is blocked.
+- **Where nobody is named.** The Status page lists the components, areas and token groups no one in `owners` decides for, and says so once when `owners` names nobody at all. A change that waits on nobody says so too, with where to name someone.
+
+### The states a component must have
+
+Your page for a component can list what it owes under a title that says so: "Required states" or "States it must have". A plain "States" stays a list of what exists.
+
+- **Read as states.** Error, loading, success, read-only, disabled, selected, focus, hover, active and empty, however your page words them ("Loading: a spinner replaces the label").
+- **Held against each side.** Figma by its variants and on/off properties, the code by its props, markup and styles. A side that lacks one gets a finding.
+- **Said, never dropped.** A line the engine cannot read as a state is listed for you to reword.
 
 ### Your rules, read against each other
 

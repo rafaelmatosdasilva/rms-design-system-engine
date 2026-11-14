@@ -470,6 +470,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
   - A border, outline or background the code draws on a component Figma draws with none, in any variant, fails (focus rules aside). This holds for the system's rules and a product's alike, on the component itself, its `::before` or its `::after`.
   - A paint made only of the tokens of a component Figma nests inside (a divider drawn as a `::after` line) belongs to that part. `knownPhantomFillExceptions` names a selector allowed one.
 - **All states are built.** Hover, disabled, selected and the rest, each with the right values.
+  - The states your team's pages say a component must have (a "Required states" section: error, loading, read-only…) are held against Figma and the code. A side that lacks one is told, with the page it comes from. It is advice, and never fails the gate.
 - **Component props match Figma.** The same names, defaults and choices, spelled exactly the same.
   - `Size` and `size` are two prop names, and the finding shows the letters that differ (`letter case S → s`).
   - `L` and `large` are two values, and the finding says which code value it most likely is.

@@ -400,7 +400,8 @@ that may write to it; in a folder of the project the pages are written there, ne
 and commit (a page changed since it was read is never overwritten). Notion and Confluence are never written to: the
 changes are made on the pages as read, into `.design-system-engine-out/intent-changes/`, and listed for a person
 to make there. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
-Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
+Usage rules; When not to use or What not to do; Common mistakes; Limitations; Required states or States it must
+have, the states it owes, held against each side by Gate [14] as advice (`owed-states.mjs`); a numbered title is read by its
 words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
 and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a
 kind with only the name changed (a generator's filler). A page belongs to a component by its name ("Button

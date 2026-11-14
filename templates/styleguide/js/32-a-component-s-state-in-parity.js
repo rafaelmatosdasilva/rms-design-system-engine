@@ -204,7 +204,17 @@
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
-    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
+    // Where nobody is named to decide (DATA.undecided, ds-config.json owners): said under the numbers, so an empty
+    // approver is seen before a change waits on it. Plain sentences, a short list, the rest counted.
+    var U = DATA.undecided, undecidedHTML = '';
+    if (U) {
+      var few = function (xs) { return xs.length > 8 ? xs.slice(0, 8).join(', ') + ' and ' + (xs.length - 8) + ' more' : xs.join(', '); };
+      var parts = U.nobody ? [] : [U.components.length ? 'Components: ' + few(U.components) + '.' : '', U.areas.length ? 'Areas: ' + few(U.areas) + '.' : '', U.tokenPrefixes.length ? 'Token groups: ' + few(U.tokenPrefixes) + '.' : ''].filter(Boolean);
+      undecidedHTML = '<div class="sg-health-undecided"><p class="sg-health-label">' + esc(U.nobody ? 'Nobody is named to decide for any part of the system.' : 'Nobody is named to decide for these.') + '</p>' +
+        parts.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') +
+        '<p class="sg-health-undecided-how">' + esc('Name who decides in owners, in ds-config.json, so a change does not wait on nobody.') + '</p></div>';
+    }
+    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div>' + undecidedHTML + '</div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
     if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
