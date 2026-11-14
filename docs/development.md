@@ -56,6 +56,8 @@ The tests badge in the README is not written by hand: the Tests workflow puts wh
 
 Actions are pinned by commit, so they are updated on purpose rather than by drift. Dependabot watches them and opens one grouped pull request a week when any has moved (`.github/dependabot.yml`); it arrives labelled `release: patch` and goes through the same gate as any other change.
 
+The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
+
 ## Release labels
 
 Every pull request carries exactly one, and it decides the version the release workflow publishes:

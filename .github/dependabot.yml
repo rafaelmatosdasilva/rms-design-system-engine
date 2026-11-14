@@ -40,6 +40,12 @@ updates:
       ci-tools:
         patterns:
           - '*'
+    # TypeScript 7 is a rewrite that exposes no JS API (no transpileModule, no createSourceFile), and the engine reads
+    # JSX and Props through it, so a new TypeScript major waits for a person to check it rather than arriving here.
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
