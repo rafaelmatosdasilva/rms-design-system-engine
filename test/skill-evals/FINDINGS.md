@@ -590,3 +590,14 @@ Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **1
 - Three hypotheses that are all about the same component are one hypothesis. All three here were "the catalog passes the wrong object", varied in the details; none of them was testable without first establishing that the catalog ran at all.
 
 **What changed because of it.** The check stopped taking the library's name from configuration - the variable that did not exist was there to supply it - and reads its system's own boilerplate instead: a word half a system's descriptions share is that team's house phrasing, whatever it is, and nothing outside the system has to know it. On a real system of 275 components the check finds two, both a component's name restated as a sentence.
+## The check told a page scoring 10 to keep going until it scored 10
+
+**The case.** A prototype page written against a real system came back `✅ Ready`, `🎨 AS A PAGE 10/10`, and three `⚠️` lines under `📱 EVERY SIZE` where column headings were cut on a phone. The advice under it read: *fix each ⚠️ line under 🎨 and 📱 … run it again until it scores 10*. Both halves are wrong for that run. `🎨` held nothing to fix, and the score it was sent to reach was the score it already had.
+
+**Why no fixture caught it.** The line fired on `review.findings.length || drawn?.lines?.length` and then named both sections unconditionally. Every case a fixture builds has findings in the scored section, so the two are never separated, and the sentence reads correctly whenever `🎨` has anything at all. The combination that breaks it - a page that scores 10 and is cut at one width - only turns up on a real system with real words in it, and it is the ordinary outcome there rather than an edge case: a layout can be faultless and still cut a translated heading.
+
+**What it teaches.** Two sections under one `if` share one sentence, and a sentence written for the case where both fired is wrong for the case where one did. `📱 EVERY SIZE` has no score at all; asking for a 10 there is asking for something that does not exist. Advice is output like any other, and it is worth checking against the run that produced it rather than against the case it was written for.
+
+**What changed.** `warnedIn` names only the sections that found something and says whether a score is the thing to chase; `fixWarned` builds the sentence from that. A page with only size findings is now told to run it again *until no line is left*.
+
+**Found by proving a route end to end.** The run only happened because the visual half of the prototype route had never been exercised on a real system - the copy it was tried in had no `node_modules`, so every width check had been skipped silently. Linking the real install in was the whole cost, and it produced three true findings about the page and one defect in the engine.
