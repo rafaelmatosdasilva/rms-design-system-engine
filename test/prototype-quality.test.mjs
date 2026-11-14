@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { intentText, contextFrom, productScreensOf, requestFocus, focusLines } from '../lib/prototype-context.mjs';
-import { fillsWidth, a11yLines } from '../lib/prototype.mjs';
+import { fillsWidth, a11yLines, warnedIn, fixWarned } from '../lib/prototype.mjs';
 import { normaliseValues, statesOwed } from '../lib/prototype-states.mjs';
 import { buildCatalog, catalogTable, checkUi } from '../lib/ui-catalog.mjs';
 import { checkPrototype } from '../lib/prototype-pieces.mjs';
@@ -101,4 +101,35 @@ test('the page\'s own accessibility findings are listed with their fix; the syst
     '   ⚠️  group: div.seg (role="radiogroup" with no name) (give it "name": "<what it is for>" in its props)',
     '   • the system\'s components themselves (focusthin, annotation ×2): for the audit (rms-design-system-engine --a11y), not this page',
   ]);
+});
+
+// What to do next names only the sections that found something. 🎨 AS A PAGE is scored out of 10 and 📱 EVERY SIZE
+// is not: a page already at 10 with a word cut on a phone was sent to fix 🎨, which held nothing, and to run it
+// again until it reached the score it was already at.
+test('the advice names only the ⚠️ sections that found something', () => {
+  const review = (n) => ({ findings: Array.from({ length: n }, (_, i) => ({ message: `finding ${i}` })) });
+  const drawn = (n) => ({ lines: Array.from({ length: n }, (_, i) => `cut ${i}`) });
+
+  assert.deepEqual(warnedIn(review(2), drawn(3)), { where: ['🎨', '📱'], scored: true });
+  assert.deepEqual(warnedIn(review(0), drawn(3)), { where: ['📱'], scored: false });
+  assert.deepEqual(warnedIn(review(2), drawn(0)), { where: ['🎨'], scored: true });
+  assert.deepEqual(warnedIn(review(0), drawn(0)), { where: [], scored: false });
+  assert.deepEqual(warnedIn(null, null), { where: [], scored: false }, 'a run that drew nothing has nothing to say');
+});
+
+test('a score is only asked for where there is one', () => {
+  const review = (n) => ({ findings: Array.from({ length: n }, () => ({})) });
+  const drawn = (n) => ({ lines: Array.from({ length: n }, () => 'x') });
+
+  const size = fixWarned(review(0), drawn(3), { input: 'p.vue' });
+  assert.ok(size.includes('under 📱'), size);
+  assert.ok(!size.includes('🎨'), 'a section that found nothing is not named');
+  assert.ok(!size.includes('scores 10'), 'EVERY SIZE has no score to reach');
+  assert.ok(size.includes('until no line is left'), size);
+
+  const page = fixWarned(review(2), drawn(0), { input: 'p.vue' });
+  assert.ok(page.includes('until it scores 10'), page);
+  assert.ok(!page.includes('📱'), page);
+
+  assert.equal(fixWarned(review(0), drawn(0), { input: 'p.vue' }), '', 'nothing found is nothing to say');
 });

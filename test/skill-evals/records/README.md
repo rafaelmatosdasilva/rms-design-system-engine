@@ -278,6 +278,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-14-a-layout-part-is-a` | The 24 guide tasks on Haiku (engine 7cfcaf8) | "A layout part is a class named after a layout, never one that only ends in its word" |
 | `2026-11-14-figma-builder-asks-on-main` | The 24 guide tasks on Haiku (engine 253ad7b) | "The Figma builder asks, and its benchmark on a real library, on main" |
 | `2026-11-14-the-status-cards-measured-on` | The 24 guide tasks on Haiku (engine f7ce0c9) | "The Status cards' measured-on line taken out, at the owner's word" |
+| `2026-11-14-what-a-reader-said-is` | The 24 guide tasks on Haiku (engine 77c0288) | "What a reader said is what the check found, with the day as the page says it, and hearing it again is what to do" |
 | `figma-edits-one-kind-at-a-time` | The 24 guide tasks on Haiku (engine ab57ae1) | "What the engine knows, written into Figma, each kind asked on its own" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
