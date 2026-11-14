@@ -548,12 +548,15 @@ The kinds are your intent layer's own, so nothing new is invented to say what a 
 - **Read from your own.** What every one of your templates holds is a rule, and what most hold is a fix, the way the engine reads how you build components.
 - **Asked, never assumed.** A new one that lacks what every one of yours holds is a question for you.
 - **A box that is too small.** A layer that runs beyond a box of a fixed size is said, for you to decide: grow the box, or shorten the layer.
+- **Asked, not built literally.** A bigger size copied from a smaller one is asked what it changes, a setting for a part the component lacks is asked which part, and a copy that changes nothing is asked what makes it different, where your rules allow no twins.
 
 ### Measured every time
 
-- **A kept set of requests.** The same build and change requests run again whenever the builder or its guide changes.
+- **A kept set of requests.** The same build and change requests run again whenever the builder or its guide changes, some in the builder's words and some in a person's own.
 - **Separate counts, never one number.** Whether the script runs, whether what was asked is there, whether anything else changed, whether only your components and variables are used, and whether it made a layout fault.
-- **Checked by a person.** A sample goes on a sheet for someone to say whether the counts hold.
+- **Whether it makes sense.** A setting named for a part shows that part, and a bigger size is bigger, not only there.
+- **Your rules.** Each result is held to how your system builds components, and it can run on your own library, its results kept on your computer.
+- **Checked by a person, in Figma.** A sample is built in a Figma file, before and after, for someone to say whether the counts hold.
 
 The full options are in [the reference](../reference/usage.md) (`--spec`).
 

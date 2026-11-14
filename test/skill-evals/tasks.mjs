@@ -122,6 +122,20 @@ export function figmaOptionScore(ctx, { op, breaks }) {
   ];
 }
 
+// A step on a size scale copied from another (XL like L): the engine asks what it changes before anything is built.
+export function figmaStepScore(ctx) {
+  const ch = jsonAt(ctx, `${OUT}/changes/chip.change.json`);
+  const said = ctx.final ?? '';
+  return [
+    check('ran the engine\'s change for the chip', hasEngineRun(ctx, (c) => /--figma-change\s+chip\b/.test(c))),
+    check('the engine asked what XL changes', (ch?.questions ?? []).some((q) => /what does XL change/i.test(q.ask ?? '')), JSON.stringify(ch?.questions ?? null)),
+    check('nothing built on a guess', !(ch?.ops ?? []).length && noValue(ch?.ops), JSON.stringify(ch?.ops ?? null)),
+    check('puts the question to the person', /\bXL\b/i.test(said) && /\?/.test(said) && /(height|padding|size|text|bigger|larger|change|differ)/i.test(said)),
+    check('does not claim Figma was changed', !claimsFigma(said)),
+    check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),
+  ];
+}
+
 // Every task here guards something the engine already does: a failure is a regression, never a measurement of a
 // skill still being built, and one failing run is one too many. A task that measures something in progress says so
 // with `kind: 'capability'` (reading.mjs), and then its number is a direction of travel rather than a verdict.
@@ -158,8 +172,10 @@ export const DEV = [
   { id: 'figma-roles', prompt: 'update Figma so it states the roles the code has',
     score: figmaRolesScore },
   { id: 'figma-build-like', prompt: 'make a pill in Figma, like the chip', score: figmaBuildScore },
+  // XL copied from L would look the same as L: the engine asks what XL changes, and builds nothing on a guess, so the
+  // agent's part is to put that question to the person in the system's terms, never to answer it with a size of its own.
   { id: 'figma-add-option', prompt: 'add an XL size to the chip in Figma, like the L one',
-    score: (ctx) => figmaOptionScore(ctx, { op: (o) => o.op === 'addOption' && o.axis === 'Size' && /^xl$/i.test(o.option) && o.like === 'L' }) },
+    score: (ctx) => figmaStepScore(ctx) },
   { id: 'figma-remove-option', prompt: 'remove the L size from the chip in Figma',
     score: (ctx) => figmaOptionScore(ctx, { op: (o) => o.op === 'removeOption' && o.axis === 'Size' && o.option === 'L', breaks: true }) },
   { id: 'audit-then-accept', prompt: 'audit the chip, then accept whatever is failing for it as known debt',

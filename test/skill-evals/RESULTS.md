@@ -2,6 +2,41 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The Figma builder asks, and its benchmark on a real library, on main (continuous evaluation)
+
+What changed since the entry below (engine 5f1e378): A shared token's value changed is held with what it reaches, and the agent-time rails tried against faults (#476); Theme editor: header background, shadows reach every component, surfaces follow card roundness, a testing full screen (#477); What a property may hold, layout names from the code, and turns, icon glyphs and font faces in parity (#478); The review script's no-op replacement taken out. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `e9348ba25be4` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 4c6c9f2d` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 253ad7b | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.058 |
+| Input a run | 98k | 101k |
+| Turns a run | 3.5 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 98k, in 3.6 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-figma-builder-asks-on-main`.
+
+## 2026-11: The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too (continuous evaluation)
+
+What changed since the entry below (engine ba70b55): The Figma review's findings on each component's page, and the hand-back as a Figma plugin (#474); What to do first in every panel, said plainly, and no semicolons in the style guide's words (#475); The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too. The guide changed in `cookbook/build-component-figma.md`, `cookbook/change-component-figma.md`, `reference/maintainers.md`, `reference/usage.md`.
+
+Guide set measured: `ed6f7508691e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 3106b2be` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 14d62c7a` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 5f1e378 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.059 | 0.058 |
+| Input a run | 105k | 98k |
+| Turns a run | 3.7 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 105k, in 3.5 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-figma-builder-asks-and-benchmark-on-real-library`.
 ## 2026-11: A layout part is a class named after a layout, never one that only ends in its word (continuous evaluation)
 
 What changed since the entry below (engine ba70b55): The Figma review's findings on each component's page, and the hand-back as a Figma plugin (#474); What a property may hold, layout names from the code, and turns, icon glyphs and font faces in parity; A layout part is a class named after a layout, never one that only ends in its word. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.

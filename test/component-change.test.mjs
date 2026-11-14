@@ -57,12 +57,12 @@ test('more said in words: a description without quotes, an option named after it
 });
 
 test('the report: what changes, where it is used, what breaks, what it adds, and the faults it already had, apart', () => {
-  const ops = parseChange('add xl to size like l; remove the property showCount; rename Label layer to Text', modelOf('chipInput', captures)).ops;
+  const ops = parseChange('add dense to size like l; remove the property showCount; rename Label layer to Text', modelOf('chipInput', captures)).ops;
   const ch = changeOf({ component: 'chipInput', asked: 'x', ops: [...ops, { op: 'removeProperty', name: 'showClose' }], captures, grammar, livesIn });
   assert.deepEqual(ch.questions.map((q) => q.ask), ['chipInput has no property showCount.']);
   assert.deepEqual(ch.report.skeleton, [{ change: 'renamed', what: 'layer', from: 'Content/Label', to: 'Content/Text' }]);
-  assert.deepEqual(ch.report.architecture.map((x) => `${x.change} ${x.what}`), ['added option size=xl', 'removed property showClose', 'changed variants']);
-  assert.deepEqual(ch.held.map((h) => h.what), ['a new option, size=xl, on chipInput']);
+  assert.deepEqual(ch.report.architecture.map((x) => `${x.change} ${x.what}`), ['added option size=dense', 'removed property showClose', 'changed variants']);
+  assert.deepEqual(ch.held.map((h) => h.what), ['a new option, size=dense, on chipInput']);
   assert.equal(ch.breaking.length, 1);
   assert.deepEqual(ch.faults.map((f) => `${f.rule}: ${f.value}`), ['icons-are-instances: Content/Dot']);
   const lines = changeLines(ch).join('\n');
@@ -101,20 +101,20 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   write('contracts/chipFilter.contract.json', { name: 'chipFilter', livesIn });
   const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   assert.match(cli('--figma-change', 'chipFilter', 'make it nicer'), /not one the engine reads in words[\s\S]*--figma-change chipFilter --ops <file>/);
-  const first = cli('--figma-change', 'chipFilter', 'add xl to size like l, then rename Label layer to Text');
+  const first = cli('--figma-change', 'chipFilter', 'add dense to size like l, then rename Label layer to Text');
   assert.match(first, /chipFilter: the change asked .*, 2 steps:/);
   assert.match(first, /Where it is used: the code of Checkout/);
   assert.match(first, /it waits for someone to sign it off/);
-  const signed = cli('--figma-change', 'chipFilter', 'add xl to size like l, then rename Label layer to Text', '--signed-off', 'the system owner');
+  const signed = cli('--figma-change', 'chipFilter', 'add dense to size like l, then rename Label layer to Text', '--signed-off', 'the system owner');
   assert.match(signed, /only when they say yes, run the script .*use_figma \(fileKey KEY\)[\s\S]*--change-report chipFilter/);
   assert.match(readFileSync(join(root, '.design-system-engine-out/handback/figma-apply.js'), 'utf8'), /--figma-change[\s\S]*getNodeByIdAsync\("1:10"\)/);
   // Figma read again, as the change said.
   const after = JSON.parse(JSON.stringify(skeleton));
   after.chipFilter.trees[0].c[0].c[1].n = 'Text';
-  after.chipFilter.variants.push(['size=xl', 0]);
+  after.chipFilter.variants.push(['size=dense', 0]);
   write('src/skeleton.json', after);
   write('component-values.snapshot.json', JSON.parse(JSON.stringify(values).replaceAll('Content/Label', 'Content/Text')));
-  write('src/props.json', { ...props, chipFilter: { ...props.chipFilter, properties: { ...props.chipFilter.properties, size: { type: 'VARIANT', variantOptions: ['s', 'l', 'xl'], defaultValue: 's' } } }, _updated: '2099-01-01T00:00:00Z' });
+  write('src/props.json', { ...props, chipFilter: { ...props.chipFilter, properties: { ...props.chipFilter.properties, size: { type: 'VARIANT', variantOptions: ['s', 'l', 'dense'], defaultValue: 's' } } }, _updated: '2099-01-01T00:00:00Z' });
   const report = cli('--change-report', 'chipFilter');
   assert.match(report, /↻ layer: Content\/Label → Content\/Text/);
   assert.match(report, /✅ It is what the change said\./);
@@ -139,7 +139,7 @@ test('--figma-change: local or shared, who made it, never signed off by its auth
   // A person runs it by hand (no agent session): the name their git uses is its author.
   const person = { CLAUDE_CODE_SESSION_ID: '', DESIGN_SYSTEM_ENGINE_SESSION: '', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'Design lead' };
   const cli = (env, ...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '', ...env } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
-  const asked = 'add xl to size like l, then rename Label layer to Text';
+  const asked = 'add dense to size like l, then rename Label layer to Text';
   const first = cli(person, '--figma-change', 'chipFilter', asked);
   assert.match(first, /\nShared: chipFilter's Figma component is the system's: 1 product uses it \(Checkout\), [^\n]*It waits on Chips team\./);
   assert.match(first, /Ask who \(Chips team decides for it in ds-config\.json owners; never your own name/);

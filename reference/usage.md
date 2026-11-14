@@ -1650,6 +1650,13 @@ drives, and a removed layer takes with it the property that drove only it. The o
 
 A layer is named by its path inside the component (`Content/Label`).
 
+What is built makes sense, not only exists, so three readings that would be built literally are asked instead: an
+option on a size scale copied from another step (`xl` like `l`) is asked what it changes, unless the operations that
+follow bind something where it is that option; a boolean named for a part (`showBadge`, `hasIcon`) put on a layer that
+is not that part is asked which part it shows (the part, when the component has it, is proposed) or to add it first;
+and a copy that changes nothing of how it is built or what it takes, in a system that holds `no-twins`, is asked what
+makes it different.
+
 Not only components (`system-kinds.mjs`): what the description makes decides what is built, by the intent layer's own
 kinds. "Make a template like settings", "a settings page", "a pattern for bulk actions" and "a checkout flow" build a
 frame (`create { kind: "frame", as }`) of the system's own components; "a spacing token like spacing/32" builds a
