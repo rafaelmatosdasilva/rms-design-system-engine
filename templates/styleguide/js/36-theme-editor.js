@@ -700,6 +700,10 @@
       // Every screen scrolls in its frame: the specimen as long as it runs, a Showroom screen at its own height at least.
       if (screenEl) { screenEl.style.width = lw + 'px'; screenEl.style.minHeight = lh + 'px'; screenEl.style.height = screenEl._flow ? 'auto' : Math.max(lh, size[1]) + 'px'; }
       box.style.width = Math.floor(lw * k) + 'px'; box.style.height = Math.floor(lh * k) + 'px'; box.style.marginInline = 'auto';
+      // Zoomed in, the stage keeps the size it has at fit and scrolls: the zoom is the preview's alone, and never grows the
+      // panel around it, whose own scroll it would take over.
+      var bs = getComputedStyle(stage).boxSizing === 'border-box' ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 0;
+      stage.style.height = zoom > 1 ? Math.floor(Math.round(roomH / kFit) * kFit) + bs + 'px' : '';
       if (typeof placeLabel === 'function') placeLabel();   // the labels follow the zoom
     };
     window.addEventListener('resize', function () { fit(); });

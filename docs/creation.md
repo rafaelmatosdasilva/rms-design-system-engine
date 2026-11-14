@@ -56,7 +56,7 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
 - **Full screen.** The button at the end of the preview's bar shows it at the screen's real size. Escape brings the form back. It is for trying the screens: nothing is outlined or named there, and a click does what it does in the app.
 - **No scroll bars.** A screen still scrolls, as a phone does, but shows no bar of its own.
-- **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview scrolls; hold the space bar, or the middle button, and drag to move it.
+- **Zoom and pan.** The bar's zoom is a number field like the others (− the percentage, its reset, +). Zoomed in, the preview keeps its size and its screens scroll inside it, so the form beside it scrolls as before. Hold the space bar, or the middle button, and drag to move it.
 - **Every screen scrolls.** A new screen shows only once the theme is on it, so your original brand never flashes first.
 - **Screens side by side.** A page built for showing the editor can ask for its screens in a row, with no list to choose from (`row: true` in its data, as `enabled` is): phone screens shown together, centred, the panel's own background around them.
 

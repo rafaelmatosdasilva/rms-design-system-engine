@@ -304,6 +304,7 @@ Every build writes the page's twin in text beside it, from the same object the p
 
 One row for each component, with one word per state. The cards above the table and the filter chips use the same words.
 
+
 | Column | States |
 |---|---|
 | Figma | Found, Missing |
