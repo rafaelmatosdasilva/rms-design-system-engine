@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The Status cards' measured-on line taken out, at the owner's word (continuous evaluation)
+
+What changed since the entry below (engine 253ad7b): Test tools kept current by themselves, a major is the owner's call, and a version every 15 commits (#480); test-tools: bump the vue-cli-tools group (#484); test-tools: bump vue in /test/.nuxt-tools in the nuxt-tools group (#481); test-tools: bump @anthropic-ai/claude-agent-sdk (#482); The Figma builder asks when the literal reading would not serve, and its benchmark scores sense, questions and rules, on a team's own library too (#479); Three things a real system found that a fixture could not (#469); Token references point down their layers, each Health card says what it was measured on, and examples that no longer build are out of date; The Status cards' measured-on line taken out, at the owner's word. The guide changed in `reference/usage.md`.
+
+Guide set measured: `aa339f978ccc` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2a99b1bc` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 24fbea25` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine f7ce0c9 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.061 |
+| Input a run | 101k | 111k |
+| Turns a run | 3.6 | 3.8 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 101k, in 3.8 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-the-status-cards-measured-on`.
+
 ## 2026-11: The Figma builder asks, and its benchmark on a real library, on main (continuous evaluation)
 
 What changed since the entry below (engine 5f1e378): A shared token's value changed is held with what it reaches, and the agent-time rails tried against faults (#476); Theme editor: header background, shadows reach every component, surfaces follow card roundness, a testing full screen (#477); What a property may hold, layout names from the code, and turns, icon glyphs and font faces in parity (#478); The review script's no-op replacement taken out. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.

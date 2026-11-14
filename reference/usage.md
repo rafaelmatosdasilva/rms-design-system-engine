@@ -437,7 +437,8 @@ accessibility check found broken (by WCAG criterion). The code file it names mus
 calls a deprecated component stable is wrong. **Out of date**: the component's props (names, and the values each
 takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
-history dates its file too). **Twins**: two components' pages that say the same (their own names aside, lines a template
+history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
+prop it does not have, or a literal value the prop does not take. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
@@ -1508,7 +1509,8 @@ own aliases (the vars snapshot's `figmaTokens`, `token-layers.mjs`), how the sys
 model: a collection whose tokens point nowhere is a base, one whose tokens mostly point at another sits on it, and a
 collection whose aliases stay inside it keeps its layers as a few large groups of names (`primitives/…`, `semantic/…`).
 Three rules come of it, each a place (a token) rather than a component: a token of a layer points at the layer it goes
-through, never past it or elsewhere (`token-layer-<layer>`); an alias reaches its value in no more steps than most of
+through, never past it, up, elsewhere or across at another component's token, read from the library's component names
+(`token-layer-<layer>`); a base token never points at a layer above it (`token-base-<layer>`); an alias reaches its value in no more steps than most of
 the system's, and never comes back on itself (`token-alias-chains`); and a token's name begins as its collection's
 names do (`token-name-collection`). A layer whose tokens point every way has no clear layer beneath it and no rule.
 With both, four more on what a component binds: never a base token (one in the layer others go through), where the

@@ -57,6 +57,8 @@ How your tokens are layered is read from the tokens themselves, so you never hav
 - **The layers come from the aliases.** A group of tokens that point at nothing is a base; one that mostly points at another sits on it. Layers can be collections of their own (Primitives, Semantic) or groups of names inside one collection (`primitives/…`, `semantic/…`).
 - **A token that skips its layer is flagged.** For example, a component token pointing straight at a primitive where the rest go through a semantic token.
 - **So is a long or circular alias chain.** Longer than most of your system's, or one that comes back on itself.
+- **A base token never points up.** A primitive that points at a semantic token makes the layer below move with the one above.
+- **A component token never points at another component's.** `chip/bg` pointing at `card/bg` changes the chip whenever the card changes. Only names of your library's own components count, so one semantic group pointing at another is fine.
 - **And a token named like another collection's.** For example, `primitives/…` sitting in Semantic.
 - **Nothing is imposed.** A group of tokens that points in every direction has no clear layer, so it gets no rule.
 
