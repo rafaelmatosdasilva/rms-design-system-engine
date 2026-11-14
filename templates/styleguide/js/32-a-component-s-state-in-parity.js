@@ -166,9 +166,7 @@
         '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></button>' : '';
       // The share done, big, after a green dot that ties it to the green of the bar, and its word beside it (51% Match).
       var count = '<div class="sg-health-count"><p class="sg-health-num">' + (o.pct == null ? '–' : '<span class="sg-health-dot" aria-hidden="true"></span><span class="sg-health-pct">' + o.pct + '%</span><span class="sg-health-out">' + esc(o.pctWord) + '</span>') + '</p></div>';
-      // Beside the number, what it was measured on: never a share without how much of the system it is a share of.
-      var read = o.total ? '<p class="sg-health-read">Measured on <b>' + o.readN + '</b> of ' + o.total + ' component' + (o.total === 1 ? '' : 's') + '</p>' : '';
-      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + read + barHTML + legend + '<div class="sg-health-go">' + done + next + '</div></div>';
+      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + '<div class="sg-health-go">' + done + next + '</div></div>';
     };
     // Every card counts over the same whole: everything the table lists, as its All filter does. Parity compares only
     // what the code has built; Accessibility tries only that, in a browser.
@@ -197,9 +195,7 @@
     var aT = card('Accessibility', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
     aT.untested = countOf(accP, 'Untested');
     var dT = card('Documentation', rowsSplit(docOwn), ['Written', 'Partial', 'Missing'], nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
-    // How much of the system each number was measured on: every component, less those it could not apply to (N/A) and
-    // those not tried yet (Untested). A share of a third of the system is no share of the system, so it is said beside it.
-    [[pT, parP], [iT, codeP], [aT, accP], [dT, docP]].forEach(function (x) { x[0].total = mx.length; x[0].doneN = countOf(x[1], x[0].pctWord); x[0].readN = mx.length - countOf(x[1], 'N/A') - countOf(x[1], 'Untested'); });
+    [[pT, parP], [iT, codeP], [aT, accP], [dT, docP]].forEach(function (x) { x[0].total = mx.length; x[0].doneN = countOf(x[1], x[0].pctWord); });
     // What each card counts, said simply: one or two fixed sentences a person reads at a glance (25 words at most, nothing
     // made from data: test/styleguide-template.test.mjs holds them to it).
     pT.how = 'How closely the code matches Figma, in every property, token and value. The line under it counts what matches in full.';

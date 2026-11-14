@@ -44,8 +44,6 @@
 :root[data-sg-scheme="light"] :is(.sg-health-tile, .sg-health-card) { background: var(--sg-bg); }   /* in light mode a raised card is lighter than the page, never a shade darker */
 .sg-health-card > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
 .sg-health-card + .sg-health-card { margin-top: var(--sg-space-l); }
-.sg-health-read { font-size: var(--sg-s); color: var(--sg-text-2); font-variant-numeric: tabular-nums; margin-top: calc(-1 * var(--sg-space-xs)); }
-.sg-health-read > b { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .sg-health-label { font-size: calc(var(--sg-s) + var(--sg-space-xxs)); color: var(--sg-muted); }
 .sg-health-num { font-size: calc(var(--sg-h1) * 4); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
 .sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
