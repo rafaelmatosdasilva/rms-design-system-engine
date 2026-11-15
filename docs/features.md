@@ -182,12 +182,16 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Opens one issue per difference in your tracker, and closes it once it is fixed. *(Coming soon)*
 - Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
 - Reads products kept in their own repositories. *(Coming soon)*
+- Hands a renamed prop or value back with its way across: the old name kept as a deprecated alias, a patch for each product and the version that removes it.
+- Finds the same job built differently across products, such as a create flow, and asks whether each difference is earned.
+- Reads your results as one inspection report: ten questions, each with a rating, its evidence and what only an interview answers.
 
 ### What to ask
 
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
+| `/rms-design-system-engine inspect our design system` | One rating for each of ten questions (coverage, accessibility, governance, adoption and more), with the evidence behind it and what only an interview answers |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
 ## Write component specs
