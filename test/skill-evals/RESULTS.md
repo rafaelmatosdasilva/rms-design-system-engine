@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A rename handed back with its way across, the same job done differently across products, and one inspection report (continuous evaluation)
+
+What changed since the entry below (engine ba67c2a): A rename handed back with its way across, the same job done differently across products, and one inspection report; The accessibility criteria a browser decides, tried in Firefox and Safari too, and only what differs from Chrome said (#503). The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `54957ff3cf64` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 9ac68d53` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md f98aaa2b` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 37d549e | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.057 |
+| Input a run | 104k | 95k |
+| Turns a run | 3.7 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 95k a run against 104k, in 3.4 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-a-rename-handed-back-with`.
+
 ## 2026-11: The demo's report says the browsers line as it is now (continuous evaluation)
 
 What changed since the entry below (engine 1f76f4a): The privacy check reads a package at its version as a version, not an email address (#500); A part built by hand in prototype after prototype, counted (#501); The common set a system lacks, browser support, governance against what happened, and products that quietly left (#502); The accessibility criteria a browser decides, tried in Firefox and WebKit too, and only what differs from Chrome said; The Tab walk starts at the components, so a page's own menus never take every press first; The demo's report says the browsers line as it is now. The guide changed in `reference/config.md`, `reference/usage.md`.
