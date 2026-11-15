@@ -94,6 +94,7 @@ rms-design-system-engine --contract-changes [--record] [--base <folder>] [--fail
 rms-design-system-engine --proposals                     # the same override or detach in two or more products, drafted as a proposal with where it was seen and what it would reach (handback/proposals.md)
 rms-design-system-engine --proposal <id> --accept|--reject "<why>"|--research --by "<who>"   # a person's decision on one, kept in design-system-engine-proposals.json
 rms-design-system-engine --inspection                    # the engine's results as one inspection report: ten questions, each with a rating, its evidence, what it could not see and what only an interview answers (inspection.md)
+rms-design-system-engine --mistakes                      # for each component, the mistakes its kind is known for that its page does not say, and each written one without why or what instead
 rms-design-system-engine --guidance-rating [--extract]   # how much an agent can take from the guidance: ready, partial or thin per component; --extract asks a model (your tokens)
 rms-design-system-engine --judge-pages                  # only when asked, since it spends the person's model tokens: a model judges each Showroom screen (its screenshot, code, components and brief) on named decisions (pageJudgment.decisions); advisory, cached by screenshot, shown under the screen's page review, with its cost
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
