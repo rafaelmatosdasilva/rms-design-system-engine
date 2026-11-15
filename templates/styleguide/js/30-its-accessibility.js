@@ -33,7 +33,7 @@
     return ((c.a11y || {}).sources || []).filter(function (x) { return x.st === 'agents'; }).map(function (x) {
       var figma = /annotation|Figma/.test(x.from);
       return { key: c.name + '\u0000u:' + x.from + ':' + x.what, area: 'Accessibility', kind: x.from, figma: figma ? esc(x.what) : '', code: '', todo: (figma ? '' : esc(x.what) + '<span class="pg-todo">') + unreadFix(x) + (figma ? '' : '</span>'),
-        who: x.todo ? (/annotation/.test(x.from) ? WHO.figma : WHO.person) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
+        who: x.todo ? (/annotation/.test(x.from) ? WHO.designer : WHO.a11y) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
     });
   }
   function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
@@ -76,7 +76,7 @@
       // A difference found against Figma says where it is fixed (figma, code, both); in the Accessibility area that is
       // said as the person who does it, so the whole area speaks of people and not of places.
       var side = { figma: 'designer', code: 'developer' };
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[side[x.who]] || WHO.both) + teamNote(c.name) : '', x.new);
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[side[x.who]] || a11yWho(scOfLabel(x.wcag) || '', '', [], '')) + teamNote(c.name) : '', x.new);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix)), '', false, i.tasks || TASKS[i.issue]); });
     var stat = {};

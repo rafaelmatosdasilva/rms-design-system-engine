@@ -71,6 +71,10 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
       });
     })()`);
     for (const c of counted) assert.equal(c.got, c.want);
+    // Every task names a person by role (a designer, a developer, a person checking by hand, whoever writes the words,
+    // whoever owns the flow): never the older "You decide" or "You in Figma", which said a place or a doubt.
+    const who = await run(`[...new Set([...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((t) => t.dataset.fWho).filter(Boolean))]`);
+    for (const w of who) assert.match(w, /^(A designer, in Figma|A developer, in the code|A person checks it by hand|Whoever writes the words|Whoever owns the flow)/, w);
     assert.match(seen.comp, /^#c-/, 'a row names its component, a link to its page');
     // The rows are the component's own: the same criteria its Accessibility area lists.
     const name = await run(`document.querySelector('#accessibility .sg-a11y-table tbody tr').cells[1].textContent.trim()`);

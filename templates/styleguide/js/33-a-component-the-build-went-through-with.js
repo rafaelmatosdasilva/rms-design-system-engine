@@ -267,7 +267,7 @@
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
       var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML((r.k.beyond ? '' : 'WCAG ') + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
-        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
+        who: r.st === 'todo' || r.st === 'check' ? (own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
         // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.
         unrun: r.st === 'check' && (/^(Run the audit|Build .* in the code: the audit|The last audit did not|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(act || r.note || '') || r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) };
       // Owed to one person, or to nobody yet: the row as it was. Owed to several: one row each, with that person's
