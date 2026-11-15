@@ -80,7 +80,8 @@ test('every finding carries its tasks, so a11y.json says who acts', () => {
 test('who acts has a card of its own in the panel, and what to do says only what to do, at the top', () => {
   const page = templateText();
   // Its own card, from the row's own who, where the table has its column.
-  assert.match(page, /if \(k === 'whoCell'\) return card\(col\[0\], r\.who \?/);
+  // A criterion's level and principle stand in front of it, a card of their own (the Accessibility page's filters).
+  assert.match(page, /if \(k === 'whoCell'\) return \(r\.k && r\.k\.sc \? card\('Level and principle', [^\n]*\+ card\(col\[0\], r\.who \?/);
   // What to do never repeats who acts (the owner's, 12 November 2026), and every panel opens with it.
   assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(r\.todo \?/);
   assert.match(page, /order = order\.filter\(function \(col\) \{ return col\[1\] === 'todo'; \}\)\.concat/);
