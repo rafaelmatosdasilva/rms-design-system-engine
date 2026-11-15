@@ -261,8 +261,25 @@ What a *product* does with the system is a product leaving it, so it is said und
   - **Built its own:** a component it defines beside the system's, by the same name, by its own name before it (ShopButton), or by a known alias (Modal for a dialog). A wrapper that brings in the system's package is not one.
   - Each line says where it is (file and line) and is a need the system does not meet yet. Ask the product's team what it needed.
   - The version a product uses is the one its lockfile pinned (package-lock, yarn or pnpm), before the range its package.json accepts.
+- The same job done differently across products:
+  - It reads each product's pages and says what job each one does: a create flow, an edit form, a detail page, a list or table page, a search, a settings page, a sign-in or the navigation.
+  - The job comes from the file's name or its folder's (`CreateOrder.jsx`, `orders/[id]`), else from what the page is built from (a table makes a list page).
+  - It groups the pages that do the same job in two or more products and says what differs: the system components that carry it, their order, and where the main action sits.
+  - Each difference is a question for the teams: is it earned? Align the products, or keep it.
+  - A job kept different on purpose (`sameJobs.keep` in `ds-config.json`) is said as kept, with its reason.
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
+
+#### One inspection report
+
+Ask for an inspection and the engine reads what it already found as one report (`rms-design-system-engine --inspection`). Run the full check first: the report reads its results.
+
+- Ten questions: coverage, best practices, accessibility, shared language, testing, orchestration across design, code and docs, governance, adoption, machine-readable docs and agent access.
+- Each gets a rating (green, yellow or red) and the evidence behind it, such as "9 of 12 checks pass".
+- Each says what the engine could not see, such as a browser that was not here.
+- A question with no evidence gets no rating. It says why, and never guesses.
+- Each names what only an interview answers, such as who decides what goes into the system.
+- The report is written to `.design-system-engine-out/inspection.md`.
 
 #### Browser support
 
