@@ -178,17 +178,17 @@
     // Accessibility by criterion, over the whole system: a criterion is met when nothing tried fails it or waits on it,
     // to review when only a check by hand is left somewhere, failing when anything fails it. One that fails anywhere is
     // not met: that is how an audit reads WCAG.
-    var bySc = {};
+    var a11yAll = [];
     // Documentation by what people write: the page existing and its properties are the engine's own, never counted.
     var docOwn = [];
     COMPONENTS.forEach(function (c) {
       var s = componentStates(c);
       s.all.forEach(function (r) {
-        if (r.area === 'Accessibility' && r.k && r.k.sc) { var was = bySc[r.k.sc]; bySc[r.k.sc] = r.st === 'todo' || was === 'todo' ? 'todo' : r.st === 'check' || was === 'check' ? 'check' : 'done'; }
+        if (r.area === 'Accessibility') a11yAll.push(r);
         if (r.area === 'Documentation' && !c.codeOnly && r.kind !== 'Intent layer' && r.kind !== 'Properties') docOwn.push(r);
       });
     });
-    var scSplit = rowsSplit(Object.keys(bySc).map(function (k) { return { st: bySc[k] }; }));
+    var bySc = a11yCriteria(a11yAll), scSplit = rowsSplit(Object.keys(bySc).map(function (k) { return { st: bySc[k].st }; }));
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
     var pT = card('Parity', checksSplit(builtRows, 'par'), ['Match', 'Unsure', 'Differs'], nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial') || nx(countOf(parP, 'Unsure'), 'Unsure', 'ParityUnsure'));
     // Code's checks are the rows themselves: built, the rest unsure (or only its CSS class) or missing.

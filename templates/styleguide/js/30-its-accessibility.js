@@ -387,18 +387,31 @@
     labelCells(td);
     todoHeadHeight();
   }
+  // Each criterion across the system, as an audit reads WCAG: met only when no component fails it and none waits on a
+  // review, to review when only reviews are left somewhere, failing when any component fails it. Level A and AA only:
+  // what is looked at beyond them (forced colours, reduced motion) is in the tables, never in the share. The Status
+  // page's Accessibility card and the Accessibility page's card both count by this one function, so the two always say
+  // the same number (the owner's, 15 November 2026). → { [sc]: { st, level, principle } }
+  function a11yCriteria(rows) {
+    var by = {}, RANK = { done: 0, kept: 0, check: 1, todo: 2 };
+    rows.forEach(function (r) {
+      var k = r.k; if (r.area !== 'Accessibility' || r.extra || !k || !k.sc || !(r.st in RANK)) return;
+      var n = /^(\d)\./.exec(k.sc), was = by[k.sc];
+      if (!was) by[k.sc] = { st: r.st === 'kept' ? 'done' : r.st, level: k.level, principle: n ? A11Y_PRINCIPLE[n[1]] : '' };
+      else if (RANK[r.st] > RANK[was.st]) was.st = r.st;
+    });
+    return by;
+  }
   // ── The Accessibility page: every criterion of every component, one table ───────────────────────────────────────
   // The rows a component's own Accessibility area shows (a11yIssueRows, and the notes no check reads), for every
   // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
   // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
-  // browser, then the component, the level, the principle, who acts and what the criterion depends on. Above them a card
-  // a level: the share of its criteria met across the system, by principle. Every row is one the browser tries, so until every component is
+  // browser, then the component, the level, the principle and who acts (what a criterion depends on is said in each
+  // row's panel, never a filter: the owner's, 15 November 2026). Above them one card, the Status page's number. Every row is one the browser tries, so until every component is
   // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
   var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
   var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
   var A11Y_LEVELS = ['A', 'AA', 'Beyond AA', 'Not a criterion'];
-  // What a criterion depends on, as a row says where it was tried (wcag21.mjs browser).
-  var A11Y_DEPENDS = { same: 'The same in every browser', each: 'Each browser decides', chrome: 'Chrome alone' };
   var A11Y_ST = { todo: 'fix', check: 'check', done: 'done' };
   function fillA11yPage() {
     var sec = a11ySec; if (!sec) return;
@@ -424,7 +437,6 @@
     var BB = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null;
     var levelOf = function (r) { return r.k ? (r.k.level || 'Beyond AA') : 'Not a criterion'; };
     var principleOf = function (r) { var n = r.k && /^(\d)\./.exec(r.k.sc); return n ? A11Y_PRINCIPLE[n[1]] : ''; };
-    var dependsOf = function (r) { return r.k ? A11Y_DEPENDS[r.k.browser] || '' : ''; };
     var whoOf = function (r) { return plainText(r.who || '').replace(/\s+/g, ' ').trim(); };
     // Fails in one browser and passes in another: each browser's line says ✓ and ✕.
     var differs = function (x) { var b = BB && x.r.k && BB[x.c.name] && BB[x.c.name][x.r.k.sc]; return !!(b && /✓/.test(b.line) && /✕/.test(b.line)); };
@@ -433,7 +445,7 @@
     rows.sort(function (p, q) { return ORDER_[p.r.st] - ORDER_[q.r.st] || (TODO_NO[p.r.key] || 1e9) - (TODO_NO[q.r.key] || 1e9) || p.c.name.localeCompare(q.c.name); });
     var rowHTML = function (x, i) {
       var r = x.r, id = ROW_DETAIL.push({ r: r, area: 'Accessibility' }) - 1;
-      var f = { component: x.c.name, status: stWord(r), level: levelOf(r), principle: principleOf(r), who: whoOf(r), depends: dependsOf(r) };
+      var f = { component: x.c.name, status: stWord(r), level: levelOf(r), principle: principleOf(r), who: whoOf(r) };
       return '<tr class="sg-row-open" tabindex="0" data-row-detail="' + id + '" data-a11y-row="' + i + '" data-status="' + r.st + '" data-f' + Object.keys(f).map(function (k) { return f[k] ? ' data-f-' + k + '="' + esc(f[k]) + '"' : ''; }).join('') + (differs(x) ? ' data-f-differs="1"' : '') + '>' +
         ISSUE_CELL.no(r) + '<td><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td>' + ISSUE_CELL.kind(r) + '<td>' + esc(levelOf(r)) + '</td>' + ISSUE_CELL.whoCell(r) + ISSUE_CELL.status(r) + ISSUE_CELL.updated(r) +
         '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
@@ -463,19 +475,11 @@
     var chips = ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]);
     filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
       { key: 'status' }, { key: 'component', label: 'Component' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'principle', label: 'Principle', order: A11Y_PRINCIPLES },
-      { key: 'who', label: 'Who acts' }, { key: 'depends', label: 'Depends on', order: [A11Y_DEPENDS.same, A11Y_DEPENDS.each, A11Y_DEPENDS.chrome] }] });
-    // A card a level, counted by criterion across the system, as an audit reads WCAG and as the Status page's
-    // Accessibility card counts: a criterion is met only when no component fails it and none waits on a review, to
-    // review when only reviews are left somewhere, failing when any component fails it. Its principle's bar beside it.
-    // Counted by row (a criterion on a component), the many components that pass a criterion would hide the few that
-    // fail it, and the share read far higher than the system stands (the owner's, 15 November 2026).
-    var RANK = { done: 0, check: 1, todo: 2 };
-    var levelCard = function (lv) {
-      var by = {}, order = [];
-      rows.forEach(function (x) { var k = x.r.k; if (!k || k.level !== lv || !principleOf(x.r)) return; if (!by[k.sc]) { by[k.sc] = { area: principleOf(x.r), st: 'done' }; order.push(k.sc); } if (RANK[x.r.st] > RANK[by[k.sc].st]) by[k.sc].st = x.r.st; });
-      return doneCard('Level ' + lv, order.map(function (sc) { return { area: by[sc].area, state: A11Y_ST[by[sc].st] }; }));
-    };
-    doneCards(sec, levelCard('A') + levelCard('AA'));
+      { key: 'who', label: 'Who acts' }] });
+    // One card, the Status page's Accessibility number: every criterion at A and AA across the system (a11yCriteria),
+    // with a bar for each level. One number for accessibility wherever it is said.
+    var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
+    doneCards(sec, doneCard('Accessibility', ['A', 'AA'].reduce(function (out, lv) { return out.concat(Object.keys(bySc).filter(function (sc) { return bySc[sc].level === lv; }).map(function (sc) { return { area: 'Level ' + lv, state: A11Y_ST[bySc[sc].st] }; })); }, [])));
     labelCells(sec);
     if (route.last !== undefined && !sec.hidden) underTitle(sec);
   }

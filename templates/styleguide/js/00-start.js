@@ -146,7 +146,7 @@
     items.forEach(function (x) { if (!by[x.area]) { by[x.area] = { a: x.area, done: 0, check: 0, fix: 0 }; order.push(x.area); } by[x.area][x.state]++; all[x.state]++; });
     var tot = function (n) { return n.done + n.check + n.fix; };
     var areas = order.map(function (k) { return by[k]; }).sort(function (x, y) { return x.done / tot(x) - y.done / tot(y) || tot(y) - tot(x); });
-    var t = tot(all), pct = Math.round(all.done / t * 100), at = 0;
+    var t = tot(all), pct = Math.floor(all.done / t * 100), at = 0;   // rounded down, as the Status page's cards are: 100% is all done, never 99.6%
     // A gap between two states, as the bars have (their 2px at the ring's default size); none when there is one state.
     var GAP = DONE_STATES.filter(function (k) { return all[k]; }).length > 1 ? 1.5 : 0;
     var arcs = DONE_STATES.map(function (k) { if (!all[k]) return ''; var len = C * all[k] / t, draw = Math.max(0.5, len - GAP), a = '<circle class="sg-cx-ring-' + k + '" cx="54" cy="54" r="' + R + '" stroke-dasharray="' + draw.toFixed(2) + ' ' + (C - draw).toFixed(2) + '" stroke-dashoffset="' + (-(at + GAP / 2)).toFixed(2) + '"/>'; at += len; return a; }).join('');
