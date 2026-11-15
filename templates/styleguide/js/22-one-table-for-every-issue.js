@@ -99,7 +99,7 @@
   function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
-    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.said ? ' data-said="1"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
+    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.said ? ' data-said="1"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + listAttrs(r, a) + (r.extra ? ' data-extra' : '') + '>' +
       tableColsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
   }
   // A row in full, in a panel from the right, as a token opens: each column of its table as a card, nothing cut short,
@@ -263,7 +263,7 @@
   function statusSum(rows) {
     var n = {}; rows.forEach(function (r) { if (!r.extra) n[r.st] = (n[r.st] || 0) + 1; });
     var area = rows.length && rows.every(function (r) { return r.area === rows[0].area; }) ? rows[0].area : null;
-    return chipsHTML(n, area);
+    return chipsHTML(n, area, listChipsHTML(rows, area));
   }
   // The chips: All, then each status there is, its dot, its name and its count in the segments' badge; a click shows
   // only those rows (filterChips).
@@ -285,6 +285,51 @@
   // rest. Several at once, because one criterion often owes work to more than one of them. The shape is the Status
   // page's own filter (a chip that opens a listbox, each choice with how many rows it has), and it combines with the
   // status chips: a row is shown when both let it through.
+  // ── The page's own list filters, in a component's area ───────────────────────────────────────────────────────────
+  // A component's area filters its rows as the page of the same name does (the owner's, 15 November 2026): the
+  // Documentation page's Source, the Rules page's Area, each a chip that opens a list, beside the status chips and
+  // combined with them. A list every row answers the same way is no filter, so it is left out, as on the page.
+  var LIST_FILTERS = {
+    Documentation: [['source', 'Source', function (r) { return docSrcNames(r.src); }]],
+    Rules: [['area', 'Area', function (r) { return r.ruleArea ? [r.ruleArea] : []; }]]
+  };
+  function listAttrs(r, area) { return (LIST_FILTERS[area] || []).map(function (f) { var v = f[2](r); return v.length ? ' data-lf-' + f[0] + '="' + esc(v.join('|')) + '"' : ''; }).join(''); }
+  var LF_DD = 0;
+  function listChipsHTML(rows, area) {
+    return (LIST_FILTERS[area] || []).map(function (f) {
+      var n = {}, words = [], total = 0;
+      rows.forEach(function (r) { if (r.extra) return; var v = f[2](r); if (v.length) total++; v.forEach(function (w) { if (!n[w]) { n[w] = 0; words.push(w); } n[w]++; }); });
+      if (words.length < 2) return '';
+      var id = 'sg-lf-dd-' + (++LF_DD);
+      return '<span class="sg-chip-dd sg-lf-dd" data-lf-key="' + f[0] + '"><button type="button" class="sg-chip sg-chip-menu" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+        '<span class="sg-chip-label">' + esc(f[1]) + '</span><span class="sg-chip-word">All</span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+        '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(f[1]) + '" tabindex="-1" hidden>' +
+        '<span class="sg-dd-option" role="option" data-lfpick="" aria-selected="true"><span>All</span><span class="sg-count">' + total + '</span></span>' +
+        words.map(function (w) { return '<span class="sg-dd-option" role="option" data-lfpick="' + esc(w) + '" aria-selected="false"><span>' + esc(w) + '</span><span class="sg-count">' + n[w] + '</span></span>'; }).join('') +
+        '</span></span>';
+    }).join('');
+  }
+  // The rows every list filter of the area lets through, and the word on each chip: none chosen is All.
+  function applyLists(scope) {
+    var dds = Array.prototype.slice.call(scope.querySelectorAll('.sg-lf-dd'));
+    var picked = dds.map(function (dd) { var o = dd.querySelector('.sg-dd-option[aria-selected="true"]'); return [dd.getAttribute('data-lf-key'), o ? o.getAttribute('data-lfpick') : '']; });
+    Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) {
+      tr.classList.toggle('sg-lf-off', !picked.every(function (p) { return !p[1] || String(tr.getAttribute('data-lf-' + p[0]) || '').split('|').indexOf(p[1]) >= 0; }));
+    });
+    dds.forEach(function (dd, i) { var btn = dd.querySelector('.sg-chip-menu'), w = picked[i][1]; btn.setAttribute('aria-pressed', w ? 'true' : 'false'); btn.querySelector('.sg-chip-word').textContent = w || 'All'; });
+    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.classList.contains('sg-lf-off') && !tr.hidden; })); });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.sg-lf-dd .sg-chip-menu');
+    if (b) { var list = document.getElementById(b.getAttribute('aria-controls')), open = b.getAttribute('aria-expanded') !== 'true'; list.hidden = !open; b.setAttribute('aria-expanded', String(open)); return; }
+    var o = e.target.closest && e.target.closest('.sg-lf-dd .sg-dd-option[data-lfpick]');
+    if (o) {
+      Array.prototype.forEach.call(o.parentElement.querySelectorAll('.sg-dd-option'), function (x) { x.setAttribute('aria-selected', x === o ? 'true' : 'false'); });
+      var dd = o.closest('.sg-lf-dd'), m = dd.querySelector('.sg-chip-menu'); m.setAttribute('aria-expanded', 'false'); o.parentElement.hidden = true;
+      applyLists(dd.closest('.pg-par, .sg-todo') || dd.parentElement); return;
+    }
+    if (!(e.target.closest && e.target.closest('.sg-lf-dd'))) Array.prototype.forEach.call(document.querySelectorAll('.sg-lf-dd .sg-chip-menu[aria-expanded="true"]'), function (x) { x.setAttribute('aria-expanded', 'false'); document.getElementById(x.getAttribute('aria-controls')).hidden = true; });
+  });
   var WHO_DD = 0;
   function whoChipsHTML(rows) {
     var n = {}, keys = [], total = 0;
@@ -344,7 +389,7 @@
     scope._chip = st;
     Array.prototype.forEach.call(group.querySelectorAll('.sg-chip[data-st]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });   // the status chips only: a filter in the same group (Who acts) keeps its own
     Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) { tr.classList.toggle('sg-st-off', st !== 'all' && tr.dataset.status !== st); });
-    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.hidden; })); });
+    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.classList.contains('sg-lf-off') && !tr.hidden; })); });
     Array.prototype.forEach.call(scope.querySelectorAll('.sg-who-dd'), function (dd) { applyWho(dd); });   // the two filters agree on what is shown
   }
   document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sg-chip[data-st]'); if (b) { applyChip(b); if (e.isTrusted && hashParts().id !== 'status') setHashQuery({ st: b.dataset.st }); } });

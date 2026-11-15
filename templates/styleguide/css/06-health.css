@@ -105,6 +105,3 @@ th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
 .sg-health-cell { display: flex; flex-direction: column; gap: var(--sg-space-xxs); min-width: calc(var(--sg-space-xxl) * 2); font-variant-numeric: tabular-nums; }
 .sg-health-comps td { font-variant-numeric: tabular-nums; }
 /* Where nobody is named to decide: a quiet note under the numbers, the same type as a card's lines. */
-.sg-health-undecided { margin-top: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
-.sg-health-undecided > p { margin: 0; font-size: var(--sg-s); }
-.sg-health-undecided-how { color: var(--sg-muted); }

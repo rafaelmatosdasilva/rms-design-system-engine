@@ -575,7 +575,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*( check)?$/, 'what is to write first, then what is to check, what is written after; its stage, not counted, last');
     // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
     assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
-    assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
+    assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Review|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
@@ -1547,12 +1547,12 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what Code says');
     assert.match(tiles[1][1], /^\d+%Built\|$/);
     assert.match(tiles[2][1], /^(\d+%Met|–)\|$/);
-    assert.match(tiles[3][1], /^\d+%Written\|$/);
+    assert.match(tiles[3][1], /^\d+%Done\|$/);
     // Each card's foot counts what is done in full, the rows its filter shows for the done word, said as complete
     // (the big number counts the work).
     const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
     const of = (col, w) => col.filter((x) => x === w).length;
-    assert.deepEqual(table.done, [`${of(table.par, 'Match')} of ${table.n} complete`, `${of(table.code, 'Built')} of ${table.n} complete`, `${of(table.acc, 'Met')} of ${table.n} complete`, `${of(table.doc, 'Written')} of ${table.n} complete`], 'each count at the foot is what its filter shows for the done word');
+    assert.deepEqual(table.done, [`${of(table.par, 'Match')} of ${table.n} complete`, `${of(table.code, 'Built')} of ${table.n} complete`, `${of(table.acc, 'Met')} of ${table.n} complete`, `${of(table.doc, 'Done')} of ${table.n} complete`], 'each count at the foot is what its filter shows for the done word');
     assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(of(table.code, 'Built') / table.n * 100), 'Code\'s share is what is built over everything');
     // The bar draws what the numbers say: its green is the big number, and the big number and the legend's shares add
     // up to 100. No word says what is counted: the line above the cards does.
@@ -1564,7 +1564,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
       const sum = +pct + shares.reduce((t, x) => t + x, 0);
       assert.ok(sum >= 99.5 && sum <= 100.5, `${tiles[i][0]}: ${pct}% and the legend's ${shares.join(', ')} add up to 100`);
     }
-    if (tiles[3][2]) assert.match(tiles[3][2], /^(<?\d+% (Partial|Missing))+$/, 'the Documentation card\'s words for what is left, the table\'s: Partial, Missing');
+    if (tiles[3][2]) assert.match(tiles[3][2], /^(<?\d+% (Review|Missing))+$/, 'the Documentation card\'s words for what is left, the Documentation page\'s: Review, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
