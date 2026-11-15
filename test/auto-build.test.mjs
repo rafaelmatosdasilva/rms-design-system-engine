@@ -274,9 +274,11 @@ test('a step still running past its limit is stopped with all it started, and th
 
 test('the accessibility check stops a browser copy that runs past its limit, says what it was on, and leaves its parts', () => {
   const src = readFileSync(join(ENGINE, 'lib', 'a11y-check.mjs'), 'utf8');
-  // Its limit: its share, inside what is left of the run's own time, given to it so it stops itself and keeps what it
-  // checked; stopped from outside only two minutes past it.
-  assert.match(src, /const own = Math\.min\(RUN_LIMIT_SEC - \(Date\.now\(\) - RUN_BEGAN\) \/ 1000 - 120, Number\(cfg\.a11y\?\.timeoutSec\) \|\| Math\.min\(LIMIT_CAP_SEC, Math\.max\(150, Math\.ceil\(open\.reduce\(\(s, t\) => s \+ share\(t\), 0\) \/ n\)\)\)\);/, 'its limit: its share, inside the run\'s');
+  // Its limit: its share, inside what is left of the run's own time less a margin (at most two minutes, never more
+  // than a quarter of the limit), given to it so it stops itself and keeps what it checked; stopped from outside only
+  // two minutes past it.
+  assert.match(src, /const MARGIN_COPIES = Math\.min\(120, Math\.floor\(RUN_LIMIT_SEC \/ 4\)\)/, 'a margin that never spends a short limit');
+  assert.match(src, /const own = Math\.min\(RUN_LIMIT_SEC - \(Date\.now\(\) - RUN_BEGAN\) \/ 1000 - MARGIN_COPIES, Number\(cfg\.a11y\?\.timeoutSec\) \|\| Math\.min\(LIMIT_CAP_SEC, Math\.max\(150, Math\.ceil\(open\.reduce\(\(s, t\) => s \+ share\(t\), 0\) \/ n\)\)\)\);/, 'its limit: its share, inside the run\'s');
   assert.match(src, /const wait = copyLimit \+ 120;/, 'two minutes past it');
   assert.match(src, /'--time-limit', String\(copyLimit\)/, 'given to the copy as its own');
   assert.match(src, /stdio: \['ignore', fd, fd\], detached: true \}\);/, 'what it prints kept, its browsers in its own group');
