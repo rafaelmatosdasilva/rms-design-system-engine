@@ -81,3 +81,32 @@ test('the loop on a project that has been round it: each step with its own numbe
   // One component reads as one component.
   assert.match(loopState({ cards: new Set(['chip']) }).find((s) => s.step === 'reading').said, /1 component had its card read .* what it says\./);
 });
+
+// A prototype is checked two ways and each keeps what it can. A page written as code is read by the page check,
+// which works out whose fault each mistake was (inventions.json). A composition drawn from the catalog is checked
+// without that reading, and its record is kept beside it (<name>.check.json). The loop read only the first, so it
+// told anyone who draws compositions - every designer this route is for - that no page had ever been checked.
+const mistakesIn = (state) => state.find((s) => s.step === 'mistakes');
+
+test('a composition checked counts as a page checked', () => {
+  const checks = { orders: { name: 'orders', items: [] }, approve: { name: 'approve', items: [] } };
+  assert.match(mistakesIn(loopState({})).said, /No page has been checked yet/);
+  assert.match(mistakesIn(loopState({ checks })).said, /Nothing invented across 2 checks/);
+  assert.doesNotMatch(loopState({ checks }).find((s) => s.step === 'written').said, /Nothing to write yet/,
+    'a check is a run for every step, not only for the mistakes');
+});
+
+test('the two stores add up, and the split speaks only for what was read for it', () => {
+  const inventions = { runs: [{ items: [{ kind: 'prop', gap: true, need: 'what the prop takes' }, { kind: 'prop', gap: false }] }] };
+  const checks = { orders: { name: 'orders', items: [{ kind: 'component', message: '"Button" is not in the catalog' }] } };
+  const m = mistakesIn(loopState({ inventions, checks }));
+  assert.match(m.said, /3 mistakes across 2 checks\./, m.said);
+  assert.match(m.lines.join(' '), /of the 2 read for whose fault it was/, 'it says how many it speaks for');
+});
+
+test('a composition\'s mistakes alone say plainly that whose fault is unknown', () => {
+  const checks = { orders: { name: 'orders', items: [{ kind: 'component', message: '"Button" is not in the catalog' }] } };
+  const m = mistakesIn(loopState({ checks }));
+  assert.match(m.said, /1 mistake across 1 check\./);
+  assert.match(m.lines.join(' '), /none of them was read for whose fault it was/, 'rather than a percentage of nothing');
+});

@@ -138,3 +138,53 @@ test('one page is not a flow, and a joined-up prototype says nothing', () => {
   // Start → middle → end, all joined: nothing to say, the end included.
   assert.deepEqual(wholeFindings(flowGraph({ a: page(['b']), b: page(['c']), c: page([]) })), []);
 });
+
+// A designer is building a journey, not a page. What a page just drawn did to the flow is said without being asked:
+// reading it used to need a command of its own, which a person has to know exists and remember to run.
+test('a page just drawn is placed in its flow, unasked', async () => {
+  const { flowNowLines, flowPages, flowOf } = await import('../lib/prototype.mjs');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tempDir } = await import('./helpers.mjs');
+  const dir = tempDir('flow-now');
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  const page = (heading, to) => JSON.stringify({ prototype: { component: 'Page', children: [
+    { component: 'Text', props: { as: 'h1', text: heading } },
+    ...(to ? [{ component: 'button', props: { Label: 'Continue', goesTo: to } }] : []),
+  ] } });
+  writeFileSync(join(dir, 'prototypes', 'orders.json'), page('Orders', 'approve'));
+  writeFileSync(join(dir, 'prototypes', 'approve.json'), page('Approve', null));
+
+  const said = flowNowLines(dir, {}, 'orders').join('\n');
+  assert.match(said, /2 page\(s\), 1 link\(s\)/, said);
+  assert.match(said, /orders → approve/, said);
+  assert.match(said, /ends: approve/, 'the page nothing leads on from is named');
+
+  assert.match(flowNowLines(dir, {}, 'approve').join('\n'), /approve leads nowhere/);
+});
+
+test('one page is no flow, and says nothing rather than a number', async () => {
+  const { flowNowLines } = await import('../lib/prototype.mjs');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tempDir } = await import('./helpers.mjs');
+  const dir = tempDir('flow-now-one');
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'only.json'), JSON.stringify({ prototype: { component: 'Page', children: [] } }));
+  assert.deepEqual(flowNowLines(dir, {}, 'only'), [], 'a folder with one page has no flow to speak of');
+  assert.deepEqual(flowNowLines(tempDir('flow-now-none'), {}, 'x'), [], 'nor has an empty one');
+});
+
+test('a link to a page nobody drew is said where the page is drawn', async () => {
+  const { flowNowLines } = await import('../lib/prototype.mjs');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tempDir } = await import('./helpers.mjs');
+  const dir = tempDir('flow-now-missing');
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  const p = (h, to) => JSON.stringify({ prototype: { component: 'Page', children: [
+    { component: 'Text', props: { as: 'h1', text: h } }, { component: 'button', props: { Label: 'On', goesTo: to } }] } });
+  writeFileSync(join(dir, 'prototypes', 'a.json'), p('A', 'b'));
+  writeFileSync(join(dir, 'prototypes', 'b.json'), p('B', 'nowhere'));
+  assert.match(flowNowLines(dir, {}, 'b').join('\n'), /led to but not drawn: nowhere/);
+});

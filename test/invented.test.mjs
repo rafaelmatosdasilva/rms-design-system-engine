@@ -89,3 +89,22 @@ test('an event it does not emit, and the page check\'s tags filed under the cata
   const text = buildLlms([{ name: 'tileStrip', contract: { name: 'tileStrip', invented: inventedFor(read, 'tileStrip') } }], {}, 0, null);
   assert.match(text, /    - agents here wrote \(never write it\): event click-tile → clicked, prop showFooters → showFooter/);
 });
+
+// Every invention is in a check that failed. Noting them only on the way to a drawn page kept none of them, and
+// a composition's check - the way a designer works - never reached the note at all.
+test('what a composition invented is kept, and kept when the check failed', async () => {
+  const { noteInvented, readInvented, rejectedFrom } = await import('../lib/invented.mjs');
+  const dir = tempDir('invented-from-a-composition');
+  const failed = [
+    { level: 'error', message: '"Button" is not in the catalog (did you mean button?)' },
+    { level: 'error', message: 'chip has no prop "colour" (did you mean color?)' },
+  ];
+  noteInvented(dir, failed);
+  const all = readInvented(dir);
+  assert.deepEqual(all.components.Button, { right: 'button', times: 1 });
+  assert.equal(all.props['chip.colour'].right, 'color');
+  // And the catalog reads it back, which is the whole point of keeping it.
+  assert.ok(Object.keys(all.components).includes('Button'), 'the next catalog rejects it by name');
+  noteInvented(dir, failed);
+  assert.equal(readInvented(dir).components.Button.times, 2, 'the same invention twice is the same name, counted');
+});
