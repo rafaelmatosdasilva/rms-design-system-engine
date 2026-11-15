@@ -31,7 +31,7 @@ test('no sentence the style guide template writes has a ";" in it', () => {
 });
 
 test('the engine\'s own words on the page carry none either: a shared or local reason, a rule kept, a fix, an anatomy difference', () => {
-  const files = ['lib/local-shared.mjs', 'lib/rule-checks.mjs', 'lib/construction-grammar.mjs', 'lib/build-rules.mjs', 'lib/library-rules.mjs', 'lib/run-diff.mjs'];
+  const files = ['lib/local-shared.mjs', 'lib/rule-checks.mjs', 'lib/construction-grammar.mjs', 'lib/build-rules.mjs', 'lib/library-rules.mjs', 'lib/run-diff.mjs', 'lib/owed-states.mjs'];
   const found = [];
   for (const f of files) for (const s of strings(join(ROOT, f))) {
     if (s.text === '; ') found.push(`${f}:${s.line}: a list joined with "; "`);

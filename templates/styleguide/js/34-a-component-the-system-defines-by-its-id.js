@@ -536,7 +536,7 @@
   // brands, so a module's control always has one).
   window.SG = {
     esc: esc, sysButton: sysButton, customSelect: customSelect, sidePanelPage: sidePanelPage,
-    tokens: TOKENS, allVars: DATA.allVars || [], brands: BRANDS, title: DATA.title || '', components: COMPONENTS,
+    tokens: TOKENS, allVars: DATA.allVars || [], mixedAway: DATA.mixedAway || [], brands: BRANDS, title: DATA.title || '', components: COMPONENTS,
     // A component's markup as the page draws it: its first rendering (the code's own), else the markup read from it.
     markupOf: function (c) { return (c && c.renders && c.renders[0] && c.renders[0].markup) || (c && c.markup) || ''; },
     // The Showroom's screens, and one drawn in a box as its card draws it (inert, scaled to the box): drawScreen returns

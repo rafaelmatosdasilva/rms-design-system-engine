@@ -229,8 +229,10 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 
 - Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
 - Two components whose own rules are nearly the same.
+- Colour tokens a person cannot tell apart, in every mode they share, offered as one merge each: which one stays, which would point at it, and the components the merge reaches. Two neighbouring steps of a grey scale stay apart, two colours with different jobs (white text on a button, a white surface) stay apart, a token named after a component is never the one kept over a shared one, and a token that already points at another is that one.
 - Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
 - Aliases to a removed token, with the commit that removed it.
+- A colour token the code mixes at 0%, so it never shows. A `color-mix()` gives all of the mix to the other colour, often an opacity token given to the wrong side. It is read through a stylesheet function that returns one, such as a Sass `@function`.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
 
 What a *product* does with the system is a product leaving it, so it is said under the drift check instead (`🪢 Drift from the system`), not here. Each part does what its line on the [features page](features.md) says:

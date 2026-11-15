@@ -79,6 +79,7 @@ Click a component on the screen. The innermost one under the pointer is picked (
 - **Linked tokens, as Figma shows them.** A token that follows another shows that token's name in its field (a colour's with its swatch) instead of a value, and a button to detach it. Detached, it takes a value of its own, and a reset in its field links it again. A token linked to another of its own component (its corners on one radius) follows it as it changes.
 - **The system's colours.** A colour's chip, or the button beside a detached colour, opens every base, semantic and primitive colour of the system, searchable, each swatch as this theme draws it. The list opens over the panel, below its field or above it when there is more room, and only the list scrolls; a click outside it, or Escape, closes it. One chosen links the token to it, its dark value following that colour's own.
 - **Only real tokens.** Everything a part offers is one of the system's own tokens: its corners are its radius tokens, never a value of the editor's own.
+- **A colour that never shows.** When the code mixes a colour token at 0%, its field says so: a change there never shows, and the task is for the code, on the Status page.
 - **Text style.** A text shows the text style it is drawn in, and that style's own size and line height at the breakpoints the screens on show are at (phones: Phone), its breakpoint named under each value. The values are the token's own breakpoint modes. A change is the style's token's, so every text in that style follows.
 - A change there wins over the theme's wider settings. **Done** brings the theme's own settings back.
 
@@ -515,7 +516,14 @@ When you correct what an AI made, the correction is usually said once, in a chat
 | A step agents read | It is about how the agent works, such as asking before adding a token | Said to the agent with every request in Claude Code, and in the engine's section of `AGENTS.md` and the other instruction files that have it |
 | A rule for your guidelines | Anything else | One sentence a reviewer can check, drafted on the component's page or the System page of your intent layer, for your team to approve |
 
-Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same guard is not proposed again. `--rule "<sentence>"` gives a step or a rule in your own words. Only your answer writes anything: the hooks ask you first.
+Answer with `--lesson-answer <id> yes` or `no`. `--rule "<sentence>"` gives a step or a rule in your own words. Only your answer writes anything: the hooks ask you first.
+
+- Each proposal shows what it rests on: the screens, files or edits it was seen in, and when.
+- It also shows where a yes would write it: a check, a step in the agent rules, or a rule for your guidelines.
+- A proposal with no recorded cases can't be approved yet. The engine says what is missing.
+- When you say no, you can also say what would change your mind with `--would-accept more`, `new` or `narrower`: more cases, a new kind of case, or a narrower wording (given with `--rule`).
+- The proposal then waits until that is there, and comes back telling you what changed since your no.
+- A no with nothing added is final, and the same proposal is not made again.
 
 **Where corrections come from.**
 
