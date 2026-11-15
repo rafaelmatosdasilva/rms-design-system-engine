@@ -85,3 +85,27 @@ test('the routed finding: the audit\'s line reaches the differences list, for th
   assert.match(toCode.todo, /^In the code, give cardTile the "loading" state/);
   for (const t of [...lines, toFigma.todo, toCode.todo]) assert.doesNotMatch(t, /;/);
 });
+
+// A team that writes pages rather than metadata says the states a component must have under a heading. A plain
+// "States" is a fact copied from Figma or the code and stays one; only a heading saying they are required is read
+// as what the component owes, and both sources add up.
+test('a section titled for required states says what the component owes', () => {
+  const page = (title, body) => entityView({
+    kind: 'component', identifier: 'c-filewell', name: 'fileWell',
+    documentBlocks: [{ kind: 'sections', items: [{ title, body }] }],
+  }, 'docs/dsds/components/file-well.dsds.json');
+
+  assert.deepEqual(page('Required states', '- error\n- loading\n- read-only').states, ['error', 'loading', 'read-only']);
+  assert.deepEqual(page('States the component must have', '- empty').states, ['empty']);
+  assert.equal(page('States', '- error\n- loading').states, undefined, 'a plain States heading is a fact, not a demand');
+  assert.ok(page('States', '- error').facts.includes('States'), 'and it is kept as the fact it is');
+});
+
+test('the metadata and the heading are both read, once each', () => {
+  const view = entityView({
+    kind: 'component', identifier: 'c-filewell', name: 'fileWell',
+    metadata: { states: ['error', 'loading'] },
+    documentBlocks: [{ kind: 'sections', items: [{ title: 'Required states', body: '- loading\n- read-only' }] }],
+  }, 'docs/dsds/components/file-well.dsds.json');
+  assert.deepEqual(view.states, ['error', 'loading', 'read-only'], 'both sources, and loading is not said twice');
+});

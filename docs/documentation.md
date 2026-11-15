@@ -362,6 +362,8 @@ The part that pays is what agents get. A card now carries what was already ruled
 
 - A component's page can list the states it must have, such as error, loading, success, disabled or read-only.
 - Write them in front matter as `states: [error, loading, read-only]`, or as a list under `states:`. In a DSDS file, use the entity's `metadata.states`.
+- Or write them as a section, if your pages are prose rather than metadata: a heading that says they are required — **Required states**, **States it must have** — and the list under it is read the same way. A plain **States** heading is left alone: that is the list of the states a component *has*, copied from Figma or the code, not the ones it owes.
+- Both are read, so a page may use either or both, and a state named twice is counted once.
 - The engine looks for each state in Figma and in the code, by what it means and not only by its name.
 - In Figma it finds a variant value such as `State=Loading`, or a property that turns the state on, such as `isReadOnly`.
 - In the code it finds a prop such as `loading` or `readOnly`, or a rule or attribute the component reacts to, such as `:disabled`, `aria-busy` or `.is-loading`, in the component's own file.

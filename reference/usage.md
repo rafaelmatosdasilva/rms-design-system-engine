@@ -440,8 +440,10 @@ takes, in the code or Figma) changed after the page was last edited; the engine 
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
 history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
 prop it does not have, or a literal value the prop does not take. **States owed**: a page's front matter `states:` (or a
-DSDS entity's `metadata.states`) names the states its component owes, and each one Figma or the code has none of is
-reported under "States the intent layer owes" and goes to that side's list of things to do. **Twins**: two components' pages that say the same (their own names aside, lines a template
+DSDS entity's `metadata.states`, or a section headed for them - "Required states", "States it must have", never a plain
+"States", which is the list of the states it has) names the states its component owes, and each one Figma or the code
+has none of is reported under "States the intent layer owes" and goes to that side's list of things to do. A state named
+by both the metadata and the heading is counted once. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
