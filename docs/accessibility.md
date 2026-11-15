@@ -287,6 +287,9 @@ look at, **how to look at it**, and keeps the answer only while it is still true
 - **A change to the style guide's own screens keeps every result.** The Status table, the Documentation panel and the other screens around the components never reach what the check measures. When only that CSS changed, each part's page is opened just long enough to read what surrounds its components, and its results are put back. A change around a component (its stage, the page behind it) still tries it again.
 - **The report says why a page was tried again:** the check changed, the CSS every component shares changed, which components changed and the tokens that moved them, or it was never checked before.
 - **Several pages are tried at once.** When many need trying, a few browsers share them out (`a11y.parallel`, by default a quarter of the computer's cores), and the report is the same as one browser's.
+- **Each part lays out only its own components.** The style guide's own screens (Status, History, Documentation) are left out of a part's page. They hold a copy of every component, and on a big guide laying them out made each part slow, until the browser stopped answering.
+- **A run stays inside its time.** The browsers that share the parts, and then the run itself, each stop on their own before `a11y.timeoutSec` runs out. What they checked is kept, so the next run goes on from there.
+- **A check of a few components opens only their parts.** `--component` no longer goes through the whole guide to reach them.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
 
