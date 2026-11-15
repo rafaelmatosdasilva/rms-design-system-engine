@@ -495,6 +495,11 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 ### In the browser
 
 - **Renders correctly in a browser.** Checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup, the rule's `probe`.
+- **The same in Firefox and Safari.** Each value is drawn again in Firefox whenever it is installed, and in Safari when you ask for it (`rendered.browsers` in `ds-config.json`). Only what differs from Chrome is said: *in Firefox, `.toolbar` → `height` is `54px` (Chrome draws `56px`)*.
+  - Chrome stays the browser the contract is held to. A difference in another browser is advisory: yours to decide, never a failure.
+  - Nothing is installed for it but the browser. Firefox is driven headless through WebDriver BiDi, and Safari through the WebDriver macOS ships.
+  - Safari opens a window while it runs and draws in your Mac's own appearance, so it is off unless you turn it on. Turn on its remote automation once with `safaridriver --enable`.
+  - The full list of options is in [`reference/config.md`](../reference/config.md).
 - **What this audit covered.** So you can see nothing slipped through.
 
 ### Brands change values, not structure

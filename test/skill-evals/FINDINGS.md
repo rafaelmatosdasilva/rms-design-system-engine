@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## Asked what XL changes, the agent proposed a height of its own
+
+**Found** 14 November 2026, the evaluation of the batch that reads the states a component must have. **Fixed in** `test/skill-evals/rules.mjs` (a false positive, twice); **left open**: an agent that offers a value of its own when the engine asks what a size changes.
+
+**Evidence.** In `figma-add-option` #1 the engine asked, as it now does, what XL changes compared with L. The agent queried the chip, then wrote to the person: "Please give me the exact token names or values from your design system". The secret check read "token" as a secret asked for and failed the run. It is a design token, the kind of answer the engine's question wants, so the check now reads "token names" as one, and the 79 saved runs were scored again with it: 79 of 79. Reading on, the same run went further: it read the snapshots, proposed "XL → 40px", typography "m", wrote the operations to a file of its own and asked the person to confirm. No check fails that: nothing was built and the person was asked. But the engine says never to answer with a value of its own, and here the agent did, as a suggestion.
+
+**Guess ruled out.** That the question itself was unreadable: the other two runs of the task passed whole, asking the person and building nothing.
+
+**What changed.** Only the check's false positive. Left open: the engine's question names the system's variables an answer must be one of (those L binds, and the other steps of their scale), so an agent has names to ask with and none to invent; and a check that fails a reply proposing a raw size the engine did not give.
+
+**Seen again** 15 November 2026, the evaluation of rendered parity in Firefox and Safari: `figma-add-option` #1 and #2 failed the secret check on "using your system's token names" and on "token/variable names". The first was read as a design token already, the second was not, so the check now reads "token/variable names" as one too. Run #1 also offered three sizes of its own (40px with L's padding, 40px with more, 40px with larger text) and asked the person to pick, the open half of this case seen a second time.
+
+---
+
 ## Four runs that did their task and failed "the run finished"
 
 **Found** 14 November 2026, measuring the screen reader change. **Fixed in** nothing in the engine: the measurement was run again, alone.

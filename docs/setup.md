@@ -28,6 +28,7 @@ Two more are optional, and each decides how much a run can see. The installer ch
 | Optional | What you lose without it | How to get it |
 |---|---|---|
 | **Google Chrome** | Nothing is measured as a browser draws it: rendered parity, the accessibility check and every picture are skipped. | [Install Chrome](https://google.com/chrome), or point `CHROME_PATH` at the one you already keep. |
+| **Firefox** | Rendered parity is drawn in Chrome alone, so a value Firefox draws differently goes unseen. | [Install Firefox](https://www.mozilla.org/firefox/), or point `FIREFOX_PATH` at the one you keep. Safari needs nothing installed: turn its remote automation on once with `safaridriver --enable`. |
 | **TypeScript 5** | Your components' JSX and props are read from their text alone, so fewer components are understood. | A project with its own `typescript` 5 is already fine. Otherwise `npm i -g typescript@5`. |
 
 > **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
