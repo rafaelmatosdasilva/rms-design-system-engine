@@ -367,7 +367,19 @@
     var pill = function (n) { return '<code class="sg-name">' + esc(n) + '</code>'; };
     var pillList = function (names) { return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; };
     // One change Figma made, its name a pill: "showLabel added", a property's values "a" → "b".
-    var figmaChangeHTML = function (t) { var s0 = figmaChange(t), m = /^(?!and\b)(\S+)(\s[\s\S]*)$/.exec(s0); return m ? pill(m[1]) + esc(m[2]) : esc(s0); };
+    // Its name and its values pills too: "breakpoint" "a" → "b", "showIcon" renamed "Show Icon" (the owner's, 15 November 2026).
+    var figmaChangeHTML = function (t) {
+      var s0 = figmaChange(t), val = function (v) { return v ? pill(v) : quiet('nothing'); };
+      var ch = /^(\S+) "(.*)" → "(.*)"$/.exec(s0); if (ch) return pill(ch[1]) + ' ' + val(ch[2]) + ' → ' + val(ch[3]);
+      var rn = /^(\S+) renamed (.+)$/.exec(s0); if (rn) return pill(rn[1]) + ' renamed ' + pill(rn[2]);
+      var m = /^(?!and\b)(\S+)(\s[\s\S]*)$/.exec(s0); return m ? pill(m[1]) + esc(m[2]) : esc(s0);
+    };
+    // A read's changes to one component: the first few, the rest behind the chevron pill every list on the page uses.
+    var CHANGES_SHOWN = 4;
+    var figmaChangesHTML = function (list) {
+      return '<div class="sg-log-changes">' + list.map(function (t, i) { return '<p class="sg-il-line"' + (i >= CHANGES_SHOWN ? ' hidden' : '') + '>' + figmaChangeHTML(t) + '</p>'; }).join('') +
+        (list.length > CHANGES_SHOWN ? pillsMore(list.length - CHANGES_SHOWN) : '') + '</div>';
+    };
     var isFirst = function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); };
     var line = function (html) { return '<p class="sg-il-line">' + html + '</p>'; };
     var quiet = function (text) { return '<span class="pg-log-date">' + text + '</span>'; };
@@ -438,7 +450,7 @@
     order.forEach(function (g) {
       if (!g.read) return;
       var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
-      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', c.changed.map(function (t) { return line(figmaChangeHTML(t)); }).join('') + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', figmaChangesHTML(c.changed) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
       if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
     });
