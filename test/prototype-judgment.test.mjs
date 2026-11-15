@@ -16,7 +16,7 @@ const ALL = (v = 'holds') => DECISION_IDS.map((id) => ({ decision: id, verdict: 
 
 test('the decisions are named and fixed, and a project may judge fewer', () => {
   // A judgement nobody can repeat is an opinion: the words are the engine's on every project.
-  assert.deepEqual(DECISION_IDS, ['asked', 'whole', 'honest', 'shown']);
+  assert.deepEqual(DECISION_IDS, ['asked', 'whole', 'honest', 'shown', 'unasked']);
   for (const id of DECISION_IDS) { assert.ok(DECISIONS[id].label); assert.ok(DECISIONS[id].ask.length > 60, id); }
   assert.deepEqual(decisionsFrom({}).decisions.map((d) => d.id), DECISION_IDS);
   const some = decisionsFrom({ prototypeJudgment: { decisions: ['whole', 'nonsense'] } });
@@ -86,7 +86,7 @@ test('what a person reads, and that it is advisory', async () => {
   assert.deepEqual(broken(run.findings).map((f) => f.decision), ['whole']);
   // All holding is said in one line: a thing that was paid for should not look like a thing that never ran.
   const good = judgmentLines({ findings: ALL('holds'), cost: 0.05, cached: false });
-  assert.match(good.join('\n'), /4 decision\(s\), all hold · \$0\.05/);
+  assert.match(good.join('\n'), /5 decision\(s\), all hold · \$0\.05/);
   assert.deepEqual(judgmentLines(null), []);
   assert.match(judgmentLines({ why: 'no request' }).join('\n'), /not judged: no request/);
 });
@@ -165,4 +165,72 @@ test('a prototype judgement never counts toward a screen review\'s rule, nor the
 test('nothing judged broken proposes nothing', async () => {
   assert.deepEqual(dueLines([]), []);
   assert.deepEqual(await dueFromJudging(tempDir('proto-judge-none')), []);
+});
+
+// ── Nothing nobody asked for ────────────────────────────────────────────────────────────────────────────────────
+// The case the judgment item names: a default an agent keeps adding unasked (a shadow on every card). Written down
+// as a constraint it stops; left unnamed, every prototype gets it again and somebody takes it out by hand.
+import { PROMPT_VERSION } from '../lib/prototype-judgment.mjs';
+
+const SAYS = [{ name: 'ConsultPage', purpose: 'A shell for inquiry and list screens, with a toolbar above the table.' }];
+
+test('what was added that nobody asked for is a decision of its own', () => {
+  assert.ok(DECISION_IDS.includes('unasked'));
+  const d = DECISIONS.unasked;
+  assert.match(d.ask, /Name what was added and where/, 'a finding has to say what, or it cannot be acted on');
+  assert.match(d.ask, /the system's documentation requires/, 'the system\'s own parts are never what was added');
+  assert.match(d.ask, /implies without naming it/, 'a way back from a page the request asks for is not an addition');
+});
+
+test('the system\'s own documentation is given, so a required part is not read as an addition', () => {
+  const ds = [{ id: 'unasked', ...DECISIONS.unasked }];
+  const p = judgmentPrompt({ request: 'a list of orders', pages: [], decisions: ds, says: SAYS });
+  assert.ok(p.includes('A part that is here is the system\'s, not something added on top'), p.slice(0, 400));
+  assert.ok(p.includes('ConsultPage: A shell for inquiry'), 'with the documentation\'s own words');
+});
+
+test('the documentation is given only where it is what is being judged', () => {
+  const other = [{ id: 'whole', ...DECISIONS.whole }];
+  const p = judgmentPrompt({ request: 'a list', pages: [], decisions: other, says: SAYS });
+  assert.ok(!p.includes('ConsultPage'), 'a question about dead controls is not answered by what a page is built from');
+});
+
+test('a system that documents no shell says so by its absence, never by a guess', () => {
+  const ds = [{ id: 'unasked', ...DECISIONS.unasked }];
+  const p = judgmentPrompt({ request: 'a list', pages: [], decisions: ds, says: [] });
+  assert.ok(!p.includes('documentation says a page is built from'), 'nothing is made up to fill the section');
+});
+
+test('a shell whose documentation says nothing is still named', () => {
+  const ds = [{ id: 'unasked', ...DECISIONS.unasked }];
+  const p = judgmentPrompt({ request: 'a list', pages: [], decisions: ds, says: [{ name: 'BarePage', purpose: '' }] });
+  assert.ok(p.includes('BarePage: (its documentation says nothing about it)'), 'it exists, and that it is undocumented is worth seeing');
+});
+
+test('what the documentation says is part of the question, so an answer to another is never reused', async () => {
+  const dir = tempDir('proto-judge-says-key');
+  let asked = 0;
+  const ask = async () => { asked += 1; return answer([{ decision: 'unasked', verdict: 'holds', severity: 'low', evidence: 'nothing added', check: 'read the pages' }])(); };
+  const base = { request: 'a list of orders', pages: pagesIn(dir), ask, now: '2026-11-15T10:00:00Z' };
+  await judgePrototype(dir, {}, { ...base, says: SAYS });
+  await judgePrototype(dir, {}, { ...base, says: SAYS });
+  assert.equal(asked, 1, 'the same question is not paid for twice');
+  await judgePrototype(dir, {}, { ...base, says: [{ name: 'ConsultPage', purpose: 'Something else entirely.' }] });
+  assert.equal(asked, 2, 'documentation that changed is a different question');
+});
+
+test('the question\'s version moved when a decision was added', () => {
+  assert.ok(PROMPT_VERSION >= 2, 'an answer to the four-decision question is never reused for the five');
+});
+
+test('a default added again and again becomes a rule, like the other decisions', async () => {
+  const dir = tempDir('proto-judge-unasked-rule');
+  const added = [{ decision: 'unasked', verdict: 'breaks', severity: 'medium', evidence: 'a shadow on every card', check: 'look at the cards' }];
+  for (const [i, name] of ['orders', 'billing', 'profile'].entries()) {
+    const pages = [{ name, shot: shotIn(dir, `${name}.png`), outline: 'cards', leadsTo: [] }];
+    await judgePrototype(dir, {}, { request: `flow ${i}`, pages, says: SAYS, now: `2026-11-1${5 + i}T10:00:00Z`, ask: answer(added) });
+  }
+  const due = await dueFromJudging(dir);
+  assert.deepEqual(due.map((r) => r.kind), ['proto:unasked']);
+  assert.match(due[0].text, /nothing is added on top/, 'the constraint that stops it');
 });
