@@ -110,12 +110,12 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
         if (!tr) continue;
         tr.cells[2].click(); await new Promise((r) => setTimeout(r, 400));
         const first = document.querySelector('#sg-row-panel .pg-inspect');
-        const a = first && first.querySelector('a.sg-cx-figma');
-        out[who] = a ? [a.getAttribute('target'), !!a.querySelector('svg'), /figma\\.com/.test(a.href)] : null;
+        const a = first && first.querySelector('a[data-see="sg-cx-figma"]');
+        out[who] = a ? [a.getAttribute('target'), !!a.querySelector('svg'), /figma\\.com/.test(a.href), a.textContent.trim(), a.className.includes('sg-uses-link')] : null;
       }
       return out;
     })()`);
-    if ('A designer, in Figma' in figma) assert.deepEqual(figma['A designer, in Figma'], ['_blank', true, true], 'a Figma task opens the component in Figma');
+    if ('A designer, in Figma' in figma) assert.deepEqual(figma['A designer, in Figma'], ['_blank', true, true, 'See in Figma', false], 'a Figma task opens the component in Figma, from the system\'s own button');
     if ('A developer, in the code' in figma) assert.equal(figma['A developer, in the code'], null, 'a task of the code never links to Figma');
     assert.ok(Object.keys(figma).length, 'both kinds of task were looked at');
     assert.deepEqual(errors, []);

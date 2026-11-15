@@ -183,7 +183,8 @@
       var c0 = HAS_PAGE[comp], codeUrl = c0 ? ((c0.links || []).filter(function (l) { return l.label === 'Code'; })[0] || {}).url : null;
       var see = r.who && r.who.indexOf(WHO.designer) === 0 && figmaOf() ? ['sg-cx-figma', figmaOf(), FIGMA_SVG, 'See in Figma', 'Open ' + comp + ' in Figma']
         : r.who && r.who.indexOf(WHO.developer) === 0 && codeUrl ? ['sg-cx-code', codeUrl, CODE_SVG, 'See in code', 'Open ' + comp + '\'s file in the code'] : null;
-      if (see && firstTodo) cards[0] = cards[0].replace(/<\/div><\/div>$/, '<p><a class="sg-uses-link ' + see[0] + '" href="' + esc(see[1]) + '" target="_blank" rel="noopener" title="' + esc(see[4]) + '">' + see[2] + esc(see[3]) + '</a></p></div></div>');
+      // The system's own button, as a component's Figma and Code links at the top of its page are, its mark before it.
+      if (see && firstTodo) cards[0] = cards[0].replace(/<\/div><\/div>$/, '<p class="sg-see">' + sysButton('a', see[3], ' href="' + esc(see[1]) + '" target="_blank" rel="noopener" title="' + esc(see[4]) + '" data-see="' + see[0] + '"', null, null, see[2]) + '</p></div></div>');
       cards.splice(firstTodo, 0, card('Component', '<p><a class="sg-uses-link" href="#' + esc(cid(comp)) + '">' + esc(comp) + '</a></p>') + card('Where it was read', srcLines()));
       body = cards.join('');
     }
