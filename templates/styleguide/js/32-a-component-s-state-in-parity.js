@@ -207,7 +207,7 @@
     // made from data: test/styleguide-template.test.mjs holds them to it).
     pT.how = 'How closely the code matches Figma, in every property, token and value. The line under it counts what matches in full.';
     iT.how = 'How much of the system exists in the code. The line under it counts what is built.';
-    aT.how = 'How many WCAG 2.2 AA criteria the system meets, tried in a browser on every variant. Shown for the theme chosen at the top.';
+    aT.how = A11Y_HOW + ' Tried in a browser on every variant, for the theme chosen at the top.';
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');

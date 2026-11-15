@@ -392,6 +392,8 @@
   // what is looked at beyond them (forced colours, reduced motion) is in the tables, never in the share. The Status
   // page's Accessibility card and the Accessibility page's card both count by this one function, so the two always say
   // the same number (the owner's, 15 November 2026). → { [sc]: { st, level, principle } }
+  // What the accessibility number counts, said in the tip of the card that shows it, on this page and the Status page.
+  var A11Y_HOW = 'The WCAG 2.2 criteria a system has to meet for AA, those of level A included. A criterion is met only when no component fails it and none waits on a review, so one component that fails it is enough. The number is the met criteria out of all of them, rounded down, so 100% means the system meets AA. It is not an average of the components. The bars split the same criteria into level A and level AA.';
   function a11yCriteria(rows) {
     var by = {}, RANK = { done: 0, kept: 0, check: 1, todo: 2 };
     rows.forEach(function (r) {
@@ -479,7 +481,7 @@
     // One card, the Status page's Accessibility number: every criterion at A and AA across the system (a11yCriteria),
     // with a bar for each level. One number for accessibility wherever it is said.
     var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
-    doneCards(sec, doneCard('Accessibility', ['A', 'AA'].reduce(function (out, lv) { return out.concat(Object.keys(bySc).filter(function (sc) { return bySc[sc].level === lv; }).map(function (sc) { return { area: 'Level ' + lv, state: A11Y_ST[bySc[sc].st] }; })); }, [])));
+    doneCards(sec, doneCard('WCAG 2.2 AA', ['A', 'AA'].reduce(function (out, lv) { return out.concat(Object.keys(bySc).filter(function (sc) { return bySc[sc].level === lv; }).map(function (sc) { return { area: 'Level ' + lv, state: A11Y_ST[bySc[sc].st] }; })); }, []), A11Y_HOW));
     labelCells(sec);
     if (route.last !== undefined && !sec.hidden) underTitle(sec);
   }

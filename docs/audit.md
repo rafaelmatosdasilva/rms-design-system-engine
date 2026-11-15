@@ -210,6 +210,7 @@ Your Figma library gets one number from the rules your team keeps. Your code now
 
 - **One number a side**, on the Rules page's Figma and Code cards: how closely the rules are followed, across everything they read.
 - **Classified by area**, so you can see which part is weakest.
+- **How it is counted, in its tip.** The mark at each card's top right says what its ring counts: the rules every component already follows, out of all the rules read from that side, rounded down.
 - **With its trend**: the change since the last day the page was built. Each side keeps its own history.
 
 A rule still to decide, or one your team set aside, counts for nothing. The ring on each card still says how many rules are done, which is a different thing, so neither number stands for the other.

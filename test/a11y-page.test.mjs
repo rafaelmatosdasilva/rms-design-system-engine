@@ -59,7 +59,8 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     for (const f of ['Component', 'Level', 'Principle']) assert.ok(seen.filters.includes(f), `${f}: ${seen.filters}`);
     assert.ok(!seen.filters.includes('Depends on'), 'what a criterion depends on is said in its panel, never a filter');
     assert.ok(seen.chips.includes('todo') || seen.chips.includes('check'), seen.chips.join());
-    assert.deepEqual(seen.cards, ['Accessibility'], 'one number')
+    assert.deepEqual(seen.cards, ['WCAG 2.2 AA'], 'one number, the level it is measured against')
+    assert.equal(await run(`[...document.querySelectorAll('#accessibility .sg-cx-score')].every((c) => c.querySelector('.sg-health-top .sg-tip'))`), true, 'its tip says how it is counted, as the Status page\'s cards do')
     // The card counts criteria across the system at A and AA, never rows: a criterion is met only when no component
     // fails it and none waits on a review. The Status page's Accessibility card says the same number.
     const counted = await run(`(() => {
