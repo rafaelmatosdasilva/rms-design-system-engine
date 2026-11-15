@@ -88,6 +88,12 @@ test('a bot signs its own commits, and that sign-off is nobody\'s address', () =
   assert.ok(kinds(`Signed-off-by: dependabot[bot] <${bot}>\nand write to ${bot}`).includes('email address'));
 });
 
+test('a package at a version is no address, and an address beside one is still found', () => {
+  // Release notes quote packages as name@version, and every one of them was refused as an email address.
+  assert.deepEqual(kinds('Bumps pinia@4.1.0, vue-router@5.5.0, @vitejs/plugin-vue@6.0.10 and vite@8.0.0-beta.3'), []);
+  assert.ok(kinds(`pinia@4.1.0 and ${'ana' + '.lopes'}@${'mail' + 'box'}.org`).includes('email address'));
+});
+
 test('placeholders, no-reply addresses, colour spaces and products are not private', () => {
   assert.deepEqual(kinds('demo@example.com, git@gitlab.example.com, noreply@anthropic.com, user:secret@gitlab.com'), []);
   assert.deepEqual(kinds('icon@1x.png; Display P3 (D65); a heading H2; fonts from Google Fonts; by the design team'), []);

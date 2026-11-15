@@ -58,6 +58,8 @@ Actions are pinned by commit, so they are updated on purpose rather than by drif
 
 The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
 
+The privacy check reads Dependabot's release notes like any other text. A package quoted at its version (`pinia@4.1.0`) is not an address there, since a domain ends in letters and a version in a number. An address beside one is still found.
+
 ## Release labels
 
 Every pull request carries exactly one, and it decides the version the release workflow publishes:
