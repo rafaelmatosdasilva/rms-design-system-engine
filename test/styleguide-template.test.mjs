@@ -1874,7 +1874,17 @@ test('History says the other pages a change touched on one line, in counts by ki
   assert.match(src, /line\(quiet\('Added: '\) \+ pagesSaid\(made, comps\)\)/);
   assert.match(src, /line\(quiet\('Changed: '\) \+ pagesSaid\(edited, comps\)\)/);
   // A Figma change and a contract change name what changed as pills too, and never join them with ";".
-  assert.match(src, /c\.changed\.map\(function \(t\) \{ return line\(figmaChangeHTML\(t\)\); \}\)/);
+  assert.match(src, /figmaChangesHTML\(c\.changed\) \+ saved/);
+  // Its name and its values pills: the first four changes shown, the rest behind the chevron pill every list uses.
+  const fig = src.slice(src.indexOf('    var figmaChange = '), src.indexOf('    var pill = ', src.indexOf('    var figmaChange = '))) + src.slice(src.indexOf('    var figmaChangeHTML = '), src.indexOf('    var CHANGES_SHOWN'));
+  const figBody = src.slice(src.indexOf('    var CHANGES_SHOWN'), src.indexOf('    var figmaChangesHTML')) + src.slice(src.indexOf('    var figmaChangesHTML'), src.indexOf('};', src.indexOf('    var figmaChangesHTML')) + 2);
+  const pill = (n) => `<code class="sg-name">${esc(n)}</code>`, quiet = (t) => `<span>${t}</span>`;
+  const changes = new Function('esc', 'pill', 'quiet', 'pillsMore', fig + figBody + '\nreturn figmaChangesHTML;')(esc, pill, quiet, pillsMore);
+  const out = changes(['property showLabel added', 'property density VARIANT · compact, comfy · comfy → VARIANT · compact, comfy, roomy · comfy', 'property show-icon renamed Show Icon', 'property iconSlot removed', 'property tone added']);
+  assert.match(out, /<p class="sg-il-line"><code class="sg-name">density<\/code> <code class="sg-name">compact, comfy · comfy<\/code> → <code class="sg-name">compact, comfy, roomy · comfy<\/code><\/p>/);
+  assert.match(out, /<code class="sg-name">show-icon<\/code> renamed <code class="sg-name">Show Icon<\/code>/);
+  assert.match(out, /<p class="sg-il-line" hidden><code class="sg-name">tone<\/code> added<\/p><button data-pills-more>1 more<\/button><\/div>$/);
+  assert.doesNotMatch(changes(['property a added']), /data-pills-more/);
   assert.match(src, /line\(whatHTML\(x\.what\)/);
 });
 
