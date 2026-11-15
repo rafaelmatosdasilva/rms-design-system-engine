@@ -234,6 +234,13 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 - Aliases to a removed token, with the commit that removed it.
 - A colour token the code mixes at 0%, so it never shows. A `color-mix()` gives all of the mix to the other colour, often an opacity token given to the wrong side. It is read through a stylesheet function that returns one, such as a Sass `@function`.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+- Governance on paper, held against what happened:
+  - It reads the team's own contribution guide, release process and changelog for the rules they state.
+  - It holds each breaking change in the last five releases to those rules: a major version, a changelog entry that names it, and a migration note.
+  - A breaking change is one its commit marks (`!:`, a `BREAKING CHANGE:` footer) or one the engine recorded when it published the contracts.
+  - A rule the documents do not state is never checked. With no such documents, it says nothing.
+  - It says when commits stop following Conventional Commits, when the guide asks for them.
+  - Where the engine keeps the team's issues on GitLab, it names open issues left past the guide's own stale or duplicate limit, in days.
 
 What a *product* does with the system is a product leaving it, so it is said under the drift check instead (`🪢 Drift from the system`), not here. Each part does what its line on the [features page](features.md) says:
 
