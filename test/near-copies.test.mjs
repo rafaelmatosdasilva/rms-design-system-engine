@@ -98,7 +98,14 @@ test('the audit says it under System health, and the style guide puts it in the 
       assert.match(row, /^\d+[\w-]+-shop\.shopButton shop\.css:2[\w-]+-shop's \.shopButton is nearly button \(\d+ of \d+ declarations alike, and it differs in background[^)]*\)\.Decide: use button in [\w-]+-shop, with a new option if it needs one, or add \.shopButton to the system on purpose\. Your team decides which\./);
       close();
     } finally { c.kill(); }
+    // In the audit, under the drift check, gathered under the product that copied it (product-departures.mjs), with the
+    // version its lockfile pinned and the button it built of its own beside the system's.
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/kit', version: '2.1.0' }));
+    writeFileSync(join(shop, 'package.json'), JSON.stringify({ dependencies: { '@acme/kit': '^1.0.0' } }));
+    writeFileSync(join(shop, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3, packages: { 'node_modules/@acme/kit': { version: '1.4.0' } } }));
+    writeFileSync(join(shop, 'Button.jsx'), 'export function Button({ children }) {\n  return <button className="shop-cta">{children}</button>;\n}\n');
     const audit = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
-    assert.match(audit.stdout, /1 class in the products nearly copies a system component\. For each, decide: use the component \(with a new option if it needs one\), or add the new one to the system on purpose:\n\s+· \.\.\/[\w-]+-shop\/shop\.css:2 {2}\.shopButton is nearly button \(\d+ of \d+ declarations alike; differs in background/);
+    assert.match(audit.stdout, /🪢 Drift from the system: [^\n]*\n\s+shop has left the system in 3 places, each a need the system does not meet yet \(ask its team what it needed\):\n\s+· stopped upgrading: on 1\.4\.0, 1 major and 1 minor behind 2\.1\.0\n\s+· copied button and changed it: \.\.\/[\w-]+-shop\/shop\.css:2 {2}\.shopButton \(\d+ of \d+ declarations alike, differs in background[^\n]*\)\n\s+· built its own button: \.\.\/[\w-]+-shop\/Button\.jsx:1 {2}Button\n/, audit.stdout.slice(-3000));
+    assert.doesNotMatch(audit.stdout, /in the products nearly cop/, 'said once, under the product');
   } finally { rmSync(dir, { recursive: true, force: true }); rmSync(shop, { recursive: true, force: true }); }
 });
