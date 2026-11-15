@@ -299,6 +299,65 @@ Four shapes are read from the pages themselves — their name, their title, the 
 A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
 
 Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
+### Which shell your request starts from
+
+A prototype starts from a shell — the whole-page layout everything else is laid inside — and which one it starts from is the decision every other decision sits under.
+
+The engine ranks them by counting the words your request and a shell's description share. That works only where you happen to use your documentation's own vocabulary. Ask for a page to **browse orders** when the shell is documented for **inquiry and list** screens and the count is zero for every shell, so the order falls back to the alphabet and the catalog says the honest thing a count can say: *these are the shells, and that choice is yours.*
+
+Which shell a request starts from is judgement, so a model can be asked:
+
+```bash
+rms-design-system-engine --prototype --catalog --judge-shell --for "a page to browse orders"
+```
+
+```
+🧭 WHICH SHELL  ConsultPage · $0.01
+   ConsultPage — the request is a list a person looks something up in, which is what inquiry means here
+   could also: DetailPage — a row could open as one record shown in full
+   Advisory: a model read the documentation, not a person. The counted order above stands on its own.
+```
+
+Three things it is held to, and they are why this is worth more than asking a model in a chat window:
+
+- **It chooses only from your shells.** A name that is not one of them is dropped and named, never quietly swapped for the nearest. The engine's promise to a prototype is that nothing else exists, and a shell invented here would be the one place that promise broke.
+- **It says where its reason came from.** Each reason is read back against that shell's own description. One that rests on nothing your documentation says is still shown, marked *(not from the documentation: the model read the name)* — so you can see which reasons came from your system and which from the model's idea of what a name means.
+- **It can answer that none of them fits.** A ranking that always produces a winner cannot tell you your system is missing a shell. This one says so, and says it is worth telling the design team.
+
+A system with one shell is not asked at all: there is nothing to choose between.
+
+Advisory, never a failure, and never asked unless you ask — it spends your model tokens, and the counted order is a whole answer without it. Kept by your request's and your shells' hashes, so the same question is never paid for twice.
+
+### Did what you asked for come out whole
+
+Everything else the engine checks about a prototype is structure — the components are the system's, the pages link, a shape owes what it owes, the page still owes a route. **All of it can hold while the thing is useless.** You asked for a way to approve an order, got a page where the approve button leads nowhere, and every check passes because nothing it measures is wrong.
+
+Whether a request came out whole is judgement, so a model is asked:
+
+```bash
+rms-design-system-engine --prototype --judge --for "a way to approve an order"
+```
+
+```
+⚖️  THE REQUEST, JUDGED  2 of 4 decision(s) break · $0.08:
+   ❌ Nothing drawn but dead: Approve on orders leads nowhere
+      check: click Approve and see that nothing follows
+   ⚠️  Fit to put in front of someone: the flow ends on the orders page
+      check: there is no confirmation after approving
+```
+
+Four decisions, fixed and named — a judgement nobody can repeat is an opinion:
+
+| | |
+|---|---|
+| **It does what was asked** | the flow carries out the thing the request describes, end to end |
+| **Nothing drawn but dead** | every control a person reaches for leads somewhere or changes something |
+| **What is missing is shown as missing** | a gap, not something faked to look finished |
+| **Fit to put in front of someone** | usable in a user test with nothing explained away |
+
+**It will not judge the pages against themselves.** With no `--for`, it refuses rather than marking its own work — what was asked and what was drawn are the two things being compared.
+
+Advisory, never a failure. Asked only when you ask, because it spends your model tokens. Kept by the pictures' hashes and the request's, so a flow that has not changed is never paid for twice. And every finding carries a **check** — one sentence you can verify on the pages yourself, so the model's word is never the last one.
 
 ### Did what you asked for come out whole
 
