@@ -11,7 +11,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | Ready to use |
 | [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
 | [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | Early development |
-| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Coming soon |
+| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Early development |
 
 ### Documentation
 
@@ -147,7 +147,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 ## Lint your codebase rules
 
-**Coming soon** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
+**Early development** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
 
 *Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
 
