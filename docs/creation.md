@@ -300,6 +300,29 @@ Four shapes are read from the pages themselves — their name, their title, the 
 A success page is an ending and is never asked what comes next. A page of no known shape leaves the question open rather than guessing.
 
 Two things it will not do. **It never writes the missing part** — a shape is a reading, not an instruction, and the engine does not invent. And **it reads the pages, never the request**: what you asked for and what was drawn are the two things being compared, so taking the shape from the request would compare the request with itself.
+### A judgement made again and again is a rule you never wrote down
+
+Judging one prototype tells you about that prototype. The fourth time a model says the same thing about a different flow, it is not telling you about the flow any more — it is telling you your team has a rule nobody has written down.
+
+So the four decisions are counted across prototypes, and once the same one has broken enough times it is proposed as a guideline:
+
+```
+📏 JUDGED THE SAME WAY AGAIN  1 rule(s) this keeps asking for:
+   "Every control a person reaches for in a prototype leads somewhere or changes something: nothing is drawn and dead."
+      — 3 time(s) across 3 prototypes; it would go in the intent layer, the System page, under Rules, as a draft
+   Written down, it stops being judged again: the team decides each one, and a no is remembered.
+```
+
+This is the same loop a correction goes through — a lesson becomes the strongest guard that can hold it — with a model's judgement as the source instead of a person's correction.
+
+Three things it is careful about:
+
+- **A flow is one place, not one per page.** A flow of four pages judged broken once is one count. Counting it per page would say a single judgement was four mistakes, and a rule would fall due on the first prototype anyone judged.
+- **Prototype judgements and screen judgements never mix.** A rule proposed from whole flows is counted apart from one proposed from the style guide's screens: they are judged on different things, and a proposal should never cite the other as its evidence.
+- **It proposes, and remembers a no.** The rule is drafted for your team to accept or turn down. Turned down, it is not asked again until the evidence has grown.
+
+A decision that holds is never counted. Only the four fixed decisions are, because a rule is only worth proposing where the answer should be the same every time.
+
 ### Which shell your request starts from
 
 A prototype starts from a shell — the whole-page layout everything else is laid inside — and which one it starts from is the decision every other decision sits under.
