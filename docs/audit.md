@@ -599,7 +599,7 @@ Thirteen checks change behaviour with a setting in `ds-config.json`, and the two
 | `reimplementationStrict` | a component built by hand where the system has one |
 | `renderedModeStrict` | a rendered assertion that covers some modes and not all |
 | `templateCompositionStrict` | a page missing a component its Figma template composes |
-| `versionLockStrict` | a product left on an older version of the system |
+| `versionLockStrict` | a Figma file saved again since its snapshot was taken |
 | `screenElementStrict` | an element on a screen the code never builds |
 
 **Stops the merge until you ask for less.** On unless you turn them off. Set the key to `false` to make the finding advice:

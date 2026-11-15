@@ -70,9 +70,9 @@ test('each kind of file is read for what it can hold: nesting only in plain CSS,
   assert.deepEqual(scanFile({ file: 'src/Menu.tsx', text: '<div className="a popover b" />' }, B).features, []);
   const flex = '.row { display: flex; gap: 8px; }\n.grid { display: grid; gap: 8px; }\n';
   assert.deepEqual(scanFile({ file: 'src/row.css', text: flex }, { safari: '14' }).features.map((f) => [f.id, f.line]), [['flex-gap', 1]]);
-  // a browser that never runs it
+  // a browser that runs it only from a later version than the one supported
   const fs = scanFile({ file: 'src/field.css', text: 'textarea { field-sizing: content; }' }, { firefox: '140' }).features;
-  assert.deepEqual(fs[0].missing, [{ browser: 'firefox', from: null }]);
+  assert.deepEqual(fs[0].missing, [{ browser: 'firefox', from: '152' }]);
 });
 
 test('old patterns are named with what replaces them, the line-clamp idiom aside', () => {
@@ -93,7 +93,7 @@ test('the lines: one per feature and file with how many more, each with the brow
   assert.deepEqual(lines, [
     '2 features not supported in every browser the team supports:',
     '   · src/card.css:1 (and 1 more)  :has() runs from Chrome 105, Firefox 121 and Safari 15.4, and the team supports Chrome 100, Firefox 113 and Safari 15. Put it inside @supports selector(:has(*)), or raise the target.',
-    '   · src/field.css:1  field-sizing runs from Chrome 123 and Safari 26.2 and does not run in Firefox yet, and the team supports Chrome 100, Firefox 113 and Safari 15. Size the field another way where it does not run, or raise the target.',
+    '   · src/field.css:1  field-sizing runs from Chrome 123, Firefox 152 and Safari 26.2, and the team supports Chrome 100, Firefox 113 and Safari 15. Size the field another way where it does not run, or raise the target.',
     '1 old pattern the platform now replaces:',
     '   · src/card.css:3  display: -webkit-box, use display: flex',
   ]);
