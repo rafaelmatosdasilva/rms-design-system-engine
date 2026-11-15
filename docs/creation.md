@@ -206,6 +206,26 @@ Two things it leaves alone:
 
 On a real system of 275 components this found two. It is meant to: a check that flags a tenth of your library is measuring your writing style, not finding a gap.
 
+### The flow is told to you, not asked for
+
+A designer is building a journey, not a page. So every time a page is drawn, you are told what it did to the flow it belongs to — no command to remember:
+
+```
+🔗 IN THE FLOW  3 page(s), 4 link(s)
+   approve → done, orders
+   ends: done (nothing leads on: the end of a flow, or a page owed a way on or back)
+```
+
+A page that leads nowhere says so the moment you draw it:
+
+```
+   lonely leads nowhere
+```
+
+and a link to a page nobody has drawn is named as an error, where you are drawing.
+
+A folder with one page in it says nothing at all: there is no flow to speak of yet, and a number there would be noise. `--prototype --flow` still gives you the whole picture when you want it; you no longer have to know it exists to find out a page is stranded.
+
 ### A prototype is the journey, not a screen
 
 You take a prototype to a user test, hand it to a development team and show it to a client. Isolated pages fail all three — so a folder of pages that do not link is a failure, not a partial success.
