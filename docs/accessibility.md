@@ -58,9 +58,9 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 The style guide has a page of its own for accessibility, under Documentation in the menu, as Rules and Documentation have theirs.
 
 - **One table for every component.** Each row is one criterion of one component, the same row its own Accessibility area shows, under the same task number.
-- **The same panel.** A row opens the panel it opens on the component's page, with what to do first.
+- **The same panel.** A row opens the panel it opens on the component's page, with what to do first, then the criterion's level and its principle (Level AA · Operable), as the filters name them.
 - **Filters.** A chip for each status (Issues, Review, Met) and one for what differs by browser, then the component, the level, the principle and who acts. They combine, and each says how many rows it would leave. What a criterion depends on (the code, each browser, Chrome alone) is said in each row's panel.
-- **A card a level.** Level A and Level AA, each the share of its own criteria the system meets, with a bar for each principle (perceivable, operable, understandable, robust). The tip at each card's top right says how it is counted.
+- **A card a level.** Level A and Level AA, each the share of its criteria the system meets, with a bar for each principle (perceivable, operable, understandable, robust). The tip at each card's top right gives the sum in plain words.
 - **Filled once every component is tried.** Every row is one the browser tries as the page opens, so until each component has been, the page says how far it has got rather than drawing half a table.
 - **On the Status page.** Its Accessibility card counts the criteria that pass in one browser and fail in another, and opens this page with that filter on.
 
@@ -72,9 +72,11 @@ The style guide has a page of its own for accessibility, under Documentation in 
 | To review | No component fails it, but at least one waits on a person's check |
 | Failing | At least one component fails it |
 
-- **On this page.** Level A's card is the level A criteria met, out of all of them. Level AA's is the same for the level AA criteria alone.
-- **On the Status page.** Its card, titled Accessibility (WCAG 2.2 AA), is the two levels together: every criterion AA asks for, met or not. So it sits between the two cards here, and reaching 100% there means the system meets AA.
+- **Level A.** The level A criteria met ÷ all level A criteria.
+- **Level AA.** The level A and level AA criteria met ÷ all of them. Levels build on each other, as WCAG conformance does: a system meets AA only when it meets every criterion of both, so the AA card counts both. 100% there means the system meets AA.
+- **On the Status page.** Its Accessibility card is the same number as Level AA here, worked out by the same code.
 - **Rounded down.** Every number, so 100% only ever means all of them are met.
+- **In each card's tip.** The sum in plain words, such as *Level A criteria met ÷ all level A criteria, rounded down*. The counts themselves are under each percentage (12 of 22).
 - **The ring and the bars.** A ring splits its criteria into met, to review and failing. Each principle's bar does the same for its own criteria, with no number of its own.
 - **Why not rows.** A row is one criterion on one component. Counted that way, the many simple components that pass would hide the few that fail, and a system with no component meeting level A could still read 75%.
 - **What is left out.** A criterion that does not apply to a component (video and sound on a button) is not counted for it. What is looked at beyond A and AA (high contrast mode, reduced motion) is in the table but not in the number.

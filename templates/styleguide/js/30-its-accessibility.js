@@ -394,8 +394,8 @@
   // the same number (the owner's, 15 November 2026). → { [sc]: { st, level, principle } }
   // What each level's card counts, in its tip: a fixed sentence or two, 25 words at most, as the Status page's tips are.
   var A11Y_LEVEL_HOW = {
-    A: 'WCAG 2.2 criteria of level A, met only when no component fails them. Not an average. The bars split them by principle.',
-    AA: 'WCAG 2.2 criteria of level AA, met only when no component fails them. Not an average. The bars split them by principle.'
+    A: 'Level A criteria met ÷ all level A criteria, rounded down. Met only when no component fails it. Not an average.',
+    AA: 'Level A and AA criteria met ÷ all of them, rounded down, as AA asks for both. Met only when no component fails it.'
   };
   function a11yCriteria(rows) {
     var by = {}, RANK = { done: 0, kept: 0, check: 1, todo: 2 };
@@ -481,10 +481,13 @@
     filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
       { key: 'status' }, { key: 'component', label: 'Component' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'principle', label: 'Principle', order: A11Y_PRINCIPLES },
       { key: 'who', label: 'Who acts' }] });
-    // A card a level, each counting its own criteria across the system (a11yCriteria, the Status page's count), with a
-    // bar for each principle. The Status page's number is the two together, the criteria WCAG 2.2 AA asks for.
+    // A card a level, counting criteria across the system (a11yCriteria, the Status page's count), with a bar for each
+    // principle.
     var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
-    var levelCard = function (lv) { return doneCard('Level ' + lv, Object.keys(bySc).filter(function (sc) { return bySc[sc].level === lv && bySc[sc].principle; }).map(function (sc) { return { area: bySc[sc].principle, state: A11Y_ST[bySc[sc].st] }; }), A11Y_LEVEL_HOW[lv]); };
+    // Levels build on each other, as WCAG conformance does: Level AA is every criterion of A and of AA, the Status page's
+    // number, never the AA criteria alone (the owner's, 15 November 2026).
+    var IN_LEVEL = { A: ['A'], AA: ['A', 'AA'] };
+    var levelCard = function (lv) { return doneCard('Level ' + lv, Object.keys(bySc).filter(function (sc) { return IN_LEVEL[lv].indexOf(bySc[sc].level) >= 0 && bySc[sc].principle; }).map(function (sc) { return { area: bySc[sc].principle, state: A11Y_ST[bySc[sc].st] }; }), A11Y_LEVEL_HOW[lv]); };
     doneCards(sec, levelCard('A') + levelCard('AA'));
     labelCells(sec);
     if (route.last !== undefined && !sec.hidden) underTitle(sec);

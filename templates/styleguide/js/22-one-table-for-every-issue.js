@@ -139,7 +139,9 @@
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
       // Who acts has a column of its own, so it is its own card below, never inside this one.
-      if (k === 'whoCell') return card(col[0], r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '');
+      // A criterion's level and the WCAG principle it is under, the Accessibility page's Level and Principle filters, said
+      // before who acts on it (the owner's, 15 November 2026).
+      if (k === 'whoCell') return (r.k && r.k.sc ? card('Level and principle', '<p>' + esc(r.k.beyond || !r.k.level ? 'Beyond A and AA' : 'Level ' + r.k.level + (/^(\d)\./.test(r.k.sc) ? ' · ' + A11Y_PRINCIPLE[r.k.sc.charAt(0)] : '')) + '</p>') : '') + card(col[0], r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '');
       if (k === 'todo') return card(col[0], (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }

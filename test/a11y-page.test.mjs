@@ -61,13 +61,13 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     assert.ok(seen.chips.includes('todo') || seen.chips.includes('check'), seen.chips.join());
     assert.deepEqual(seen.cards, ['Level A', 'Level AA'], 'a card a level')
     assert.equal(await run(`[...document.querySelectorAll('#accessibility .sg-cx-score')].every((c) => c.querySelector('.sg-health-top .sg-tip'))`), true, 'its tip says how it is counted, as the Status page\'s cards do')
-    // Each card counts its level's criteria across the system, never rows: a criterion is met only when no component
-    // fails it and none waits on a review. The Status page's number is the two levels together.
+    // Each card counts criteria across the system, never rows: a criterion is met only when no component fails it and
+    // none waits on a review. Levels build on each other: Level AA is A and AA together, the Status page's number.
     const counted = await run(`(() => {
       const trs = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')], rank = { done: 0, check: 1, todo: 2 }, all = {};
       const out = ['A', 'AA'].map((lv) => {
         const by = {};
-        trs.filter((t) => t.dataset.fLevel === lv && t.dataset.fPrinciple).forEach((t) => { const sc = t.cells[2].textContent.trim().split(' ')[0]; by[sc] = Math.max(by[sc] ?? 0, rank[t.dataset.status]); all[sc] = by[sc]; });
+        trs.filter((t) => (lv === 'AA' ? /^(A|AA)$/ : /^A$/).test(t.dataset.fLevel || '') && t.dataset.fPrinciple).forEach((t) => { const sc = t.cells[2].textContent.trim().split(' ')[0]; by[sc] = Math.max(by[sc] ?? 0, rank[t.dataset.status]); all[sc] = by[sc]; });
         const v = Object.values(by), card = [...document.querySelectorAll('#accessibility .sg-cx-score')].find((c) => c.querySelector('.sg-health-label').textContent === 'Level ' + lv);
         return { want: v.filter((x) => x === 0).length + ' of ' + v.length, got: card.querySelector('.sg-cx-ring-text .sg-health-sub').textContent };
       });
@@ -75,8 +75,10 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
       return { levels: out, both: Math.floor(v.filter((x) => x === 0).length / v.length * 100) };
     })()`);
     for (const c of counted.levels) assert.equal(c.got, c.want);
-    const statusN = await run(`(() => { const t = [...document.querySelectorAll('#status .sg-health-tile')].find((x) => /^Accessibility \\(WCAG 2\\.2 AA\\)$/.test(x.querySelector('.sg-health-label').textContent)); return t ? t.querySelector('.sg-health-pct').textContent.replace(/\\D/g, '') : null; })()`);
-    assert.equal(statusN, String(counted.both), 'the Status page says both levels together, named for WCAG 2.2 AA');
+    const statusN = await run(`(() => { const t = [...document.querySelectorAll('#status .sg-health-tile')].find((x) => /^Accessibility$/.test(x.querySelector('.sg-health-label').textContent)); return t ? t.querySelector('.sg-health-pct').textContent.replace(/\\D/g, '') : null; })()`);
+    assert.equal(statusN, String(counted.both), 'the Status page says both levels together');
+    const aaN = await run(`[...document.querySelectorAll('#accessibility .sg-cx-score')].find((c) => c.querySelector('.sg-health-label').textContent === 'Level AA').querySelector('.sg-health-num').textContent.replace(/\\D/g, '')`);
+    assert.equal(aaN, statusN, 'Level AA here is the Status page\'s number');
     // Every task names a person by role (a designer, a developer, a person checking by hand, whoever writes the words,
     // whoever owns the flow): never the older "You decide" or "You in Figma", which said a place or a doubt.
     const who = await run(`[...new Set([...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((t) => t.dataset.fWho).filter(Boolean))]`);
@@ -95,6 +97,7 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     const panel = await run(`(async () => { const tr = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].find((x) => x.dataset.status === '${chip}'); tr.cells[2].click(); await new Promise((r) => setTimeout(r, 400)); const m = document.querySelector('#sg-row-panel:not([hidden])'); return m ? [...m.querySelectorAll('.pg-inspect-head')].map((h) => h.textContent) : null; })()`);
     assert.ok(panel && panel.length, 'the panel opened');
     assert.ok(panel.includes('What to do'), panel.join());
+    assert.ok(panel.includes('Level and principle'), 'the panel says the level and the principle, as the filters do');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
