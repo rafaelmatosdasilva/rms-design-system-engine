@@ -176,10 +176,14 @@
       body = cards.join('');
     }
     if (A11Y_TOP) {
-      // A Figma task (a designer, in Figma) says where to do it, in what to do: the component's node in the Figma file, in
-      // a tab of its own with Figma's mark. A task of the code never links to Figma.
-      var figUrl = r.who && r.who.indexOf(WHO.designer) === 0 ? figmaOf() : null;
-      if (figUrl && firstTodo) cards[0] = cards[0].replace(/<\/div><\/div>$/, '<p><a class="sg-uses-link sg-cx-figma" href="' + esc(figUrl) + '" target="_blank" rel="noopener" title="' + esc('Open ' + comp + ' in Figma') + '">' + FIGMA_SVG + esc('Open ' + comp + ' in Figma') + '</a></p></div></div>');
+      // Where to see it, in what to do, as a link it names for what it does (See, never Fix: nothing is fixed by a click).
+      // A designer's task: the component's node in the Figma file, with Figma's mark. A developer's: its file in the
+      // code, with the code's mark. In a tab of their own. A task of the code never links to Figma (the owner's,
+      // 15 November 2026).
+      var c0 = HAS_PAGE[comp], codeUrl = c0 ? ((c0.links || []).filter(function (l) { return l.label === 'Code'; })[0] || {}).url : null;
+      var see = r.who && r.who.indexOf(WHO.designer) === 0 && figmaOf() ? ['sg-cx-figma', figmaOf(), FIGMA_SVG, 'See in Figma', 'Open ' + comp + ' in Figma']
+        : r.who && r.who.indexOf(WHO.developer) === 0 && codeUrl ? ['sg-cx-code', codeUrl, CODE_SVG, 'See in code', 'Open ' + comp + '\'s file in the code'] : null;
+      if (see && firstTodo) cards[0] = cards[0].replace(/<\/div><\/div>$/, '<p><a class="sg-uses-link ' + see[0] + '" href="' + esc(see[1]) + '" target="_blank" rel="noopener" title="' + esc(see[4]) + '">' + see[2] + esc(see[3]) + '</a></p></div></div>');
       cards.splice(firstTodo, 0, card('Component', '<p><a class="sg-uses-link" href="#' + esc(cid(comp)) + '">' + esc(comp) + '</a></p>') + card('Where it was read', srcLines()));
       body = cards.join('');
     }
