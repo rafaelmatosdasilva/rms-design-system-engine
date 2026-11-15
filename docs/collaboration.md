@@ -127,7 +127,7 @@ What every page shares:
 
 One page for how the system stands and what is left. It is second in the list, under the index.
 
-- **Four cards at the top.** Parity, Code, Accessibility and Documentation: how many components are done in each, and what is left.
+- **Four cards at the top.** Parity, Code, Documentation and Accessibility: how many components are done in each, and what is left.
 - **One table of the components.** A row for each component, with its state in Figma, Code, Parity, Accessibility and Documentation, and when it was last checked. A row opens the component's page in a side panel. Filters narrow the table by state, and a link keeps what you chose. How the table works is in [The Status table](#the-status-table).
 - **Not tied to one component.** Under the table, the system's own tasks: token descriptions, components whose file is still to confirm, controls the page stands in for.
 
@@ -314,11 +314,11 @@ One row for each component, with one word per state. The cards above the table a
 | Accessibility | Met, Issues, Review, Untested |
 | Documentation | Done, Review, Missing |
 
-- **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
+- **Cards.** Parity, Code, Documentation and Accessibility, all over the same whole: everything the table lists. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
   - **Parity** counts every property, token and value compared, in what the code has built.
   - **Code** counts the rows themselves: built, unsure or missing.
-  - **Accessibility** counts WCAG 2.2 AA criteria over the whole system, those of level A included. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it. It is not an average of the components, and it is the same number as the [Accessibility page](accessibility.md#the-accessibility-page)'s, its tip saying how it is counted.
   - **Documentation** counts what people write. Its page existing and its properties, which the engine writes itself, are not counted.
+  - **Accessibility** counts WCAG 2.2 AA criteria over the whole system, those of level A included. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it. It is not an average of the components, and it is the same number as the [Accessibility page](accessibility.md#the-accessibility-page)'s, its tip saying how it is counted.
 - **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts. A part of a part counts in the row of the component at the top, never in a row of its own.
 - **Opening a component.** A row, or its arrow, opens the component's page in a panel from the right, with its tabs. A Parity, Accessibility or Documentation cell with something left opens that area, filtered to what is to fix or decide.
 - **N/A and Untested.** N/A has no dot and no arrow, since there is nothing to open. N/A and Untested carry an i that says why. A component only one side has says what to do in an i on the side that lacks it.

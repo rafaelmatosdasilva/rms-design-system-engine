@@ -210,7 +210,8 @@
     aT.how = A11Y_HOW + ' Tried in a browser on every variant, for the theme chosen at the top.';
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
-    var tiles = [pT, iT, aT, dT].map(tile).join('');
+    // In the menu's order: Documentation before Accessibility, as their pages are (the owner's, 15 November 2026).
+    var tiles = [pT, iT, dT, aT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
