@@ -2627,8 +2627,10 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   what an input does, dragging, target size), tried in Chrome and in no other engine today; `chrome`, what a screen
   reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. The style guide says
   which under each row, the run names a browser that is not installed rather than passing over it (`browsers.mjs`),
-  and the result records which were here (`browsers` in `a11y.json`, names only). The passes in Firefox and WebKit
-  are not built yet.
+  and the result records which were here (`browsers` in `a11y.json`, names only). The accessibility passes in
+  Firefox and WebKit are not built yet. Rendered parity is drawn in both already (`cross-browser.mjs`, through
+  `page-driver.mjs`: Firefox over WebDriver BiDi, Safari over `safaridriver`), and its `⚠️ BROWSERS` lines say only what
+  differs from Chrome (`rendered.browsers` in `reference/config.md`).
 - **Judgement calls, pre-sorted** (`--judge-a11y`) — a model reads the words a component's own code shows and marks
   the ones a person should look at first for 2.4.6, 3.3.3 and 2.4.4, each likely, unclear or fine with one short
   reason. Advisory and asked for only (`a11yJudgement.cmd`): no criterion passes or fails on it, and the answer is

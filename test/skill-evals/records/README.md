@@ -282,5 +282,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-14-a-merge-keeps-the-shared` | The 24 guide tasks on Haiku (engine b64f57b) | "A merge keeps the shared colour, never a component's own, and the demo report shows the new advice" |
 | `2026-11-14-a-colour-token-the-code` | The 24 guide tasks on Haiku (engine 6ca5cea) | "A colour token the code mixes at 0% is found and said: an audit check and a note on the editor's field" |
 | `2026-11-15-the-states-a-component-owes` | The 24 guide tasks on Haiku (engine b78b123) | "The states a component owes from a heading too, colours a person cannot tell apart, a colour mixed at 0%, and where nobody is named to decide" |
+| `2026-11-15-the-secret-check-reads-token` | The 24 guide tasks on Haiku (engine c089de5) | "The secret check reads token/variable names as design tokens, and the XL case seen again" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

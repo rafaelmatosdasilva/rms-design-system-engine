@@ -142,9 +142,10 @@ test('[smoke effect-check] runs without crashing on a minimal fixture', () => {
 });
 
 test('[rendered-check] an assertion can read a ::before or ::after layer', async () => {
-  const src = (await import('node:fs')).readFileSync(new URL('../lib/rendered-check.mjs', import.meta.url), 'utf8');
+  // The measuring script is one for every browser (cross-browser.mjs), Chrome's included.
+  const src = (await import('node:fs')).readFileSync(new URL('../lib/cross-browser.mjs', import.meta.url), 'utf8');
   assert.match(src, /getComputedStyle\(el, a\.pseudo\)\[a\.prop\]/);
-  assert.match(src, /pseudo: x\.a\.pseudo \?\? null/);
+  assert.match(src, /pseudo: a\.pseudo \?\? null/);
 });
 
 test('[rendered-check] transitions are off before any colour scheme group is measured', async () => {
