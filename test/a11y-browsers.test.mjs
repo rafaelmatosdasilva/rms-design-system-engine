@@ -62,7 +62,7 @@ const PAGE = `<!doctype html><html><head><style>
   /* Only Firefox reads this: the ring is taken away there alone. */
   @supports (-moz-appearance: none) { .ff:focus-visible { outline: none; } }
   .tiny { width: 12px; height: 12px; padding: 0; border: 0; }
-</style></head><body><section id="c-demo"><div class="pg-preview">
+</style></head><body><nav>${'<a href="#n">A link of the page</a> '.repeat(60)}</nav><section id="c-demo"><div class="pg-preview">
   <button class="ok">Fine</button>
   <button class="gone">No ring anywhere</button>
   <button class="ff">No ring in Firefox</button>
@@ -78,7 +78,8 @@ test('in Chrome and Firefox: real Tab presses, and a focus ring Firefox alone ta
     const run = await a11yBrowsers({ url: () => pathToFileURL(page).href, components: ['demo'], browsers: [{ name: 'chrome', path: HERE.chrome }, { name: 'firefox', path: HERE.firefox }], open: openBrowser, rootOf: (n) => `#c-${n} .pg-preview` });
     assert.deepEqual(run.refused, []);
     const kinds = (l) => run.components.demo[l].map((f) => `${f.kind} ${f.desc}`).sort();
-    // The same in both: a ring removed everywhere, the targets too small. Every control reached by Tab.
+    // The same in both: a ring removed everywhere, the targets too small. Every control reached by Tab, though the
+    // page's own sixty links come first: the walk starts at the components.
     for (const l of ['Chrome', 'Firefox']) {
       assert.ok(kinds(l).includes('focus button.gone'), `${l}: ${kinds(l)}`);
       assert.ok(kinds(l).some((k) => k.startsWith('target button.tiny')), `${l}: ${kinds(l)}`);
