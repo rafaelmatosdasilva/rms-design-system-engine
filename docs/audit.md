@@ -234,6 +234,13 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 - Aliases to a removed token, with the commit that removed it.
 - A colour token the code mixes at 0%, so it never shows. A `color-mix()` gives all of the mix to the other colour, often an opacity token given to the wrong side. It is read through a stylesheet function that returns one, such as a Sass `@function`.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+- The common set a system lacks:
+  - It lists the system against the 23 components most product UIs need (button, link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, badge, icon, pagination, progress, skeleton, empty state).
+  - Three columns: Figma, the code and the intent layer. A side the engine has nothing to read from is left out, never counted as missing.
+  - It matches by meaning, not exact name: a modal is a dialog, a snackbar a toast, a TextField a text input, an IconButton a button.
+  - It names each one missing on every side, and each that is on some sides only.
+  - It counts the five token categories (colour, spacing, radius, elevation, typography) that have tokens, and how many values of an untokenised one the styles write by hand.
+  - A gap the team leaves on purpose (`commonSet.leaveOut` in `ds-config.json`) is said as kept, with its reason, never as missing.
 - Governance on paper, held against what happened:
   - It reads the team's own contribution guide, release process and changelog for the rules they state.
   - It holds each breaking change in the last five releases to those rules: a major version, a changelog entry that names it, and a migration note.
