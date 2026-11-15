@@ -157,7 +157,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-chip:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-chip.sg-chip--only, .sg-chip.sg-chip--only:hover { cursor: default; background: var(--sg-bg); color: var(--sg-text); box-shadow: inset 0 0 0 var(--sg-line-width, 1px) var(--sg-text); }   /* the one status there is: shown chosen, as it is all there is, and never unchosen */
 .sg-chip.sg-chip--only > .sg-count { background: var(--sg-text); color: var(--sg-bg); }
-.sg-issues tr.sg-st-off, .sg-issues tr.sg-who-off, .pg-par-card.sg-st-empty { display: none; }
+.sg-issues tr.sg-st-off, .sg-issues tr.sg-who-off, .sg-issues tr.sg-lf-off, .pg-par-card.sg-st-empty { display: none; }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-card-gap); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
 @media (max-width: 720px) {
