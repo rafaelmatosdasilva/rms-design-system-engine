@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, TIME_SCALE } from './helpers.mjs';
 import { axeFindings, elementKey, tabTrap, spokenLine, cvdFindings, cvdLuminance, accountFor, a11ySummaryLines, guideFor, severityOf, A11Y_GUIDE, a11yVerdict, AXE_SAME } from '../lib/a11y-check.mjs';
 import { WCAG22, WCAG22_NEW, WCAG_KIND, WCAG21_GUIDE } from '../lib/wcag21.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -233,7 +233,14 @@ test('out of time: what the pages it finished found is kept, the page it was on 
   const held = [];
   const server = createServer((req, res) => { held.push(res); });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const slow = Array.from({ length: 8 }, (_, i) => `slow${i}.html`);
+  // Both sides of this scale together (helpers.mjs TIME_SCALE). The budget has to be long enough for the one quick
+  // page to finish on a loaded machine - unscaled, 30s stopped buying that once the suite began starting Firefox and
+  // Safari too, and the run read as a broken engine on a machine working fine. But it must still run out, and each
+  // slow page gives up loading on its own after 10s, so a longer budget needs proportionally more of them to outlast
+  // it. Scaling one without the other breaks the test either way: too short and nothing finishes, too long and the
+  // budget never runs out.
+  const slow = Array.from({ length: 8 * TIME_SCALE }, (_, i) => `slow${i}.html`);
+  const pageCount = slow.length + 1;
   const dir = makeFixture({
     'first.html': '<!doctype html><html lang="en"><title>First</title><body><main><h1>First</h1><p style="color:#bbb;background:#fff">Faint words</p></main></body></html>',
     ...Object.fromEntries(slow.map((f, i) => [f, `<!doctype html><html lang="en"><title>Slow</title><body><img alt="" src="http://127.0.0.1:${server.address().port}/${i}.png"></body></html>`])),
@@ -252,21 +259,21 @@ test('out of time: what the pages it finished found is kept, the page it was on 
     // said to have been stopped partway, and what was never started is said not to have been reached. Which page each
     // of those is depends on how fast this computer is, so nothing below reads a page by name. An earlier version did,
     // and failed on a loaded machine that was working perfectly.
-    const secs = 30;
+    const secs = 30 * TIME_SCALE;
     writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ a11y: { timeoutSec: secs } }, null, 2));
 
     const out = await check([...['first.html', ...slow].flatMap((f) => ['--url', url(f)]), '--json-out', join(dir, 'a11y.json')]);
-    const done = out.match(new RegExp(`stopped after ${secs}s, with (\\d+) of 9 page\\(s\\) checked: what they found is kept`));
+    const done = out.match(new RegExp(`stopped after ${secs}s, with (\\d+) of ${pageCount} page\\(s\\) checked: what they found is kept`));
     assert.ok(done, out);
     const d = JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8'));
     const said = (d.notRead ?? []).join('\n');
-    // Eight pages wait on a server that never answers, so the budget always runs out with one under way and others
-    // never started, however fast the computer is.
+    // The slow pages wait on a server that never answers, so the budget always runs out with one under way and
+    // others never started, however fast the computer is.
     assert.match(said, new RegExp(`\\(stopped partway: the check ran out of its ${secs}s\\)`), said);
     assert.match(said, new RegExp(`\\(not reached: the check ran out of its ${secs}s\\)`), said);
     // Every page is accounted for: counted as checked, or said why not. A page can be both (one that was reached and
     // then gave up loading on its own), so this is a floor, not a sum.
-    assert.ok(Number(done[1]) + (d.notRead ?? []).length >= 9, `${done[1]} checked and ${(d.notRead ?? []).length} said why not:\n${said}`);
+    assert.ok(Number(done[1]) + (d.notRead ?? []).length >= pageCount, `${done[1]} checked and ${(d.notRead ?? []).length} said why not:\n${said}`);
     // Nothing found is thrown away, and nothing missing is passed over in silence: the quick page's finding is here,
     // or that page is named among those the budget cut short. A page stopped partway keeps what it had already
     // measured, so the finding and the page being named are not opposites — both can be true at once.
