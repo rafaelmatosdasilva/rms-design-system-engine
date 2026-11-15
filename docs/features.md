@@ -184,6 +184,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Reads products kept in their own repositories. *(Coming soon)*
 - Hands a renamed prop or value back with its way across: the old name kept as a deprecated alias, a patch for each product and the version that removes it.
 - Finds the same job built differently across products, such as a create flow, and asks whether each difference is earned.
+- Drafts a proposal when two or more products work around the same thing, such as overriding a component's padding or detaching it in Figma, and keeps each rejected one with its reason.
 - Reads your results as one inspection report: ten questions, each with a rating, its evidence and what only an interview answers.
 
 ### What to ask
@@ -191,6 +192,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
+| `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
 | `/rms-design-system-engine inspect our design system` | One rating for each of ten questions (coverage, accessibility, governance, adoption and more), with the evidence behind it and what only an interview answers |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
