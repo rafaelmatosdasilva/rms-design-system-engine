@@ -378,6 +378,11 @@ Four decisions, fixed and named — a judgement nobody can repeat is an opinion:
 | **Nothing drawn but dead** | every control a person reaches for leads somewhere or changes something |
 | **What is missing is shown as missing** | a gap, not something faked to look finished |
 | **Fit to put in front of someone** | usable in a user test with nothing explained away |
+| **Nothing nobody asked for** | every part is there because you asked for it, or because your documentation says a page of this kind has it |
+
+**The last one is the one that saves you taking things out by hand.** An agent adds a default nobody asked for — a shadow on every card, an extra confirmation step, a search box on a page that lists four things — and you notice it in review, take it out, and get it again in the next prototype. Judged, it is named with what was added and where; judged the same way three times, it becomes a constraint your team can accept, and then it stops.
+
+It is judged against **your documentation**, not against what a model supposes a page needs: the shells your system documents are given with the question, so a component your system requires is never read as something added on top. A system that documents no shell is given none — nothing is invented to fill the gap.
 
 **It will not judge the pages against themselves.** With no `--for`, it refuses rather than marking its own work — what was asked and what was drawn are the two things being compared.
 
