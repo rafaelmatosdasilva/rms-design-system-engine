@@ -162,6 +162,11 @@ What you get:
 
 - **How strict.** `ds-config.json` `contractChanges.failOn`, or `--fail-on`: `unaccounted` (the default), `breaking` (any breaking change fails) or `never` (it only reports).
 - **For the merge request.** The same report is written to `.design-system-engine-out/contract-changes.md`, ready to post as a comment.
+- **A rename, with its way across.** A prop gone and a prop new holding the same type, options and default are read as one prop renamed, and a value moved in place in a prop's options as one value renamed. For each:
+  - the system keeps the old name as a deprecated alias, with a warning, until its next major version, which removes it
+  - each product that still writes the old name gets a patch that writes the new one (`handback/renames-<product>.diff`), and the system's own pages get `handback/renames.diff`
+  - `handback/renames.md` counts the places each product still has on the old name
+  - nothing is applied: a person applies each patch in its own folder
 - **It only reports.** It never changes your code. Your pipeline decides what a failing exit stops.
 
 #### Set it up in CI
