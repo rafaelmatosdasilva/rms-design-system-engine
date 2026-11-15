@@ -383,3 +383,31 @@ test('a system not built in code yet takes its spacing from Figma: the catalog n
   const coded = systemScales({ components: [], tokens: { spacing: [{ figma: 'space/m', var: '--space-m', value: '12px' }] } }, figma, '');
   assert.deepEqual(coded.spacing.map((t) => t.name), ['space/m']);
 });
+
+// A command that cannot run: the flags that read the whole project rather than one composition, and a flag's own
+// value never mistaken for the file to read.
+test('every way of reading the whole project runs without a composition', async () => {
+  const { NEEDS_NO_FILE } = await import('../lib/prototype.mjs');
+  for (const f of ['--catalog', '--consistency', '--flow', '--judge', '--coverage', '--rules', '--loop', '--scenarios', '--sweep']) {
+    assert.ok(NEEDS_NO_FILE.includes(f), `${f} would fall to the usage text, however right the rest of the command is`);
+  }
+});
+
+test('a flag\'s own value is never read as the composition', async () => {
+  const { wordsAfter } = await import('../lib/prototype.mjs');
+  const only = (args) => wordsAfter(args).find((a) => !a.startsWith('--')) ?? null;
+  assert.equal(only(['--judge', '--for', 'a way to approve an order']), null, 'the request is not a file');
+  assert.equal(only(['--catalog', '--detail', 'button,chip']), null);
+  assert.equal(only(['--sweep', '--model', 'claude-opus-5']), null);
+  assert.equal(only(['--scenarios', '--requests', '12']), null);
+  assert.equal(only(['prototypes/orders.json', '--offline']), 'prototypes/orders.json', 'a real file still is one');
+  assert.equal(only(['--for', 'x', 'prototypes/orders.json']), 'prototypes/orders.json', 'even after a flag that took its value');
+});
+
+test('what the engine writes beside a composition is not one', async () => {
+  const { isComposition } = await import('../lib/prototype.mjs');
+  assert.ok(isComposition('orders.json'));
+  assert.ok(!isComposition('orders.check.json'), 'a check\'s own record is not a page to judge');
+  assert.ok(!isComposition('conventions.json'));
+  assert.ok(!isComposition('orders.handoff.md'));
+});
