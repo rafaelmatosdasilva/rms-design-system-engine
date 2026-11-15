@@ -90,3 +90,79 @@ test('what a person reads, and that it is advisory', async () => {
   assert.deepEqual(judgmentLines(null), []);
   assert.match(judgmentLines({ why: 'no request' }).join('\n'), /not judged: no request/);
 });
+
+// ── A judgement that keeps coming back ──────────────────────────────────────────────────────────────────────────
+// Everything above judges one flow once. A decision judged broken again and again is not four findings: it is a
+// rule the team never wrote down, and lessons.mjs proposes it once it has been seen enough times.
+import { REPEAT_RULES, readSeen, proposedRules } from '../lib/lessons.mjs';
+import { flowPlace, dueFromJudging, dueLines } from '../lib/prototype-judgment.mjs';
+
+test('every prototype decision has a rule to propose, in its own words', () => {
+  for (const id of DECISION_IDS) {
+    const r = REPEAT_RULES[`proto:${id}`];
+    assert.ok(r, `proto:${id}`);
+    assert.equal(r.form, 'guideline', 'a judgement of a whole flow is not something an edit check can hold');
+    assert.ok(r.text.length > 30 && r.text.endsWith('.'), `${id}: ${r.text}`);
+  }
+});
+
+test('a flow is one place, named by its pages', () => {
+  assert.equal(flowPlace([{ name: 'orders' }, { name: 'approve' }]), 'approve+orders', 'the same flow judged again is the same place');
+  assert.equal(flowPlace([{ name: 'approve' }, { name: 'orders' }]), 'approve+orders', 'whatever order they come in');
+  assert.equal(flowPlace([]), 'the flow');
+});
+
+test('a decision judged broken is counted once for the flow, not once per page', async () => {
+  const dir = tempDir('proto-judge-repeat');
+  const pages = [
+    { name: 'orders', shot: shotIn(dir, 'orders.png'), outline: 'a list', leadsTo: ['approve'] },
+    { name: 'approve', shot: shotIn(dir, 'approve.png'), outline: 'a button', leadsTo: [] },
+  ];
+  await judgePrototype(dir, {}, { request: 'a way to approve an order', pages, now: '2026-11-15T10:00:00Z',
+    ask: answer([{ decision: 'whole', verdict: 'breaks', severity: 'high', evidence: 'Approve leads nowhere', check: 'click it' }]) });
+  const seen = readSeen(dir);
+  assert.equal(seen.repeats['proto:whole']?.times, 1, 'one flow judged is one count, not two pages');
+  assert.deepEqual(Object.keys(seen.repeats['proto:whole'].places), ['approve+orders']);
+});
+
+test('a decision that holds is never counted', async () => {
+  const dir = tempDir('proto-judge-holds');
+  await judgePrototype(dir, {}, { request: 'a way to approve an order', pages: pagesIn(dir), now: '2026-11-15T10:00:00Z',
+    ask: answer([{ decision: 'whole', verdict: 'holds', severity: 'low', evidence: 'everything leads somewhere', check: '' }]) });
+  assert.equal(readSeen(dir).repeats['proto:whole'], undefined);
+});
+
+test('the same flow made the same way again counts again, and a rule falls due', async () => {
+  const dir = tempDir('proto-judge-due');
+  const breaks = [{ decision: 'whole', verdict: 'breaks', severity: 'high', evidence: 'Approve leads nowhere', check: 'click it' }];
+  // Three different flows, each judged broken the same way: the same mistake made three times.
+  for (const [i, name] of ['orders', 'billing', 'profile'].entries()) {
+    const pages = [{ name, shot: shotIn(dir, `${name}.png`), outline: 'a button', leadsTo: [] }];
+    await judgePrototype(dir, {}, { request: `flow ${i}`, pages, now: `2026-11-1${5 + i}T10:00:00Z`, ask: answer(breaks) });
+  }
+  assert.equal(readSeen(dir).repeats['proto:whole'].times, 3);
+
+  const due = await dueFromJudging(dir);
+  assert.equal(due.length, 1, 'one rule, not three findings');
+  assert.equal(due[0].kind, 'proto:whole');
+  assert.equal(due[0].text, REPEAT_RULES['proto:whole'].text, 'proposed in the engine\'s words, the same on every project');
+  assert.deepEqual(due[0].places.sort(), ['billing', 'orders', 'profile']);
+
+  const lines = dueLines(due).join('\n');
+  assert.ok(lines.includes('3 time(s) across 3 prototype(s)'), lines);
+  assert.ok(lines.includes('the team decides each one'), 'it proposes; it does not write');
+});
+
+test('a prototype judgement never counts toward a screen review\'s rule, nor the other way', async () => {
+  const dir = tempDir('proto-judge-apart');
+  await judgePrototype(dir, {}, { request: 'a way to approve an order', pages: pagesIn(dir), now: '2026-11-15T10:00:00Z',
+    ask: answer([{ decision: 'whole', verdict: 'breaks', severity: 'high', evidence: 'dead', check: 'click' }]) });
+  const seen = readSeen(dir);
+  assert.ok(seen.repeats['proto:whole'], 'counted under its own prefix');
+  assert.equal(seen.repeats['judge:whole'], undefined, 'and never under the screen review\'s');
+});
+
+test('nothing judged broken proposes nothing', async () => {
+  assert.deepEqual(dueLines([]), []);
+  assert.deepEqual(await dueFromJudging(tempDir('proto-judge-none')), []);
+});
