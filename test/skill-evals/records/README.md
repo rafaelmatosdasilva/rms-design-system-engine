@@ -290,5 +290,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-15-a-rename-handed-back-with` | The 24 guide tasks on Haiku (engine 37d549e) | "A rename handed back with its way across, the same job done differently across products, and one inspection report" |
 | `2026-11-15-merge-main` | The 24 guide tasks on Haiku (engine 275e515) | "Merge main" |
 | `2026-11-15-proposals-drafted-from-how-the` | The 24 guide tasks on Haiku (engine c1dd084) | "Proposals drafted from how the system is used" |
+| `2026-11-15-what-a-destructive-action-owes` | The 24 guide tasks on Haiku (engine d500ad2) | "What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

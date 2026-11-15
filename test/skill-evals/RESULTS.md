@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents (continuous evaluation)
+
+What changed since the entry below (engine c1dd084): Proposals drafted from how the system is used (#511); What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents. The guide changed in `reference/usage.md`.
+
+Guide set measured: `91a94b084db3` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 0a8db60b` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md a7c77c05` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine d500ad2 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 96k | 103k |
+| Turns a run | 3.4 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 96k, in 3.7 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-what-a-destructive-action-owes`.
+
 ## 2026-11: Proposals drafted from how the system is used (continuous evaluation)
 
 What changed since the entry below (engine 275e515): A judgement made again and again is a rule nobody wrote down (#509); Proposals drafted from how the system is used; A big style guide's accessibility check finishes, and the Safari it opens is closed again (#508); The proposals test writes through tempDir. The guide changed in `reference/config.md`, `reference/usage.md`.
