@@ -180,20 +180,37 @@ rms-design-system-engine --hear
 
 ### Which browser answered it
 
-Every browser check runs in Chrome, through its DevTools protocol. Engines differ in layout, fonts, form controls and
-focus rings, so a run in one browser answers some criteria for all of them and others for Chrome alone. Each criterion
-says which it is, and its row says so under what was found:
+Engines differ in layout, fonts, form controls and focus rings, so a run in one browser answers some criteria for
+all of them and others for that browser alone. Each criterion says which it is, and its row says so under what was
+found:
 
 | What it depends on | Criteria | What the row says |
 |---|---|---|
 | The code, the markup or your own values | A missing alternative text, contrast from the tokens, an orientation lock in the page's CSS, a title, a language | *Same in every browser* |
-| The browser | What Tab reaches, where the focus shows and whether anything hides it, reflow at 320px, zoom, text spacing, what an input does when it changes, dragging, target size | *Tried in Chrome*, and which other engines are not set up here |
+| The browser | What Tab reaches, where the focus shows and whether anything hides it, reflow at 320px, zoom, text spacing, what an input does when it changes, dragging, target size | Each browser's result, *Chrome ✓ · Firefox ✓ · WebKit ✕*, where the other browsers tried it |
 | Chrome's accessibility tree | What a screen reader hears (4.1.2) | *Chrome only* — no other engine exposes one, and a tool that works it out itself reads the same everywhere |
 
-The accessibility passes in Firefox and WebKit are not built yet. Rendered parity is already drawn in them (see
-[Measure Figma-code parity](audit.md#in-the-browser)), through the same drivers they will use. What is built here is the
-accounting: a run that found only Chrome says so, a browser that is not installed is named as missing rather than passed
-over, and the criteria a browser decides are never presented as answered for engines nobody ran.
+**Tried in Firefox and WebKit too.** Six of the criteria a browser decides are tried again in the other browsers, on
+each component the style guide draws:
+
+- **Which ones.** What Tab reaches (2.1.1), whether the focus shows when it gets there (2.4.7), reflow at 320px
+  (1.4.10), text spacing (1.4.12), zoom to 200% (1.4.4) and target size (2.5.8).
+- **The same measurements.** They are plain scripts run in the page, with real Tab presses. Chrome is measured by the
+  same code in the same pass, so a difference is never two ways of measuring.
+- **Only what differs is said.** A fault in Chrome is reported once, by the Chrome run. One that only another browser
+  has is a finding of its own on the row, *Fails in WebKit only: no visible focus when Tab reaches it,
+  button.icon*, and the row keeps the worst status across browsers.
+- **Firefox by default, Safari when asked.** Firefox runs whenever it is installed. Safari opens a window of its own,
+  so it runs when `a11y.browsers` names `webkit`, and `a11y.browsers: false` turns the pass off
+  ([config](../reference/config.md)).
+- **Option+Tab in Safari.** Safari moves Tab between text fields only, unless a person turns on "Press Tab to
+  highlight each item". The pass presses Option+Tab there, which reaches every control, and the row says so.
+- **A browser that is missing is said.** The run names it rather than passing over it, and the rows keep saying
+  *Tried in Chrome*.
+
+The other criteria a browser decides (what an input does when it changes, dragging, content on hover, a focus hidden
+by something else) are still tried in Chrome alone, and their rows say so. Rendered parity is drawn in the same
+browsers (see [Measure Figma-code parity](audit.md#in-the-browser)), through the same drivers.
 
 ### How sure each finding is
 
