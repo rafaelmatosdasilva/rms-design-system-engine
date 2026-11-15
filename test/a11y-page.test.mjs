@@ -59,6 +59,18 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     for (const f of ['Component', 'Level', 'Principle']) assert.ok(seen.filters.includes(f), `${f}: ${seen.filters}`);
     assert.ok(seen.chips.includes('todo') || seen.chips.includes('check'), seen.chips.join());
     assert.deepEqual(seen.cards, ['Level A', 'Level AA']);
+    // Each card counts criteria across the system, never rows: a criterion is met only when no component fails it and
+    // none waits on a review.
+    const counted = await run(`(() => {
+      const trs = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')], rank = { done: 0, check: 1, todo: 2 };
+      return ['A', 'AA'].map((lv) => {
+        const by = {};
+        trs.filter((t) => t.dataset.fLevel === lv && t.dataset.fPrinciple).forEach((t) => { const sc = t.cells[2].textContent.trim().split(' ')[0]; by[sc] = Math.max(by[sc] ?? 0, rank[t.dataset.status]); });
+        const v = Object.values(by), card = [...document.querySelectorAll('#accessibility .sg-cx-score')].find((c) => c.querySelector('.sg-health-label').textContent === 'Level ' + lv);
+        return { want: v.filter((x) => x === 0).length + ' of ' + v.length, got: card.querySelector('.sg-cx-ring-text .sg-health-sub').textContent };
+      });
+    })()`);
+    for (const c of counted) assert.equal(c.got, c.want);
     assert.match(seen.comp, /^#c-/, 'a row names its component, a link to its page');
     // The rows are the component's own: the same criteria its Accessibility area lists.
     const name = await run(`document.querySelector('#accessibility .sg-a11y-table tbody tr').cells[1].textContent.trim()`);

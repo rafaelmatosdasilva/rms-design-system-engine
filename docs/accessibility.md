@@ -60,9 +60,22 @@ The style guide has a page of its own for accessibility, under Documentation in 
 - **One table for every component.** Each row is one criterion of one component, the same row its own Accessibility area shows, under the same task number.
 - **The same panel.** A row opens the panel it opens on the component's page, with what to do first.
 - **Filters.** A chip for each status (Issues, Review, Met) and one for what differs by browser, then the component, the level, the principle, who acts and what the criterion depends on. They combine, and each says how many rows it would leave.
-- **A card a level.** Level A and Level AA, each criterion's share met, by principle.
+- **A card a level.** Level A and Level AA, each the share of its criteria met across the system, with a bar for each principle (perceivable, operable, understandable, robust).
 - **Filled once every component is tried.** Every row is one the browser tries as the page opens, so until each component has been, the page says how far it has got rather than drawing half a table.
 - **On the Status page.** Its Accessibility card counts the criteria that pass in one browser and fail in another, and opens this page with that filter on.
+
+**How the percentage is worked out.** It counts criteria, never rows, the way an audit reads WCAG and the way the Status page's Accessibility card counts:
+
+| A criterion is | When |
+|---|---|
+| Met | No component fails it, and none waits on a review |
+| To review | No component fails it, but at least one waits on a person's check |
+| Failing | At least one component fails it |
+
+- **The number.** Criteria met, out of every criterion at that level the system's components are tried for. 12 met out of 22 at level A reads 55%.
+- **The ring and the bars.** The ring splits the same criteria into met, to review and failing. Each principle's bar does the same for its own criteria.
+- **Why not rows.** A row is one criterion on one component. Counted that way, the many simple components that pass would hide the few that fail, and a system with no component meeting level A could still read 75%.
+- **What is left out.** A criterion that does not apply to a component (video and sound on a button) is not counted for it. What is looked at beyond A and AA (high contrast mode, reduced motion) is in the table but not in the cards.
 
 ### Two parts
 

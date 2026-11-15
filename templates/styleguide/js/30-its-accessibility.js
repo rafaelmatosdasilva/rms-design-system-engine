@@ -392,7 +392,7 @@
   // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
   // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
   // browser, then the component, the level, the principle, who acts and what the criterion depends on. Above them a card
-  // a level, each criterion's share met by principle. Every row is one the browser tries, so until every component is
+  // a level: the share of its criteria met across the system, by principle. Every row is one the browser tries, so until every component is
   // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
   var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
   var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
@@ -464,8 +464,17 @@
     filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
       { key: 'status' }, { key: 'component', label: 'Component' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'principle', label: 'Principle', order: A11Y_PRINCIPLES },
       { key: 'who', label: 'Who acts' }, { key: 'depends', label: 'Depends on', order: [A11Y_DEPENDS.same, A11Y_DEPENDS.each, A11Y_DEPENDS.chrome] }] });
-    // A card a level: every component's criteria at that level, each in the colour of its status, by principle.
-    var levelCard = function (lv) { return doneCard('Level ' + lv, rows.filter(function (x) { return x.r.k && x.r.k.level === lv && principleOf(x.r); }).map(function (x) { return { area: principleOf(x.r), state: A11Y_ST[x.r.st] }; })); };
+    // A card a level, counted by criterion across the system, as an audit reads WCAG and as the Status page's
+    // Accessibility card counts: a criterion is met only when no component fails it and none waits on a review, to
+    // review when only reviews are left somewhere, failing when any component fails it. Its principle's bar beside it.
+    // Counted by row (a criterion on a component), the many components that pass a criterion would hide the few that
+    // fail it, and the share read far higher than the system stands (the owner's, 15 November 2026).
+    var RANK = { done: 0, check: 1, todo: 2 };
+    var levelCard = function (lv) {
+      var by = {}, order = [];
+      rows.forEach(function (x) { var k = x.r.k; if (!k || k.level !== lv || !principleOf(x.r)) return; if (!by[k.sc]) { by[k.sc] = { area: principleOf(x.r), st: 'done' }; order.push(k.sc); } if (RANK[x.r.st] > RANK[by[k.sc].st]) by[k.sc].st = x.r.st; });
+      return doneCard('Level ' + lv, order.map(function (sc) { return { area: by[sc].area, state: A11Y_ST[by[sc].st] }; }));
+    };
     doneCards(sec, levelCard('A') + levelCard('AA'));
     labelCells(sec);
     if (route.last !== undefined && !sec.hidden) underTitle(sec);
