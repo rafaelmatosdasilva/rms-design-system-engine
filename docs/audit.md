@@ -264,6 +264,18 @@ What a *product* does with the system is a product leaving it, so it is said und
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
 
+#### Browser support
+
+Advice on the web features your code uses, against the browsers your team supports (`🌐 Browser support`), never a failure.
+
+- It reads the browsers your team supports from `supportedBrowsers` in `ds-config.json`, then `browserslist` in `package.json`, then `.browserslistrc`.
+- Only explicit minimums are read (`chrome >= 111`, `safari 16.4`). A query like `last 2 versions` needs usage data, so the audit asks you for explicit minimums instead.
+- With no targets anywhere, it says nothing. It never guesses which browsers you support.
+- Each CSS, HTML or JavaScript feature a supported browser does not run is listed with its line, the first version that runs it, and how to keep it working.
+- A feature you already guard is left out: inside `@supports`, after a fallback value in the same rule, or behind a check in a script.
+- Old patterns the platform now replaces (`-webkit-box`, `-ms-` prefixes, `keyCode`, `document.write()`) are named with their replacement.
+- The system's own code and each product's code are listed apart. The browser versions come from a table kept in the engine, from the web platform's own compatibility data, so nothing is fetched when it runs.
+
 #### A token in the right layer
 
 A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
