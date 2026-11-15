@@ -4,7 +4,7 @@
 // component to be tried in the browser, so it never draws half a table that changes under the reader.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +29,8 @@ test('the page is made of the rows a component\'s own area shows, and the try fi
 test('in Chrome: one table for every component, filtered as Rules is, each row opening its panel', { timeout: budget(300000) }, async (t) => {
   const dir = tempDir('sg-a11y-page-');
   cpSync(HARBOR, dir, { recursive: true });
+  const cfgPath = join(dir, 'ds-config.json');
+  writeFileSync(cfgPath, JSON.stringify({ ...JSON.parse(readFileSync(cfgPath, 'utf8')), figmaFileKey: 'AbCd1234' }, null, 2));
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
@@ -98,6 +100,24 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     assert.ok(panel && panel.length, 'the panel opened');
     assert.ok(panel.includes('What to do'), panel.join());
     assert.ok(panel.includes('Level and principle'), 'the panel says the level and the principle, as the filters do');
+    assert.deepEqual(panel.slice(0, 3), ['What to do', 'Component', 'Where it was read'], 'whose it is and where it was read, right under what to do');
+    // A task for a designer links to the component in Figma in What to do, in a tab of its own with Figma's mark. A
+    // task for a developer never links to Figma.
+    const figma = await run(`(async () => {
+      const out = {};
+      for (const who of ['A designer, in Figma', 'A developer, in the code']) {
+        const tr = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].find((x) => (x.dataset.fWho || '').startsWith(who) && x.dataset.status !== 'done');
+        if (!tr) continue;
+        tr.cells[2].click(); await new Promise((r) => setTimeout(r, 400));
+        const first = document.querySelector('#sg-row-panel .pg-inspect');
+        const a = first && first.querySelector('a.sg-cx-figma');
+        out[who] = a ? [a.getAttribute('target'), !!a.querySelector('svg'), /figma\\.com/.test(a.href)] : null;
+      }
+      return out;
+    })()`);
+    if ('A designer, in Figma' in figma) assert.deepEqual(figma['A designer, in Figma'], ['_blank', true, true], 'a Figma task opens the component in Figma');
+    if ('A developer, in the code' in figma) assert.equal(figma['A developer, in the code'], null, 'a task of the code never links to Figma');
+    assert.ok(Object.keys(figma).length, 'both kinds of task were looked at');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
