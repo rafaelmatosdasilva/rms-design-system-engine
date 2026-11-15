@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { tempDir } from './helpers.mjs';
 import { codeOverrides, figmaDetaches, proposals, proposalLines, proposalsMarkdown, recordDecision, readDecided } from '../lib/proposals.mjs';
 
 const classes = { button: '.btn', card: '.card' };
@@ -45,12 +43,12 @@ test('the same override in two products becomes a proposal with its evidence and
 });
 
 test('a decision is kept with who made it, a rejection must say why, and a decided proposal is said in one line', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'proposals-'));
-  try {
+  const dir = tempDir('proposals-');
+  {
     assert.throws(() => recordDecision(dir, 'detach:card', { verdict: 'rejected', by: 'QA' }), /says why/);
     assert.throws(() => recordDecision(dir, 'detach:card', { verdict: 'accepted' }), /who made it/);
     recordDecision(dir, 'detach:card', { verdict: 'rejected', reason: 'each product needs its own layout', by: 'QA', at: '2026-11-15T10:00:00Z' });
     const list = proposals({ detaches: [{ component: 'card', product: 'shop', screen: 'A' }, { component: 'card', product: 'admin', screen: 'B' }], decided: readDecided(dir) });
     assert.deepEqual(proposalLines(list), ['   detach:card: rejected by QA on 2026-11-15: each product needs its own layout']);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
 });
