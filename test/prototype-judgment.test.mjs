@@ -10,7 +10,8 @@ import { DECISIONS, DECISION_IDS, decisionsFrom, judgmentPrompt, parseJudgment, 
 
 const shotIn = (dir, name = 'a.png') => { const p = join(dir, name); writeFileSync(p, 'not really a picture'); return p; };
 const pagesIn = (dir) => [{ name: 'orders', shot: shotIn(dir), outline: 'Page > DataTable > Button(Approve)', leadsTo: [] }];
-const answer = (findings, cost = 0.08) => async () => JSON.stringify({ result: JSON.stringify({ findings }), total_cost_usd: cost });
+// What the person's command answers (askModel): { ok, out }, the model's own JSON on stdout.
+const answer = (findings, cost = 0.08) => async () => ({ ok: true, out: JSON.stringify({ result: JSON.stringify({ findings }), total_cost_usd: cost }) });
 const ALL = (v = 'holds') => DECISION_IDS.map((id) => ({ decision: id, verdict: v, severity: 'low', evidence: `${id} seen`, check: `check ${id}` }));
 
 test('the decisions are named and fixed, and a project may judge fewer', () => {

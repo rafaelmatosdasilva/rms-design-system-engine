@@ -1758,10 +1758,10 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   ]);
   assert.deepEqual(fns.ROWS.map((x) => [x.chip, x.type, text(x.what)]), [
     ['code', 'Code', '#11 · 2 commits again'],
-    ['figma', 'Figma', 'showLabel added; labelContent added Saved in 9878c3f'],
+    ['figma', 'Figma', 'showLabel added labelContent added Saved in 9878c3f'],
     ['figma', 'Figma', 'tileSlot added Saved in 9878c3f'],
     ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
-    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Also changed: 1 page (Saving) Committed in eea0cd0e'],
+    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Also changed: 1 page Saving Committed in eea0cd0e'],
     ['decisions', 'Decision', 'No large tile Answered'],
     ['code', 'Code', '#11 · 2 commits REV-1 the tile'],
   ], 'newest first, whatever the type: an issue a count of its commits; a read of Figma a row a component it changed, the new ones named once');
@@ -1775,7 +1775,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   assert.equal(text(fns.dateCell('2026-10-25', null)), '2026-10-25', 'no release, no tag');
   // A page named unlike the component it documents (Table Body Cell Tooltip, table/Cell/tooltip) is under Affects only.
   const named = run([{ k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', pages: ['Table Body Cell Tooltip', 'Saving'], components: ['table/Cell/tooltip'], alone: ['Saving'], files: 2 } }]);
-  assert.equal(text(named.ROWS[0].what), '2 pages changed Also changed: 1 page (Saving) Committed in eea0cd0e', 'only the page that documents no component is named in What');
+  assert.equal(text(named.ROWS[0].what), '2 pages changed Also changed: 1 page Saving Committed in eea0cd0e', 'only the page that documents no component is named in What');
   assert.deepEqual(fns.ROWS.filter((x) => x.chip === 'figma').map((x) => [...x.affects.matchAll(/href="#([^"]+)"/g)].map((m) => m[1])), [['c-buttonFloat/history'], ['c-navTab/history'], ['c-cardRow/history', 'c-chipRow/history']], 'the components only under Affects, as pills');
   assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
   assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
@@ -1854,25 +1854,28 @@ test('no tab carries a stage badge: the stage of a part is the features page\'s 
   assert.doesNotMatch(tpl, /EARLY_AREAS|sg-early|o\.early/);
 });
 
-test('History says the other pages a change touched on one line, Also changed, in counts by kind, every name one click away', () => {
+test('History says the other pages a change touched on one line, in counts by kind, their names pills as Tasks shows them', () => {
   const src = readFileSync(new URL('../templates/styleguide/js/07-second-in-the-list.js', import.meta.url), 'utf8');
-  const body = src.slice(src.indexOf('var NOT_YET_NAMED'), src.indexOf('    layers.forEach(function (x) {'));
+  const body = src.slice(src.indexOf('var pagesSaid'), src.indexOf('    layers.forEach(function (x) {'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
-  const notYet = new Function('esc', 'plural', body + '\nreturn pagesSaid;')(esc, plural);
+  const pillsMore = (n) => `<button data-pills-more>${n} more</button>`;
+  const pillList = (names) => '<span class="sg-il-codes">' + names.map((n, i) => `<code class="sg-name"${i >= 5 ? ' hidden' : ''}>${esc(n)}</code>`).join('') + (names.length > 5 ? pillsMore(names.length - 5) : '') + '</span>';
+  const said = new Function('esc', 'plural', 'pillList', body + '\nreturn pagesSaid;')(esc, plural, pillList);
   const tokens = Array.from({ length: 1212 }, (_, i) => `--advanced-thing-${i}-color`);
-  const shown = (html) => html.replace(/<span class="pg-par-val sg-log-list" hidden>[\s\S]*?<\/span>/, '');
-  const many = notYet(['Spacing', 'Consult Template', 'Operation Template', ...tokens]);
-  assert.match(shown(many), /3 pages \(Spacing, Consult Template, Operation Template\) and 1212 token pages/);
-  assert.doesNotMatch(shown(many), /--advanced/, 'no token named in the row until asked for');
-  assert.match(many, /data-list-more>Show all<\/button><span class="pg-par-val sg-log-list" hidden>Spacing, Consult Template/, 'every name one click away');
-  assert.equal(notYet(['Spacing']), '<span class="sg-log-also">1 page (Spacing)</span>', 'a few pages named, nothing to open');
+  const many = said(['Spacing', 'Consult Template', 'Operation Template', ...tokens]);
+  assert.match(many, /^<span class="sg-log-also">3 pages and 1212 token pages<\/span><span class="sg-il-codes"><code class="sg-name">Spacing<\/code>/);
+  assert.equal((many.match(/<code class="sg-name">/g) ?? []).length, 5, 'five shown, the rest behind the chevron pill');
+  assert.match(many, /<button data-pills-more>1210 more<\/button><\/span>$/);
+  assert.equal(said(['Spacing']), '<span class="sg-log-also">1 page</span><span class="sg-il-codes"><code class="sg-name">Spacing</code></span>');
+  assert.doesNotMatch(src, /data-list-more|Show all/, 'one way to open a list, the pill Tasks uses');
   assert.match(src, /line\(quiet\('Also changed: '\) \+ pagesSaid\(others\)\)/, 'one line, its label first');
-  // Known which pages it made: Added and Changed apart, its components' pages counted.
-  assert.match(notYet(['cardTile', 'Spacing'], ['cardTile']), /1 component page and 1 page \(Spacing\)/);
+  assert.match(said(['cardTile', 'Spacing'], ['cardTile']), /1 component page and 1 page/);
   assert.match(src, /line\(quiet\('Added: '\) \+ pagesSaid\(made, comps\)\)/);
   assert.match(src, /line\(quiet\('Changed: '\) \+ pagesSaid\(edited, comps\)\)/);
-  assert.doesNotMatch(src, /Not in the guide yet/);
+  // A Figma change and a contract change name what changed as pills too, and never join them with ";".
+  assert.match(src, /c\.changed\.map\(function \(t\) \{ return line\(figmaChangeHTML\(t\)\); \}\)/);
+  assert.match(src, /line\(whatHTML\(x\.what\)/);
 });
 
 test('History: a contract change is done by the person who ran the build, under Contracts, as every row names a person', () => {

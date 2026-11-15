@@ -312,6 +312,12 @@
       var m = /^(.+?) (TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))? → (?:TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))?$/.exec(t);
       return m ? m[1] + ' "' + (m[3] || '') + '" → "' + (m[4] || '') + '"' : t;
     };
+    // A name in a sentence, the one pill the whole guide sets names in (.sg-name), and a list of names as Tasks shows one:
+    // five pills, the rest behind a chevron pill (the owner's, 14 November 2026).
+    var pill = function (n) { return '<code class="sg-name">' + esc(n) + '</code>'; };
+    var pillList = function (names) { return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; };
+    // One change Figma made, its name a pill: "showLabel added", a property's values "a" → "b".
+    var figmaChangeHTML = function (t) { var s0 = figmaChange(t), m = /^(?!and\b)(\S+)(\s[\s\S]*)$/.exec(s0); return m ? pill(m[1]) + esc(m[2]) : esc(s0); };
     var isFirst = function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); };
     var line = function (html) { return '<p class="sg-il-line">' + html + '</p>'; };
     var quiet = function (text) { return '<span class="pg-log-date">' + text + '</span>'; };
@@ -382,7 +388,7 @@
     order.forEach(function (g) {
       if (!g.read) return;
       var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
-      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', line(esc(c.changed.map(figmaChange).join('; '))) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', c.changed.map(function (t) { return line(figmaChangeHTML(t)); }).join('') + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
       if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
     });
@@ -413,19 +419,18 @@
     });
     // The pages a change touched, in counts by kind on one line: its components' pages counted (they are under Affects),
     // the other pages named while they are few, the token pages counted (each one's name is its token); every other name
-    // one click away (Show all), never a list of a thousand names in a row of the table (the owner's, 11 November 2026).
+    // one click away (the chevron pill), never a list of a thousand names in a row of the table (the owner's, 11 November 2026).
     // comps: the names among them that document a component.
-    var NOT_YET_NAMED = 5;
     var pagesSaid = function (all, comps) {
       comps = comps || [];
       var ofComp = all.filter(function (n) { return comps.indexOf(n) >= 0; }), names = all.filter(function (n) { return comps.indexOf(n) < 0; });
       var tokens = names.filter(function (n) { return /^--/.test(n); }), pages = names.filter(function (n) { return !/^--/.test(n); });
       var said = [];
       if (ofComp.length) said.push(plural(ofComp.length, 'component page', 'component pages'));
-      if (pages.length) said.push(plural(pages.length, 'page', 'pages') + (pages.length <= NOT_YET_NAMED ? ' (' + pages.join(', ') + ')' : ''));
+      if (pages.length) said.push(plural(pages.length, 'page', 'pages'));
       if (tokens.length) said.push(plural(tokens.length, 'token page', 'token pages'));
-      var whole = pages.length > NOT_YET_NAMED || tokens.length;
-      return '<span class="sg-log-also">' + esc(said.join(' and ')) + '</span>' + (whole ? ' <button type="button" class="sg-link-pill sg-link-pill--table" data-list-more>Show all</button><span class="pg-par-val sg-log-list" hidden>' + esc(names.join(', ')) + '</span>' : '');
+      // Every name it changed (no component's), as pills: five, the rest behind the chevron pill Tasks uses.
+      return '<span class="sg-log-also">' + esc(said.join(' and ')) + '</span>' + (names.length ? pillList(names) : '');
     };
     layers.forEach(function (x) {
       x.components.sort(); x.commits.sort(function (a, b) { return a.k - b.k; });
@@ -473,7 +478,9 @@
       (b.changes || []).forEach(function (c) {
         var kind = c.kind === 'component' ? '' : c.kind === 'flow' ? 'Flow ' : 'Pattern ';
         var head = c.change === 'added' ? 'Contract added' : c.change === 'removed' ? 'Contract removed' : 'Contract changed';
-        var items = (c.items || []).map(function (x) { return line(esc(capital(x.what) + ' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
+        // Its kind in words, its name a pill: "Token `typography.s/strong` added".
+        var whatHTML = function (w) { var m = /^(\S+)\s+(\S+)$/.exec(String(w || '')); return m ? esc(capital(m[1])) + ' ' + pill(m[2]) : esc(capital(w)); };
+        var items = (c.items || []).map(function (x) { return line(whatHTML(x.what) + esc(' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
           b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
@@ -541,7 +548,6 @@
       var th = e.target.closest('th[data-sort]'); if (th) { logSort(th.getAttribute('data-sort')); return; }
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
-      var all = e.target.closest('[data-list-more]'); if (all) { var list = all.nextElementSibling; if (list) list.hidden = false; all.remove(); return; }
     });
     // Any "N more" pill on the page shows the rest of its list, History's and a task's alike: one handler for all.
     document.addEventListener('click', function (e) {

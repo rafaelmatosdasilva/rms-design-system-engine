@@ -75,7 +75,8 @@ rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules 
 rms-design-system-engine --sign-off "chip size=xl" --by "<who>"  # a named person signs off what an edit adds to the system itself (a token, a component's option): the hook lets that edit through; --sign-off alone lists them
 rms-design-system-engine --second-review "<what>"       # run from another agent session: the engine's checks again on a change held for sign-off; the agent that made a change never signs it off, and with review.second "agent-or-person" a clean review signs it off (a removal, rename, breaking or high-risk change still waits for a person)
 rms-design-system-engine --lesson "<what was wrong>" --why "<reason>" [--component <name>] [--rule "<sentence>"]  # keep a person's correction (why is required) and propose the strongest guard that holds it: a check, a step for agents, else a guideline
-rms-design-system-engine --lesson-answer <id> yes|no     # the person's answer to a proposed guard; a yes writes it where it belongs, a no is kept so it is not proposed again
+rms-design-system-engine --lesson-answer <id> yes|no     # the person's answer to a proposed guard; a yes writes it where it belongs (refused while it names no case it was seen in), a no is kept so it is not proposed again
+rms-design-system-engine --lesson-answer <id> no --would-accept more|new|narrower [--why "<reason>"] [--rule "<narrower words>"]  # a no that says what would get it accepted: held until that is there, then proposed again with what changed
 rms-design-system-engine --lessons                       # every lesson, repeated finding and proposed rule, what each became, and any that came back after its guard
 rms-design-system-engine --lesson --edit <n> --why "<reason>"  # a line an agent wrote that a person changed, made a lesson (--unlesson --edit <n> sets it aside)
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
@@ -440,7 +441,11 @@ calls a deprecated component stable is wrong. **Out of date**: the component's p
 takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
 history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
-prop it does not have, or a literal value the prop does not take. **Twins**: two components' pages that say the same (their own names aside, lines a template
+prop it does not have, or a literal value the prop does not take. **States owed**: a page's front matter `states:` (or a
+DSDS entity's `metadata.states`, or a section headed for them - "Required states", "States it must have", never a plain
+"States", which is the list of the states it has) names the states its component owes, and each one Figma or the code
+has none of is reported under "States the intent layer owes" and goes to that side's list of things to do. A state named
+by both the metadata and the heading is counted once. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
@@ -684,7 +689,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Last checked; what is written, what to do and each source's file in the row's panel), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
-  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
+  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), colour tokens the code
+  mixes at 0%, so they never show (Colour never shows, Claude in the code), the same value written by
   hand in two tokens (You decide), each one row with its first names (a token one component uses is the system's own
   choice, not a row). A token belongs to every component that uses it: in its code, named after it, bound on its
   Figma component (the structure snapshot), or pointed at by one of those; its missing description shows on each of
@@ -1588,7 +1594,7 @@ its own dot, and a list for the area and for the side, each saying how many rows
   (`declared-tiers`, read from the vars snapshot's aliases, so it shows on the Rules page); and the tokens (named by role, never by look or after a brand, described, aliases that resolve,
   one primitive for a value written twice, the first layer where a value can change, a brand that pins what it
   inherits, a control's border at 3:1 and one job a token).
-- **Code**: values written by hand (the census), aliases to a token declared nowhere, a font family written by hand,
+- **Code**: values written by hand (the census), aliases to a token declared nowhere, a colour mixed at 0%, a font family written by hand,
   modes that fail together, the comparison's gates that lint the code (tokens a screen binds exist in CSS, every mode
   covered, no invented variables or text casing, no hand-built component, clean CSS: read from the last full audit's
   `findings.json`) and a product's near copy of a component, to decide.
