@@ -312,7 +312,7 @@ One row for each component, with one word per state. The cards above the table a
 | Code | Built, Unsure, Missing |
 | Parity | Match, Partial, Differs, Unsure |
 | Accessibility | Met, Issues, Review, Untested |
-| Documentation | Written, Partial, Missing |
+| Documentation | Done, Review, Missing |
 
 - **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
   - **Parity** counts every property, token and value compared, in what the code has built.

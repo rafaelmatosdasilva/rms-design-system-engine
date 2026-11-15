@@ -18,8 +18,10 @@ const loadReview = () => {
   const ilOn = new Function(`return (${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
+  // A sentence's names in pills, shared by the Documentation and Rules pages, from where the page says it once.
+  const pillNamesIn = new Function('esc', `return (${/var pillNamesIn = (function \(t, names\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)(esc);
   const isRuleChange = new Function(`return (${/var isRuleChange = (function \(x\) \{[^\n]*\});/.exec(tpl)[1]})`)();
-  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom, ilDraftSources: ilDraftSources };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
+  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', 'pillNamesIn', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom, ilDraftSources: ilDraftSources };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange, pillNamesIn);
 };
 const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';

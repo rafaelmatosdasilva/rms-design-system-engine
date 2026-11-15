@@ -54,7 +54,7 @@
     // Met: nothing to fix or decide. Issues: something to fix. Review: something to decide. Untested: not tried yet.
     var acc = untested ? stateC('none', 'Untested') : a.fix ? stateC('differs', 'Issues', a.fix, a.dec) : a.dec ? stateC('figma', 'Review', 0, a.dec) : a.n ? stateC('match', 'Met') : stateC('none', 'N/A', 0, 0, NA_WHY.Accessibility);
     // Written: everything written. Missing: nothing written at all. Partial: anything between, text to check included.
-    var doc = !d.n ? stateC('none', 'N/A', 0, 0, c.codeOnly ? NA_WHY.codeOnly : NA_WHY.Documentation) : !d.fix && !d.dec ? stateC('match', 'Written') : d.fix === d.n ? stateC('differs', 'Missing', d.fix, d.dec) : stateC('figma', 'Partial', d.fix, d.dec);
+    var doc = !d.n ? stateC('none', 'N/A', 0, 0, c.codeOnly ? NA_WHY.codeOnly : NA_WHY.Documentation) : !d.fix && !d.dec ? stateC('match', 'Done') : d.fix === d.n ? stateC('differs', 'Missing', d.fix, d.dec) : stateC('figma', 'Review', d.fix, d.dec);
     // How many checks each state counts, so a card can say how much of them is done (its percentage).
     par.n = p.n; acc.n = a.n; doc.n = d.n;
     return { par: par, acc: acc, doc: doc, all: all, untested: untested, fix: p.fix + a.fix + d.fix + (c.codeOnly ? 1 : 0), dec: p.dec + a.dec + d.dec };
@@ -74,7 +74,7 @@
     var left = [];
     if (s.par.say !== 'Match') left.push('Parity ' + s.par.say);
     if (s.acc.say !== 'Met' && s.acc.say !== 'N/A') left.push('Accessibility ' + s.acc.say);
-    if (s.doc.say !== 'Written' && s.doc.say !== 'N/A') left.push('Documentation ' + s.doc.say);
+    if (s.doc.say !== 'Done' && s.doc.say !== 'N/A') left.push('Documentation ' + s.doc.say);
     if (c.coverage && c.coverage.lines < STABLE_COVERAGE) left.push('tests cover ' + Math.round(c.coverage.lines) + '% of its lines, under ' + STABLE_COVERAGE + '%');
     return left.length ? { kind: 'beta', status: 'Beta', why: left }
       : { kind: 'stable', status: 'Stable', why: ['Parity Match, Accessibility ' + s.acc.say + ', Documentation ' + s.doc.say + (c.coverage ? ', tests cover ' + Math.round(c.coverage.lines) + '% of its lines' : '')] };
@@ -110,16 +110,17 @@
     var at = area.querySelector('.pg-footer') || area; if (x && x.say === 'N/A') at.insertAdjacentHTML('afterbegin', naInfo(x));
   }
   // Each row's status in its area's own words, the Status page's: Parity Differs, Unsure, Match; Accessibility Issues,
-  // Review, Met; Documentation Missing, Partial, Written. Elsewhere, the general words (STATUS).
+  // Review, Met; Documentation Missing, Review, Done, the Documentation page's own words everywhere (the owner's, 15 November 2026). Elsewhere, the general words (STATUS).
   var ROW_WORD = {
     Parity: { todo: 'Differs', check: 'Unsure', done: 'Match' },
     Accessibility: { todo: 'Issues', check: 'Review', done: 'Met' },
-    Documentation: { todo: 'Missing', check: 'Partial', done: 'Written' }
+    Documentation: { todo: 'Missing', check: 'Review', done: 'Done' },
+    Rules: { todo: 'Fix', check: 'Decide', done: 'Done' }   // the Rules page's own words
   };
   function rowWord(st, area) { return (ROW_WORD[area] && ROW_WORD[area][st]) || (STATUS[st] || STATUS.none)[1]; }
   // The four cards above the table, read from its rows: the same components (one a family, a part with its parent)
   // and the same states, in the same words (Match, Differs; Built, Unsure, Missing; Met, Issues, Review,
-  // Untested; Written, Partial, Missing). The big number is what is done; the bar and its legend split the rest.
+  // Untested; Done, Review, Missing). The big number is what is done; the bar and its legend split the rest.
   function fillHealth(mx) {
     if (!hl || !mx) return;
     var figmaRows = mx.filter(function (o) { return o.figma; }), built = figmaRows.filter(function (o) { return o.code === 'found' || o.code === 'css'; });
@@ -194,7 +195,7 @@
     var iT = card('Code', { all: mx.length, fix: missingN, dec: unsureN + cssN }, ['Built', cssN && unsureN ? 'Unsure or CSS only' : cssN ? 'CSS only' : 'Unsure', 'Missing'], missingN ? nx(missingN, 'Missing', 'Implementation') : nx(unsureN, 'Unsure', 'Unsure'));
     var aT = card('Accessibility', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
     aT.untested = countOf(accP, 'Untested');
-    var dT = card('Documentation', rowsSplit(docOwn), ['Written', 'Partial', 'Missing'], nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
+    var dT = card('Documentation', rowsSplit(docOwn), ['Done', 'Review', 'Missing'], nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Review'), 'Review', 'DocumentationPartial'));
     [[pT, parP], [iT, codeP], [aT, accP], [dT, docP]].forEach(function (x) { x[0].total = mx.length; x[0].doneN = countOf(x[1], x[0].pctWord); });
     // What each card counts, said simply: one or two fixed sentences a person reads at a glance (25 words at most, nothing
     // made from data: test/styleguide-template.test.mjs holds them to it).
@@ -204,23 +205,13 @@
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
-    // Where nobody is named to decide (DATA.undecided, ds-config.json owners): said under the numbers, so an empty
-    // approver is seen before a change waits on it. Plain sentences, a short list, the rest counted.
-    var U = DATA.undecided, undecidedHTML = '';
-    if (U) {
-      var few = function (xs) { return xs.length > 8 ? xs.slice(0, 8).join(', ') + ' and ' + (xs.length - 8) + ' more' : xs.join(', '); };
-      var parts = U.nobody ? [] : [U.components.length ? 'Components: ' + few(U.components) + '.' : '', U.areas.length ? 'Areas: ' + few(U.areas) + '.' : '', U.tokenPrefixes.length ? 'Token groups: ' + few(U.tokenPrefixes) + '.' : ''].filter(Boolean);
-      undecidedHTML = '<div class="sg-health-undecided"><p class="sg-health-label">' + esc(U.nobody ? 'Nobody is named to decide for any part of the system.' : 'Nobody is named to decide for these.') + '</p>' +
-        parts.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') +
-        '<p class="sg-health-undecided-how">' + esc('Name who decides in owners, in ds-config.json, so a change does not wait on nobody.') + '</p></div>';
-    }
-    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div>' + undecidedHTML + '</div>';
+    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
     if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
     // Each link filters the table to the rows its card counted: Documentation counts every Figma component, built in the
     // code or not, so its links never add Code: Built (the components not built yet are documented too, or missing).
-    if (!box._go) { box._go = true; box.addEventListener('click', function (e) { var b = e.target.closest('[data-go-area]'); if (b) goTask.apply(null, ({ Implementation: [null, { code: 'Missing' }, 'Code'], Unsure: [null, { code: 'Unsure' }, 'Code'], Parity: ['Parity', { figma: 'Found', code: 'Built', par: 'Differs' }], Accessibility: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Issues' }], Documentation: ['Documentation', { figma: 'Found', doc: 'Missing' }], ParityPartial: ['Parity', { figma: 'Found', code: 'Built', par: 'Partial' }], ParityUnsure: ['Parity', { figma: 'Found', code: 'Built', par: 'Unsure' }], AccessibilityReview: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Review' }], DocumentationPartial: ['Documentation', { figma: 'Found', doc: 'Partial' }] })[b.getAttribute('data-go-area')] || [b.getAttribute('data-go-area')]); }); }
+    if (!box._go) { box._go = true; box.addEventListener('click', function (e) { var b = e.target.closest('[data-go-area]'); if (b) goTask.apply(null, ({ Implementation: [null, { code: 'Missing' }, 'Code'], Unsure: [null, { code: 'Unsure' }, 'Code'], Parity: ['Parity', { figma: 'Found', code: 'Built', par: 'Differs' }], Accessibility: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Issues' }], Documentation: ['Documentation', { figma: 'Found', doc: 'Missing' }], ParityPartial: ['Parity', { figma: 'Found', code: 'Built', par: 'Partial' }], ParityUnsure: ['Parity', { figma: 'Found', code: 'Built', par: 'Unsure' }], AccessibilityReview: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Review' }], DocumentationPartial: ['Documentation', { figma: 'Found', doc: 'Review' }] })[b.getAttribute('data-go-area')] || [b.getAttribute('data-go-area')]); }); }
   }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   // Accessibility last: what a browser still has to try is numbered after the rest, so no other number moves.
@@ -237,7 +228,7 @@
   var MX_WORD = { code: { found: 'Built', css: 'CSS only', unsure: 'Unsure', missing: 'Missing' } };
   // One order for a column's states, the cards' legends and the filters' lists alike: done first, then what is to
   // check, then what is to fix, then what was not tried.
-  var MX_ORDER = ['Found', 'Built', 'Match', 'Met', 'Written', 'Partial', 'Unsure', 'Review', 'Missing', 'Differs', 'Issues', 'Untested', 'N/A'];
+  var MX_ORDER = ['Found', 'Built', 'Match', 'Met', 'Done', 'Unsure', 'Review', 'Missing', 'Differs', 'Issues', 'Untested', 'N/A'];
   var MX_CHIP_COLS = [
     ['Figma', 'figma', function (o) { return o.figma ? 'Found' : 'Missing'; }],
     ['Code', 'code', function (o) { return MX_WORD.code[o.code]; }],

@@ -15,12 +15,11 @@ test('the components, areas and token prefixes no entry of owners covers; all of
   assert.deepEqual(undecided({}, {}).nobody, true);
 });
 
-test('the guard refusal says when nobody is named to decide, and the Status page lists it under its numbers', () => {
+test('the guard refusal says when nobody is named to decide, and the Status page never lists it', () => {
   const guard = readFileSync(new URL('../lib/guard.mjs', import.meta.url), 'utf8');
   assert.match(guard, /nobody is named to decide for it \(ds-config\.json owners covers it with no entry\), so name one there/);
   assert.match(guard, /ds-config\.json owners names nobody yet/);
+  // The Status page never lists it (the owner's, 15 November 2026): the guard says it where a change is stopped.
   const page = readFileSync(new URL('../templates/styleguide/js/32-a-component-s-state-in-parity.js', import.meta.url), 'utf8');
-  assert.match(page, /Nobody is named to decide for any part of the system\./);
-  assert.match(page, /Name who decides in owners, in ds-config\.json, so a change does not wait on nobody\./);
-  assert.doesNotMatch(page.match(/var U = DATA\.undecided[\s\S]*?var html/)[0], /;\s*'\)/, 'no semicolon in the page\'s words');
+  assert.doesNotMatch(page, /Nobody is named to decide|DATA\.undecided/);
 });
