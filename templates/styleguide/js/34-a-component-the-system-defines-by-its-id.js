@@ -421,6 +421,7 @@
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.dataset.group || tGroup.textContent;
     if (target.id === 'status') { openTodoKind(at.slug, at.q); setTimeout(a11ySweep, 300); }   // its accessibility number and tasks wait on the try
+    if (target.id === 'accessibility') { fillA11yPage(); setTimeout(a11ySweep, 300); }   // every row of it waits on the try too
     underTitle(target);
     // A section's own action level with its title, as a component's Figma and Code links are.
     Array.prototype.forEach.call(target.querySelectorAll(':scope > .sg-section-actions'), function (box) { var t = target.querySelector(':scope > h2'); if (t) box.style.top = (t.offsetTop + (t.offsetHeight - box.offsetHeight) / 2) + 'px'; });

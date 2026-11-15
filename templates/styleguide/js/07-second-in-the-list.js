@@ -1295,6 +1295,11 @@
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
   }
+  // Accessibility: every criterion of every component in one table, as Rules and Documentation gather theirs, each row the
+  // same row a component's own Accessibility area shows and opening the same panel. Built here, under Documentation in
+  // the menu, and filled once every component is tried in this browser (fillA11yPage, 30-its-accessibility.js).
+  var a11ySec = null;
+  if (DATA.wcag21 && DATA.wcag21.criteria && COMPONENTS.some(function (c) { return c.a11y; })) { hr(); navLink('accessibility', 'accessibility'); a11ySec = section('accessibility', 'System', 'Accessibility', ''); }
   // The notes no agent is given (once the For agents page) are on the Documentation page, flagged Remove, each with
   // why, how to keep it instead and whether to remove it.
   // Documentation: what the team has written about each component. What it is, how to use it, pictures of it used well

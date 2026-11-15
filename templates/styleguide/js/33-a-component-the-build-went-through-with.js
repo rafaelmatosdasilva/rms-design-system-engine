@@ -51,7 +51,10 @@
   // seconds after): each component tried draws the Status page again, which would close what they are reading.
   var lastTouch = 0;
   ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (t) { document.addEventListener(t, function (e) { if (e.isTrusted) lastTouch = Date.now(); }, { capture: true, passive: true }); });
-  var personBusy = function () { return !BAKING && (Date.now() - lastTouch < 2000 || !!document.querySelector('.sg-tip:hover, .sg-tip:focus-within, .sg-comp-panel:not([hidden])')); };
+  // A component's panel loaded ahead and parked out of sight (preloadComponentPanel) is not one a person reads.
+  var personBusy = function () { return !BAKING && (Date.now() - lastTouch < 2000 || !!document.querySelector('.sg-tip:hover, .sg-tip:focus-within, .sg-comp-panel:not([hidden]):not(.is-parked)')); };
+  // The pages that wait on the try: the Status page's numbers, and the Accessibility page, every row of which is one.
+  var SWEEP_PAGES = { status: 1, accessibility: 1 };
   function a11ySweep() {
     // The component panel (?embed) is this page again: the page around it tries every component already.
     if (ALL || sweeping || html.classList.contains('sg-embed')) return;
@@ -63,7 +66,7 @@
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
     sweeping = true;
     (function next() {
-      if (sweepAt >= list.length || hashParts().id !== 'status') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || !SWEEP_PAGES[hashParts().id]) { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       if (personBusy() && !(list[sweepAt].__a11y && (list[sweepAt].__a11y.live || list[sweepAt].__a11y.baked))) return setTimeout(next, 500);
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);

@@ -5,6 +5,7 @@ How the engine tests the accessibility of every component, and of your products'
 **On this page**
 
 - [Test accessibility](#test-accessibility)
+  - [The Accessibility page](#the-accessibility-page)
   - [Pages and flows](#pages-and-flows)
   - [Beyond A and AA](#beyond-a-and-aa)
   - [Video and sound](#video-and-sound)
@@ -51,6 +52,17 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - One verdict line, such as `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`.
 
 `--no-axe` and `--no-states` leave a part out, and then the result says not all of it was checked.
+
+### The Accessibility page
+
+The style guide has a page of its own for accessibility, under Documentation in the menu, as Rules and Documentation have theirs.
+
+- **One table for every component.** Each row is one criterion of one component, the same row its own Accessibility area shows, under the same task number.
+- **The same panel.** A row opens the panel it opens on the component's page, with what to do first.
+- **Filters.** A chip for each status (Issues, Review, Met) and one for what differs by browser, then the component, the level, the principle, who acts and what the criterion depends on. They combine, and each says how many rows it would leave.
+- **A card a level.** Level A and Level AA, each criterion's share met, by principle.
+- **Filled once every component is tried.** Every row is one the browser tries as the page opens, so until each component has been, the page says how far it has got rather than drawing half a table.
+- **On the Status page.** Its Accessibility card counts the criteria that pass in one browser and fail in another, and opens this page with that filter on.
 
 ### Two parts
 
@@ -210,6 +222,8 @@ each component the style guide draws:
   Safari is never touched.
 - **A browser that is missing is said.** The run names it rather than passing over it, and the rows keep saying
   *Tried in Chrome*.
+- **Counted on the Status page.** Its Accessibility card says how many criteria differ by browser, and opens
+  [the Accessibility page](#the-accessibility-page) on them.
 
 The other criteria a browser decides (what an input does when it changes, dragging, content on hover, a focus hidden
 by something else) are still tried in Chrome alone, and their rows say so. Rendered parity is drawn in the same

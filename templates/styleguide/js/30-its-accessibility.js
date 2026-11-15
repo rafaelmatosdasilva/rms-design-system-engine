@@ -229,6 +229,7 @@
     if (wait) order.forEach(function (g) { if (!tried.some(function (c) { return c.name === g.name; })) return; byStatus(g.rows.filter(function (r) { return r.area === 'Accessibility'; })).forEach(function (r) { if (!TODO_NO[r.key]) TODO_NO[r.key] = ++no; }); });
     var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     fillTodoNos(document);
+    fillA11yPage();   // the Accessibility page's rows carry the same numbers
     var link = nav.querySelector('a[href="#status"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     // The menu's count waits for every kind, so it never changes in front of the reader.
@@ -385,6 +386,89 @@
     showTodoArea(box);
     labelCells(td);
     todoHeadHeight();
+  }
+  // ── The Accessibility page: every criterion of every component, one table ───────────────────────────────────────
+  // The rows a component's own Accessibility area shows (a11yIssueRows, and the notes no check reads), for every
+  // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
+  // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
+  // browser, then the component, the level, the principle, who acts and what the criterion depends on. Above them a card
+  // a level, each criterion's share met by principle. Every row is one the browser tries, so until every component is
+  // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
+  var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
+  var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
+  var A11Y_LEVELS = ['A', 'AA', 'Beyond AA', 'Not a criterion'];
+  // What a criterion depends on, as a row says where it was tried (wcag21.mjs browser).
+  var A11Y_DEPENDS = { same: 'The same in every browser', each: 'Each browser decides', chrome: 'Chrome alone' };
+  var A11Y_ST = { todo: 'fix', check: 'check', done: 'done' };
+  function fillA11yPage() {
+    var sec = a11ySec; if (!sec) return;
+    var tried = COMPONENTS.filter(function (c) { return c.__a11y; }).length, wait = !ALL && tried < COMPONENTS.length;
+    var clear = function () { Array.prototype.forEach.call(sec.querySelectorAll(':scope > :not(h2):not(.sg-section-badge)'), function (n) { n.remove(); }); };
+    if (wait) {
+      var sayWait = esc('Each component is tried in this browser first, ' + tried + ' of ' + COMPONENTS.length + ' so far. The table shows once every one is.');
+      if (sec._sig === 'wait:' + tried) return;
+      clear(); sec._sig = 'wait:' + tried;
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><p class="sg-none" role="status">' + sayWait + '</p></div>');
+      return;
+    }
+    var rows = [];
+    COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
+      try {
+        var t = c.__a11y;
+        a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).concat(unreadRows(c)).forEach(function (r) { if (A11Y_ST[r.st]) rows.push({ c: c, r: r }); });
+      } catch (e) { /* its accessibility is read on its own page */ }
+    });
+    var sig = rows.map(function (x) { return x.r.key + ':' + x.r.st + ':' + (TODO_NO[x.r.key] || ''); }).join('|');
+    if (sec._sig === sig) return;
+    clear(); sec._sig = sig;
+    var BB = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null;
+    var levelOf = function (r) { return r.k ? (r.k.level || 'Beyond AA') : 'Not a criterion'; };
+    var principleOf = function (r) { var n = r.k && /^(\d)\./.exec(r.k.sc); return n ? A11Y_PRINCIPLE[n[1]] : ''; };
+    var dependsOf = function (r) { return r.k ? A11Y_DEPENDS[r.k.browser] || '' : ''; };
+    var whoOf = function (r) { return plainText(r.who || '').replace(/\s+/g, ' ').trim(); };
+    // Fails in one browser and passes in another: each browser's line says ✓ and ✕.
+    var differs = function (x) { var b = BB && x.r.k && BB[x.c.name] && BB[x.c.name][x.r.k.sc]; return !!(b && /✓/.test(b.line) && /✕/.test(b.line)); };
+    var stWord = function (r) { return rowWord(r.st, 'Accessibility'); };   // the rows' own words: Issues, Review, Met
+    var ORDER_ = { todo: 0, check: 1, done: 2 };
+    rows.sort(function (p, q) { return ORDER_[p.r.st] - ORDER_[q.r.st] || (TODO_NO[p.r.key] || 1e9) - (TODO_NO[q.r.key] || 1e9) || p.c.name.localeCompare(q.c.name); });
+    var rowHTML = function (x, i) {
+      var r = x.r, id = ROW_DETAIL.push({ r: r, area: 'Accessibility' }) - 1;
+      var f = { component: x.c.name, status: stWord(r), level: levelOf(r), principle: principleOf(r), who: whoOf(r), depends: dependsOf(r) };
+      return '<tr class="sg-row-open" tabindex="0" data-row-detail="' + id + '" data-a11y-row="' + i + '" data-status="' + r.st + '" data-f' + Object.keys(f).map(function (k) { return f[k] ? ' data-f-' + k + '="' + esc(f[k]) + '"' : ''; }).join('') + (differs(x) ? ' data-f-differs="1"' : '') + '>' +
+        ISSUE_CELL.no(r) + '<td><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td>' + ISSUE_CELL.kind(r) + '<td>' + esc(levelOf(r)) + '</td>' + ISSUE_CELL.whoCell(r) + ISSUE_CELL.status(r) + ISSUE_CELL.updated(r) +
+        '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
+    };
+    // A column head sorts by it, again the other way round, as the Rules page's do.
+    var SORT = [
+      ['Task nr', function (x) { return TODO_NO[x.r.key] || 1e9; }],
+      ['Component', function (x) { return x.c.name.toLowerCase(); }],
+      ['WCAG', function (x) { return x.r.k ? x.r.k.sc.split('.').map(function (n) { return ('000' + n).slice(-3); }).join('.') : 'zzz' + x.r.kind; }],
+      ['Level', function (x) { return A11Y_LEVELS.indexOf(levelOf(x.r)); }],
+      ['Who acts', function (x) { return whoOf(x.r).toLowerCase() || 'zzz'; }],
+      ['Status', function (x) { return ORDER_[x.r.st]; }],
+      ['Last checked', function (x) { return x.r.at || ''; }]
+    ];
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-a11y-table"><colgroup><col class="sg-a11y-no"><col class="sg-a11y-comp"><col class="sg-a11y-sc"><col class="sg-a11y-level"><col class="sg-a11y-who"><col class="sg-a11y-st"><col class="sg-a11y-at"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var table = sec.querySelector('.sg-a11y-table');
+    tableNone(table, 'criteria', { head: 'No component has been tried yet', say: 'Each component\'s criteria are tried in the browser as the page opens, and the audit tries the rest.' });
+    var sortKey = null, sortDir = 1;
+    sec.onclick = function (e) {
+      var th = e.target.closest('.sg-a11y-table th[data-sort]'); if (!th) return;
+      var key = th.getAttribute('data-sort'), val = SORT.filter(function (c) { return c[0] === key; })[0][1];
+      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
+      var tb = table.tBodies[0];
+      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(rows[+a.getAttribute('data-a11y-row')]), v = val(rows[+b.getAttribute('data-a11y-row')]); return (u < v ? -1 : u > v ? 1 : 0) * sortDir; }).forEach(function (tr) { tb.appendChild(tr); });
+      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (h) { h.setAttribute('aria-sort', h.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+    };
+    var chips = ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]);
+    filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
+      { key: 'status' }, { key: 'component', label: 'Component' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'principle', label: 'Principle', order: A11Y_PRINCIPLES },
+      { key: 'who', label: 'Who acts' }, { key: 'depends', label: 'Depends on', order: [A11Y_DEPENDS.same, A11Y_DEPENDS.each, A11Y_DEPENDS.chrome] }] });
+    // A card a level: every component's criteria at that level, each in the colour of its status, by principle.
+    var levelCard = function (lv) { return doneCard('Level ' + lv, rows.filter(function (x) { return x.r.k && x.r.k.level === lv && principleOf(x.r); }).map(function (x) { return { area: principleOf(x.r), state: A11Y_ST[x.r.st] }; })); };
+    doneCards(sec, levelCard('A') + levelCard('AA'));
+    labelCells(sec);
+    if (route.last !== undefined && !sec.hidden) underTitle(sec);
   }
   // Each card's head row sticks under the filter and the counts, whatever their height at this width.
   // Not while the pages are first built: the router measures the page it opens once they are (route → underTitle).

@@ -158,7 +158,8 @@
       // Only what is left, side by side: its share, in the table's word. What a browser has not tried yet is said apart,
       // with no share: none of it is counted yet.
       var items = o.rest.map(function (x) { return '<span class="pg-par-status pg-par--' + (x.cls === 'fix' ? 'differs' : 'figma') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(share(x.pct) + ' ' + x.word) + '</span>'; }).join('') +
-        (o.untested ? '<span class="pg-par-status pg-par--none is-untested"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(o.untested + ' Untested') + '</span>' : '');
+        (o.untested ? '<span class="pg-par-status pg-par--none is-untested"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(o.untested + ' Untested') + '</span>' : '') +
+        (o.byBrowser ? '<a class="sg-link-pill sg-health-browsers" href="#accessibility?show=differs">' + esc(o.byBrowser + (o.byBrowser === 1 ? ' criterion differs' : ' criteria differ') + ' by browser') + LINK_GO + '</a>' : '');
       var legend = items ? '<p class="sg-health-legend">' + items + '</p>' : '';
       // At its foot, on one line: how many of everything in the system are done in full here (complete, never the big
       // number's word, which counts the work), and the link down to the table with that filter on (its arrow points down).
@@ -195,6 +196,11 @@
     var iT = card('Code', { all: mx.length, fix: missingN, dec: unsureN + cssN }, ['Built', cssN && unsureN ? 'Unsure or CSS only' : cssN ? 'CSS only' : 'Unsure', 'Missing'], missingN ? nx(missingN, 'Missing', 'Implementation') : nx(unsureN, 'Unsure', 'Unsure'));
     var aT = card('Accessibility', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
     aT.untested = countOf(accP, 'Untested');
+    // The criteria that pass in one browser and fail in another (the browsers pass, a11y-browsers.mjs), counted once
+    // each however many components they differ on, a link to the Accessibility page with that filter on.
+    var bbC = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null, bbSc = {};
+    if (bbC) Object.keys(bbC).forEach(function (n) { Object.keys(bbC[n]).forEach(function (sc) { var l = bbC[n][sc].line || ''; if (/✓/.test(l) && /✕/.test(l)) bbSc[sc] = 1; }); });
+    aT.byBrowser = a11ySec ? Object.keys(bbSc).length : 0;
     var dT = card('Documentation', rowsSplit(docOwn), ['Done', 'Review', 'Missing'], nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Review'), 'Review', 'DocumentationPartial'));
     [[pT, parP], [iT, codeP], [aT, accP], [dT, docP]].forEach(function (x) { x[0].total = mx.length; x[0].doneN = countOf(x[1], x[0].pctWord); });
     // What each card counts, said simply: one or two fixed sentences a person reads at a glance (25 words at most, nothing

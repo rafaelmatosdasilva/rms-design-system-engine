@@ -248,6 +248,9 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
+/* The Accessibility page's table: the criterion takes the room, who acts and the status keep theirs, so neither runs into the next. */
+.sg-a11y-table { table-layout: fixed; } .sg-a11y-table col.sg-a11y-no { width: 8%; } .sg-a11y-table col.sg-a11y-comp { width: 14%; } .sg-a11y-table col.sg-a11y-sc { width: 22%; } .sg-a11y-table col.sg-a11y-level { width: 7%; } .sg-a11y-table col.sg-a11y-who { width: 18%; } .sg-a11y-table col.sg-a11y-st { width: 14%; } .sg-a11y-table col.sg-a11y-at { width: 12%; }
+.sg-a11y-table td.sg-todo-whocell { white-space: normal; }
 /* The few short things a person does to check a criterion, numbered, and the command that records it. */
 .pg-a11y-steps { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .pg-a11y-steps li { margin: 0 0 var(--sg-space-xxs); }

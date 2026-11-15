@@ -197,6 +197,7 @@
     templates: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 6v8"/>',   // a page frame: its header, a side column and the content
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
     rules: '<path d="M2.5 13.5V2.5l11 11z"/><path d="M5.2 10.8V6.3l4.5 4.5z"/>',   // a set square: the system measured against its own rules
+    accessibility: '<circle cx="8" cy="3" r="1.3"/><path d="M3 5.8l5 1 5-1M8 6.8v3.2M8 10l-2.2 4M8 10l2.2 4"/>',   // a person, arms open: the system as everyone uses it
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
