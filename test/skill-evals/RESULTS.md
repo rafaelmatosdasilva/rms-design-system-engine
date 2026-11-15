@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/q21-c12-q44 (continuous evaluation)
+
+What changed since the entry below (engine c089de5): What the engine knows, written into Figma: descriptions, spec pages, token values the code changed first; Each kind of Figma change a yes of its own, the way back in the guide, and the part documented; Keep main's three Figma writes: route to their commands, point the docs at them, drop the edits module's wiring; A request to add a token in Figma is a build, not a token value written back; Asked for the roles alone, a role the accessibility spec would state is still listed; Skill evaluation of the Figma edits, each kind asked on its own: 79/79, and what the first run found; Rendered parity drawn in Firefox and Safari too, with nothing installed but the browser (#499). The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `8e25301a4cf9` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d33029cf` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md eaca595d` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 61167fe | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.061 | 0.057 |
+| Input a run | 113k | 97k |
+| Turns a run | 3.7 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 113k, in 3.5 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-merge-branch-main-of-https`.
+
 ## 2026-11: The secret check reads token/variable names as design tokens, and the XL case seen again (continuous evaluation)
 
 What changed since the entry below (engine b78b123): The secret check reads token/variable names as design tokens, and the XL case seen again.
@@ -89,6 +107,24 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 111k, in 3.6 turns against 3.8. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-a-colour-token-the-code`.
+
+## 2026-11: What the engine knows, written into Figma, each kind asked on its own (continuous evaluation)
+
+What changed since the entry below (engine f7ce0c9): What the engine knows, written into Figma: descriptions, spec pages, token values the code changed first; Each kind of Figma change a yes of its own, the way back in the guide, and the part documented; Keep main's three Figma writes: route to their commands, point the docs at them, drop the edits module's wiring; A request to add a token in Figma is a build, not a token value written back; Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); test-tools: bump the vue-tools group in /test/.vue-tools with 6 updates (#485); Documentation that is there and says nothing (#489); Asked for the roles alone, a role the accessibility spec would state is still listed. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `466056ffded2` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 1eb70167` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 6c54056e` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine ab57ae1 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.061 | 0.057 |
+| Input a run | 111k | 101k |
+| Turns a run | 3.8 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 111k, in 3.7 turns against 3.8. no task changed state, and no run moved: the same result. Records: `records/figma-edits-one-kind-at-a-time`.
 
 ## 2026-11: The Status cards' measured-on line taken out, at the owner's word (continuous evaluation)
 

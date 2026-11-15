@@ -40,6 +40,15 @@ Newest first.
 **Guess ruled out.** That the batch's guide change made the agent stop answering on that task: the change touched no part of what `accept-radius` reads, and a run the agent finishes leaves a reply even when it is wrong. A run with no reply at all never started its answer.
 
 **What changed.** Nothing in the engine. The failed row is kept in the record as it ran, beside this note and the clean run again.
+## Asked for the roles alone, Figma was said to state every role
+
+**Found** 14 November 2026, measuring the change that makes each kind of Figma edit a yes of its own. **Fixed in** `lib/figma-edits.mjs` (`onlyKinds`) and `lib/audit.mjs`.
+
+**Evidence.** The first run scored 72 of 79. `figma-roles` ("update Figma so it states the roles the code has") went from passing every run to failing every run, on one check: the reply never named the field's `Role: textbox`. All three agents did what the guide says and ran `--figma-edits roles`. The engine answered "Figma states every role the code has" and listed only the chip's decision, and each agent relayed that. The engine was wrong: `--figma-edits` with no kind named still listed the field as a textbox, in its accessibility spec, and its to do list said the field has no role note. The run drops a role note whenever the accessibility spec states the same role, so it is not written twice, and it did so before the kinds were picked. Asked for the roles alone, the specs were then filtered out too, and the role went with them.
+
+**Guess ruled out.** Not the guide's wording and not the scorer: the agents ran the right command and repeated its output faithfully, and the check asks for what the person asked for. The other four failures were not the change either: three runs ended with no result and nothing on stderr (`fix-chip-height`, `accept-radius-pt`, `audit-then-accept`, each #0, while a full suite ran on the same computer), and `new-ui-saved` 9 of 10 is the rate near 3% already settled further down.
+
+**What changed.** The spec's claim on a role counts only when the spec is among what is written: asked for the roles alone, the role note lists the field again. Measured again on the fixed engine, run alone on the computer: 79 of 79, `figma-roles` 3 of 3, no rule broken (`records/figma-edits-one-kind-at-a-time`). The measurement that found it was not recorded as an entry, since its engine was not the one that ships.
 
 ---
 

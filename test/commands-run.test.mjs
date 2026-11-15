@@ -41,7 +41,7 @@ const COMMANDS = [
   '--version', '--census', '--doctor', '--status', '--summary', '--trend', '--writes', '--findings', '--hygiene',
   '--duplication', '--agent-rules', '--annotation-categories', '--check-intent', '--code-drift',
   '--contract-completeness', '--exemption-debt', '--guidance-rating', '--guide-status', '--readmes', '--route',
-  '--stores', '--styleguide-check', '--tailwind', '--unchecked', '--prune', '--figma-edits', '--query chip',
+  '--stores', '--styleguide-check', '--tailwind', '--unchecked', '--prune', '--figma-edits', '--figma-edits spec-pages', '--figma-undo', '--query chip',
   // A command whose argument is a file, not only a flag. This project has no components in code, so --prototype on
   // a page returns before it checks anything: what it guards here is that saying so is all it does. The page check
   // itself needs a project whose system is built, and has its own test (page-report-cli.test.mjs) - this sweep
