@@ -263,17 +263,21 @@ test('out of time: what the pages it finished found is kept, the page it was on 
     writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ a11y: { timeoutSec: secs } }, null, 2));
 
     const out = await check([...['first.html', ...slow].flatMap((f) => ['--url', url(f)]), '--json-out', join(dir, 'a11y.json')]);
-    const done = out.match(new RegExp(`stopped after ${secs}s, with (\\d+) of ${pageCount} page\\(s\\) checked: what they found is kept`));
+    // The run stays inside the time it was given (docs/accessibility.md): what it took before the pages, and the room
+    // it keeps for its report, come out of it, so the pages stop at that time or sooner, never at exactly it.
+    const done = out.match(new RegExp(`stopped after (\\d+)s, with (\\d+) of ${pageCount} page\\(s\\) checked: what they found is kept`));
     assert.ok(done, out);
+    const stoppedAt = Number(done[1]);
+    assert.ok(stoppedAt <= secs, `stopped after ${stoppedAt}s, past the ${secs}s it was given`);
     const d = JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8'));
     const said = (d.notRead ?? []).join('\n');
     // The slow pages wait on a server that never answers, so the budget always runs out with one under way and
     // others never started, however fast the computer is.
-    assert.match(said, new RegExp(`\\(stopped partway: the check ran out of its ${secs}s\\)`), said);
-    assert.match(said, new RegExp(`\\(not reached: the check ran out of its ${secs}s\\)`), said);
+    assert.match(said, new RegExp(`\\(stopped partway: the check ran out of its ${stoppedAt}s\\)`), said);
+    assert.match(said, new RegExp(`\\(not reached: the check ran out of its ${stoppedAt}s\\)`), said);
     // Every page is accounted for: counted as checked, or said why not. A page can be both (one that was reached and
     // then gave up loading on its own), so this is a floor, not a sum.
-    assert.ok(Number(done[1]) + (d.notRead ?? []).length >= pageCount, `${done[1]} checked and ${(d.notRead ?? []).length} said why not:\n${said}`);
+    assert.ok(Number(done[2]) + (d.notRead ?? []).length >= pageCount, `${done[2]} checked and ${(d.notRead ?? []).length} said why not:\n${said}`);
     // Nothing found is thrown away, and nothing missing is passed over in silence: the quick page's finding is here,
     // or that page is named among those the budget cut short. A page stopped partway keeps what it had already
     // measured, so the finding and the page being named are not opposites — both can be true at once.
