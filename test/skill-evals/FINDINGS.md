@@ -17,6 +17,15 @@ Newest first.
 **Guess ruled out.** That the change broke accepting a difference. Nothing it touched is on that path (the new request words were checked against the task's words), and the same tasks passed unchanged once the computer was not busy.
 
 **What changed.** Nothing in the engine. A skill evaluation is run on its own, never beside a full suite: a run cut off by a busy computer reads as a run that failed, and the check that names it ("the run finished") says so. The measurement was also stopped once by a commit made while it ran, since it measures one commit: commit first, then measure.
+## An empty run is the runner's, not the engine's
+
+**Found** 14 November 2026, measuring the batch that added colour merges, owed states and lesson evidence (guide set f1f79254251b). **Fixed in** nothing: no fix was owed.
+
+**Evidence.** One of 79 runs (`accept-radius` #1) came back with no result and no reply, so both its checks failed. It ran while a second evaluation from another session was running on the same computer. The task's other two runs passed in 2 turns each, and the task run again alone passed 3 of 3, in 2 turns each.
+
+**Guess ruled out.** That the batch's guide change made the agent stop answering on that task: the change touched no part of what `accept-radius` reads, and a run the agent finishes leaves a reply even when it is wrong. A run with no reply at all never started its answer.
+
+**What changed.** Nothing in the engine. The failed row is kept in the record as it ran, beside this note and the clean run again.
 
 ---
 

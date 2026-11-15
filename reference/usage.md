@@ -75,7 +75,8 @@ rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules 
 rms-design-system-engine --sign-off "chip size=xl" --by "<who>"  # a named person signs off what an edit adds to the system itself (a token, a component's option): the hook lets that edit through; --sign-off alone lists them
 rms-design-system-engine --second-review "<what>"       # run from another agent session: the engine's checks again on a change held for sign-off; the agent that made a change never signs it off, and with review.second "agent-or-person" a clean review signs it off (a removal, rename, breaking or high-risk change still waits for a person)
 rms-design-system-engine --lesson "<what was wrong>" --why "<reason>" [--component <name>] [--rule "<sentence>"]  # keep a person's correction (why is required) and propose the strongest guard that holds it: a check, a step for agents, else a guideline
-rms-design-system-engine --lesson-answer <id> yes|no     # the person's answer to a proposed guard; a yes writes it where it belongs, a no is kept so it is not proposed again
+rms-design-system-engine --lesson-answer <id> yes|no     # the person's answer to a proposed guard; a yes writes it where it belongs (refused while it names no case it was seen in), a no is kept so it is not proposed again
+rms-design-system-engine --lesson-answer <id> no --would-accept more|new|narrower [--why "<reason>"] [--rule "<narrower words>"]  # a no that says what would get it accepted: held until that is there, then proposed again with what changed
 rms-design-system-engine --lessons                       # every lesson, repeated finding and proposed rule, what each became, and any that came back after its guard
 rms-design-system-engine --lesson --edit <n> --why "<reason>"  # a line an agent wrote that a person changed, made a lesson (--unlesson --edit <n> sets it aside)
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
@@ -438,7 +439,9 @@ calls a deprecated component stable is wrong. **Out of date**: the component's p
 takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
 `.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
 history dates its file too); an example on the page is out of date when a call of the component in a code block sets a
-prop it does not have, or a literal value the prop does not take. **Twins**: two components' pages that say the same (their own names aside, lines a template
+prop it does not have, or a literal value the prop does not take. **States owed**: a page's front matter `states:` (or a
+DSDS entity's `metadata.states`) names the states its component owes, and each one Figma or the code has none of is
+reported under "States the intent layer owes" and goes to that side's list of things to do. **Twins**: two components' pages that say the same (their own names aside, lines a template
 writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
 with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
 the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
