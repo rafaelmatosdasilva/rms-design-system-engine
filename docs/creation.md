@@ -447,6 +447,31 @@ to read: nothing says what this page is for or what goes on it. What should it s
 
 A page that says anything of its own is documented, however thin — only a pointer and nothing else counts as none.
 
+### A part you build by hand again and again
+
+Every prototype keeps what your system had nothing for, in `.design-system-engine-out/prototypes/gaps.json`. One prototype's gap is its own business. The same part built by hand in four prototypes is your system asking for a component.
+
+It could not tell you that, because needs were counted on their exact words — and you write the need in your own words every time. "A top bar", "the bar at the top", "top bars": three needs, each seen once, and the thing worth knowing stayed invisible however many prototypes built it.
+
+Now the needs are gathered by what they say:
+
+```
+🧱 BUILT BY HAND AGAIN  2 part(s) the system had nothing for in more than one prototype:
+   a top bar — built by hand in 3 prototypes: Orders, Settings, Billing; closest in the system: pageHeader
+      also written as: the bar at the top
+   empty states — built by hand in 3 prototypes: Orders, Profile, Billing
+      also written as: an empty state
+   Each is the design team's to decide: a component of its own, an option on one that exists, or left as it is.
+```
+
+The same lines are in `gaps.json` under `repeated`, so you can read it without running anything.
+
+**It builds nothing.** It does not create a component, name one, or write anything into your system — it counts, and hands you the count. Whether your system grows a component is yours to decide, as everything on that list already is.
+
+**A rewording, never a renaming.** "A top bar" and "the bar at the top" are gathered: the words about the part are the same two. "A top bar" and "page header bar" are not, because *header* and *page* are things one says of the part and the other does not. Reading those as one would take a guess, and a wrong guess tells you a part repeats when it does not — the one mistake this must not make. Every wording gathered is shown under **also written as**, so you can see what was grouped and say it was grouped wrongly.
+
+Two prototypes is the least that counts as again: one is the prototype that needed it, and that gap is already on your list.
+
 ### A gap reaches the team by itself
 
 A prototype finds what your system does not have — a component it lacks, an option, a token. Those used to sit in a file and a chat, and someone had to remember to carry them to the people who decide. On the run this came from, they were only written up after being asked for twice.
