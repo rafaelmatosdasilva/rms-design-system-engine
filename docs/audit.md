@@ -234,6 +234,20 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 - Aliases to a removed token, with the commit that removed it.
 - A colour token the code mixes at 0%, so it never shows. A `color-mix()` gives all of the mix to the other colour, often an opacity token given to the wrong side. It is read through a stylesheet function that returns one, such as a Sass `@function`.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+- The common set a system lacks:
+  - It lists the system against the 23 components most product UIs need (button, link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, badge, icon, pagination, progress, skeleton, empty state).
+  - Three columns: Figma, the code and the intent layer. A side the engine has nothing to read from is left out, never counted as missing.
+  - It matches by meaning, not exact name: a modal is a dialog, a snackbar a toast, a TextField a text input, an IconButton a button.
+  - It names each one missing on every side, and each that is on some sides only.
+  - It counts the five token categories (colour, spacing, radius, elevation, typography) that have tokens, and how many values of an untokenised one the styles write by hand.
+  - A gap the team leaves on purpose (`commonSet.leaveOut` in `ds-config.json`) is said as kept, with its reason, never as missing.
+- Governance on paper, held against what happened:
+  - It reads the team's own contribution guide, release process and changelog for the rules they state.
+  - It holds each breaking change in the last five releases to those rules: a major version, a changelog entry that names it, and a migration note.
+  - A breaking change is one its commit marks (`!:`, a `BREAKING CHANGE:` footer) or one the engine recorded when it published the contracts.
+  - A rule the documents do not state is never checked. With no such documents, it says nothing.
+  - It says when commits stop following Conventional Commits, when the guide asks for them.
+  - Where the engine keeps the team's issues on GitLab, it names open issues left past the guide's own stale or duplicate limit, in days.
 
 What a *product* does with the system is a product leaving it, so it is said under the drift check instead (`🪢 Drift from the system`), not here. Each part does what its line on the [features page](features.md) says:
 
@@ -241,8 +255,26 @@ What a *product* does with the system is a product leaving it, so it is said und
 - A product that brings in two of the system's themes, one overriding the other by load order.
 - A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
 - A class a product styles almost as one of the system's components, as a decision, never a drift.
+- A product that has quietly left the system gets one block of its own:
+  - **Stopped upgrading:** how many majors and minors it is behind the system's latest version, and, when the system's version tags give the dates, for how long, counted from the version after its own.
+  - **Copied and changed:** a class in its folder that nearly copies one of the system's components, with what differs.
+  - **Built its own:** a component it defines beside the system's, by the same name, by its own name before it (ShopButton), or by a known alias (Modal for a dialog). A wrapper that brings in the system's package is not one.
+  - Each line says where it is (file and line) and is a need the system does not meet yet. Ask the product's team what it needed.
+  - The version a product uses is the one its lockfile pinned (package-lock, yarn or pnpm), before the range its package.json accepts.
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
+
+#### Browser support
+
+Advice on the web features your code uses, against the browsers your team supports (`🌐 Browser support`), never a failure.
+
+- It reads the browsers your team supports from `supportedBrowsers` in `ds-config.json`, then `browserslist` in `package.json`, then `.browserslistrc`.
+- Only explicit minimums are read (`chrome >= 111`, `safari 16.4`). A query like `last 2 versions` needs usage data, so the audit asks you for explicit minimums instead.
+- With no targets anywhere, it says nothing. It never guesses which browsers you support.
+- Each CSS, HTML or JavaScript feature a supported browser does not run is listed with its line, the first version that runs it, and how to keep it working.
+- A feature you already guard is left out: inside `@supports`, after a fallback value in the same rule, or behind a check in a script.
+- Old patterns the platform now replaces (`-webkit-box`, `-ms-` prefixes, `keyCode`, `document.write()`) are named with their replacement.
+- The system's own code and each product's code are listed apart. The browser versions come from a table kept in the engine, from the web platform's own compatibility data, so nothing is fetched when it runs.
 
 #### A token in the right layer
 
@@ -567,7 +599,7 @@ Thirteen checks change behaviour with a setting in `ds-config.json`, and the two
 | `reimplementationStrict` | a component built by hand where the system has one |
 | `renderedModeStrict` | a rendered assertion that covers some modes and not all |
 | `templateCompositionStrict` | a page missing a component its Figma template composes |
-| `versionLockStrict` | a product left on an older version of the system |
+| `versionLockStrict` | a Figma file saved again since its snapshot was taken |
 | `screenElementStrict` | an element on a screen the code never builds |
 
 **Stops the merge until you ask for less.** On unless you turn them off. Set the key to `false` to make the finding advice:

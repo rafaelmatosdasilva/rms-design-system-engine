@@ -261,10 +261,14 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 
 ℹ️  State contrast: every rendered component state meets WCAG AA (8 checked; disabled states exempt).
 
-🧭 System health: 2 things to keep the system healthy as it grows. Advisory.
+🧭 System health: 4 things to keep the system healthy as it grows. Advisory.
      17 of 17 semantic tokens have no description in Figma (button/background/color, button/background/hover/color, button/text/color, chip/background/color, chip/text/color, …): what a token is for is what an agent reads to pick it.
      2 colour tokens look the same as another in every mode they share, in 1 group: each could be one colour (keep one, point the others at it, or say why they stay apart):
         · keep --text-primary, point --chip-text at it
+     The system has 2 of the 23 components most product UIs need (Figma 2, the code 1). Missing on every side, so each product builds its own: link, text input, select, checkbox, radio, switch, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, badge, icon, pagination, progress, skeleton, empty state. Add each, or say why it stays out in ds-config.json → commonSet.leaveOut:
+        · form field (field) is in Figma but not in the code
+     The system is tokenised in 4 of the 5 token categories (colour, spacing, radius, typography). No tokens for elevation. Add tokens for it, or say why it stays out in ds-config.json → commonSet.leaveOut:
+        · typography has tokens in Figma but none in the code, which writes 3 values of it by hand
 
 📐 Contracts → contracts  (4 components · 19 DTCG tokens)
 ℹ️  DSDS view → contracts/dsds: the 4 contracts in DSDS 0.23.0, for a team that documents its system in that format.
