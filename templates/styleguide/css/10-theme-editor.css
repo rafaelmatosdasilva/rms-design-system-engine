@@ -288,3 +288,5 @@ button.sg-ts-alias-chip:hover .sg-ts-chip > span:last-child { text-decoration: u
 
 /* Full screen is for trying the screens: no outline over what is hovered or picked. */
 .sg-ts-preview:fullscreen .sg-ts-hitbox { display: none !important; }
+#sg-theme-panel .pg-ctl.sg-ts-has-under { flex-wrap: wrap; row-gap: 0; }
+#sg-theme-panel .sg-ts-has-under > .sg-ts-mixed { flex: 1 0 100%; padding-top: var(--sg-space-xs); }   /* under the label and the field, the row's whole width */

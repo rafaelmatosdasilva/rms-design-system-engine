@@ -280,5 +280,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-14-the-status-cards-measured-on` | The 24 guide tasks on Haiku (engine f7ce0c9) | "The Status cards' measured-on line taken out, at the owner's word" |
 | `2026-11-14-what-a-reader-said-is` | The 24 guide tasks on Haiku (engine 77c0288) | "What a reader said is what the check found, with the day as the page says it, and hearing it again is what to do" |
 | `2026-11-14-a-merge-keeps-the-shared` | The 24 guide tasks on Haiku (engine b64f57b) | "A merge keeps the shared colour, never a component's own, and the demo report shows the new advice" |
+| `2026-11-14-a-colour-token-the-code` | The 24 guide tasks on Haiku (engine 6ca5cea) | "A colour token the code mixes at 0% is found and said: an audit check and a note on the editor's field" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

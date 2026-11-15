@@ -130,3 +130,21 @@ test('a token named after a product or a brand, the components\' own tokens asid
   assert.equal(row.who, 'figma');
   assert.match(row.say, /^1 token is named after a product or brand \(acme\/primary for acme\)/);
 });
+
+test('a colour token the code mixes at 0% never shows: read through a stylesheet function, and one with its share kept is left alone', async () => {
+  const { mixedAwayColours, tokenTodos } = await import('../lib/system-advice.mjs');
+  const files = [
+    { file: 'mixins.scss', text: '@function addAlpha($colorVar, $mixColor, $alpha) {\n\t@return color-mix(in srgb, var($colorVar, transparent), var($mixColor, transparent) calc(var($alpha) * 1%));\n}\n' },
+    { file: 'Tag.vue', text: '.tag {\n\tbackground-color: addAlpha(\n\t\t--tag-bg-color,\n\t\t--white,\n\t\t--tag-bg-opacity);\n}\n.chip { background: addAlpha(--chip-bg-color, --white, --chip-bg-opacity); }\n.card { background: color-mix(in srgb, var(--card-bg) 0%, var(--surface)); }\n' }
+  ];
+  const vars = { sizing: { 'tag/bg/opacity': '100px', 'chip/bg/opacity': '40px' } };
+  const away = mixedAwayColours(files, vars);
+  assert.deepEqual(away.map((x) => [x.token, x.file, x.line, x.other, x.share, x.by]).sort(), [
+    ['--card-bg', 'Tag.vue', 8, '--surface', 100, null],
+    ['--tag-bg-color', 'Tag.vue', 2, '--white', 100, '--tag-bg-opacity']
+  ]);
+  const [row] = tokenTodos({ mixedAway: away });
+  assert.equal(row.kind, 'Colour never shows');
+  assert.equal(row.who, 'code');
+  assert.doesNotMatch(row.say + row.todo, /;/, 'no semicolon in the style guide\'s words');
+});
