@@ -19,6 +19,7 @@
     BUILDERS[cid(c.name)] = function () {
       hr();
       var cardEl = buildCard(c); main.appendChild(cardEl); cardEl.hidden = false;
+      if (ONLY) cardEl.classList.add('sg-only-keep');
       cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
       thumbOf(c, cardEl.querySelector('.pg-preview').firstElementChild);
       cardEl._area('play', true);   // a component opens on its Playground
@@ -30,6 +31,10 @@
     else { var fam = menuFamily(c); if (fam && !MENU_FAMS[fam]) { MENU_FAMS[fam] = 1; navLink(cid(FAM_FIRST[fam] || c.name), fam); } }
     if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
+  // The page's own pages (Status, History, Documentation…) are not laid out for a check of some components: they hold
+  // copies of every component, so each part measured them all again, and a big system's History alone (50,000
+  // elements) made a part's every resize take seconds, until the browser stopped answering.
+  if (ALL && ONLY) { document.body.classList.add('sg-only'); var onlySt = document.createElement('style'); onlySt.textContent = 'body.sg-only main > :not(.sg-only-keep) { display: none !important; }'; document.head.appendChild(onlySt); }
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
   // The menu: its buttons say what they do in words (the system's own text button), never an icon alone. On a wide
