@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: FINDINGS: a rule between the two newest cases (continuous evaluation)
+
+What changed since the entry below (engine b5889c4): test-tools: bump the vue-tools group in /test/.vue-tools with 6 updates (#485); Documentation that is there and says nothing (#489); Dependabot leaves TypeScript majors to a person (#490); Did what the designer asked for come out whole (#460); What to do next names only what was found (#491); Listen with a real screen reader: what VoiceOver or NVDA said, held against the browser on the 4.1.2 row (#493); FINDINGS: a rule between the two newest cases. The guide changed in `reference/usage.md`.
+
+Guide set measured: `69dc231cce66` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 6be5d597` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md d9ff61d2` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 4c93060 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 76/79 | 79/79 |
+| Mean cost a run | 0.056 | 0.058 |
+| Input a run | 95k | 99k |
+| Turns a run | 3.3 | 3.6 |
+| Rule violations | 3 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 95k, in 3.6 turns against 3.3. no task changed state; 3 runs moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-15-findings-a-rule-between-the`.
+
 ## 2026-11: Merge main (continuous evaluation)
 
 What changed since the entry below (engine 2ec80b6): Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); Gate 14 says nothing of owed states where there are none, a page's intent carries them only when it has some, and the evaluation's secret check reads token names as design tokens. The guide changed in `reference/usage.md`.
