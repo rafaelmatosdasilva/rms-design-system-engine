@@ -205,6 +205,9 @@ each component the style guide draws:
   ([config](../reference/config.md)).
 - **Option+Tab in Safari.** Safari moves Tab between text fields only, unless a person turns on "Press Tab to
   highlight each item". The pass presses Option+Tab there, which reaches every control, and the row says so.
+- **The Safari it opens is closed again.** Safari keeps the copy a session started running after the session ends,
+  one more for every session. The engine quits exactly the copies it started, when it is done or stopped. Your own
+  Safari is never touched.
 - **A browser that is missing is said.** The run names it rather than passing over it, and the rows keep saying
   *Tried in Chrome*.
 
