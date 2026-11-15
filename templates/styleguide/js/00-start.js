@@ -1,4 +1,7 @@
 (function () {
+  // How wide the window's scroll bar is (none where it floats over the page): a panel gives that room back while open.
+  var gutter = function () { var de = document.documentElement; if (de.classList.contains('sg-panel-open')) return; de.style.setProperty('--sg-gutter', Math.max(0, window.innerWidth - de.clientWidth) + 'px'); };
+  gutter(); window.addEventListener('resize', gutter);
   // The page's data: set by its data file beside it (styleguide-files.mjs), or written in the page itself.
   var DATA_TAG = document.getElementById('sg-data');
   var DATA = self.SG_DATA || JSON.parse(self.SG_DATA_JSON || (DATA_TAG && DATA_TAG.type === 'application/json' && DATA_TAG.textContent) || '{}');

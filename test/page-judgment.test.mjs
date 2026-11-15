@@ -125,7 +125,7 @@ test('--judge-pages: each screen judged once, kept by its screenshot and rubric,
   assert.ok(r, JSON.stringify(rules));
   assert.equal(r.times, 3);
   assert.equal(r.form, 'guideline');
-  assert.equal(r.text, 'Each screen shows one main action that reads first; every other action looks secondary.');
+  assert.equal(r.text, 'Each screen shows one main action that reads first, and every other action looks secondary.');
   assert.ok(proposalFor(root, 'R-judge-destructive'), 'answerable by its id');
   assert.ok(!rules.some((x) => x.id === 'R-judge-component'), 'a decision that holds proposes nothing');
 

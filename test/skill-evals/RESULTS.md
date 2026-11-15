@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The states a component owes from a heading too, colours a person cannot tell apart, a colour mixed at 0%, and where nobody is named to decide (continuous evaluation)
+
+What changed since the entry below (engine 77c0288): three branches measured together: the states a component owes read from a heading as well as its metadata, colour tokens offered as merges and one the code mixes at 0%, and lessons that carry their evidence. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `1ebd3fb1aa64` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 4cbf92c9` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 3522190b` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine b78b123 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.058 |
+| Input a run | 101k | 101k |
+| Turns a run | 3.6 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 101k, in 3.6 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-the-states-a-component-owes`.
+
 ## 2026-11: What a reader said is what the check found, with the day as the page says it, and hearing it again is what to do (continuous evaluation)
 
 What changed since the entry below (engine f7ce0c9): Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); Work in progress: drive a real screen reader over each component and hold what it says against the browser's tree; Listen with a real screen reader: --hear drives VoiceOver or NVDA over each component and shows what it said apart from the browser on the 4.1.2 row; A check a person already made with a reader stays theirs, and the heard note sits in the row it belongs to; What a reader said is what the check found, with the day as the page says it, and hearing it again is what to do. The guide changed in `reference/usage.md`.
@@ -19,6 +37,40 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 111k, in 3.6 turns against 3.8. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-what-a-reader-said-is`.
+## 2026-11: A merge keeps the shared colour, never a component's own, and the demo report shows the new advice (continuous evaluation)
+
+What changed since the entry below (engine f7ce0c9): Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); test-tools: bump the vue-tools group in /test/.vue-tools with 6 updates (#485); Documentation that is there and says nothing (#489); Colours a person cannot tell apart offered as merges, the states each component owes, and a lesson that carries its evidence; A merge keeps the shared colour, never a component's own, and the demo report shows the new advice. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f1f79254251b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 759fc851` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 3082babc` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine b64f57b | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 78/79 |
+| Mean cost a run | 0.061 | 0.059 |
+| Input a run | 111k | 104k |
+| Turns a run | 3.8 | 3.6 |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 79 runs failed, fewer passes than the entry below, 1 rule violation. Failed: accept-radius #1: the run finished (no result ()); accept-radius #1: reports in the chat, not in a file (no reply). no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-14-a-merge-keeps-the-shared`.
+## 2026-11: A colour token the code mixes at 0% is found and said: an audit check and a note on the editor's field (continuous evaluation)
+
+What changed since the entry below (engine f7ce0c9): Theme editor: zoom affects only the preview, which keeps its size and scrolls inside (#486); One decision a task on the Documentation page, said plainly, and no rule check that says the opposite of its rule (#487); Token references point down their layers, and examples that no longer build are out of date (#488); A colour token the code mixes at 0% is found and said: an audit check and a note on the editor's field. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f33ae81ca1a4` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 51e55bd1` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 9f22fb1e` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 6ca5cea | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.061 | 0.059 |
+| Input a run | 111k | 103k |
+| Turns a run | 3.8 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 111k, in 3.6 turns against 3.8. no task changed state, and no run moved: the same result. Records: `records/2026-11-14-a-colour-token-the-code`.
 
 ## 2026-11: The Status cards' measured-on line taken out, at the owner's word (continuous evaluation)
 

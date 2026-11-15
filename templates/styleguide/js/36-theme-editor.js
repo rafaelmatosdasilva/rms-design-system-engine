@@ -17,6 +17,9 @@
   // Every variable of the system, each with its CSS variable: its own, else its Figma name as the system writes it
   // (a/b/c → --a-b-c; a switch has none in the page's data). A copy: the page's own data is left as it is.
   var VARS = (SG.allVars || []).map(function (v) { return Object.assign({}, v, { var: v.var || '--' + String(v.figma).split('/').join('-').replace(/\s+/g, '') }); });
+  // The colour tokens the code mixes at 0% (the audit's Colour never shows): a change to one never shows, so its field
+  // says so rather than leave the person changing a colour nothing draws.
+  var MIXED_AWAY = {}; (SG.mixedAway || []).forEach(function (x) { if (x && x.var) MIXED_AWAY[x.var] = x; });
   var PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>';
   var draft = (function () { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } })() || {};
   var keep = function () { try { localStorage.setItem(KEY, JSON.stringify(draft)); } catch (e) { /* this browser keeps nothing */ } };
@@ -1118,8 +1121,10 @@
         if (src && !linked) ctl += '<button type="button" class="sg-icon-btn sg-ts-auto sg-ts-relink" data-relink="' + esc(x.v.var) + '" title="Back to ' + esc(shortName(src)) + '" aria-label="' + esc(x.label) + ' back to ' + esc(shortName(src)) + '">' + RESET + '</button>';
         if (!linked && x.kind === 'colour') ctl += '<button type="button" class="sg-icon-btn sg-ts-auto sg-ts-lib-btn" data-lib="' + esc(x.v.var) + '" title="Use one of the system\'s colours" aria-label="Use one of the system\'s colours for ' + esc(x.label) + '">' + LIB + '</button>';
         if (linked) over = null;
-        return '<div class="pg-ctl sg-ts-tok' + (linked ? ' is-linked' : '') + '" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + link + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
-          (x.kind !== 'size' || (src && !linked) ? '' : '<button type="button" class="sg-icon-btn sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div></div>';
+        var mixed = x.kind === 'colour' && MIXED_AWAY[x.v.var];
+        var note = mixed ? '<p class="sg-ts-hint sg-ts-mixed">The code mixes this colour at 0% under <code>' + esc(mixed.other) + '</code>, so a change here never shows. A task for the code, on the Status page.</p>' : '';
+        return '<div class="pg-ctl sg-ts-tok' + (linked ? ' is-linked' : '') + (mixed ? ' sg-ts-has-under' : '') + '" data-hit="' + esc(x.v.var) + '"><span class="sg-mode-label" title="' + esc(x.v.figma) + '">' + esc(x.label) + link + '</span><div class="sg-ts-field sg-ts-tok-field">' + ctl +
+          (x.kind !== 'size' || (src && !linked) ? '' : '<button type="button" class="sg-icon-btn sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="' + x.kind + '" title="Back to the theme" aria-label="Back to the theme"' + (over != null ? '' : ' hidden') + '>' + RESET + '</button>') + '</div>' + note + '</div>';
       };
       // Its head stays in view: the components it sits in (each a click away), the one picked, and Done.
       // The path starts at the component picked: one clicked inside another (a tag in a table in a card) is the first

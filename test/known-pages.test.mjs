@@ -103,3 +103,21 @@ test('a scratch copy in the system\'s temporary folders is never kept, whatever 
   const file = join(makeFixture({}), 'pages.json');
   for (const root of ['/tmp/a-session/preview/proj', '/private/tmp/a-session/preview/proj']) assert.equal(rememberPage(root, { env: {}, file }), false, root);
 });
+
+// A page a person builds with a script of their own is never on the list: after the pages, each executable in their
+// own folder is started, apart, with RMS_ENGINE naming the engine, and nothing else in it is.
+test('after the pages, each of the person\'s own scripts is started, with the engine named', async () => {
+  const { runAfterUpdate } = await import('../lib/known-pages.mjs');
+  const { writeFileSync, chmodSync } = await import('node:fs');
+  const { tempDir } = await import('./helpers.mjs');
+  const dir = tempDir('after-update-');
+  writeFileSync(join(dir, 'b-build.sh'), '#!/bin/sh\n'); chmodSync(join(dir, 'b-build.sh'), 0o755);
+  writeFileSync(join(dir, 'a-notes.txt'), 'not a script');
+  writeFileSync(join(dir, '.hidden.sh'), '#!/bin/sh\n'); chmodSync(join(dir, '.hidden.sh'), 0o755);
+  const started = [];
+  const spawn = (f, a, o) => { started.push({ f, engine: o.env.RMS_ENGINE, detached: o.detached }); return { unref() {} }; };
+  assert.deepEqual(runAfterUpdate({ engineDir: '/the/engine', env: {}, dir, spawn }), ['b-build.sh']);
+  assert.deepEqual(started, [{ f: join(dir, 'b-build.sh'), engine: '/the/engine', detached: true }]);
+  assert.deepEqual(runAfterUpdate({ env: { CI: '1' }, dir, spawn }), [], 'never on CI');
+  assert.deepEqual(runAfterUpdate({ env: {}, dir: join(dir, 'none'), spawn }), [], 'no folder, nothing');
+});
