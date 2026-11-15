@@ -16,7 +16,7 @@ const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
 const tpl = templateText();
 
 test('the page is made of the rows a component\'s own area shows, and the try fills it as it fills the Status page', () => {
-  assert.match(tpl, /a11yIssueRows\(c, t \? t\.items : c\.a11y \? a11yStaticItems\(c\) : \[\], t \? t\.live : null\)\.concat\(unreadRows\(c\)\)/, 'the same rows, one way to work them out');
+  assert.match(tpl, /a11yIssueRows\(c, t \? t\.items : c\.a11y \? a11yStaticItems\(c\) : \[\], t \? t\.live : null\)\.forEach\(function \(r\) \{ if \(A11Y_ST\[r\.st\] && !r\.extra && r\.k && \(r\.k\.level === 'A' \|\| r\.k\.level === 'AA'\)\)/, 'the same rows, one way to work them out, those AA asks for');
   assert.match(tpl, /ROW_DETAIL\.push\(\{ r: r, area: 'Accessibility' \}\)/, 'each opens the same panel as on the component');
   assert.match(tpl, /var SWEEP_PAGES = \{ status: 1, accessibility: 1 \};/, 'opening the page tries every component, as the Status page does');
   assert.match(tpl, /fillTodoNos\(document\);\n    fillA11yPage\(\);/, 'drawn with the task numbers it shares');
@@ -56,8 +56,8 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     })()`);
     assert.ok(seen.rows > 10 && seen.comps > 1, JSON.stringify(seen));
     assert.deepEqual(seen.heads, ['Task nr', 'Component', 'WCAG', 'Level', 'Who acts', 'Status', 'Last checked']);
-    for (const f of ['Component', 'Level', 'Principle']) assert.ok(seen.filters.includes(f), `${f}: ${seen.filters}`);
-    assert.ok(!seen.filters.includes('Depends on'), 'what a criterion depends on is said in its panel, never a filter');
+    assert.deepEqual(seen.filters, ['Level', 'Who acts'], 'the level and who acts, nothing else: the component, the principle and what it depends on are in each row and its panel');
+    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((t) => t.dataset.fLevel))].sort()`), ['A', 'AA'], 'only the criteria AA asks for')
     assert.ok(seen.chips.includes('todo') || seen.chips.includes('check'), seen.chips.join());
     assert.deepEqual(seen.cards, ['Level A', 'Level AA'], 'a card a level')
     assert.equal(await run(`[...document.querySelectorAll('#accessibility .sg-cx-score')].every((c) => c.querySelector('.sg-health-top .sg-tip'))`), true, 'its tip says how it is counted, as the Status page\'s cards do')

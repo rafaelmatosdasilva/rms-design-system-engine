@@ -411,8 +411,8 @@
   // The rows a component's own Accessibility area shows (a11yIssueRows, and the notes no check reads), for every
   // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
   // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
-  // browser, then the component, the level, the principle and who acts (what a criterion depends on is said in each
-  // row's panel, never a filter: the owner's, 15 November 2026). Above them one card, the Status page's number. Every row is one the browser tries, so until every component is
+  // browser, then the level and who acts (what a criterion depends on, its component's name and its principle are in
+  // each row and its panel, never a filter: the owner's, 15 November 2026). Above them one card, the Status page's number. Every row is one the browser tries, so until every component is
   // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
   var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
   var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
@@ -433,7 +433,10 @@
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
       try {
         var t = c.__a11y;
-        a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).concat(unreadRows(c)).forEach(function (r) { if (A11Y_ST[r.st]) rows.push({ c: c, r: r }); });
+        // The criteria WCAG 2.2 AA asks for, levels A and AA, and nothing else: what is looked at beyond them (forced
+        // colours, reduced motion, AAA advice) and a Figma note no check reads stay on the component's own Accessibility
+        // area, so every row here is one the page's numbers count (the owner's, 15 November 2026).
+        a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).forEach(function (r) { if (A11Y_ST[r.st] && !r.extra && r.k && (r.k.level === 'A' || r.k.level === 'AA')) rows.push({ c: c, r: r }); });
       } catch (e) { /* its accessibility is read on its own page */ }
     });
     var sig = rows.map(function (x) { return x.r.key + ':' + x.r.st + ':' + (TODO_NO[x.r.key] || ''); }).join('|');
@@ -479,8 +482,7 @@
     };
     var chips = ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]);
     filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
-      { key: 'status' }, { key: 'component', label: 'Component' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'principle', label: 'Principle', order: A11Y_PRINCIPLES },
-      { key: 'who', label: 'Who acts' }] });
+      { key: 'status' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'who', label: 'Who acts' }] });
     // A card a level, counting criteria across the system (a11yCriteria, the Status page's count), with a bar for each
     // principle.
     var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
