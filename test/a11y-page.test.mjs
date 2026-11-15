@@ -59,20 +59,24 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     for (const f of ['Component', 'Level', 'Principle']) assert.ok(seen.filters.includes(f), `${f}: ${seen.filters}`);
     assert.ok(!seen.filters.includes('Depends on'), 'what a criterion depends on is said in its panel, never a filter');
     assert.ok(seen.chips.includes('todo') || seen.chips.includes('check'), seen.chips.join());
-    assert.deepEqual(seen.cards, ['WCAG 2.2 AA'], 'one number, the level it is measured against')
+    assert.deepEqual(seen.cards, ['Level A', 'Level AA'], 'a card a level')
     assert.equal(await run(`[...document.querySelectorAll('#accessibility .sg-cx-score')].every((c) => c.querySelector('.sg-health-top .sg-tip'))`), true, 'its tip says how it is counted, as the Status page\'s cards do')
-    // The card counts criteria across the system at A and AA, never rows: a criterion is met only when no component
-    // fails it and none waits on a review. The Status page's Accessibility card says the same number.
+    // Each card counts its level's criteria across the system, never rows: a criterion is met only when no component
+    // fails it and none waits on a review. The Status page's number is the two levels together.
     const counted = await run(`(() => {
-      const trs = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')], rank = { done: 0, check: 1, todo: 2 }, by = {};
-      trs.filter((t) => /^(A|AA)$/.test(t.dataset.fLevel || '')).forEach((t) => { const sc = t.cells[2].textContent.trim().split(' ')[0]; by[sc] = Math.max(by[sc] ?? 0, rank[t.dataset.status]); });
-      const v = Object.values(by);
-      return { want: v.filter((x) => x === 0).length + ' of ' + v.length, got: document.querySelector('#accessibility .sg-cx-ring-text .sg-health-sub').textContent };
+      const trs = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')], rank = { done: 0, check: 1, todo: 2 }, all = {};
+      const out = ['A', 'AA'].map((lv) => {
+        const by = {};
+        trs.filter((t) => t.dataset.fLevel === lv && t.dataset.fPrinciple).forEach((t) => { const sc = t.cells[2].textContent.trim().split(' ')[0]; by[sc] = Math.max(by[sc] ?? 0, rank[t.dataset.status]); all[sc] = by[sc]; });
+        const v = Object.values(by), card = [...document.querySelectorAll('#accessibility .sg-cx-score')].find((c) => c.querySelector('.sg-health-label').textContent === 'Level ' + lv);
+        return { want: v.filter((x) => x === 0).length + ' of ' + v.length, got: card.querySelector('.sg-cx-ring-text .sg-health-sub').textContent };
+      });
+      const v = Object.values(all);
+      return { levels: out, both: Math.floor(v.filter((x) => x === 0).length / v.length * 100) };
     })()`);
-    assert.equal(counted.got, counted.want);
-    const pageN = await run(`document.querySelector('#accessibility .sg-cx-ring-text .sg-health-num').textContent.replace(/\\D/g, '')`);
-    const statusN = await run(`(() => { const t = [...document.querySelectorAll('#status .sg-health-tile')].find((x) => /^Accessibility/.test(x.querySelector('.sg-health-label').textContent)); return t ? t.querySelector('.sg-health-pct').textContent.replace(/\\D/g, '') : null; })()`);
-    assert.equal(pageN, statusN, 'the Status page and the Accessibility page say one number');
+    for (const c of counted.levels) assert.equal(c.got, c.want);
+    const statusN = await run(`(() => { const t = [...document.querySelectorAll('#status .sg-health-tile')].find((x) => /^Accessibility \\(WCAG 2\\.2 AA\\)$/.test(x.querySelector('.sg-health-label').textContent)); return t ? t.querySelector('.sg-health-pct').textContent.replace(/\\D/g, '') : null; })()`);
+    assert.equal(statusN, String(counted.both), 'the Status page says both levels together, named for WCAG 2.2 AA');
     // Every task names a person by role (a designer, a developer, a person checking by hand, whoever writes the words,
     // whoever owns the flow): never the older "You decide" or "You in Figma", which said a place or a doubt.
     const who = await run(`[...new Set([...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((t) => t.dataset.fWho).filter(Boolean))]`);

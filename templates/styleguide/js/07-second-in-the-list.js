@@ -198,7 +198,7 @@
     // Done is green, to decide amber and to fix red, as the filters' dots under them say.
     var RULE_STATE = { rule: 'done', decide: 'check', fix: 'fix' };
     // What a side's card counts, said in its tip.
-    var RULES_HOW = function (name) { return 'The share of the rules read from ' + (name === 'Code' ? 'the code' : name) + ' that every component already follows. A rule the team has still to settle is to decide, and one some components break is to fix. The bars split the same rules by area. Rounded down, so 100% means every rule is followed.'; };
+    var RULES_HOW = function (name) { return 'The rules read from ' + (name === 'Code' ? 'the code' : name) + ' that every component already follows, out of all of them. The bars split them by area.'; };
     var sideCard = function (side, name) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; }), RULES_HOW(name)); };
     var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
@@ -1292,7 +1292,7 @@
       if (list.some(function (r) { return r.st === 'todo'; })) return 'fix';
       return list.some(isOpen) ? 'check' : 'done';
     };
-    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The share of the pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there. A page with only a review left is to review, and one with something still to write is missing. The bars split the same pages by area. Rounded down, so 100% means every page is written.'); }).join(''));
+    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there, out of all of them. The bars split them by area.'); }).join(''));
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };

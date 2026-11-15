@@ -194,7 +194,8 @@
     // Code's checks are the rows themselves: built, the rest unsure (or only its CSS class) or missing.
     var unsureN = countOf(codeP, 'Unsure'), cssN = countOf(codeP, 'CSS only'), missingN = countOf(codeP, 'Missing');
     var iT = card('Code', { all: mx.length, fix: missingN, dec: unsureN + cssN }, ['Built', cssN && unsureN ? 'Unsure or CSS only' : cssN ? 'CSS only' : 'Unsure', 'Missing'], missingN ? nx(missingN, 'Missing', 'Implementation') : nx(unsureN, 'Unsure', 'Unsure'));
-    var aT = card('Accessibility', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
+    // Named for the standard it is measured against, so the number reads as how far the system is from it.
+    var aT = card('Accessibility (WCAG 2.2 AA)', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
     aT.untested = countOf(accP, 'Untested');
     // The criteria that pass in one browser and fail in another (the browsers pass, a11y-browsers.mjs), counted once
     // each however many components they differ on, a link to the Accessibility page with that filter on.
@@ -207,7 +208,7 @@
     // made from data: test/styleguide-template.test.mjs holds them to it).
     pT.how = 'How closely the code matches Figma, in every property, token and value. The line under it counts what matches in full.';
     iT.how = 'How much of the system exists in the code. The line under it counts what is built.';
-    aT.how = A11Y_HOW + ' Tried in a browser on every variant, for the theme chosen at the top.';
+    aT.how = 'WCAG 2.2 criteria of levels A and AA, met only when no component fails them. Not an average. For the theme chosen at the top.';
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     // In the menu's order: Documentation before Accessibility, as their pages are (the owner's, 15 November 2026).
