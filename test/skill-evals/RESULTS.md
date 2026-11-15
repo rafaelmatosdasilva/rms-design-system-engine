@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The secret check reads token/variable names as design tokens, and the XL case seen again (continuous evaluation)
+
+What changed since the entry below (engine b78b123): The secret check reads token/variable names as design tokens, and the XL case seen again.
+
+Guide set measured: `4a9031c27254` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md e0c3a29a` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 2d840b96` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md edc2803a` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine c089de5 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.061 |
+| Input a run | 101k | 113k |
+| Turns a run | 3.6 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 101k, in 3.7 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-the-secret-check-reads-token`.
+
 ## 2026-11: The states a component owes from a heading too, colours a person cannot tell apart, a colour mixed at 0%, and where nobody is named to decide (continuous evaluation)
 
 What changed since the entry below (engine 77c0288): three branches measured together: the states a component owes read from a heading as well as its metadata, colour tokens offered as merges and one the code mixes at 0%, and lessons that carry their evidence. The guide changed in `reference/config.md`, `reference/usage.md`.
