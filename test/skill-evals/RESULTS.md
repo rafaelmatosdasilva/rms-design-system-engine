@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The demo's report says the browsers line as it is now (continuous evaluation)
+
+What changed since the entry below (engine 1f76f4a): The privacy check reads a package at its version as a version, not an email address (#500); A part built by hand in prototype after prototype, counted (#501); The common set a system lacks, browser support, governance against what happened, and products that quietly left (#502); The accessibility criteria a browser decides, tried in Firefox and WebKit too, and only what differs from Chrome said; The Tab walk starts at the components, so a page's own menus never take every press first; The demo's report says the browsers line as it is now. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `433771a58e65` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 86cca97a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 7f3142a0` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine ba67c2a | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.058 | 0.057 |
+| Input a run | 103k | 104k |
+| Turns a run | 3.7 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 103k, in 3.7 turns against 3.7. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-the-demo-s-report-says`.
+
 ## 2026-11: versionLockStrict said for what it does, and Firefox runs anchor positioning (147) and field-sizing (152) (continuous evaluation)
 
 What changed since the entry below (engine 61167fe): What the engine knows, written into Figma, each kind asked on its own and each with its way back (#451); The products that quietly left the system, gathered one block a product under the drift check; Governance on paper, held against what happened; Docs: products that quietly left the system; The common set a system lacks, in Figma, in the code and documented, and the token categories it leaves raw; Docs: governance on paper, held against what happened; Web features checked against the browsers the team supports; Docs: browser support; versionLockStrict said for what it does, and Firefox runs anchor positioning (147) and field-sizing (152). The guide changed in `reference/config.md`.

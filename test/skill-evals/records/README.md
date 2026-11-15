@@ -286,5 +286,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `figma-edits-one-kind-at-a-time` | The 24 guide tasks on Haiku (engine ab57ae1) | "What the engine knows, written into Figma, each kind asked on its own" |
 | `2026-11-15-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 61167fe) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into figma/q21-c12-q44" |
 | `2026-11-15-versionlockstrict-said-for-what-it` | The 24 guide tasks on Haiku (engine 1f76f4a) | "versionLockStrict said for what it does, and Firefox runs anchor positioning (147) and field-sizing (152)" |
+| `2026-11-15-the-demo-s-report-says` | The 24 guide tasks on Haiku (engine ba67c2a) | "The demo's report says the browsers line as it is now" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
