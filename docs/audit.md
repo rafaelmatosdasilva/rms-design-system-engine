@@ -241,6 +241,12 @@ What a *product* does with the system is a product leaving it, so it is said und
 - A product that brings in two of the system's themes, one overriding the other by load order.
 - A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
 - A class a product styles almost as one of the system's components, as a decision, never a drift.
+- A product that has quietly left the system gets one block of its own:
+  - **Stopped upgrading:** how many majors and minors it is behind the system's latest version, and, when the system's version tags give the dates, for how long, counted from the version after its own.
+  - **Copied and changed:** a class in its folder that nearly copies one of the system's components, with what differs.
+  - **Built its own:** a component it defines beside the system's, by the same name, by its own name before it (ShopButton), or by a known alias (Modal for a dialog). A wrapper that brings in the system's package is not one.
+  - Each line says where it is (file and line) and is a need the system does not meet yet. Ask the product's team what it needed.
+  - The version a product uses is the one its lockfile pinned (package-lock, yarn or pnpm), before the range its package.json accepts.
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
 
