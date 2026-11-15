@@ -2486,6 +2486,9 @@ function personalEmails(text) {
   for (const m of withoutBotTrailers(text).matchAll(/(^|[^\w.%+:/-])([\w.%+-]+)@([\w-]+(?:\.[\w-]+)+)/g)) {
     const [, , local, domain] = m;
     if (PLACEHOLDER_DOMAIN.test(domain) || FILE_LIKE.test(`@${domain}`) || /^git$/i.test(local)) continue;
+    // A package at a version (pinia@4.1.0, plugin-vue@6.0.10-beta.1), as release notes quote them, is no address: a
+    // domain ends in a name of letters, a version in a number. Dependabot's notes were refused for it (14 November 2026).
+    if (!/\.(?:[a-z]{2,}|xn--[a-z0-9-]+)$/i.test(domain)) continue;
     if (/^(no-?reply|noreply\+?.*)$/i.test(local) || /(^|\.)users\.noreply\.github\.com$/i.test(domain)) continue;
     out.push(`${local}@${domain}`);
   }
