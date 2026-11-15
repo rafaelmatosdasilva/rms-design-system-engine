@@ -109,6 +109,10 @@
     });
     var rows = crit.map(function (k) {
       var its = (by[k.sc] || []).filter(function (it) { return it.st !== 'none'; }), st = null, note = '';
+      // What fails in another browser only (a11y-browsers.mjs): a finding of its own, so the row keeps the worst status
+      // across browsers, with what to change and the browser it fails in.
+      var bb = WCAG && WCAG.byBrowser && WCAG.byBrowser.components[c.name] ? WCAG.byBrowser.components[c.name][k.sc] : null;
+      if (bb && bb.only.length) its = its.concat(bb.only.map(function (line) { var b = /^Fails in (.+?) only/.exec(line); return { st: 'todo', html: esc(line), todo: 'Change the code so it holds in ' + (b ? b[1] : 'that browser') + ' as it does in Chrome.', from: 'Tested in ' + (b ? b[1] : 'another browser') }; }));
       var fig = (a.notes || []).filter(function (n) { return n.sc.indexOf(k.sc) >= 0; }).map(function (n) { return n.text; });
       var how = (WCAG_HOW[k.how] || '') + (fig.length ? ', with the Figma annotation' + (fig.length > 1 ? 's ' : ' ') + fig.join(', ') : '');
       var texts = /^(1\.3\.3|1\.4\.5|3\.1\.2|1\.4\.12|2\.4\.6)$/.test(k.sc) && (c.__textParts || []).length ? ', its ' + c.__textParts.join(', ') : '';
@@ -191,7 +195,11 @@
       if (note) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(note) + '</div>';
       // Where it was tried, by what the criterion depends on: the same in every browser, in each browser (and only
       // Chrome runs today), or Chrome alone for what a screen reader hears.
-      var triedLine = WCAG && WCAG.tried ? WCAG.tried[r.k.browser || 'same'] : '';
+      // Where it was tried: each browser's result when the other browsers tried it on this component, else what the
+      // criterion depends on.
+      var bbRow = WCAG && WCAG.byBrowser && WCAG.byBrowser.components[c.name] ? WCAG.byBrowser.components[c.name][r.k.sc] : null;
+      var triedLine = bbRow ? 'Tried in ' + bbRow.line + (WCAG.byBrowser.altTab && /^2\.(1\.1|4\.7)$/.test(r.k.sc) ? ' (in WebKit with Option+Tab, as Safari reaches every control with it)' : '') + '.'
+        : WCAG && WCAG.tried ? WCAG.tried[r.k.browser === 'each' && (WCAG.passSc || []).indexOf(r.k.sc) >= 0 ? 'pass' : (r.k.browser || 'same')] : '';
       if (triedLine) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(triedLine) + '</div>';
       // What to do: each open finding's own fix, then what a person checks or what has still to run; a finding with no
       // fix of its own, what the criterion asks.
