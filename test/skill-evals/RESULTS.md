@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Proposals drafted from how the system is used (continuous evaluation)
+
+What changed since the entry below (engine 275e515): A judgement made again and again is a rule nobody wrote down (#509); Proposals drafted from how the system is used; A big style guide's accessibility check finishes, and the Safari it opens is closed again (#508); The proposals test writes through tempDir. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `6b04c763c9cb` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9c8bc819` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 0a8db60b` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md ae0a1fe6` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine c1dd084 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.056 | 0.057 |
+| Input a run | 93k | 96k |
+| Turns a run | 3.3 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 93k, in 3.4 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-15-proposals-drafted-from-how-the`.
+
 ## 2026-11: Merge main (continuous evaluation)
 
 What changed since the entry below (engine 37d549e): A side panel square at its top corners, as every panel is (#504); The README says what the engine replaces, and Lint your codebase rules is in early development (#506); A big style guide's accessibility check finishes: each part lays out only its components, and the run stops inside its own time; The Safari a check opens is quit when it is done, and a person's own never touched; A rule's panel opens on what to do, and a component's areas filter as their pages do (#507); The copies' limit test reads the limit inside the run's; A rename handed back with its way across, the same job done differently across products, and one inspection report (#505). The guide changed in `reference/usage.md`.

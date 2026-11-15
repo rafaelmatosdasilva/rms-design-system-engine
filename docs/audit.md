@@ -270,6 +270,17 @@ What a *product* does with the system is a product leaving it, so it is said und
 
 A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
 
+#### Proposals from how the system is used
+
+What two or more products work around is the system asking for a change (`rms-design-system-engine --proposals`).
+
+- **Overrides in the code:** a rule of a product's own that styles a system component's class, or an inline style on its tag. A product's own class is not one, and neither is a custom property.
+- **Detaches in Figma:** a frame in a product's screen detached from a system component, read from the screens capture (`--figma-screens`).
+- When the same override (one component's one property) or the same detach repeats in two or more products, it becomes a proposal: what to change, where it was seen (file and line, or the screen) and the products that use the component, which the change would reach.
+- A person decides each one: `--proposal <id> --accept`, `--reject "<why>"` or `--research`, always with `--by "<who>"`. A rejection needs its reason.
+- Decisions are kept in `design-system-engine-proposals.json`. A rejected proposal is said in one line with its reason, never drafted again as new.
+- The full check says in one line, under the drift check, how many are open. The proposals are written to `handback/proposals.md`.
+
 #### One inspection report
 
 Ask for an inspection and the engine reads what it already found as one report (`rms-design-system-engine --inspection`). Run the full check first: the report reads its results.
