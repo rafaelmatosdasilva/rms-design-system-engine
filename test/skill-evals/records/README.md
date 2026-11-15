@@ -288,6 +288,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-15-versionlockstrict-said-for-what-it` | The 24 guide tasks on Haiku (engine 1f76f4a) | "versionLockStrict said for what it does, and Firefox runs anchor positioning (147) and field-sizing (152)" |
 | `2026-11-15-the-demo-s-report-says` | The 24 guide tasks on Haiku (engine ba67c2a) | "The demo's report says the browsers line as it is now" |
 | `2026-11-15-a-rename-handed-back-with` | The 24 guide tasks on Haiku (engine 37d549e) | "A rename handed back with its way across, the same job done differently across products, and one inspection report" |
-| `2026-11-15-proposals-drafted-from-how-the` | The 24 guide tasks on Haiku (engine a323ed6) | "Proposals drafted from how the system is used" |
+| `2026-11-15-merge-main` | The 24 guide tasks on Haiku (engine 275e515) | "Merge main" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

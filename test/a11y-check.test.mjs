@@ -274,7 +274,21 @@ test('a style guide with many components is checked in parts of a few components
   assert.equal(parts[2].url, `${sg.url}&only=c${SHARE_COMPONENTS * 2}%2Ctable%2Frow`);
   assert.equal(parts[0].part, '1 of 3');
   assert.deepEqual(styleguideShares({ ...sg, names: names.slice(0, 2) }), [{ ...sg, names: names.slice(0, 2) }], 'a small one stays one page');
-  assert.equal(styleguideShares({ label: 'x', url: 'file:///x?all', styleguide: true }).length, 1, 'a list it cannot read: one page');
+  assert.equal(styleguideShares({ label: 'x', url: 'file:///x?all', styleguide: true }).length, 1, 'a list it cannot read: one page');  // A check of some components opens only what draws them, and only them.
+  const asked = styleguideShares(sg, SHARE_COMPONENTS, ['c1', 'table/row', 'nowhere']);
+  assert.deepEqual(asked.map((p) => p.only), [['c1', 'table/row']]);
+  assert.equal(asked[0].url, `${sg.url}&only=c1%2Ctable%2Frow`);
+  assert.equal(styleguideShares(sg, SHARE_COMPONENTS, ['nowhere']).length, 3, 'a name the page does not hold: the page as it is');
+});
+
+test('a part of the style guide lays out only its own components, never the guide\'s own screens', async () => {
+  // Status, History and Documentation hold a copy of every component: laid out in each part, a big guide's part
+  // took minutes and its browser stopped answering.
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const page = templateText();
+  assert.match(page, /if \(ONLY\) cardEl\.classList\.add\('sg-only-keep'\);/);
+  assert.match(page, /if \(ALL && ONLY\) \{ document\.body\.classList\.add\('sg-only'\);/);
+  assert.match(page, /body\.sg-only main > :not\(\.sg-only-keep\) \{ display: none !important; \}/);
 });
 
 test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: budget(30000) }, async () => {

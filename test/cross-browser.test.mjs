@@ -7,11 +7,11 @@ import { createServer } from 'node:http';
 import { writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
 import { tempDir } from './helpers.mjs';
 import { join, dirname } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { measureExpr, crossBrowsers, differences, untried, schemeNeeds, crossPass } from '../lib/cross-browser.mjs';
 import { fromRemote, userJs } from '../lib/bidi.mjs';
-import { launchSafari, webdriverSession, webdriverPage, whySafariRefused } from '../lib/webdriver.mjs';
+import { launchSafari, webdriverSession, webdriverPage, whySafariRefused, automationSafaris } from '../lib/webdriver.mjs';
 import { openBrowser } from '../lib/page-driver.mjs';
 import { findFirefox } from '../lib/browsers.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -182,4 +182,24 @@ test('in Firefox and Chrome alike: one page opened, measured in each scheme, and
     const off = spawnSync(process.execPath, [join(ENGINE, 'lib', 'rendered-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CHROME_PATH: CHROME, DESIGN_SYSTEM_ENGINE_FIREFOX: 'none' }, timeout: 170000 });
     assert.doesNotMatch(off.stdout, /BROWSERS/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the Safari a session started is quit when it closes, and a person\'s own Safari is never touched', async () => {
+  const ps = () => [
+    '  101 /Applications/Safari.app/Contents/MacOS/Safari',
+    '  202 /System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari -ApplePersistenceIgnoreStateQuietly YES --automation',
+    '  303 /usr/bin/safaridriver -p 4444',
+  ].join('\n');
+  assert.deepEqual(automationSafaris({ ps }), [202], 'only the automation copy');
+  // A stand-in for the Safari a session brings up: it has to be gone once the session closes.
+  const stand = spawn('sleep', ['30'], { stdio: 'ignore' });
+  const fake = await fakeSafari();
+  let calls = 0;
+  try {
+    const session = await webdriverSession(fake.base, { safaris: () => (calls++ === 0 ? [] : [stand.pid]) });
+    assert.deepEqual(session.safaris, [stand.pid]);
+    const gone = new Promise((r) => stand.on('exit', () => r(true)));
+    await session.close();
+    assert.equal(await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), 3000))]), true, 'the session\'s Safari is quit');
+  } finally { try { stand.kill(); } catch {} await fake.close(); }
 });
