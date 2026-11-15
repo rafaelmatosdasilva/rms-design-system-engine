@@ -165,7 +165,7 @@
       (r.toFix || []).forEach(function (t, i) {
         if (t.component !== c.name) return;
         var fix = (t.fix && t.fix.say) || r.todo || 'Change it in Figma so it follows the rule.';
-        out.push({ key: c.name + '\u0000rule:' + r.id + ':' + (t.value || i), area: 'Rules', kind: r.says, figma: '', code: '',
+        out.push({ key: c.name + '\u0000rule:' + r.id + ':' + (t.value || i), area: 'Rules', kind: r.says, ruleArea: RULE_AREA[r.area] || capital(r.area), figma: '', code: '',
           // The rule is said once, as the row's kind; what to do says what this component does and the fix.
           // What this component does, unless the fix already says it (most fixes name the value they change).
           todo: (t.value && String(fix).indexOf(t.value) < 0 ? esc(t.value) : '') + '<span class="pg-todo">' + esc(fix) + '</span>',

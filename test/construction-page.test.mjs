@@ -111,7 +111,8 @@ test('the page: in the menu by default, one table whose heads sort, chips for wh
   assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['source', 'Source'], ['area', 'Area']], 'where it was read from, then the area: lists');
   assert.match(page, /var cxStatusChips = \['fix', 'decide', 'rule'\]\.map\(function \(k\) \{ return \{ key: k, label: ST\[k\]\[1\], dot: ST\[k\]\[0\]/, 'each status a chip of its own, with its dot, read without opening a list');
   assert.match(page, /data-f data-f-area="' \+ esc\(AREA\[r\.area\] \|\| capital\(r\.area\)\)/, 'every row says its values to the filter');
-  assert.match(page, /card\(r\.status === 'rule' \? 'Nothing to change' : 'Suggested change', suggest \+ ways \+ list \+ decide\)/, 'what is suggested, what it changes and the decision are one card, the decision under the draft');
+  assert.match(page, /var body = card\('What to do', lead\) \+ card\('Status'/, 'What to do comes first, holding the decision, as on Documentation');
+  assert.match(page, /\+ \(r\.status === 'rule' \? '' : card\(\(byComponent\(r\) \? 'Components it changes \(' : 'Places it changes \('\) \+ n \+ '\)', list\)\)/, 'every component it changes, in a card of its own after the facts');
   assert.match(page, /Hand each change back as a patch for a person to apply, and change no code yourself\./, 'the code\'s change is handed back, never written over the code people wrote');
   const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
   assert.match(gen, /const constructionShow = cfg\.styleguide\?\.construction \?\? 'listed';/, 'in the menu unless the team leaves it out');
