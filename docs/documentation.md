@@ -427,6 +427,30 @@ Nothing is rewritten. Each line comes with both sentences and where each came fr
 
 Which token is for this? A token counts as answered when Figma's description, its own entry in the layer or a page that names it says what it is for. An entry that only repeats the token's name, its modes or what it points to is no answer. Is there a component the system doesn't have? The layer must say what to do when none fits, in one rule for every case, or an agent asked for a toast builds its own. Both show on the Documentation page, the second also in the audit's advice.
 
+### Mistakes that look right
+
+The most common mistakes are the plausible ones: a status shown by colour alone, a skeleton that does not match what loads, a submit button disabled with no reason.
+
+- Each line under a page's **Common mistakes** is read as three parts: the wrong use, why it fails, and what to use instead.
+- `llms.txt` carries the first two of each component's, whole, beside what to avoid.
+- `rms-design-system-engine --mistakes` lists, for each component, the mistakes its kind is known for that its page does not say yet, and each written mistake that leaves out why it fails or what to use instead.
+- Those are suggestions to write in your own pages. The engine writes none of them, and no agent reads one until your page says it.
+
+### What a destructive action owes
+
+How much damage an action does decides how it is built:
+
+| Kind | What it owes |
+|---|---|
+| Can be undone | Runs at once and offers undo, with no confirmation in front of it |
+| Can be undone for a while | The same, and says how long |
+| Permanent | Asks first, with the safe option selected |
+
+- Write each kind on any page of the intent layer, under a section titled **Destructive actions**, or in a line of its rules: "Deleting a project is permanent", "Archiving a board can be undone for 30 days".
+- `llms.txt` lists each one with what it owes, so an agent builds it that way.
+- The page review of your product's screens checks each button that does one of them against its kind.
+- The same review checks what any reviewer would on any page: no dialog opened over another, one main action in a dialog, and a destructive main action styled as destructive.
+
 ### Lists your intent layer copies
 
 A prop table copied from the code, a whole token family listed by name, or a catalog of components written out on a page is flagged, right today or not, because it goes stale and agents take it for the whole list. Each says which generated file to link to instead: the component's contract, the file its tokens come from, or the contracts. A table that says what each token is for, an order of components, or a few picked out with a rule is guidance and left alone.
