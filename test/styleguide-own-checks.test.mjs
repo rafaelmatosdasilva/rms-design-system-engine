@@ -120,8 +120,10 @@ test('a time that ticks over between two pictures moves nothing', { timeout: bud
       const { sessionId } = await openPage(send, 'about:blank');
       await send('Page.navigate', { url: `data:text/html,<table style="width:600px"><tr><td data-at="x">${words}</td><td id="after">after</td></tr></table>` }, sessionId);
       await new Promise((r) => setTimeout(r, 300));
-      const js = `(() => { const s = document.createElement('style'); s.textContent = ${JSON.stringify(css)}; document.head.appendChild(s); return Math.round(document.getElementById('after').getBoundingClientRect().left); })()`;
-      return (await send('Runtime.evaluate', { expression: js, returnByValue: true }, sessionId)).result.value;
+      // The stylesheet is handed to the browser as an argument, never written into the code it runs (styleguide-shots.mjs).
+      const global = (await send('Runtime.evaluate', { expression: 'globalThis' }, sessionId)).result.objectId;
+      const fn = function (css) { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); return Math.round(document.getElementById('after').getBoundingClientRect().left); };
+      return (await send('Runtime.callFunctionOn', { objectId: global, functionDeclaration: String(fn), arguments: [{ value: css }], returnByValue: true }, sessionId)).result.value;
     };
     assert.notEqual(await where('Just now', ''), await where('1 min ago', ''), 'the clock does move the page, with nothing holding it');
     assert.equal(await where('Just now', QUIET), await where('1 min ago', QUIET), 'and QUIET holds it still');
