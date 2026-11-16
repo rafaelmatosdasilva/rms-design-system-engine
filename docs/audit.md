@@ -584,6 +584,40 @@ Under its verdict, the summary of a full audit counts the components that pass, 
 
 It is written whether or not you have a style guide, and the summary of every check says where it is.
 
+### The same findings where you already review code
+
+A finding on a page of its own is read less than one beside the line it is about. Add one flag to the audit in your
+pipeline and the findings arrive in the surface your team already uses.
+
+| Host | Flag | What you add to the job | What you see |
+|---|---|---|---|
+| GitHub | `--sarif` | Upload `findings.sarif` with `github/codeql-action/upload-sarif` | Each finding on its line in the pull request, under Code scanning, with a check a branch rule can wait on |
+| GitLab | `--code-quality` | Name `code-quality.json` as the job's `artifacts.reports.codequality` | Each finding in the merge request's widget and on the line |
+
+The recipes are in the [CI cookbook](../cookbook/ci-and-hooks.md).
+
+**How a finding finds its line.** From the file and line its own words name, else from the file the catalog says that
+component lives in. Some findings are about the system and not a file at all — "3 of 3 semantic tokens have no
+description" — and those keep no line. They are carried in the SARIF without one, left out of GitLab's report, which
+has no entry without a path, and **counted in the line the run prints**, so a report with fewer findings than the run
+found is never mistaken for all of them.
+
+**Severity is the verdict, not a new opinion.** A check that fails is an error, one that only advises is a warning.
+What blocks a merge stays your own CI rule.
+
+### The run's result in your team's chat
+
+A scheduled run finishes at night and only the person who looks finds out. Add `--notify` and it posts one line —
+what failed, what is open, where to read the whole of it, and a link to the job.
+
+- Put the address in your CI's secrets as `DSE_CHAT_WEBHOOK`. It must be `https`.
+- It is read from there and nowhere else. Never `ds-config.json`, never a file, never printed, so a public repository
+  cannot carry it.
+- It posts one field, `{ "text": "…" }`, which is what most chat services read. If yours reads another, name it:
+  `DSE_CHAT_FORMAT=content`. The engine keeps no list of vendors' addresses, so a chat you host yourself works the
+  same as a hosted one.
+- With the variable unset, the run says what to set and posts nothing.
+
 ### Differences you keep on purpose
 
 Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#measure-figma-code-parity) and give the reason.
