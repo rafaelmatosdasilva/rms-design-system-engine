@@ -60,18 +60,17 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
 .pg-par-card + .pg-par-card { margin-top: var(--sg-card-gap); }
 .pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
-.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding-block: var(--sg-space-s); }   /* its height only: the sides are the table's, so a head sits over its column's words */
 .pg-par-card .pg-par-table tr:last-child td, .pg-par-card .pg-par-table tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
 .pg-par-card .pg-par-table tr:first-child > th:first-child,
 .pg-par-card .pg-par-table.sg-no-tasks tr:first-child > th.sg-todo-no-head + th { border-top-left-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }   /* stuck, the head keeps its card's top corners; with no task in the table its number column is hidden, and the corner is the next cell's */
 .pg-par-card .pg-par-table tr:first-child > th:last-child { border-top-right-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }
-.pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
+.pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+:is(.pg-par-table, .pg-inspect table) { font-size: var(--sg-m); }   /* every table's text size, set here only (its head a step smaller) */
 /* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
 .sg-no-tasks .sg-todo-no, .sg-no-tasks .sg-todo-no-head { display: none; }
 /* Every column wide enough that a short value keeps to one or two lines; the long ones take the rest. */
 @media (min-width: 721px) { .pg-par-table th, .pg-par-table td { min-width: calc(var(--sg-space-xxl) * 3.5); } .pg-par-table .sg-todo-no, .pg-par-table .sg-todo-no-head { min-width: 0; } }
-.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) calc(var(--sg-space-s) + var(--sg-space-xs)); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
-.pg-par-table td { padding: var(--sg-space-s) calc(var(--sg-space-s) + var(--sg-space-xs));   /* 12px a side at the default scale, a step over the system's s */ border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
+.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
@@ -86,11 +85,10 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-a11y-from { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
 .pg-a11y-quiet { color: var(--sg-text-2); }
 .pg-a11y .pg-par-type { white-space: normal; min-width: 12em; }
-.pg-par-status { display: inline-flex; align-items: center; gap: var(--sg-space-xs); white-space: nowrap; font-weight: var(--sg-heading-weight); }
+.pg-par-status { display: inline-flex; align-items: center; gap: calc(var(--sg-space-s) - var(--sg-space-xxs)); white-space: nowrap; font-weight: var(--sg-heading-weight); color: var(--sg-text); }   /* the dot 6px from its words */
 /* A status is a small dot and its words: colour only on the dot, and only where something is left (red to fix, amber
    to check, green done); what is done or not needed steps back in the quieter text colour. */
-.pg-par-sign { flex: none; width: calc(var(--sg-space-xs) * 1.5); height: calc(var(--sg-space-xs) * 1.5); border-radius: var(--sg-radius-pill); font-size: 0; color: transparent; overflow: hidden; background: var(--sg-muted); }
-.pg-par-status { gap: calc(var(--sg-space-s) - var(--sg-space-xxs)); color: var(--sg-text); }   /* the dot 6px from its words */
+.pg-par-sign { flex: none; width: var(--sg-dot); height: var(--sg-dot); border-radius: var(--sg-radius-pill); font-size: 0; color: transparent; overflow: hidden; background: var(--sg-muted); }
 .pg-par--differs .pg-par-sign { background: var(--sg-negative); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning-ink); }
 .pg-par--match .pg-par-sign { background: var(--sg-positive); }   /* done: a green dot */
@@ -98,16 +96,16 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Above a table, its statuses as chips that show only those rows: a dot, the words and the count badge. */
 .sg-mx-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sg-text); }   /* a long name cut short, whole on hover */
 .sg-matrix th.sg-mx-open-cell, .sg-matrix td.sg-mx-open-cell { width: calc(var(--sg-space-xxl) + var(--sg-space-s)); text-align: right; }
-.sg-matrix :is(td, th).sg-mx-open-cell { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); } .sg-matrix td.sg-mx-open-cell .sg-mx-go { justify-content: flex-end; }   /* its arrow as far from the right edge as the first column's words are from the left */
-.sg-mx-go { display: inline-flex; align-items: center; justify-content: center; flex: none; width: calc(var(--sg-space-xl) + var(--sg-space-xs)); height: calc(var(--sg-space-xl) + var(--sg-space-xs)); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; vertical-align: middle; }   /* an arrow that opens the component */
+.sg-matrix :is(td, th).sg-mx-open-cell { width: calc(var(--sg-icon-btn) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); } .sg-matrix td.sg-mx-open-cell .sg-mx-go { justify-content: flex-end; }   /* its arrow as far from the right edge as the first column's words are from the left */
+.sg-mx-go { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--sg-icon-btn); height: var(--sg-icon-btn); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; vertical-align: middle; }   /* an arrow that opens the component: the page's icon button */
 .sg-mx-go:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
 .sg-matrix .sg-mx-row.is-link { cursor: pointer; }   /* a row opens the component's page: its own hover and press */
 .sg-matrix .sg-mx-row.is-link:hover > td { background: var(--sg-a2); }
 .sg-matrix .sg-mx-row.is-link:active > td { background: var(--sg-a3); }
 .sg-matrix .sg-mx-row.is-link:hover:not(:has(.sg-link-pill:hover, .sg-tip:hover)) .sg-mx-go { background: var(--sg-hover-fill); color: var(--sg-text); }   /* the row and its arrow open the same page: hovering one lights both, never while an area's pill (another place) is the one hovered */
 .sg-matrix .sg-mx-row .sg-link-pill { cursor: pointer; }   /* only an area's pill opens that area: the rest of its cell is the row's */
-.sg-mx-go:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-mx-go > svg { width: calc(var(--sg-space-l) + var(--sg-space-xxs)); height: calc(var(--sg-space-l) + var(--sg-space-xxs)); }
+.sg-mx-go:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
+.sg-mx-go > svg { width: var(--sg-mark); height: var(--sg-mark); }
 /* The component's page in a panel over the Status page. */
 .sg-comp-panel { position: fixed; inset: 0; z-index: 60; --sg-bg: color-mix(in srgb, var(--sg-bg-page), var(--sg-surface) 60%); }   /* the app's own background, as behind a component's page */
 [data-sg-scheme="dark"] .sg-comp-panel { --sg-bg: var(--sg-bg-page); }
@@ -116,7 +114,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-comp-panel-scrim { position: absolute; inset: 0; background: var(--sg-a5); opacity: 0; transition: opacity var(--sg-fast); }   /* an overlay that dims the page behind, as the menu's does */
 [data-sg-scheme="dark"] .sg-comp-panel-scrim { background: color-mix(in srgb, var(--sg-bg-page) 75%, transparent); }   /* dark: darker still, never a grey veil */
 .sg-comp-panel.is-open .sg-comp-panel-scrim { opacity: 1; }
-.sg-comp-panel-box { position: absolute; top: 0; right: 0; bottom: 0; display: flex; width: min(100vw, 80vw); background: var(--sg-bg); border-left: var(--sg-line); box-shadow: var(--sg-shadow-lift); transform: translateX(100%); transition: transform var(--sg-fast); }   /* full height, from the right */
+.sg-comp-panel-box { position: absolute; top: 0; right: 0; bottom: 0; display: flex; width: var(--sg-panel-w); background: var(--sg-bg); border-left: var(--sg-line); box-shadow: var(--sg-shadow-lift); transform: translateX(100%); transition: transform var(--sg-fast); }   /* full height, from the right */
 .sg-comp-panel.is-open .sg-comp-panel-box { transform: none; }
 .sg-comp-panel-box::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-line-width, 1px)); z-index: 19; border-left: var(--sg-line); pointer-events: none; }   /* the panel's edge drawn again over what it holds: a panel's own content (its stuck head) painted over the top of its border and faded it in, which read as a rounded corner, where a component's page, in a frame, never does (the owner's, 15 November 2026) */
 .sg-comp-panel-box:focus { outline: none; }
@@ -138,9 +136,9 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-chip-n:empty { display: none; }
 .sg-chip-menu > .sg-chip-n { margin-left: calc(-1 * var(--sg-space-xxs)); }   /* the chosen state's count 6px from its word */   /* its column's name, quieter than what is chosen (All, or a state), as the Brand selector's */
 .sg-dd-option[hidden] { display: none; }
-.sg-mx-clear { font: inherit; font-size: var(--sg-s); color: var(--sg-text-2); background: none; border: 0; padding: 0 var(--sg-space-s); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sg-mx-clear { font: inherit; font-size: var(--sg-s); color: var(--sg-text-2); background: none; border: 0; padding: 0 var(--sg-space-s); cursor: pointer; text-decoration: underline; text-underline-offset: var(--sg-underline-offset); }
 .sg-mx-clear[hidden] { display: none; }
-.sg-mx-clear:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+.sg-mx-clear:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-chip-dd { position: relative; display: inline-flex; }
 .sg-chip-menu > .sg-dd-mark { margin-left: calc(-1 * var(--sg-space-xxs)); }
 .sg-chip-dd > .sg-select-list { right: auto; min-width: 100%; width: max-content; }
@@ -154,7 +152,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-chip[aria-pressed="true"] > .sg-count, .sg-chip[aria-pressed="true"] > .sg-chip-n > .sg-count, [data-sg-scheme="dark"] .sg-chip[aria-pressed="true"] > .sg-count, [data-sg-scheme="dark"] .sg-chip[aria-pressed="true"] > .sg-chip-n > .sg-count { background: var(--sg-text); color: var(--sg-bg); }   /* the chosen chip's count turned round: the text's colour behind the page's */
 .sg-chip:not([aria-pressed="true"]):hover, [data-sg-scheme="dark"] .sg-chip:not([aria-pressed="true"]):hover { background: var(--sg-a4); color: var(--sg-text); }   /* under the pointer: a clear step fuller, in light and dark alike */
 .sg-chip[aria-pressed="true"], .sg-chip[aria-pressed="true"]:hover { background: var(--sg-bg); color: var(--sg-text); box-shadow: inset 0 0 0 var(--sg-line-width, 1px) var(--sg-text); }   /* a chosen chip, a filter or not: the page's own background, outlined */
-.sg-chip:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-chip:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-chip.sg-chip--only, .sg-chip.sg-chip--only:hover { cursor: default; background: var(--sg-bg); color: var(--sg-text); box-shadow: inset 0 0 0 var(--sg-line-width, 1px) var(--sg-text); }   /* the one status there is: shown chosen, as it is all there is, and never unchosen */
 .sg-chip.sg-chip--only > .sg-count { background: var(--sg-text); color: var(--sg-bg); }
 .sg-issues tr.sg-st-off, .sg-issues tr.sg-who-off, .sg-issues tr.sg-lf-off, .pg-par-card.sg-st-empty { display: none; }
@@ -238,7 +236,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-issues .sg-col-rest { width: auto; }
 .sg-issues [data-empty-col] { display: none; }   /* a column with nothing in any row */
 .sg-issues .sg-one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* a status's word and one line under it, never more */
-.sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
+.sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-icon-btn) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
 /* The Construction table: the rule widest, the rest even, its status last. */
@@ -262,8 +260,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .pg-a11y-say code { word-break: break-word; }
 .sg-issues td.sg-todo-whocell .sg-todo-who { margin-bottom: 0; }
 /* A task that follows another person's: which step it is, so a row read on its own still says so. */
-.sg-issues .sg-todo-step { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted);
-  border: var(--sg-line); border-radius: var(--sg-radius-pill); padding: 0 var(--sg-space-xs); margin-right: var(--sg-space-xs); vertical-align: 1px; white-space: nowrap; }
+.sg-issues .sg-todo-step { display: inline-flex; align-items: center; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-right: var(--sg-space-xs); vertical-align: middle; white-space: nowrap; }   /* the box of a name (.sg-name) */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues td { overflow-wrap: break-word; }
 .sg-issues .sg-todo-area { white-space: normal; }
@@ -330,7 +327,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .pg-switch[aria-checked="true"] { background: var(--sg-text); border-color: var(--sg-text); }
 .pg-switch[aria-checked="true"]::after { left: calc(100% - var(--pg-knob) - var(--sg-space-xs)); background: var(--sg-bg); }
 .pg-switch:hover:not(:disabled) { border-color: var(--sg-border-hover); }
-.pg-switch:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+.pg-switch:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .pg-switch:disabled { opacity: 0.4; cursor: not-allowed; }
 .pg-ctl-label { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .pg-ctl-label code { font-weight: var(--sg-text-weight); margin-left: var(--sg-space-xs); }
@@ -341,7 +338,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-input, .pg-ctl > .sg-input, #sg-search .sg-input { display: block; width: 100%; box-sizing: border-box; min-height: var(--sg-control-h); margin: 0; padding: var(--sg-space-s) var(--sg-space-m); font: inherit; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); border: var(--sg-line); border-radius: var(--sg-control-radius); }
 input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(--sg-a1); }   /* a field you type in is tinted, a choice from a list (a select) is not: the two read apart */
 .sg-input::placeholder { color: var(--sg-muted); }
-.sg-input:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-input:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-input:focus, .sg-input:focus:hover, #sg-search .sg-input:focus { background-color: var(--sg-bg); border-color: var(--sg-text); }
 .sg-input:disabled { cursor: not-allowed; opacity: 0.5; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
@@ -828,10 +825,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-tk-item { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); width: 100%; margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border: 0; border-radius: var(--sg-control-radius); background: none; color: var(--sg-text-2); font: inherit; font-size: var(--sg-s); text-align: left; cursor: pointer; }
 .sg-tk-item:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
 .sg-tk-item[aria-pressed="true"] { background: var(--sg-a3); color: var(--sg-text); }
-.sg-tk-item:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-tk-item:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-tk-open-cell { width: calc(var(--sg-control-h) + var(--sg-space-m)); text-align: right; }   /* the arrow that opens a token's details */
-.sg-comp-panel--narrow .sg-comp-panel-box { width: min(100vw, 48rem); }
-.sg-comp-panel--wide .sg-comp-panel-box { width: min(100vw, 72rem); }   /* a task in full: its tables (what it affects) with room for each column on a line */   /* a token's details: room for its modes side by side and its components' table */
 .sg-tk-detail { flex: 1; min-width: 0; overflow: auto; padding: 0 var(--sg-card-gap) var(--sg-space-xxl); }
 /* A side panel's page (sidePanelPage): its head stays at the panel's top, painted with the panel, as a component page's
    head stays under the page's bars; its body's cards a card gap apart, the first a stick gap under the head. */
@@ -881,19 +876,18 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-tk-twist > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
 button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
 .sg-tk-twist[aria-expanded="true"] > svg { transform: rotate(90deg); }   /* open: the chevron points down */
-.sg-tk-twist:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-tk-twist:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-tk-n { color: var(--sg-muted); font-variant-numeric: tabular-nums; }
 .sg-tk-main { min-width: 0; display: flex; flex-direction: column; gap: var(--sg-card-gap); }
 .sg-tk-tables { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
-.sg-tk-group > th { text-align: left; padding: var(--sg-space-s) var(--sg-space-m); font-weight: var(--sg-text-weight); color: var(--sg-muted); white-space: normal; }   /* a group's path: a row of the table like any other, no gap above it */
 .pg-inspect.sg-token-card .sg-tk-group > th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px) + var(--tk-colhead-h, 0px)); z-index: 4; background: linear-gradient(var(--sg-tint), var(--sg-tint)) var(--sg-bg); }   /* the group in view stays named under the modes' row, the next one taking its place */
 .pg-inspect.sg-token-card .sg-tk-collhead > th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 6; background: var(--sg-bg-2); border-top: var(--sg-line); }   /* the next collection's names take the head's place as it scrolls in */
 .sg-token-card :is(thead, .sg-tk-collhead) th b { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
 .sg-tk-group > th b { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
 .sg-tk-crumb { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }   /* a part of the group's path: opens that folder */
-.sg-tk-crumb:hover { color: var(--sg-text); text-decoration: underline; text-underline-offset: 3px; }
-.sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
+.sg-tk-crumb:hover { color: var(--sg-text); text-decoration: underline; text-underline-offset: var(--sg-underline-offset); }
+.sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
+.sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
 .sg-link-pill[hidden] { display: none; }   /* a pill past the first ten of a list stays out of view until its More asks for it */
 .sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }
@@ -904,14 +898,14 @@ table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where 
 .sg-link-pill > .sg-link-words > code { font-size: inherit; }
 /* A pill's words on one line, cut short with an ellipsis when they do not fit: its whole name shows on hover (its title). */
 .sg-link-pill > .sg-link-words { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.sg-link-pill:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-link-pill:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-link-pill > .sg-link-go { flex: none; width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); margin-left: calc(var(--sg-space-s) / -2); }   /* the arrow half the pill's gap from its words */
 .sg-link-pill:hover > .sg-link-go { color: var(--sg-text); }
 .sg-link-pill > .pg-par-status { margin: 0; }
 .sg-tk-table .sg-token-swatch { display: inline-block; vertical-align: middle; flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0 var(--sg-space-s) 0 0; border-radius: var(--sg-radius-s); }   /* one swatch size everywhere in the table, as in Figma */
 .sg-tk-alias > .sg-token-swatch, .sg-tk-name > .sg-token-swatch { margin: 0; }
 /* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
-.sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
+.sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: var(--sg-radius-pill); }
 .sg-tk-code-line { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-s); }   /* its name and Copy on one line */
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
@@ -1029,7 +1023,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-cx-kv dt .sg-cx-pills { flex-direction: column; align-items: flex-start; }   /* the components an entry is for, one under another */
 .sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: 0; padding: 0; list-style: none; }
 .sg-row-detail-body .sg-cx-figma { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }   /* a component opened in Figma, with Figma's mark */
-.sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
 .sg-row-detail-body .sg-il-example code { font-size: var(--sg-s); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }
 .sg-row-detail-body .sg-il-draft-text { margin-bottom: var(--sg-cell-x); }   /* the drafts, then what can be done with them, as much room between as at the card's sides */
@@ -1077,7 +1070,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
 .sg-il-label { color: var(--sg-muted); font-size: var(--sg-s); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
-.pg-inspect td { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
+.pg-inspect td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
 /* One side padding for everything in a card that lines up (--sg-cell-x): a card's head, a table's first and last
    columns, a list's rows, a bar. So a head's words and every row's start on one line, in every table and list. */
 :is(.pg-par-table, .pg-inspect table) :is(td, th):first-child { padding-left: var(--sg-cell-x); }
@@ -1106,7 +1099,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
    title and size switch, a component's areas, the Status page's filter and counts: --pg-areas-h): the card's head first,
    the table's own head row under it (--pg-card-head-h). Its card clips, never hides, its overflow, so it can stick. */
 .pg-code-head { font-size: var(--sg-s); color: var(--sg-muted); }   /* the same head as the tokens card beside it */
-.pg-code-head > .sg-token-link { color: var(--sg-text); text-underline-offset: 3px; }   /* a plain action: the words, underlined */
+.pg-code-head > .sg-token-link { color: var(--sg-text); text-underline-offset: var(--sg-underline-offset); }   /* a plain action: the words, underlined */
 :is(.pg-inspect-head, .pg-code-head) { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 6; border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; }   /* stuck, it keeps its card's top corners */
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--pg-card-head-h, 0px)); }
 

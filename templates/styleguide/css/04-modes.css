@@ -33,8 +33,8 @@
 .sg-controlbar .sg-mode-diff { display: none; }
 /* The page's own select: as tall as its fields, its chevron drawn by the page with room on its right. */
 .sg-select { position: relative; display: block; }
-.sg-select > select { -webkit-appearance: none; appearance: none; cursor: pointer; box-sizing: border-box; min-height: var(--sg-control-h); padding-inline-start: calc(var(--sg-space-m) + var(--sg-space-xs)); padding-inline-end: calc(var(--sg-space-m) * 2 + 1em + var(--sg-space-xs)); }   /* every select alike: its words 4px further in than a field's, room for the chevron */
-.sg-select::after { content: ""; position: absolute; right: calc(var(--sg-space-m) + var(--sg-space-xs)); top: 50%; width: 1em; height: 1em; transform: translateY(-50%); background: var(--sg-muted); -webkit-mask: var(--sg-chevron-mark) center / contain no-repeat; mask: var(--sg-chevron-mark) center / contain no-repeat; pointer-events: none; }
+.sg-select > select { -webkit-appearance: none; appearance: none; cursor: pointer; box-sizing: border-box; min-height: var(--sg-control-h); padding-inline-start: calc(var(--sg-space-m) + var(--sg-space-xs)); padding-inline-end: calc(var(--sg-space-m) * 2 + var(--sg-mark) + var(--sg-space-xs)); }   /* every select alike: its words 4px further in than a field's, room for the chevron */
+.sg-select::after { content: ""; position: absolute; right: calc(var(--sg-space-m) + var(--sg-space-xs)); top: 50%; width: var(--sg-mark); height: var(--sg-mark); transform: translateY(-50%); background: var(--sg-muted); -webkit-mask: var(--sg-chevron-mark) center / contain no-repeat; mask: var(--sg-chevron-mark) center / contain no-repeat; pointer-events: none; }
 .sg-brand-ctl { display: flex; align-items: center; gap: calc(var(--sg-space-s) + var(--sg-space-xs)); }   /* the brand the previews are in, beside the page's mode */
 .sg-brand-ctl .sg-select, .sg-brand-ctl .sg-dd { width: 220px; }
 /* The page's own dropdown: a field-like button with the choice and a list mark, the list under it on the page's surface. */
@@ -44,7 +44,7 @@
 .sg-select-trigger:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
 /* Chosen, open or typed in: the page's own background, outlined in the text's colour, as a chosen filter chip is. */
 .sg-select-trigger[aria-expanded="true"], .sg-select-trigger[aria-expanded="true"]:hover { background-color: var(--sg-bg); border-color: var(--sg-text); }
-.sg-select-trigger:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-select-trigger:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sg-dd-label { flex: none; color: var(--sg-muted); }   /* the dropdown's name inside it, quieter than its choice */
 .sg-dd-label + .sg-dd-value { margin-right: auto; }
