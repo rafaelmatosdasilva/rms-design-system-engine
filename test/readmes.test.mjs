@@ -215,3 +215,18 @@ test('a later run where only a store moved keeps the code\'s line, read from the
   assert.deepEqual(await syncReadmes(ROOT, noProject, { env, http: g.http }), [], 'nothing to write: the section is the same');
   assert.equal(g.commits().length, commits);
 });
+
+// A store that does not keep the style guide says where it is, so neither a person nor an agent builds or copies one
+// there (the owner's, 16 November 2026).
+test('a store without the style guide says where it is, built from where, and never here', () => {
+  const r = storeRepos(cfg);
+  const layer = r.find((e) => e.repo.path === 'design/acme-layer'), guide = r.find((e) => e.repo.path === 'design/acme-guide');
+  const t = storeSection(layer, { name: 'Acme DS', tree: [], ci: null, others: r, prof: profileRepo(cfg), project: cfg.project });
+  assert.match(t, /### The style guide is not here/);
+  assert.match(t, /`index\.html` in `design\/acme-guide`: open it there\./);
+  assert.match(t, /built from the design system's own project \(`web\/acme-ui`\) and sent there with `--publish-styleguide`/);
+  assert.match(t, /Never build it or copy it into this repository, by hand or by an agent\./);
+  assert.ok(!/;/.test(t.split('### The style guide is not here')[1].split('###')[0]), 'two sentences, never a ";"');
+  const g = storeSection(guide, { name: 'Acme DS', tree: [], ci: null, others: r, prof: profileRepo(cfg), project: cfg.project });
+  assert.doesNotMatch(g, /is not here/, 'the store that keeps it says how to open it, not where it is not');
+});
