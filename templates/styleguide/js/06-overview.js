@@ -333,7 +333,7 @@
       }
       if (j) {
         var jf = j.findings || [], un = j.unjudged || [], when = j.at ? new Date(j.at) : null;
-        out += '<h3>Judged by a model</h3><p class="sg-showroom-kind">A model read its screenshot and its code against ' + jf.length + ' named decision' + (jf.length === 1 ? '' : 's') + (when && !isNaN(when) ? ' on ' + when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '. Advisory: a person checks each one.</p>' +
+        out += '<h3>Judged by a model</h3><p class="sg-showroom-kind">A model read its screenshot and its code against ' + jf.length + ' named decision' + (jf.length === 1 ? '' : 's') + (when && !isNaN(when) ? ' on ' + dayShort(when) : '') + '. Advisory: a person checks each one.</p>' +
           '<ul>' + jf.map(function (f) { return acc(f.label || f.decision, (VERDICT[f.verdict] || f.verdict) + (f.verdict === 'holds' ? '' : ' · ' + f.severity), (f.evidence ? '<p>' + esc(f.evidence) + '</p>' : '') + (f.check ? '<p>Check: ' + esc(f.check) + '</p>' : '')); }).join('') + '</ul>' +
           (un.length ? '<p class="sg-showroom-kind">Not judged: ' + un.map(function (u) { return esc((u.label || u.decision) + ' (' + u.why + ')'); }).join(', ') + '.</p>' : '');
       }

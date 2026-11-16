@@ -482,7 +482,7 @@
       if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + tag + '</td>';
       var d = new Date(t);
       // The day and its time on one line, the release under them when there is one (the owner's, 11 November 2026).
-      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) + tag + '</td>';
+      return '<td class="sg-log-when">' + line(when(d)) + tag + '</td>';
     };
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
@@ -850,7 +850,7 @@
     var t = (drafts || []).map(function (d) { return d.task || ''; }), one = t[0];
     if (!one || t.some(function (x) { return x.toLowerCase() !== one.toLowerCase(); })) return '';
     var at = (drafts[0] || {}).at, d = at ? new Date(at + 'T12:00:00') : null;
-    return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')' : '');
+    return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + dayShort(d) + ')' : '');
   };
   var IL = DATA.intentLayer, fillDocs = null;
   // The Documentation page's own table and panel, for a component's Documentation area (33), as RULES_PAGE is for its
@@ -1279,7 +1279,7 @@
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
-    var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    var ilWhen = function (x) { return isNaN(new Date(x)) ? '' : whenShort(x); };
     // When a row with no file of its own (the Tokens, a component with no page or no intent layer) was last checked: its
     // documentation's latest check, else the build's.
     var docAt = function (p) { var at = null, c = !p.tokens && docComp(p); if (c) try { docIssueRows(c).forEach(function (r) { if (r.at && (!at || r.at > at)) at = r.at; }); } catch (e) { /* none */ } at = at || DATA.builtAt; return at ? esc(ilWhen(at)) : ''; };

@@ -16,7 +16,7 @@
   // Where a status was checked, said plainly under it.
   var FROM_PAGE = 'Tested now', FROM_AUDIT = 'Tested at the last audit';
   // The last audit's test, by its day: Tested on 15 Oct (the year only when it is not this one).
-  var auditOn = function (at) { var d = new Date(at); if (!at || isNaN(d)) return FROM_AUDIT; return 'Tested on ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
+  var auditOn = function (at) { var d = new Date(at); if (!at || isNaN(d)) return FROM_AUDIT; return 'Tested on ' + dayShort(at); };
   // A component's Accessibility area: the Accessibility page's own table, its filters and its sorting, limited to the
   // component's rows and each opening the same panel (a11yArea, the owner's, 16 November 2026), then in a table of its
   // own what the page leaves out (beyond A and AA, and what Figma and the team wrote that no check reads). Above them

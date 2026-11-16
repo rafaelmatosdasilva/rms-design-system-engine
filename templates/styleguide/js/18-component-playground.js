@@ -229,5 +229,7 @@
   // A date as a row says it, short: 16 Oct, 22:11 (the year only when it is not this one).
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var whenShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ', ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
+  // A day as a sentence says it: 15 Oct (the year only when it is not this one).
+  var dayShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
   function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + linkVars(r[1]) + '</td></tr>'; }).join(''); }
 

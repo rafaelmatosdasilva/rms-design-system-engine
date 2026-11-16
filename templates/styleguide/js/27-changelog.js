@@ -20,8 +20,7 @@
       return [{ html: '<a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a>' }, esc(x.asked || x.steps[0] || '') + ' <span class="pg-log-date">' + esc(String(x.at || '').slice(0, 10)) + '</span>' + (x.signedOff ? '<span class="pg-par-val">' + esc('Signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '')];
     });
     var now = [['Figma last read', u.figmaRead ? esc(when(u.figmaRead)) : ''], ['Its code', u.uncommitted ? 'Has changes not committed yet' : '']];
-    var card = function (head, html) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>'; };
-    return (fc.length ? card('Changes in Figma', kvOne(fc)) : '') + (u.figmaRead || u.uncommitted ? card('Now', kvOne(now)) : '');
+    return (fc.length ? panelCard('Changes in Figma', kvOne(fc)) : '') + (u.figmaRead || u.uncommitted ? panelCard('Now', kvOne(now)) : '');
   }
   // Its History area, once its page is drawn: the History page's table above what changelogHTML put there, or a line
   // that nothing is known to have changed it.
