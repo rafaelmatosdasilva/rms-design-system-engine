@@ -645,3 +645,21 @@ Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **1
 **What changed.** `warnedIn` names only the sections that found something and says whether a score is the thing to chase; `fixWarned` builds the sentence from that. A page with only size findings is now told to run it again *until no line is left*.
 
 **Found by proving a route end to end.** The run only happened because the visual half of the prototype route had never been exercised on a real system - the copy it was tried in had no `node_modules`, so every width check had been skipped silently. Linking the real install in was the whole cost, and it produced three true findings about the page and one defect in the engine.
+
+## A linked flow reported as a page full of dead buttons
+
+**The case.** A prototype of four pages, built on a real design system and linked the way a product links pages — `router.push({ name: 'OrderDetail' })` — came back from the browser check with its main action named as doing nothing: `⚠️  "Approve" changes nothing on the page when it is clicked`. The control was correct. Every page's main action was reported the same way.
+
+**Three guesses, all wrong, all made without looking.** That the harness never installed a router (it does). That the exposure of it ran before the router existed (it did not). That a push by name needs the route registered on the component (it does not). Each was plausible and each was cheaper to write than to check, which is why three went by before one was tested.
+
+**What it actually was.** `appSetup` deliberately drops the project's router from the setup it installs — `skip()` in `vue-harness.mjs`, so a component drawn alone does not drive the product's real history — and the harness gives the page a router of its own instead. That router knew exactly one route, a catch-all. So `push({ name })` threw `No match for` synchronously inside the click handler, the app's own `errorHandler` swallowed it the way a product's entry would, and the check saw no navigation and no error. Two true facts, one false conclusion.
+
+**Evidence.** Driving the live harness directly: `__dseRouter.getRoutes()` returned one route, `resolve({ name })` threw `No match for`, the page's `$router` was that same object, and swapping in an error handler around the click caught `No match for` — the app had it all along. After the fix the same probe reads 218 routes, resolves to `/orders/7`, and the click moves the route from `/`.
+
+**What it teaches.**
+
+- A check that reports absence of evidence needs to know what would have swallowed the evidence. "Nothing happened" and "something happened where I was not listening" look identical from outside, and this is the second finding in this file with that shape.
+- A deliberate simplification is a defect the moment something more ambitious runs through it. The stub router was right for one component drawn alone and wrong for a prototype of linked pages, and nothing marked the boundary.
+- Guessing is cheap until it is three guesses deep. The one probe that settled it took less time than any of the three guesses took to write.
+
+**What changed.** The stub router is given what the project's own router knows, by name and by path, each route drawing nothing — the router is still never installed, so the product's history is still not driven. The acts check listens on the app's own error handler for the length of the click and names a control whose handler threw as wired rather than inert, because the two want opposite fixes.

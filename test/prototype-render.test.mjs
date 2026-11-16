@@ -150,6 +150,21 @@ test('a toggle that does not turn on and off, and a part that does not show what
     ['⚠️  "Email" does not turn on and off when clicked', '⚠️  "More" does not show and hide what it controls']);
 });
 
+// A prototype's pages lead to each other through the router, and a page drawn on its own is given a router that knows
+// what the project's router knows (vue-harness.mjs). Two ways that reads wrong if nothing is watched: the move itself,
+// which a memory history makes without touching the address, and a handler that threw - the app swallows that, and the
+// control then looks like one nobody wired.
+test('a control that moved the page it was drawn in has acted; one whose handler threw is said to be wired, not inert', () => {
+  assert.deepEqual(interactionLines([
+    { kind: 'acts', by: 'Approve', changed: true },
+    { kind: 'acts', by: 'Next', changed: false, threw: 'No match for {"name":"Step2"}' },
+    { kind: 'acts', by: 'Print', changed: false },
+  ]), [
+    '\u26a0\ufe0f  "Next" is wired and threw where it was tried (No match for {"name":"Step2"}): it needs something this page was drawn without, so whether it works is unproven here',
+    '\u26a0\ufe0f  "Print" changes nothing on the page when it is clicked',
+  ]);
+});
+
 test('what did not work in the browser is named: nothing opened, the focus left outside, no Escape, a field that takes no typing', () => {
   assert.deepEqual(interactionLines([
     { kind: 'opens', id: 'menu', by: 'More', opened: false },

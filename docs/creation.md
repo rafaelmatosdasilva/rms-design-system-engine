@@ -134,6 +134,10 @@ So the check uses the page it drew. It reads what each control says about itself
 
 That last line is the one that catches most. A row or a column header says nothing about itself in its markup, so there is no attribute to check: the page is simply watched while the control is clicked, and a control that changes no element, no attribute and no text anywhere is named.
 
+**Three ways a page moves.** A prototype's pages lead to each other, and most of them never touch the address bar, so the check watches for all three: something changed on the page, the address changed, or the router the page was drawn with moved. A page drawn on its own is given a router that knows every route your own router knows, by name and by path, so a control that calls `router.push({ name: 'OrderDetail' })` reaches a route instead of throwing. The router itself is never installed — only what it knows is.
+
+**Wired, and not the same as inert.** When a control's own handler throws, the app catches it and nothing shows, which used to read as a control that does nothing and sent people looking for a missing handler that was there all along. The check now listens for that too, and names it as what it is: wired, and untried here because it needs something this page was drawn without.
+
 This runs for a page written in your product's own code as well as for a composition. The page is drawn fresh for it, so a control is judged on the page as a person meets it, not on one the size checks have already stretched.
 
 ### The code's own width, beside the design's
