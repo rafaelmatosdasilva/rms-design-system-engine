@@ -1,0 +1,157 @@
+# DSDS is before 1.0 and may break in a minor release. The engine writes and reads it pinned to one version
+# (lib/contract-dsds.mjs), so once a week this asks DSDS's repository for its newest tag (lib/dsds-release.mjs). When it
+# is newer than the pin, it tries the engine against it and opens a pull request that moves the pin, with what passed
+# and what did not. A person merges it, or decides what the engine does about a change of meaning.
+#
+# Two jobs, so outside code never runs where anything can be written. "try" has a read-only token and no stored
+# credentials: it fetches the release, moves the pin in its own copy, runs the DSDS tests, and runs DSDS's own reference
+# validator (its code, installed with npm in a folder of its own) over the view of a sample system. "propose" runs none
+# of DSDS's code and fetches nothing: it moves the pin (and the golden reports' line that names it), commits that, and opens the pull request with try's
+# report. DSDS's files are never committed (lib/dsds-release.mjs says why); the Tests workflow fetches the pinned one.
+#
+# A pull request opened with the workflow's token starts no pull_request workflow (GitHub's rule, so one workflow cannot
+# set off another without end), so propose starts the test suite on the branch itself; the Tests workflow takes
+# workflow_dispatch for that.
+name: DSDS release
+
+on:
+  schedule:
+    # Monday, off the hour (a schedule on the hour waits longest and is dropped most).
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dsds-release
+
+jobs:
+  try:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      newer: ${{ steps.check.outputs.newer }}
+      latest: ${{ steps.check.outputs.latest }}
+      open: ${{ steps.open.outputs.open }}
+      passed: ${{ steps.report.outputs.passed }}
+      report: ${{ steps.report.outputs.report }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Is there a newer DSDS release
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          r=$(node lib/dsds-release.mjs check)
+          echo "$r"
+          echo "newer=$(node -e 'console.log(JSON.parse(process.argv[1]).newer)' "$r")" >> "$GITHUB_OUTPUT"
+          echo "latest=$(node -e 'console.log(JSON.parse(process.argv[1]).latest)' "$r")" >> "$GITHUB_OUTPUT"
+          echo "maybreak=$(node -e 'console.log(JSON.parse(process.argv[1]).mayBreak)' "$r")" >> "$GITHUB_OUTPUT"
+      - name: Is it already proposed
+        id: open
+        if: steps.check.outputs.newer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: echo "open=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "dsds/v$LATEST" --state open --json number --jq 'length > 0')" >> "$GITHUB_OUTPUT"
+      - name: Fetch it and move the pin, in this copy only
+        if: steps.check.outputs.newer == 'true' && steps.open.outputs.open != 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: node lib/dsds-release.mjs update "$LATEST"
+      - name: The DSDS tests, against the new release
+        id: tests
+        if: steps.check.outputs.newer == 'true' && steps.open.outputs.open != 'true'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node --test test/contract-dsds.test.mjs test/json-schema.test.mjs test/dsds-release.test.mjs test/intent-layer.test.mjs test/intent-sources.test.mjs 2>&1 | tee "$RUNNER_TEMP/tests.log"
+      - name: DSDS's own reference validator, over the view of a sample system
+        id: reference
+        if: steps.check.outputs.newer == 'true' && steps.open.outputs.open != 'true'
+        continue-on-error: true
+        env:
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: |
+          set -o pipefail
+          git clone --quiet --depth 1 --branch "v$LATEST" "https://github.com/somerandomdude/design-system-documentation-schema.git" "$RUNNER_TEMP/dsds"
+          npm ci --prefix "$RUNNER_TEMP/dsds" --ignore-scripts --no-audit --no-fund
+          node lib/dsds-release.mjs emit "$RUNNER_TEMP/view/dsds"
+          code=0
+          cd "$RUNNER_TEMP/view/dsds"
+          for f in system.dsds.json components/*.dsds.json; do
+            node "$RUNNER_TEMP/dsds/scripts/validate/validate.js" --strict "$f" 2>&1 | tee -a "$RUNNER_TEMP/reference.log" || code=1
+          done
+          exit $code
+      - name: The report
+        id: report
+        if: steps.check.outputs.newer == 'true' && steps.open.outputs.open != 'true'
+        env:
+          LATEST: ${{ steps.check.outputs.latest }}
+          MAYBREAK: ${{ steps.check.outputs.maybreak }}
+          TESTS: ${{ steps.tests.outcome }}
+          REFERENCE: ${{ steps.reference.outcome }}
+        run: |
+          passed=false
+          [ "$TESTS" = success ] && [ "$REFERENCE" = success ] && passed=true
+          {
+            echo "passed=$passed"
+            echo 'report<<DSDS_REPORT_END'
+            echo "DSDS $LATEST is out. This moves the engine's DSDS pin to it. The Tests workflow fetches that release's schema, conformance suite and examples before the suite runs."
+            echo
+            if [ "$MAYBREAK" = true ]; then echo "**This release may break**: before 1.0, DSDS allows a breaking change in a minor release. Read its changelog before merging."; echo; fi
+            echo "- The DSDS tests against the new schema: **$TESTS**"
+            echo "- DSDS's own reference validator over the view of a sample system: **$REFERENCE**"
+            if [ "$TESTS" != success ]; then echo; echo '<details><summary>What failed in the tests</summary>'; echo; echo '```'; grep -E '^not ok|^# (pass|fail)|Error|expected|actual' "$RUNNER_TEMP/tests.log" | head -60; echo '```'; echo '</details>'; fi
+            if [ "$REFERENCE" != success ]; then echo; echo '<details><summary>What the reference validator said</summary>'; echo; echo '```'; tail -80 "$RUNNER_TEMP/reference.log" 2>/dev/null; echo '```'; echo '</details>'; fi
+            echo
+            echo "Nothing in the engine changes until a person merges this. When something failed, the engine's view or reader needs changing first, on this branch."
+            echo DSDS_REPORT_END
+          } >> "$GITHUB_OUTPUT"
+
+  propose:
+    needs: try
+    if: needs.try.outputs.newer == 'true' && needs.try.outputs.open != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: The pin moved, on a branch of its own
+        env:
+          LATEST: ${{ needs.try.outputs.latest }}
+        run: |
+          node lib/dsds-release.mjs pin "$LATEST"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "dsds/v$LATEST"
+          git add lib/contract-dsds.mjs test/fixtures
+          git commit -m "DSDS $LATEST: the pin moved"
+          git push origin "dsds/v$LATEST"
+      - name: The pull request, and the test suite on its branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ needs.try.outputs.latest }}
+          PASSED: ${{ needs.try.outputs.passed }}
+          REPORT: ${{ needs.try.outputs.report }}
+        run: |
+          printf '%s\n' "$REPORT" > "$RUNNER_TEMP/body.md"
+          draft=''
+          [ "$PASSED" = true ] || draft='--draft'
+          gh pr create --repo "$GITHUB_REPOSITORY" --head "dsds/v$LATEST" --base main $draft \
+            --title "DSDS $LATEST" --body-file "$RUNNER_TEMP/body.md" --label 'release: patch' --label 'after: nothing'
+          gh workflow run tests.yml --repo "$GITHUB_REPOSITORY" --ref "dsds/v$LATEST"
