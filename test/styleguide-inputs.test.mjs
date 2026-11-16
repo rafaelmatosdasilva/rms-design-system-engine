@@ -9,7 +9,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync } from 
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { figmaSnapshots, missingFigma, missingBrandFiles, takeBrandFiles, inputsOnRun, SETUP_PATH } from '../lib/styleguide-inputs.mjs';
+import { figmaSnapshots, missingFigma, missingBrandFiles, takeBrandFiles, inputsOnRun, SETUP_PATH, STORE_LOGO, logoOf } from '../lib/styleguide-inputs.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -141,4 +141,18 @@ test('the style guide is never built from a capture that is not there', async ()
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /❌ The Figma capture is not here/);
   assert.equal(existsSync(join(d, 'styleguide', 'index.html')), false, 'nothing was written');
+});
+
+// A setup that names no logo of its own takes the team's from its store, kept in the engine's own folder, so a quick
+// build (which reads nothing over the network) shows it too. Never another system's mark (the owner's, 16 November 2026).
+test('no logo named: the store\'s is taken and kept here, and the page reads it', async () => {
+  assert.equal(logoOf({}), STORE_LOGO, 'with none named, the kept copy');
+  assert.equal(logoOf({ styleguide: { logo: 'assets/logo.svg' } }), 'assets/logo.svg', 'a logo the setup names comes first');
+  assert.deepEqual(missingBrandFiles(project({}), {}, { stored: true }).logo, STORE_LOGO, 'a store named, so its logo is asked for');
+  const d = project({});
+  const s = fakeStore({ [`${SETUP_PATH}/logo.svg`]: '<svg id="team"/>' });
+  const r = await takeBrandFiles(d, {}, { logo: STORE_LOGO }, { stores: s.stores });
+  assert.deepEqual(r.took, [STORE_LOGO]);
+  assert.equal(readFileSync(join(d, STORE_LOGO), 'utf8'), '<svg id="team"/>');
+  assert.equal(missingBrandFiles(d, {}, { stored: true }).logo, null, 'kept: a quick build has it');
 });

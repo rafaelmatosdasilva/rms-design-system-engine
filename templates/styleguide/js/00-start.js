@@ -452,12 +452,11 @@
   // The top of the menu: the project's own logo (styleguide.logo), when it gives one, in place of the system's name,
   // which is then said to a screen reader only; it follows the page's light and dark.
   //
-  // With no logo of its own — every guide that is not a client's — the default takes its place: RMS DS, the engine's own
-  // mark, whatever the system is called (the owner's, 11 November 2026), its name in full on hover and to a screen
-  // reader, in the style of the Status page's own numbers, over what the guide is. No version beside it: a version read from
+  // With no logo of its own, the system's own name takes its place, in the style of the Status page's own numbers, over
+  // what the guide is: never another system's mark, so a team's guide built where its logo is not (a CI, another
+  // repository) still reads as its own (the owner's, 16 November 2026: RMS DS was the demo's name, never every guide's). No version beside it: a version read from
   // the code says nothing about the Figma file the same guide shows, so one number over both would be a claim the guide
   // cannot make. The changelog still carries it, per component and per release.
-  var DEFAULT_MARK = 'RMS DS';
   var lhead = document.querySelector('.sg-sidebar-header'), lfirst = lhead && lhead.querySelector('#sg-title');
   if (lhead && DATA.logo && DATA.logo.svg) {
     Array.prototype.forEach.call(lhead.querySelectorAll('p'), function (p) { p.classList.add('sg-hidden-text'); });
@@ -467,8 +466,7 @@
   } else if (lfirst) {
     lfirst.classList.add('sg-wordmark');
     var full = DATA.title || 'Design system';
-    lfirst.innerHTML = '<span aria-hidden="true">' + esc(DEFAULT_MARK) + '</span><span class="sg-hidden-text">' + esc(full) + '</span>';
-    lfirst.setAttribute('title', full);   // the system's own name, on hover
+    lfirst.textContent = full;   // the system's own name
     fitOneLine(lfirst);
   }
   // The wordmark on one line, whatever the name's length: it starts at the big number's size and drops to the width the
