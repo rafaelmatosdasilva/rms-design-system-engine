@@ -180,7 +180,8 @@ test('a "never" in the documentation rules a use out by the words after it, not 
   assert.deepEqual(ruledOut(chip, 'on/off switch for email', 'chip'), [], 'turning on and off is what a chip is for');
   assert.equal(ruledOut(chip, 'submit the form', 'chip').length, 1);
   const tag = { never: neverOf('A status that does not change. Never a message that comes and goes, like a confirmation or an error: Tidepool has no toast yet.', 'a message that disappears') };
-  assert.deepEqual(ruledOut(tag, 'confirmation message', 'tag').map((r) => r.words), [['confirmation', 'message'], ['message']]);
+  // The words as the engine reads them: one stem a word, so confirmation and confirm are one (prototype-context.mjs).
+  assert.deepEqual(ruledOut(tag, 'confirmation message', 'tag').map((r) => r.words), [['confirm', 'messag'], ['messag']]);
   assert.deepEqual(ruledOut(tag, 'New', 'tag'), []);
 });
 
@@ -189,8 +190,9 @@ test('the request: a component its documentation rules out is named as ruled out
   const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation: there is no toast yet.'));
   const f = requestFocus(ctx, 'an account page with a Save button and a message confirming the save', []);
   assert.ok(!f.components.some((c) => c.name === 'tag'), 'not pointed to by the sentence that rules it out');
-  assert.deepEqual(f.ruledOut.map((r) => [r.name, r.words]), [['tag', ['message']]]);
-  assert.match(focusLines(f).join('\n'), /ruled out by the documentation for "message": tag, "Never a message that comes and goes, like a confirmation: there is no toast yet\."/);
+  assert.deepEqual(f.ruledOut.map((r) => [r.name, r.words]), [['tag', ['messag', 'confirm']]]);
+  // Their own words, not the stems the engine reads them as, and "confirming" meets the rule's "confirmation".
+  assert.match(focusLines(f).join('\n'), /ruled out by the documentation for "message, confirming": tag, "Never a message that comes and goes, like a confirmation: there is no toast yet\."/);
   const ui = { component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved', standInFor: 'confirmation message' } }] };
   const r = checkPrototype(ui, { catalog: cat, view: { components: [{ name: 'tag', controls: [{ label: 'Label' }] }] }, scales: { spacing: [], text: [] }, context: ctx });
   assert.equal(r.ok, false);
@@ -298,7 +300,7 @@ test('the request: a component it names that the prototype leaves out is owed; o
   assert.deepEqual(asked.map((f) => [f.level, f.kind]), [['warning', 'request']]);
   assert.match(asked[0].message, /the request asks for empty state and the system has emptyState, which is not in the prototype/);
   const out = requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Changes saved' } }]);
-  assert.ok(out.some((f) => f.level === 'error' && /tag is ruled out for "message" in this request/.test(f.message)));
+  assert.ok(out.some((f) => f.level === 'error' && /tag is ruled out for "message, confirming" in this request/.test(f.message)));
   // Another purpose is not ruled out; the confirmation the request asks for is still owed, the system having none.
   assert.deepEqual(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Beta', purpose: 'marks the page as beta' } }]).map((f) => [f.level, f.said]), [['warning', 'kind:confirmation message']]);
   assert.equal(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { purpose: 'the confirmation message' } }]).length, 1, 'a purpose the documentation rules out too');
@@ -349,7 +351,7 @@ test('a component\'s usage (when to use, common mistakes, limitations) and its D
   assert.equal(ruledOut(ctx.components.chip, 'tabs for the account sections', 'chip').length, 1);
   const out = requestFindings(ctx, 'tabs for the account sections', [{ id: 'c', component: 'chip', props: { Label: 'Profile' } }]).filter((f) => f.level === 'error');
   assert.equal(out.length, 1, 'beside the warning that the system has no tabs');
-  assert.match(out[0].message, /chip is ruled out for "tab, section".*Don't: Chips as tabs between sections/);
+  assert.match(out[0].message, /chip is ruled out for "tabs, sections".*Don't: Chips as tabs between sections/);
   const use = usesAgainstPurpose(ctx, [{ component: 'chip', props: { Label: 'Profile' } }]);
   assert.match(use[0].rule, /Use when filtering a list by one value\..*Common mistakes: a chip as a link to another page\..*Don't: Chips as tabs between sections\./);
   assert.ok(requestFocus(ctx, 'filter the list by one value').components.some((c) => c.name === 'chip'), 'When to use points a request to the component');
