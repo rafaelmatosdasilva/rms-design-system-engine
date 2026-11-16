@@ -451,4 +451,7 @@
   var themeKey = function (k) { return k && ((DATA.brands && DATA.brands.list) || []).some(function (b) { return b.key === k; }) ? k : 'default'; };
   var A11Y_THEME = themeKey(html.getAttribute('data-brand') || URLQ.get('brand') || (function () { try { return localStorage.getItem('sg-brand'); } catch (e) { return null; } })());
   function bakedFor(t) { return !BAKED ? null : BAKED.themes ? BAKED.themes[t] || null : t === 'default' ? BAKED.results || null : null; }
-  var A11Y_BASE = 'sg-a11y-kept', A11Y_KEY = A11Y_BASE + ':' + A11Y_THEME;
+  // Each page its own: every page opened from a disk (file://) shares one browser storage, and two guides whose
+  // components share names (a team's and a copy of it) wrote over each other's results, so each tried everything again
+  // whenever the other was opened. Kept under the page's own address (the owner's, 16 November 2026).
+  var A11Y_BASE = 'sg-a11y-kept:' + location.pathname, A11Y_KEY = A11Y_BASE + ':' + A11Y_THEME;
