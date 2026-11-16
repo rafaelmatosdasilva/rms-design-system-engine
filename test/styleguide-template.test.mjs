@@ -734,7 +734,7 @@ test('in the browser: no script error, a control changes the real component, the
     const sysMenu = await run(`(() => { const lab = document.querySelector('.sg-nav-label'), out = []; for (let e = lab.nextElementSibling; e && !e.classList.contains('sg-nav-label'); e = e.nextElementSibling) if (e.tagName === 'A' && !e.hidden) out.push(e.getAttribute('href')); return out.join(); })()`);
     if (/#history/.test(sysMenu)) assert.match(sysMenu, /#history$/, `the History last in the System group (${sysMenu})`);
     assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
-    assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{4}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
+    assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{1,2} [A-Z][a-z]{2}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
     // Each old address is followed until the page has moved it on, not for a fixed time: a busy machine took longer
     // than 200ms to redirect, and the address read then was still the one the row opened above had left.
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
@@ -1749,7 +1749,7 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
 test('History: a row per change, newest first, whatever its type: a commit to the code with its issues and release, what a read of Figma changed in each component, a commit to the intent layer, a decision', () => {
   const tpl = templateText();
   // The guide's one list of names and its "N more" pill (00-start.js), then History's own functions.
-  const shared = ['var PILLS_SHOWN', 'var PILLS_CHEV', 'function pillsMore(', 'function namePill(', 'function namePills('].map((k) => tpl.slice(tpl.indexOf('  ' + k), tpl.indexOf('\n', tpl.indexOf('  ' + k)) + 1)).join('');
+  const shared = ['var when =', 'var MONTHS', 'var whenShort', 'var dayShort', 'var PILLS_SHOWN', 'var PILLS_CHEV', 'function pillsMore(', 'function namePill(', 'function namePills('].map((k) => tpl.slice(tpl.indexOf('  ' + k), tpl.indexOf('\n', tpl.indexOf('  ' + k)) + 1)).join('');
   const src = shared + tpl.slice(tpl.indexOf('    // The rest of a list behind pillsMore, one for the whole guide'), tpl.indexOf("    // A component's History: only the rows of the changes that affect it"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(

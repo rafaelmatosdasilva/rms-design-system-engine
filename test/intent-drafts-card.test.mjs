@@ -16,7 +16,8 @@ const loadReview = () => {
   const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
   const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
   const ilOn = new Function(`return (${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
-  const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
+  const dayShort = new Function('MONTHS', `return (${/var dayShort = (function \(iso\) \{[^\n]*\});/.exec(tpl)[1]})`)(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+  const ilTaskOf = new Function('dayShort', `return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)(dayShort);
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
   // A sentence's names in pills, shared by the Documentation and Rules pages, from where the page says it once.
   const pillNamesIn = new Function('esc', `return (${/var pillNamesIn = (function \(t, names\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)(esc);
