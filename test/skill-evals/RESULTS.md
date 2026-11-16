@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Findings in the review surface, the result in chat, and every pin watched (continuous evaluation)
+
+What changed since the entry below (engine d500ad2): An accessibility check's parts keep the time they were set, and two of the owner's rules written down (#510); Nothing nobody asked for (#514); What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents (#515); History's Figma changes show their values as pills, and the rest behind the chevron pill (#512); The judge could not be asked for: three faults between the command and the code (#517); A failure says why, what a prototype teaches is kept, and the flow is told (#519); The judge runs on the plan's login, and the words a designer writes are drawn (#521); test-tools: bump @vitejs/plugin-vue (#522); test-tools: bump @anthropic-ai/claude-agent-sdk (#523); A word and the thing it was made from are one word (#524); A control nobody can name is said so, not called undefined (#525); Theme editor: cancelling the folder question keeps the theme in the browser and writes no file (#526); One Accessibility page for every component, its numbers counted by criterion, and the try that stopped at a parked panel (#516); The page itself, and the journey a page written as code is part of (#527); A busy machine is not a failure (#520); A rule's changes read row by row, and a Figma task is seen in Figma, never applied (#528); Every documented prototype command reaches a command of its own (#518); A guide shows its own logo or name, never another system's, and the score ring keeps its size (#529); A style guide is built in one place: never inside one of the team's stores, and each store says where it is (#531); The DSDS view valid in 0.23.1, and each new DSDS release tried before the pin moves (#530); An icon's colour is read from what it draws: a clip path, a mask and its defs are never painted (#532); What a browser tried is kept for its own page: two guides opened from a disk no longer write over each other's results (#533); DSDS, Firefox and Safari badges, and the features page no longer says every browser check runs in Chrome (#534); A control that leads to a route by name is not a control that does nothing (#535); The run's findings where the team already reviews code, and its result in the team's chat; Every standard the engine pins, asked once a week; What the pin watch taught on its first run. The guide changed in `cookbook/ci-and-hooks.md`, `reference/usage.md`.
+
+Guide set measured: `fe646bb2a10e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md c92fab2f` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 0a8db60b` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 69d6349c` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 112d31c | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 78/79 |
+| Mean cost a run | 0.058 | 0.062 |
+| Input a run | 103k | 105k |
+| Turns a run | 3.7 | 3.7 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed, fewer passes than the entry below. Failed: no-cli-on-path #0: ran the engine by its path. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/findings-and-pins`.
+
 ## 2026-11: What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents (continuous evaluation)
 
 What changed since the entry below (engine c1dd084): Proposals drafted from how the system is used (#511); What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents. The guide changed in `reference/usage.md`.
