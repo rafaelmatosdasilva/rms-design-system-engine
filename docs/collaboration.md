@@ -116,7 +116,7 @@ A full build tries every component's accessibility in a browser, so it takes min
 
 What every page shares:
 
-- **The top of the menu.** Your logo, when `styleguide.logo` names one. With none, the default mark, RMS DS, whatever the system is called (its name on hover), over "Living control center". No version: a version read from the code says nothing about the Figma file the same guide shows.
+- **The top of the menu.** Your logo, when `styleguide.logo` names one. With none, your system's own name, as `name` in `ds-config.json` gives it, over "Living control center". Built where your logo file is not (a CI, another repository), the guide still shows your name, never another system's. No version: a version read from the code says nothing about the Figma file the same guide shows.
 - **One count for the components.** The menu's Components number is the Code card's Built number. The menu lists every component the Status table counts as built, a part inside its component however deep it sits, and a component only the code has too.
 - **Every table sorts.** Click a column's name to sort by it, and again for the other way round.
 - **Filters in one order.** All first, then the filters (Who acts), then the statuses, all as far apart as each other.
