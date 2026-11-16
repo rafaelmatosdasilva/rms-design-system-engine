@@ -214,6 +214,21 @@ Every check passed. A prototype could read `Save` on every button, and nothing s
 
 A prop is now found by the component whatever your catalog called it, for text, choices, switches and slots alike.
 
+### The page itself, not just a report about it
+
+A page written the way your product writes its pages was drawn in a browser to be measured, and then thrown away. The one thing a designer hands to a client or a developer — the thing itself — existed nowhere, and the run told you about a page you could not look at.
+
+It is kept now: one picture a width, beside the page.
+
+```
+📱 EVERY SIZE  Phone (375px), Tablet (768px), Desktop (1280px) · the words as written and 40% longer: 4
+   the page, as a person sees it: .design-system-engine-out/prototypes/ApproveOrder@phone.png, …@tablet.png, …@desktop.png
+```
+
+**A gap is drawn where you can see it.** A need your system has nothing for is written as an empty `div` carrying `data-missing`, which is exactly nothing on screen: the engine's own canvas drew it as a labelled box, and a page running in your product drew air. A prototype shown to a client then hid the one thing your design team has to decide. The box is drawn for the picture only, in the page the engine is holding — nothing of your code is touched, and the words come from the need you already wrote.
+
+The picture is taken on a fresh draw, before anything clicks the page: a control that leads somewhere takes the page with it, and a picture taken afterwards is of wherever it went.
+
 ### The flow is told to you, not asked for
 
 A designer is building a journey, not a page. So every time a page is drawn, you are told what it did to the flow it belongs to — no command to remember:
