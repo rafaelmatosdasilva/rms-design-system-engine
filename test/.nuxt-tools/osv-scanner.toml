@@ -1,12 +1,30 @@
-# Advisories this test-only folder knowingly carries. Nothing here ships: these are the Nuxt build tools the Vue
-# harness tests run in CI. Each entry says why it stays and when to look again.
+# Read by OSV-Scanner, and by the OpenSSF Scorecard's Vulnerabilities check, for the lockfile beside it.
+#
+# Each advisory below has two ranges for nuxt: one that the fix closes ("introduced 4.0.0, fixed 4.6.x") and one for
+# the 3.x line, written as "introduced 3.0.0" with no end. With no end that second range covers every version after it,
+# 4.6.4 included, so a lockfile already on the fixed version is still reported. This folder is on nuxt 4.6.4 (and its
+# @nuxt/nitro-server and @nuxt/vite-server 4.6.4), past every fix, and its tools only build test projects in the
+# test suite: nothing here ships with the engine, which has no dependencies.
+#
+# Each entry expires, so it is read again rather than kept by habit: when it does, check whether the advisory's range
+# was corrected (then delete the entry) or a new fix is needed.
 
 [[IgnoredVulns]]
-id = "GHSA-gcqx-w48m-w2h4"
-ignoreUntil = 2027-01-31
-reason = "deepmerge prototype poisoning (low). No fixed release exists; it reaches Nuxt through nitropack's node-resolve plugin, which merges the build's own options, never outside input."
+id = "GHSA-f3x9-2chm-73c8"
+ignoreUntil = 2027-02-16
+reason = "Fixed in nuxt, @nuxt/nitro-server and @nuxt/vite-server 4.6.4, which this lockfile has. The advisory's 3.x range has no end, so it also names 4.6.4. Test tools only."
+
+[[IgnoredVulns]]
+id = "GHSA-hf59-9xwc-2g4p"
+ignoreUntil = 2027-02-16
+reason = "Fixed in nuxt and @nuxt/nitro-server 4.6.4, which this lockfile has. The advisory's 3.x range has no end, so it also names 4.6.4. Test tools only."
+
+[[IgnoredVulns]]
+id = "GHSA-96x6-fvhx-49hg"
+ignoreUntil = 2027-02-16
+reason = "Fixed in nuxt 4.6.4, which this lockfile has. The advisory's 3.x range has no end, so it also names 4.6.4. Test tools only."
 
 [[IgnoredVulns]]
 id = "GHSA-vjh5-4x84-xrqp"
-ignoreUntil = 2027-01-31
-reason = "Fixed in Nuxt 4.6.2, and this folder runs 4.6.3. The advisory's 3.x range has no upper bound, so it also matches 4.x. The harness never serves Nuxt's server routes either: it builds client-side."
+ignoreUntil = 2027-02-16
+reason = "Fixed in nuxt and @nuxt/nitro-server 4.6.2; this lockfile has 4.6.4. The advisory's 3.x range has no end, so it also names 4.6.4. Test tools only."
