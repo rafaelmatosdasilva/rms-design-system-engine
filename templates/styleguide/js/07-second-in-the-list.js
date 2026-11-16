@@ -86,6 +86,14 @@
     };
     // A decision's buttons, as Documentation's are: the same buttons in a row under the task, each copying its decision
     // for Claude Code, and one line under them that says it was copied.
+    // See in Figma for a Figma task: one component opens its node, several open the file their nodes are in (a node's
+    // link without its node). Nothing when Figma gave no link.
+    var seeInFigma = function (r) {
+      var cs = comps(r), urls = cs.map(function (c) { return FIGMA_URLS[c]; }).filter(Boolean);
+      if (!urls.length) return '';
+      var one = cs.length === 1, u = one ? urls[0] : urls[0].replace(/([?&])node-id=[^&#]*&?/, '$1').replace(/[?&]$/, '');
+      return '<p class="sg-see">' + sysButton('a', 'See in Figma', ' href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc(one ? 'Open ' + cs[0] + ' in Figma' : 'Open the Figma file') + '" data-see="sg-cx-figma"', null, null, FIGMA_SVG) + '</p>';
+    };
     var copyBtn = function (k, head, text) { return sysButton('button', head, ' data-cx-copy="' + esc(text) + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark(k)); };
     var decideRow = function (btns) { return '<div class="sg-il-group-actions" role="group" aria-label="Decision">' + btns + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
@@ -146,7 +154,9 @@
         why = '<p>' + esc(best.follows + ' of ' + r.of + ' components ' + lower(best.says) + '.') + '</p><p class="pg-par-val">' + esc(other.follows + ' ' + lower(other.says) + '.') + '</p>';
       }
       else if (r.status === 'decide') {
+        // A Figma rule to decide: See in Figma too, to check there before deciding. Deciding writes nothing in Figma.
         lead = sentence('Decide whether this is a rule of the system. If it is, the ' + n + ' ' + u + ' that don\'t follow it change.')
+          + (r.side === 'code' ? '' : seeInFigma(r))
           + decideRow(copyBtn('approve', 'Make it the rule', 'Make it a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' yes.') + copyBtn('drop', 'Not a rule', 'It is not a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' no.'));
         why = '<p>' + share + '</p>' + (pct < 50 ? '<p class="pg-par-val">' + esc('Fewer than half do. Make it the rule only if it is how the system should be built.') + '</p>' : '');
       }
@@ -156,7 +166,11 @@
         var one = Object.keys(mains).length === 1 ? Object.keys(mains)[0] : '';
         lead = sentence(r.kind === 'break' && r.todo ? r.todo : one ? one.replace(/\.?$/, '.') : 'Change the ' + n + ' ' + u + ' that don\'t follow it, as listed below.')
           + noteOf(sharedIf && sharedOr ? 'Only ' + sharedIf.replace(/^if /, 'where ') + '. Otherwise ' + sharedOr.replace(/^(Or|Otherwise) /, '').replace(/\.?$/, '.') : sharedOr ? 'If that does not fit, ' + sharedOr.replace(/^(Or|Otherwise) /, '').replace(/\.?$/, '.') : '')
-          + decideRow(copyBtn('approve', n === 1 ? 'Apply it' : 'Apply to all ' + n, applyAll(r)));
+          // Nothing is written in Figma (the owner's, 16 November 2026): a Figma task has no button to apply it, only See
+          // in Figma, as a designer's task on the Issues page has (22-one-table-for-every-issue.js): the component's node
+          // when it is one, else the file, each component's own link listed below. A person makes the change there. The
+          // code's change is handed back as a patch, so its task keeps the button that asks for one.
+          + (r.side === 'code' ? decideRow(copyBtn('approve', n === 1 ? 'Apply it' : 'Apply to all ' + n, applyAll(r))) : seeInFigma(r));
         why = '<p>' + share + '</p>';
       }
       // The draft: every component or place the task changes, as labelled values (kvOne): the components on the
@@ -168,10 +182,25 @@
       var saysOf = function (c) { return byC[c].map(function (t) { return (t.fix && t.fix.say) || t.value; }); };
       var groups = [], at = {};
       cs.forEach(function (c) { var says = saysOf(c), k = says.join('\u0000'); if (!(k in at)) { at[k] = groups.length; groups.push({ says: says, cs: [] }); } groups[at[k]].cs.push(c); });
-      var pill = function (c) { var u = r.side === 'figma' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code class="sg-name">' + esc(c) + '</code>'; };
+      var pill = function (c) { var u = r.side === 'figma' && FIGMA_URLS[c]; return u ? '<a class="sg-uses-link sg-cx-figma" href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c + ' in Figma') + '">' + FIGMA_SVG + esc(c) + '</a>' : byComponent(r) ? compHTML(c) : '<code class="sg-name">' + slashes(c) + '</code>'; };
       var sayHTML = function (x) { var a = actionOf(x); return '<span class="sg-cx-say">' + pillNamesIn(sharedOr ? bare(a.main) : a.main, allNames) + (a.or && a.or !== sharedOr ? noteOf(a.or) : '') + '</span>'; };
-      var list = n ? '<div class="sg-cx-changes">'
-        + kvOne(groups.map(function (g) { return [{ html: '<ul class="sg-cx-pills">' + g.cs.map(function (c) { return '<li>' + pill(c) + '</li>'; }).join('') + '</ul>' }, g.says.map(sayHTML).join('')]; }), 'sg-cx-kv') + '</div>' : '';
+      // A list of items, one change a row, in columns, with a line between rows, so which component or token each change
+      // is for is read on its row (the owner's, 16 November 2026). A rename says the name now and the name it takes, each
+      // in its own column, the labels said once above them. Any other change says what to do beside what takes it.
+      var renames = r.toFix.every(function (t) { return t.fix && t.fix.from && t.fix.to; });
+      var slashes = function (x) { return String(x).split('/').map(function (p) { return '<span class="sg-nw">' + esc(p) + '</span>'; }).join('/<wbr>'); };   // a long name breaks only between its parts, never at a hyphen inside one
+      var nameCode = function (x) { return '<code class="sg-name">' + slashes(x) + '</code>'; };
+      var head = function (cells) { return '<li class="sg-cx-row sg-cx-row--head" aria-hidden="true">' + cells.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</li>'; };
+      // A name renamed whole (a token: its name is the place) is two columns, what it is now and the name it takes. A part
+      // of it renamed (a property, an option) is three: what holds it, the name now and the name it takes.
+      var whole = renames && r.toFix.every(function (t) { return t.fix.from === atOf(t); });
+      var three = renames && !whole;
+      var changeRows = whole
+        ? head([byComponent(r) ? 'Component' : 'Token', 'Rename to']) + r.toFix.map(function (t) { return '<li class="sg-cx-row"><span>' + pill(atOf(t)) + '</span><span>' + nameCode(t.fix.to) + '</span></li>'; }).join('')
+        : three
+        ? head([byComponent(r) ? 'Component' : 'Place', 'Now', 'Rename to']) + r.toFix.map(function (t) { return '<li class="sg-cx-row"><span>' + pill(atOf(t)) + '</span><span>' + nameCode(t.fix.from) + '</span><span>' + nameCode(t.fix.to) + '</span></li>'; }).join('')
+        : head([byComponent(r) ? 'Component' : 'Place', 'What to do']) + cs.map(function (c) { return '<li class="sg-cx-row"><span>' + pill(c) + '</span><span>' + saysOf(c).map(sayHTML).join('') + '</span></li>'; }).join('');
+      var list = n ? '<div class="sg-cx-changes"><ul class="sg-cx-rows' + (three ? ' sg-cx-rows--3' : '') + '">' + changeRows + '</ul></div>' : '';
       // A family's rule: every way its components are built, how many each, so the choice is seen whole.
       var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
       // Labelled values, as the draft is: the panel opens from a row of the rules' table.
@@ -182,10 +211,9 @@
       var decidedCard = dl ? card('Decided in the team\'s ' + (TOOL[dl.tool] || dl.tool) + ' config', kvOne([['Where', '<code>' + esc(dl.file + ':' + dl.line) + '</code>'], ['Setting', '<code>' + esc(dl.setting + ' ' + JSON.stringify(dl.value)) + '</code>']]
         .concat(dl.reported != null ? [[(TOOL[dl.tool] || dl.tool) + ' reports', esc(dl.reported === 0 ? 'Nothing for this setting' : dl.reported + (dl.reported === 1 ? ' finding' : ' findings') + ' for this setting')]] : []), 'sg-cx-kv')) : '';
       // What to do first, then the facts: its status, who owns it, why, and every component it changes.
-      var body = card('What to do', lead) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
+      var body = card('What to do', lead) + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + decidedCard + card('Why', why)
-        + (fam ? card('How the ' + fam.components + ' in the family are built', ways) : '')
-        + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list));
+        + (fam ? card('How the ' + fam.components + ' in the family are built', ways) : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);

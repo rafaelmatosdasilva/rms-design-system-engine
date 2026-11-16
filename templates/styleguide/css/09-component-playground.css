@@ -1013,6 +1013,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-cx-changes > .sg-il-label { margin-top: 0; }
 .sg-row-detail-body .sg-cx-kv { padding: 0; margin-top: var(--sg-space-s); gap: var(--sg-space-m); }
 .sg-row-detail-body .sg-cx-kv dt { font-size: inherit; }
+/* The changes a task lists: a list of items, one a row, in columns, with a line between rows, the labels once above
+   them (the owner's, 16 November 2026). Two columns (what takes it, what to do), or three for a rename (now, rename to). */
+.sg-row-detail-body .sg-cx-rows { list-style: none; margin: var(--sg-space-s) 0 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--sg-space-xl); }   /* one grid for every row, so each column is as wide as its longest name and the rows line up */
+.sg-row-detail-body .sg-cx-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--sg-space-s) 0; min-width: 0; }
+.sg-row-detail-body .sg-cx-rows--3 { grid-template-columns: max-content max-content minmax(0, 1fr); }   /* a rename: the place, the name now and the name it takes, each as wide as its longest */
+.sg-row-detail-body .sg-cx-row + .sg-cx-row { border-top: var(--sg-line); }
+.sg-row-detail-body .sg-cx-row > span { min-width: 0; }   /* a name breaks only after a "/" (<wbr>), never inside a word */
+.sg-row-detail-body .sg-cx-row .sg-name { overflow-wrap: normal; display: inline-block; }
+.sg-row-detail-body .sg-nw { white-space: nowrap; }   /* one part of a name, kept whole */   /* whole: a name breaks only after a "/" (<wbr>), never inside a word */
+.sg-row-detail-body .sg-cx-row--head { padding-top: 0; font-size: var(--sg-s); color: var(--sg-muted); }
+.sg-row-detail-body .sg-cx-row--head + .sg-cx-row { border-top: none; }
+@media (max-width: 600px) { .sg-row-detail-body .sg-cx-rows, .sg-row-detail-body .sg-cx-rows--3 { grid-template-columns: minmax(0, 1fr); } .sg-row-detail-body .sg-cx-row { grid-template-columns: minmax(0, 1fr); row-gap: var(--sg-space-xs); } .sg-row-detail-body .sg-cx-row--head { display: none; } }
 .sg-row-detail-body .sg-cx-say { display: block; }   /* each change on its own line, never run together */
 .sg-row-detail-body .sg-cx-kv dt .sg-cx-pills { flex-direction: column; align-items: flex-start; }   /* the components an entry is for, one under another */
 .sg-row-detail-body .sg-cx-pills { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin: 0; padding: 0; list-style: none; }

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine, withBlocks } from '../lib/figma-hygiene.mjs';
+import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine, withBlocks, scopesUsed } from '../lib/figma-hygiene.mjs';
 import { byNodeId } from '../lib/figma-fetch.mjs';
 import { burndown } from '../lib/run-diff.mjs';
 
@@ -270,4 +270,13 @@ test('an empty frame inside a variant draws nothing: it is listed, while a frame
   const found = hygieneFindings({ promoTile: { hygiene: h } }).filter((x) => x.kind === 'empty');
   assert.match(found[0].text, /^state=default\/Spacer is an empty frame/);
   assert.match(hygieneBlock({ promoTile: { hygiene: h } }).join('\n'), /2 empty frames/);
+});
+
+// A variable left on all scopes is said as a task: the scopes it is bound with, read from every component's bindings.
+test('what a variable on all scopes should be scoped to: the scopes it is bound with, nothing when unbound', () => {
+  const values = { card: { hygiene: { binds: { 'V:1': { CORNER_RADIUS: 'card', GAP: 'card/body' } } } }, tag: { hygiene: { binds: { 'V:1': { GAP: 'tag' }, 'V:2': { TEXT_FILL: 'tag/label' } } } }, _meta: {} };
+  const used = scopesUsed(values);
+  assert.deepEqual(used('V:1'), ['corner radius', 'gap and padding']);
+  assert.deepEqual(used('V:2'), ['text fill']);
+  assert.equal(used('V:3'), null);
 });

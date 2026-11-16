@@ -95,8 +95,13 @@
   function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || plainText(html, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
   var ROW_DETAIL = [];   // every row drawn, by its index: what its side panel shows
   // A row's own address in a link (panel=row:<area>:<component>|<what>), the same however many times it is drawn.
-  function rowKey(d) { return 'row:' + (d.area || '') + ':' + String(d.r.key || d.r.kind || '').replace(/\u0000/g, '|'); }
-  function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
+  // Every panel its own short address (the owner's, 16 November 2026): the row's area and a short code made from what
+  // the row is, the same on every build while the row is, never the row's whole text in the link. A link sent before,
+  // with the whole text in it, still opens its row.
+  function rowWhole(d) { return 'row:' + (d.area || '') + ':' + String(d.r.key || d.r.kind || '').replace(/\u0000/g, '|'); }
+  function shortCode(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+  function rowKey(d) { return 'row:' + (d.area || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') + ':' + shortCode(rowWhole(d)); }
+  function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key || rowWhole(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
     return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.said ? ' data-said="1"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + listAttrs(r, a) + (r.extra ? ' data-extra' : '') + '>' +

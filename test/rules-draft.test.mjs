@@ -48,19 +48,29 @@ test('a rule\'s draft: each change said once above its components, each a Figma 
     const draftOf = (rule) => run(`(() => { const tr = [...document.querySelectorAll('#rules tr.sg-row-open')][${Number(rules.indexOf(rule))}]; if (!tr) return null; tr.cells[0].click();
       const d = document.querySelector('#sg-cx-panel .sg-cx-changes'); if (!d) return { none: true };
       const boxed = [d, ...d.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return ['Top', 'Right', 'Bottom', 'Left'].every((k) => parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none'); }).length;
-      return { tables: d.querySelectorAll('table').length, boxed, groups: [...d.querySelectorAll('dl.sg-cx-kv > div')].map((g) => ({ say: [...g.querySelectorAll('dd .sg-cx-say')].map((x) => x.textContent).join(' | '),
-        pills: [...g.querySelectorAll('dt .sg-cx-pills li')].map((li) => { const a = li.querySelector('a'); return [li.textContent, a && a.getAttribute('href'), a && a.target, !!(a && a.querySelector('svg'))]; }) })) }; })()`);
+      const lead = document.querySelector('#sg-cx-panel .sg-lead-card'), see = lead && lead.querySelector('[data-see="sg-cx-figma"]');
+      const rows = [...d.querySelectorAll('.sg-cx-rows > li.sg-cx-row:not(.sg-cx-row--head)')];
+      return { tables: d.querySelectorAll('table').length, boxed, head: [...d.querySelectorAll('.sg-cx-row--head > span')].map((s) => s.textContent),
+        lined: rows.slice(1).every((li) => parseFloat(getComputedStyle(li).borderTopWidth) > 0),
+        apply: !!(lead && /Apply/.test(lead.textContent)), see: see ? [see.textContent.trim(), see.getAttribute('href'), see.target] : null,
+        rows: rows.map((li) => { const a = li.querySelector('a'); return [a ? a.textContent : li.firstElementChild.textContent, a && a.getAttribute('href'), a && a.target, !!(a && a.querySelector('svg')), li.lastElementChild.textContent]; }) }; })()`);
     const layout = rules.find((x) => /auto layout/.test(x)), described = rules.find((x) => /description in Figma/.test(x));
     assert.ok(layout && described, 'both rules are on the page');
     for (const [rule, comps] of [[described, ['iconButton']], [layout, ['badge', 'button', 'iconButton']]]) {
       const draft = await draftOf(rule);
       assert.equal(draft.tables, 0, `${rule}: labelled values, never a table inside the rules' table`);
       assert.equal(draft.boxed, 0, `${rule}: nor a box drawn as one, inside the panel's card`);
-      const says = draft.groups.map((g) => g.say);
-      assert.equal(new Set(says).size, says.length, `${rule}: each change said once`);
-      const pills = draft.groups.flatMap((g) => g.pills);
-      assert.deepEqual(pills.map(([n]) => n).sort(), comps, `${rule}: every component it changes`);
-      for (const [n, href, target, mark] of pills) {
+      // A list of items, one component a row, a line between rows, the labels once above (the owner's, 16 November 2026).
+      assert.deepEqual(draft.head, ['Component', 'What to do'], `${rule}: the columns' labels, once above the rows`);
+      assert.equal(draft.lined, true, `${rule}: a line between rows`);
+      assert.ok(draft.rows.every((x) => x[4].trim()), `${rule}: every row says what to do on it`);
+      assert.deepEqual(draft.rows.map(([n]) => n).sort(), comps, `${rule}: every component it changes, once`);
+      // Nothing is written in Figma: no Apply, only See in Figma, the component's node when it is one, else the file.
+      assert.equal(draft.apply, false, `${rule}: no button that applies it`);
+      assert.equal(draft.see?.[0], 'See in Figma', `${rule}: See in Figma under What to do`);
+      assert.match(draft.see[1], comps.length === 1 ? /^https:\/\/www\.figma\.com\/design\/AbCd1234\?node-id=\d+-\d+$/ : /^https:\/\/www\.figma\.com\/design\/AbCd1234$/, `${rule}: its node, else the file`);
+      assert.equal(draft.see[2], '_blank', 'in a tab of its own');
+      for (const [n, href, target, mark] of draft.rows) {
         assert.match(href ?? '', /^https:\/\/www\.figma\.com\/design\/AbCd1234\?node-id=\d+-\d+$/, `${n} opens its node in the Figma file`);
         assert.equal(target, '_blank', 'in a tab of its own');
         assert.equal(mark, true, 'with Figma\'s mark');
