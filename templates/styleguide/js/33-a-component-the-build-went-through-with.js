@@ -51,7 +51,10 @@
   // seconds after): each component tried draws the Status page again, which would close what they are reading.
   var lastTouch = 0;
   ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (t) { document.addEventListener(t, function (e) { if (e.isTrusted) lastTouch = Date.now(); }, { capture: true, passive: true }); });
-  var personBusy = function () { return !BAKING && (Date.now() - lastTouch < 2000 || !!document.querySelector('.sg-tip:hover, .sg-tip:focus-within, .sg-comp-panel:not([hidden])')); };
+  // A component's panel loaded ahead and parked out of sight (preloadComponentPanel) is not one a person reads.
+  var personBusy = function () { return !BAKING && (Date.now() - lastTouch < 2000 || !!document.querySelector('.sg-tip:hover, .sg-tip:focus-within, .sg-comp-panel:not([hidden]):not(.is-parked)')); };
+  // The pages that wait on the try: the Status page's numbers, and the Accessibility page, every row of which is one.
+  var SWEEP_PAGES = { status: 1, accessibility: 1 };
   function a11ySweep() {
     // The component panel (?embed) is this page again: the page around it tries every component already.
     if (ALL || sweeping || html.classList.contains('sg-embed')) return;
@@ -63,7 +66,7 @@
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
     sweeping = true;
     (function next() {
-      if (sweepAt >= list.length || hashParts().id !== 'status') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || !SWEEP_PAGES[hashParts().id]) { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       if (personBusy() && !(list[sweepAt].__a11y && (list[sweepAt].__a11y.live || list[sweepAt].__a11y.baked))) return setTimeout(next, 500);
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
@@ -264,7 +267,7 @@
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
       var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML((r.k.beyond ? '' : 'WCAG ') + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
-        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
+        who: r.st === 'todo' || r.st === 'check' ? (own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
         // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.
         unrun: r.st === 'check' && (/^(Run the audit|Build .* in the code: the audit|The last audit did not|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(act || r.note || '') || r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) };
       // Owed to one person, or to nobody yet: the row as it was. Owed to several: one row each, with that person's

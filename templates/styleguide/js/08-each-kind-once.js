@@ -378,5 +378,5 @@
     });
   }
   // The History last in the System group: first the pages about the system as it is, then what changed in it and why.
-  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
+  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#accessibility"], a[href="#in-use"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
 

@@ -158,7 +158,8 @@
       // Only what is left, side by side: its share, in the table's word. What a browser has not tried yet is said apart,
       // with no share: none of it is counted yet.
       var items = o.rest.map(function (x) { return '<span class="pg-par-status pg-par--' + (x.cls === 'fix' ? 'differs' : 'figma') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(share(x.pct) + ' ' + x.word) + '</span>'; }).join('') +
-        (o.untested ? '<span class="pg-par-status pg-par--none is-untested"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(o.untested + ' Untested') + '</span>' : '');
+        (o.untested ? '<span class="pg-par-status pg-par--none is-untested"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(o.untested + ' Untested') + '</span>' : '') +
+        (o.byBrowser ? '<a class="sg-link-pill sg-health-browsers" href="#accessibility?show=differs">' + esc(o.byBrowser + (o.byBrowser === 1 ? ' criterion differs' : ' criteria differ') + ' by browser') + LINK_GO + '</a>' : '');
       var legend = items ? '<p class="sg-health-legend">' + items + '</p>' : '';
       // At its foot, on one line: how many of everything in the system are done in full here (complete, never the big
       // number's word, which counts the work), and the link down to the table with that filter on (its arrow points down).
@@ -177,17 +178,17 @@
     // Accessibility by criterion, over the whole system: a criterion is met when nothing tried fails it or waits on it,
     // to review when only a check by hand is left somewhere, failing when anything fails it. One that fails anywhere is
     // not met: that is how an audit reads WCAG.
-    var bySc = {};
+    var a11yAll = [];
     // Documentation by what people write: the page existing and its properties are the engine's own, never counted.
     var docOwn = [];
     COMPONENTS.forEach(function (c) {
       var s = componentStates(c);
       s.all.forEach(function (r) {
-        if (r.area === 'Accessibility' && r.k && r.k.sc) { var was = bySc[r.k.sc]; bySc[r.k.sc] = r.st === 'todo' || was === 'todo' ? 'todo' : r.st === 'check' || was === 'check' ? 'check' : 'done'; }
+        if (r.area === 'Accessibility') a11yAll.push(r);
         if (r.area === 'Documentation' && !c.codeOnly && r.kind !== 'Intent layer' && r.kind !== 'Properties') docOwn.push(r);
       });
     });
-    var scSplit = rowsSplit(Object.keys(bySc).map(function (k) { return { st: bySc[k] }; }));
+    var bySc = a11yCriteria(a11yAll), scSplit = rowsSplit(Object.keys(bySc).map(function (k) { return { st: bySc[k].st }; }));
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
     var pT = card('Parity', checksSplit(builtRows, 'par'), ['Match', 'Unsure', 'Differs'], nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial') || nx(countOf(parP, 'Unsure'), 'Unsure', 'ParityUnsure'));
     // Code's checks are the rows themselves: built, the rest unsure (or only its CSS class) or missing.
@@ -195,16 +196,22 @@
     var iT = card('Code', { all: mx.length, fix: missingN, dec: unsureN + cssN }, ['Built', cssN && unsureN ? 'Unsure or CSS only' : cssN ? 'CSS only' : 'Unsure', 'Missing'], missingN ? nx(missingN, 'Missing', 'Implementation') : nx(unsureN, 'Unsure', 'Unsure'));
     var aT = card('Accessibility', scSplit, ['Met', 'Review', 'Issues'], nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'Review', 'AccessibilityReview'));
     aT.untested = countOf(accP, 'Untested');
+    // The criteria that pass in one browser and fail in another (the browsers pass, a11y-browsers.mjs), counted once
+    // each however many components they differ on, a link to the Accessibility page with that filter on.
+    var bbC = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null, bbSc = {};
+    if (bbC) Object.keys(bbC).forEach(function (n) { Object.keys(bbC[n]).forEach(function (sc) { var l = bbC[n][sc].line || ''; if (/✓/.test(l) && /✕/.test(l)) bbSc[sc] = 1; }); });
+    aT.byBrowser = a11ySec ? Object.keys(bbSc).length : 0;
     var dT = card('Documentation', rowsSplit(docOwn), ['Done', 'Review', 'Missing'], nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Review'), 'Review', 'DocumentationPartial'));
     [[pT, parP], [iT, codeP], [aT, accP], [dT, docP]].forEach(function (x) { x[0].total = mx.length; x[0].doneN = countOf(x[1], x[0].pctWord); });
     // What each card counts, said simply: one or two fixed sentences a person reads at a glance (25 words at most, nothing
     // made from data: test/styleguide-template.test.mjs holds them to it).
     pT.how = 'How closely the code matches Figma, in every property, token and value. The line under it counts what matches in full.';
     iT.how = 'How much of the system exists in the code. The line under it counts what is built.';
-    aT.how = 'How many WCAG 2.2 AA criteria the system meets, tried in a browser on every variant. Shown for the theme chosen at the top.';
+    aT.how = 'WCAG 2.2 AA: level A and AA criteria met ÷ all of them, rounded down. Met only when no component fails it.';
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
-    var tiles = [pT, iT, aT, dT].map(tile).join('');
+    // In the menu's order: Documentation before Accessibility, as their pages are (the owner's, 15 November 2026).
+    var tiles = [pT, iT, dT, aT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';

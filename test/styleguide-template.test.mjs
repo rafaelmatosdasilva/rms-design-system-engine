@@ -1008,7 +1008,8 @@ test('To do: AAA advice is to check and to decide, never a must-fix; a component
   const tpl = templateText();
   // A comfortable 44px target or a 2px ring (AAA) found short is advice: checked, and yours to decide, as its size is the design's.
   assert.match(tpl, /if \(its\.some\(function \(it\) \{ return it\.st === 'todo'; \}\)\) st = k\.extra \? 'check' : 'todo';/);
-  assert.match(tpl, /who: r\.st === 'todo' \|\| r\.st === 'check' \? \(r\.k\.extra \? WHO\.both : own \|\| a11yWho\(/);
+  // Still to check and decide, but owed to a person by role like every accessibility task, never "You decide".
+  assert.match(tpl, /who: r\.st === 'todo' \|\| r\.st === 'check' \? \(own \|\| a11yWho\(/);
   // The code has no markup for it: build it first; the audit stopped before it: run it again, never "run the audit" as if it had not.
   assert.match(tpl, /\/no markup\/\.test\(why\) \? 'Build ' \+ c\.name \+ ' in the code: the audit tries this once the page draws it from the code\.'/);
   assert.match(tpl, /'The last audit could not try ' \+ c\.name \+ ': ' \+ plainWhy\(why\) \+ '\. Run it again once that is fixed\.'/, 'why it was not tried, in plain words');
@@ -1539,15 +1540,15 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     assert.deepEqual(await run(`[...document.querySelectorAll('.sg-nav > a')].slice(0, 2).map((a) => a.textContent.replace(/ \\(\\d+\\)$/, ''))`), ['Index', 'Status'], 'second in the side panel, under the index');
     assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#health"], .sg-nav a[href="#tasks"]')`), false, 'one page, not two');
     // Accessibility waits until every component is tried in this browser; then each card is a count over a total.
-    await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
+    await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[3]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
-    assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
+    assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Documentation', 'Accessibility'], errors.join('\n'));
     // The big number is the share of the work done, in the table's word, nothing under it; the legend says only what is left.
     assert.match(tiles[0][1], /^\d+%Match\|$/, 'parity: the share matched, nothing under it');
     for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what Code says');
     assert.match(tiles[1][1], /^\d+%Built\|$/);
-    assert.match(tiles[2][1], /^(\d+%Met|–)\|$/);
-    assert.match(tiles[3][1], /^\d+%Done\|$/);
+    assert.match(tiles[3][1], /^(\d+%Met|–)\|$/);
+    assert.match(tiles[2][1], /^\d+%Done\|$/);
     // Each card's foot counts what is done in full, the rows its filter shows for the done word, said as complete
     // (the big number counts the work).
     const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
@@ -1564,7 +1565,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
       const sum = +pct + shares.reduce((t, x) => t + x, 0);
       assert.ok(sum >= 99.5 && sum <= 100.5, `${tiles[i][0]}: ${pct}% and the legend's ${shares.join(', ')} add up to 100`);
     }
-    if (tiles[3][2]) assert.match(tiles[3][2], /^(<?\d+% (Review|Missing))+$/, 'the Documentation card\'s words for what is left, the Documentation page\'s: Review, Missing');
+    if (tiles[2][2]) assert.match(tiles[2][2], /^(<?\d+% (Review|Missing))+$/, 'the Documentation card\'s words for what is left, the Documentation page\'s: Review, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);

@@ -140,19 +140,20 @@
   // items: [{ area, state: 'done' | 'check' | 'fix' }].
   var DONE_STATES = ['done', 'check', 'fix'];
   function stateBar(n) { var t = n.done + n.check + n.fix; return '<span class="sg-health-bar" aria-hidden="true">' + DONE_STATES.map(function (k) { return n[k] ? '<span class="is-' + k + '" style="width:' + (n[k] / t * 100) + '%"></span>' : ''; }).join('') + '</span>'; }
-  function doneCard(title, items) {
+  // how: what the number counts, in a few plain sentences, in the tip at the card's top right as the Status page's cards have it.
+  function doneCard(title, items, how) {
     if (!items.length) return '';
     var R = 51.25, C = 2 * Math.PI * R, by = {}, order = [], all = { done: 0, check: 0, fix: 0 };
     items.forEach(function (x) { if (!by[x.area]) { by[x.area] = { a: x.area, done: 0, check: 0, fix: 0 }; order.push(x.area); } by[x.area][x.state]++; all[x.state]++; });
     var tot = function (n) { return n.done + n.check + n.fix; };
     var areas = order.map(function (k) { return by[k]; }).sort(function (x, y) { return x.done / tot(x) - y.done / tot(y) || tot(y) - tot(x); });
-    var t = tot(all), pct = Math.round(all.done / t * 100), at = 0;
+    var t = tot(all), pct = Math.floor(all.done / t * 100), at = 0;   // rounded down, as the Status page's cards are: 100% is all done, never 99.6%
     // A gap between two states, as the bars have (their 2px at the ring's default size); none when there is one state.
     var GAP = DONE_STATES.filter(function (k) { return all[k]; }).length > 1 ? 1.5 : 0;
     var arcs = DONE_STATES.map(function (k) { if (!all[k]) return ''; var len = C * all[k] / t, draw = Math.max(0.5, len - GAP), a = '<circle class="sg-cx-ring-' + k + '" cx="54" cy="54" r="' + R + '" stroke-dasharray="' + draw.toFixed(2) + ' ' + (C - draw).toFixed(2) + '" stroke-dashoffset="' + (-(at + GAP / 2)).toFixed(2) + '"/>'; at += len; return a; }).join('');
     var ring = '<span class="sg-cx-ring"><svg viewBox="0 0 108 108" aria-hidden="true"><circle class="sg-cx-ring-track" cx="54" cy="54" r="' + R + '"/>' + arcs
       + '</svg><span class="sg-cx-ring-text"><span class="sg-health-num">' + esc(String(pct)) + '<small>%</small></span><span class="sg-health-sub">' + esc(all.done + ' of ' + t) + '</span></span></span>';
-    return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p></div>'
+    return '<div class="sg-health-tile sg-cx-score"><div class="sg-health-top"><p class="sg-health-label">' + esc(title) + '</p>' + (how ? tipHTML(how, 'How ' + title + ' is counted') : '') + '</div>'
       + '<div class="sg-cx-score-body">' + ring + '<ul class="sg-cx-score-areas">' + areas.map(function (x) { return '<li class="sg-health-sub"><span>' + esc(x.a) + '</span>' + stateBar(x) + '</li>'; }).join('') + '</ul></div></div>';
   }
   // The cards above a page's filters, half the width each, as far over the chips as the Status page's cards are.
@@ -197,6 +198,7 @@
     templates: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 6v8"/>',   // a page frame: its header, a side column and the content
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
     rules: '<path d="M2.5 13.5V2.5l11 11z"/><path d="M5.2 10.8V6.3l4.5 4.5z"/>',   // a set square: the system measured against its own rules
+    accessibility: '<circle cx="8" cy="3" r="1.3"/><path d="M3 5.8l5 1 5-1M8 6.8v3.2M8 10l-2.2 4M8 10l2.2 4"/>',   // a person, arms open: the system as everyone uses it
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }

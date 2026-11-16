@@ -248,6 +248,9 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
+/* The Accessibility page's table: the criterion takes the room, who acts and the status keep theirs, so neither runs into the next. */
+.sg-a11y-table { table-layout: fixed; } .sg-a11y-table col.sg-a11y-no { width: 7%; } .sg-a11y-table col.sg-a11y-comp { width: 19%; } .sg-a11y-table col.sg-a11y-sc { width: 21%; } .sg-a11y-table col.sg-a11y-level { width: 7%; } .sg-a11y-table col.sg-a11y-who { width: 16%; } .sg-a11y-table col.sg-a11y-st { width: 14%; } .sg-a11y-table col.sg-a11y-at { width: 11%; }
+.sg-a11y-table td.sg-todo-whocell { white-space: normal; }
 /* The few short things a person does to check a criterion, numbered, and the command that records it. */
 .pg-a11y-steps { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .pg-a11y-steps li { margin: 0 0 var(--sg-space-xxs); }
@@ -1193,7 +1196,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cx-ring-done { stroke: var(--sg-positive); } .sg-cx-ring-check { stroke: var(--sg-warning-ink); } .sg-cx-ring-fix { stroke: var(--sg-negative); }
 .sg-cx-ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .sg-cx-ring-text .sg-health-num { font-size: calc(var(--sg-space-xxl) * 1.25); line-height: normal; column-gap: var(--sg-space-xxs); }   /* sized by the ring it sits in (40px in its 144px), never by the system's own title size, so every guide draws it the same (the owner's, 11 November 2026); its % small beside it, as the Status page sets a unit */
-.sg-cx-score-areas { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sg-space-xs) var(--sg-space-m); align-items: center; margin: 0; padding: 0; list-style: none; }
+.sg-cx-score-areas { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: calc(var(--sg-space-xs) - 1px) var(--sg-space-m); align-items: center; margin: 0; padding: 0; list-style: none; }
 .sg-cx-score-areas li { display: contents; }   /* every area's name and bar in the list's two columns, so the bars start and end together */
 .sg-cx-score-areas .sg-health-bar { height: calc(var(--sg-space-xs) * 1.5); }   /* as thin as the table's */
 /* Follow it on two lines: how many, then the bar and its share. */

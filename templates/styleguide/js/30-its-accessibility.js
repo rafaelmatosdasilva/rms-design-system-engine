@@ -33,7 +33,7 @@
     return ((c.a11y || {}).sources || []).filter(function (x) { return x.st === 'agents'; }).map(function (x) {
       var figma = /annotation|Figma/.test(x.from);
       return { key: c.name + '\u0000u:' + x.from + ':' + x.what, area: 'Accessibility', kind: x.from, figma: figma ? esc(x.what) : '', code: '', todo: (figma ? '' : esc(x.what) + '<span class="pg-todo">') + unreadFix(x) + (figma ? '' : '</span>'),
-        who: x.todo ? (/annotation/.test(x.from) ? WHO.figma : WHO.person) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
+        who: x.todo ? (/annotation/.test(x.from) ? WHO.designer : WHO.a11y) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
     });
   }
   function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
@@ -76,7 +76,7 @@
       // A difference found against Figma says where it is fixed (figma, code, both); in the Accessibility area that is
       // said as the person who does it, so the whole area speaks of people and not of places.
       var side = { figma: 'designer', code: 'developer' };
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[side[x.who]] || WHO.both) + teamNote(c.name) : '', x.new);
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[side[x.who]] || a11yWho(scOfLabel(x.wcag) || '', '', [], '')) + teamNote(c.name) : '', x.new);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix)), '', false, i.tasks || TASKS[i.issue]); });
     var stat = {};
@@ -229,6 +229,7 @@
     if (wait) order.forEach(function (g) { if (!tried.some(function (c) { return c.name === g.name; })) return; byStatus(g.rows.filter(function (r) { return r.area === 'Accessibility'; })).forEach(function (r) { if (!TODO_NO[r.key]) TODO_NO[r.key] = ++no; }); });
     var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     fillTodoNos(document);
+    fillA11yPage();   // the Accessibility page's rows carry the same numbers
     var link = nav.querySelector('a[href="#status"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     // The menu's count waits for every kind, so it never changes in front of the reader.
@@ -385,6 +386,113 @@
     showTodoArea(box);
     labelCells(td);
     todoHeadHeight();
+  }
+  // Each criterion across the system, as an audit reads WCAG: met only when no component fails it and none waits on a
+  // review, to review when only reviews are left somewhere, failing when any component fails it. Level A and AA only:
+  // what is looked at beyond them (forced colours, reduced motion) is in the tables, never in the share. The Status
+  // page's Accessibility card and the Accessibility page's card both count by this one function, so the two always say
+  // the same number (the owner's, 15 November 2026). → { [sc]: { st, level, principle } }
+  // What each level's card counts, in its tip: a fixed sentence or two, 25 words at most, as the Status page's tips are.
+  var A11Y_LEVEL_HOW = {
+    A: 'Level A criteria met ÷ all level A criteria, rounded down. Met only when no component fails it. Not an average.',
+    AA: 'Level A and AA criteria met ÷ all of them, rounded down, as AA asks for both. Met only when no component fails it.'
+  };
+  function a11yCriteria(rows) {
+    var by = {}, RANK = { done: 0, kept: 0, check: 1, todo: 2 };
+    rows.forEach(function (r) {
+      var k = r.k; if (r.area !== 'Accessibility' || r.extra || !k || !k.sc || !(r.st in RANK)) return;
+      var n = /^(\d)\./.exec(k.sc), was = by[k.sc];
+      if (!was) by[k.sc] = { st: r.st === 'kept' ? 'done' : r.st, level: k.level, principle: n ? A11Y_PRINCIPLE[n[1]] : '' };
+      else if (RANK[r.st] > RANK[was.st]) was.st = r.st;
+    });
+    return by;
+  }
+  // ── The Accessibility page: every criterion of every component, one table ───────────────────────────────────────
+  // The rows a component's own Accessibility area shows (a11yIssueRows, and the notes no check reads), for every
+  // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
+  // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
+  // browser, then the level and who acts (what a criterion depends on, its component's name and its principle are in
+  // each row and its panel, never a filter: the owner's, 15 November 2026). Above them one card, the Status page's number. Every row is one the browser tries, so until every component is
+  // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
+  var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
+  var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
+  var A11Y_LEVELS = ['A', 'AA', 'Beyond AA', 'Not a criterion'];
+  var A11Y_ST = { todo: 'fix', check: 'check', done: 'done' };
+  function fillA11yPage() {
+    var sec = a11ySec; if (!sec) return;
+    var tried = COMPONENTS.filter(function (c) { return c.__a11y; }).length, wait = !ALL && tried < COMPONENTS.length;
+    var clear = function () { Array.prototype.forEach.call(sec.querySelectorAll(':scope > :not(h2):not(.sg-section-badge)'), function (n) { n.remove(); }); };
+    if (wait) {
+      var sayWait = esc('Each component is tried in this browser first, ' + tried + ' of ' + COMPONENTS.length + ' so far. The table shows once every one is.');
+      if (sec._sig === 'wait:' + tried) return;
+      clear(); sec._sig = 'wait:' + tried;
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><p class="sg-none" role="status">' + sayWait + '</p></div>');
+      return;
+    }
+    var rows = [];
+    COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
+      try {
+        var t = c.__a11y;
+        // The criteria WCAG 2.2 AA asks for, levels A and AA, and nothing else: what is looked at beyond them (forced
+        // colours, reduced motion, AAA advice) and a Figma note no check reads stay on the component's own Accessibility
+        // area, so every row here is one the page's numbers count (the owner's, 15 November 2026).
+        a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).forEach(function (r) { if (A11Y_ST[r.st] && !r.extra && r.k && (r.k.level === 'A' || r.k.level === 'AA')) rows.push({ c: c, r: r }); });
+      } catch (e) { /* its accessibility is read on its own page */ }
+    });
+    var sig = rows.map(function (x) { return x.r.key + ':' + x.r.st + ':' + (TODO_NO[x.r.key] || ''); }).join('|');
+    if (sec._sig === sig) return;
+    clear(); sec._sig = sig;
+    var BB = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null;
+    var levelOf = function (r) { return r.k ? (r.k.level || 'Beyond AA') : 'Not a criterion'; };
+    var principleOf = function (r) { var n = r.k && /^(\d)\./.exec(r.k.sc); return n ? A11Y_PRINCIPLE[n[1]] : ''; };
+    var whoOf = function (r) { return plainText(r.who || '').replace(/\s+/g, ' ').trim(); };
+    // Fails in one browser and passes in another: each browser's line says ✓ and ✕.
+    var differs = function (x) { var b = BB && x.r.k && BB[x.c.name] && BB[x.c.name][x.r.k.sc]; return !!(b && /✓/.test(b.line) && /✕/.test(b.line)); };
+    var stWord = function (r) { return rowWord(r.st, 'Accessibility'); };   // the rows' own words: Issues, Review, Met
+    var ORDER_ = { todo: 0, check: 1, done: 2 };
+    rows.sort(function (p, q) { return ORDER_[p.r.st] - ORDER_[q.r.st] || (TODO_NO[p.r.key] || 1e9) - (TODO_NO[q.r.key] || 1e9) || p.c.name.localeCompare(q.c.name); });
+    var rowHTML = function (x, i) {
+      var r = x.r, id = ROW_DETAIL.push({ r: r, area: 'Accessibility' }) - 1;
+      var f = { component: x.c.name, status: stWord(r), level: levelOf(r), principle: principleOf(r), who: whoOf(r) };
+      return '<tr class="sg-row-open" tabindex="0" data-row-detail="' + id + '" data-a11y-row="' + i + '" data-status="' + r.st + '" data-f' + Object.keys(f).map(function (k) { return f[k] ? ' data-f-' + k + '="' + esc(f[k]) + '"' : ''; }).join('') + (differs(x) ? ' data-f-differs="1"' : '') + '>' +
+        ISSUE_CELL.no(r) + '<td><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td>' + ISSUE_CELL.kind(r) + '<td>' + esc(levelOf(r)) + '</td>' + ISSUE_CELL.whoCell(r) + ISSUE_CELL.status(r) + ISSUE_CELL.updated(r) +
+        '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
+    };
+    // A column head sorts by it, again the other way round, as the Rules page's do.
+    var SORT = [
+      ['Task nr', function (x) { return TODO_NO[x.r.key] || 1e9; }],
+      ['Component', function (x) { return x.c.name.toLowerCase(); }],
+      ['WCAG', function (x) { return x.r.k ? x.r.k.sc.split('.').map(function (n) { return ('000' + n).slice(-3); }).join('.') : 'zzz' + x.r.kind; }],
+      ['Level', function (x) { return A11Y_LEVELS.indexOf(levelOf(x.r)); }],
+      ['Who acts', function (x) { return whoOf(x.r).toLowerCase() || 'zzz'; }],
+      ['Status', function (x) { return ORDER_[x.r.st]; }],
+      ['Last checked', function (x) { return x.r.at || ''; }]
+    ];
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-a11y-table"><colgroup><col class="sg-a11y-no"><col class="sg-a11y-comp"><col class="sg-a11y-sc"><col class="sg-a11y-level"><col class="sg-a11y-who"><col class="sg-a11y-st"><col class="sg-a11y-at"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var table = sec.querySelector('.sg-a11y-table');
+    tableNone(table, 'criteria', { head: 'No component has been tried yet', say: 'Each component\'s criteria are tried in the browser as the page opens, and the audit tries the rest.' });
+    var sortKey = null, sortDir = 1;
+    sec.onclick = function (e) {
+      var th = e.target.closest('.sg-a11y-table th[data-sort]'); if (!th) return;
+      var key = th.getAttribute('data-sort'), val = SORT.filter(function (c) { return c[0] === key; })[0][1];
+      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
+      var tb = table.tBodies[0];
+      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(rows[+a.getAttribute('data-a11y-row')]), v = val(rows[+b.getAttribute('data-a11y-row')]); return (u < v ? -1 : u > v ? 1 : 0) * sortDir; }).forEach(function (tr) { tb.appendChild(tr); });
+      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (h) { h.setAttribute('aria-sort', h.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+    };
+    var chips = ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]);
+    filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
+      { key: 'status' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'who', label: 'Who acts' }] });
+    // A card a level, counting criteria across the system (a11yCriteria, the Status page's count), with a bar for each
+    // principle.
+    var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
+    // Levels build on each other, as WCAG conformance does: Level AA is every criterion of A and of AA, the Status page's
+    // number, never the AA criteria alone (the owner's, 15 November 2026).
+    var IN_LEVEL = { A: ['A'], AA: ['A', 'AA'] };
+    var levelCard = function (lv) { return doneCard('Level ' + lv, Object.keys(bySc).filter(function (sc) { return IN_LEVEL[lv].indexOf(bySc[sc].level) >= 0 && bySc[sc].principle; }).map(function (sc) { return { area: bySc[sc].principle, state: A11Y_ST[bySc[sc].st] }; }), A11Y_LEVEL_HOW[lv]); };
+    doneCards(sec, levelCard('A') + levelCard('AA'));
+    labelCells(sec);
+    if (route.last !== undefined && !sec.hidden) underTitle(sec);
   }
   // Each card's head row sticks under the filter and the counts, whatever their height at this width.
   // Not while the pages are first built: the router measures the page it opens once they are (route → underTitle).

@@ -292,6 +292,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - One site with every token and component of your system.
 - For each component: its specs, every variant, parity, accessibility and history. Its playground is a part of its own, [still in early development](#try-components-in-a-playground).
 - A status page: how far each component is in Figma, code, accessibility and documentation.
+- An Accessibility page: every WCAG A and AA criterion of every component in one table, filtered by status, level and who acts, with the share of WCAG criteria met at level A and at level AA ([how it is counted](accessibility.md#the-accessibility-page)).
 - A task list that says who acts and which team owns each component or token layer.
 - A History where every row names who did it: who answered a decision, and who made a change to the code, a read of Figma or a change to the intent layer, with whoever brought it in when that was somebody else.
 - Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.

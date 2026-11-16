@@ -197,7 +197,9 @@
     // One card a side (doneCard, 00-start.js): every rule in the colour of its state, the share done in the middle.
     // Done is green, to decide amber and to fix red, as the filters' dots under them say.
     var RULE_STATE = { rule: 'done', decide: 'check', fix: 'fix' };
-    var sideCard = function (side, name) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; })); };
+    // What a side's card counts, said in its tip.
+    var RULES_HOW = function (name) { return 'The rules read from ' + (name === 'Code' ? 'the code' : name) + ' that every component already follows, out of all of them. The bars split them by area.'; };
+    var sideCard = function (side, name) { return doneCard(name, RULES.filter(function (r) { return (r.side || 'figma') === side; }).map(function (r) { return { area: AREA[r.area] || capital(r.area), state: RULE_STATE[r.status] || 'fix' }; }), RULES_HOW(name)); };
     var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
@@ -1302,11 +1304,16 @@
       if (list.some(function (r) { return r.st === 'todo'; })) return 'fix';
       return list.some(isOpen) ? 'check' : 'done';
     };
-    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; })); }).join(''));
+    doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there, out of all of them. The bars split them by area.'); }).join(''));
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
   }
+  // Accessibility: every criterion of every component in one table, as Rules and Documentation gather theirs, each row the
+  // same row a component's own Accessibility area shows and opening the same panel. Built here, under Documentation in
+  // the menu, and filled once every component is tried in this browser (fillA11yPage, 30-its-accessibility.js).
+  var a11ySec = null;
+  if (DATA.wcag21 && DATA.wcag21.criteria && COMPONENTS.some(function (c) { return c.a11y; })) { hr(); navLink('accessibility', 'accessibility'); a11ySec = section('accessibility', 'System', 'Accessibility', ''); }
   // The notes no agent is given (once the For agents page) are on the Documentation page, flagged Remove, each with
   // why, how to keep it instead and whether to remove it.
   // Documentation: what the team has written about each component. What it is, how to use it, pictures of it used well

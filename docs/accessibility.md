@@ -5,6 +5,7 @@ How the engine tests the accessibility of every component, and of your products'
 **On this page**
 
 - [Test accessibility](#test-accessibility)
+  - [The Accessibility page](#the-accessibility-page)
   - [Pages and flows](#pages-and-flows)
   - [Beyond A and AA](#beyond-a-and-aa)
   - [Video and sound](#video-and-sound)
@@ -51,6 +52,35 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - One verdict line, such as `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`.
 
 `--no-axe` and `--no-states` leave a part out, and then the result says not all of it was checked.
+
+### The Accessibility page
+
+The style guide has a page of its own for accessibility, under Documentation in the menu, as Rules and Documentation have theirs.
+
+- **One table for every component.** Each row is one criterion of one component, the same row its own Accessibility area shows, under the same task number.
+- **The same panel.** A row opens the panel it opens on the component's page, with what to do first, and under it a link to where the fix is made: See in Figma on a designer's task, See in code (the component's file) on a developer's, then the component it is on (a link to its page) and where it was read, then the criterion's level and its principle (Level AA · Operable).
+- **Only A and AA.** The criteria WCAG 2.2 AA asks for, and nothing else. What the engine looks at beyond them (high contrast mode, reduced motion, AAA advice) and a Figma note no check reads stay on each component's own Accessibility area.
+- **Filters.** A chip for each status (Issues, Review, Met) and one for what differs by browser, then the level and who acts. They combine, and each says how many rows it would leave. The component is in each row, and the principle and what a criterion depends on are in its panel.
+- **A card a level.** Level A and Level AA, each the share of its criteria the system meets, with a bar for each principle (perceivable, operable, understandable, robust). The tip at each card's top right gives the sum in plain words.
+- **Filled once every component is tried.** Every row is one the browser tries as the page opens, so until each component has been, the page says how far it has got rather than drawing half a table.
+- **On the Status page.** Its Accessibility card counts the criteria that pass in one browser and fail in another, and opens this page with that filter on.
+
+**How the percentage is worked out.** The engine checks for WCAG 2.2 AA, and AA asks for every criterion of level A and of level AA. The numbers count criteria, never rows or components, the way an audit reads WCAG, and none is an average.
+
+| A criterion is | When |
+|---|---|
+| Met | No component fails it, and none waits on a review |
+| To review | No component fails it, but at least one waits on a person's check |
+| Failing | At least one component fails it |
+
+- **Level A.** The level A criteria met ÷ all level A criteria.
+- **Level AA.** The level A and level AA criteria met ÷ all of them. Levels build on each other, as WCAG conformance does: a system meets AA only when it meets every criterion of both, so the AA card counts both. 100% there means the system meets AA.
+- **On the Status page.** Its Accessibility card is the same number as Level AA here, worked out by the same code.
+- **Rounded down.** Every number, so 100% only ever means all of them are met.
+- **In each card's tip.** The sum in plain words, such as *Level A criteria met ÷ all level A criteria, rounded down*. The counts themselves are under each percentage (12 of 22).
+- **The ring and the bars.** A ring splits its criteria into met, to review and failing. Each principle's bar does the same for its own criteria, with no number of its own.
+- **Why not rows.** A row is one criterion on one component. Counted that way, the many simple components that pass would hide the few that fail, and a system with no component meeting level A could still read 75%.
+- **What is left out.** A criterion that does not apply to a component (video and sound on a button) is not counted for it. What is looked at beyond A and AA (high contrast mode, reduced motion, AAA advice) is on each component's own Accessibility area, never on this page or in its numbers.
 
 ### Two parts
 
@@ -210,6 +240,8 @@ each component the style guide draws:
   Safari is never touched.
 - **A browser that is missing is said.** The run names it rather than passing over it, and the rows keep saying
   *Tried in Chrome*.
+- **Counted on the Status page.** Its Accessibility card says how many criteria differ by browser, and opens
+  [the Accessibility page](#the-accessibility-page) on them.
 
 The other criteria a browser decides (what an input does when it changes, dragging, content on hover, a focus hidden
 by something else) are still tried in Chrome alone, and their rows say so. Rendered parity is drawn in the same

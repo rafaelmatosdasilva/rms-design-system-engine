@@ -273,6 +273,7 @@ Above the Documentation page's filters, a card for each source its pages come fr
 
 - **A ring of the pages that source documents,** each in the colour of its state there: complete, to review, missing. In its middle, the share complete.
 - **A bar per area** (Components, Templates, Patterns and the rest), the weakest first.
+- **How it is counted, in its tip.** The mark at the card's top right says it in a few words: the pages documented in that source with nothing left to write there, out of all of them, rounded down.
 - **Each source judged on its own part.** A component's documentation is a list of things, each with the place it belongs: its text in the intent layer, its properties in its contract, its tokens' descriptions in Figma. A page is complete in a source when everything that belongs there is written. A page with no such list (a template, a flow) keeps its own state.
 
 ### What the engine is sure of, it writes
