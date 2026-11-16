@@ -557,3 +557,42 @@ test('the engine run by its path is seen however the path is written, a quoted o
   assert.deepEqual(handEdits(ctx, /(^|\/)ds-config\.json$/), []);
   assert.equal(handEdits({ calls: [{ name: 'Bash', isError: false, input: { command: 'echo {} > ds-config.json' } }] }, /(^|\/)ds-config\.json$/).length, 1, 'a write of its own still counts');
 });
+
+// Six task graders had no case of their own: a grader that never saw a wrong answer has not been shown to reject
+// one, and a score is only as true as the grader behind it. Each gets the right answer and the wrong answer that
+// matters for that task - the engine run skipped, the Figma change claimed as done, the value invented.
+test('graders that had no case: each passes a right answer and fails the wrong one that matters', () => {
+  const OUT = '.design-system-engine-out';
+  const ask = 'I have prepared it. Shall I go ahead and apply it in Figma?';
+
+  // The link is handed to the engine, not read and summarised by the agent.
+  assert.equal(passes('guidelines-link', fakeCtx({ calls: [run('rms-design-system-engine --guidelines https://gitlab.com/tidepool-demo/design/-/wikis/Buttons')], final: 'I handed the link to the engine, which read those guidelines into the intent layer: the checks now have them.' })), true);
+  assert.equal(passes('guidelines-link', fakeCtx({ calls: [run('curl https://gitlab.com/tidepool-demo/design/-/wikis/Buttons')], final: 'I read the wiki: buttons are primary or secondary.' })), false);
+
+  // The setting is named, and where the image comes from.
+  assert.equal(passes('visual-howto', fakeCtx({ final: 'Turn on codeReading.visual, and the Figma image comes from parity-refs with FIGMA_TOKEN set.' })), true);
+  assert.equal(passes('visual-howto', fakeCtx({ final: 'Turn on the visual comparison in your config and it will compare each component.' })), false);
+
+  // Scoped to the chip, and the baseline written per finding rather than wholesale.
+  const baseline = JSON.stringify({ findings: [{ check: 'Structure', what: 'chip radius' }] });
+  assert.equal(passes('audit-then-accept', fakeCtx({ calls: [run('rms-design-system-engine --component chip'), run('rms-design-system-engine --baseline --findings --component chip')], final: 'The chip fails on its radius. I accepted that one finding as known debt, and everything else stays strict.', files: { 'design-system-engine-baseline.json': baseline } })), true);
+  assert.equal(passes('audit-then-accept', fakeCtx({ calls: [run('rms-design-system-engine --component chip')], final: 'The chip was failing, so I accepted it as known debt and the run is green again now.', files: { 'design-system-engine-baseline.json': JSON.stringify({ gates: ['Structure'] }) } })), false, 'a whole gate accepted, not the finding');
+
+  // A component built like another: a clone with no value of its own, and Figma never said to be changed.
+  const pill = { name: 'pill', 'x-rms-design-system-engine': { like: 'chip', ops: [{ op: 'clone', from: 'chip' }] } };
+  assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: ask, files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(pill) } })), true);
+  assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: 'I have created the pill in Figma.', files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(pill) } })), false, 'claiming Figma was changed');
+  const invented = { name: 'pill', 'x-rms-design-system-engine': { like: 'chip', ops: [{ op: 'clone', from: 'chip', height: '24px' }] } };
+  assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: ask, files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(invented) } })), false, 'a value of its own');
+
+  // A step on a scale: the engine asks what XL changes, and nothing is built on a guess.
+  const asked = JSON.stringify({ questions: [{ ask: 'What does XL change, against L?' }], ops: [] });
+  assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'What does XL change against L — its height, its padding, its text size?', files: { [`${OUT}/changes/chip.change.json`]: asked } })), true);
+  const guessed = JSON.stringify({ questions: [], ops: [{ op: 'addOption', axis: 'Size', option: 'XL', height: '40px' }] });
+  assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'Added XL at 40px.', files: { [`${OUT}/changes/chip.change.json`]: guessed } })), false, 'built on a guess');
+
+  // Taking an option away: what it breaks is said, and only that option goes.
+  const removal = JSON.stringify({ ops: [{ op: 'removeOption', axis: 'Size', option: 'L' }] });
+  assert.equal(passes('figma-remove-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --remove-option Size=L')], final: `This breaks every use of the chip at size L. ${ask}`, files: { [`${OUT}/changes/chip.change.json`]: removal } })), true);
+  assert.equal(passes('figma-remove-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --remove-option Size=L')], final: ask, files: { [`${OUT}/changes/chip.change.json`]: removal } })), false, 'says nothing about what it breaks');
+});
