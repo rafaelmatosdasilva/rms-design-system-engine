@@ -2561,7 +2561,7 @@ function capitalPairs(text) {
 function people(text) {
   const out = [];
   for (const p of capitalPairs(text)) if (PERSON_FIRST.has(bare(p.first)) && !TYPEFACE_WORD.test(p.second) && !NOT_A_PERSON.test(p.phrase)) out.push(p.phrase);
-  for (const m of text.matchAll(/(^|[^\w.@\/-])([a-z]{3,})[._]([a-z]{2,})(?![\w@-]|\.[a-z])/g)) if (PERSON_FIRST.has(m[2])) out.push(`${m[2]}.${m[3]}`);
+  for (const m of text.matchAll(/(^|[^\w.@/-])([a-z]{3,})[._]([a-z]{2,})(?![\w@-]|\.[a-z])/g)) if (PERSON_FIRST.has(m[2])) out.push(`${m[2]}.${m[3]}`);
   return out;
 }
 
