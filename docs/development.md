@@ -9,6 +9,7 @@ This page is for whoever is changing the engine itself: the maintainer, or anyon
 - [Where things are](#where-things-are)
 - [Run the tests](#run-the-tests)
 - [What a change needs](#what-a-change-needs)
+- [Coding standards](#coding-standards)
 - [Keeping up with DSDS](#keeping-up-with-dsds)
 - [Release labels](#release-labels)
 - [What a release asks of you](#what-a-release-asks-of-you)
@@ -33,7 +34,7 @@ The guide Claude reads is `rms-design-system-engine.md`, with `cookbook/` and `r
 The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the pinned DSDS release once, then run the suite and the docs check:
 
 ```bash
-for d in .ci-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
+for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
 node lib/dsds-release.mjs fetch
 node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
@@ -61,6 +62,30 @@ Actions are pinned by commit, so they are updated on purpose rather than by drif
 The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
 
 The privacy check reads Dependabot's release notes like any other text. A package quoted at its version (`pinia@4.1.0`) is not an address there, since a domain ends in letters and a version in a number. An address beside one is still found.
+
+## Coding standards
+
+The engine's code follows ESLint's recommended rules for JavaScript, and `test/lint.test.mjs` runs ESLint over `lib/`, the root entries and the git hooks on every test run, so a change that breaks them fails the suite. ESLint is a test tool in `test/.lint-tools`, as TypeScript is in `test/.ci-tools`: the engine itself still has no dependency.
+
+A few patterns the engine uses on purpose are stated once, with why, in `test/.lint-tools/eslint.config.mjs`:
+
+- **An empty `catch {}`** is how a step degrades safely: a file it cannot read, a browser that closed. Any other empty block is a mistake.
+- **Control characters in a pattern** are matched on purpose, in text read from terminals and other tools.
+- **A function's parameters** are its signature, which callers rely on by position, so one it no longer reads stays.
+- **Code built from text and run** is refused unless the line above says why.
+
+Beyond what ESLint checks:
+
+- **One module per job** in `lib/`, with a header comment that says what it does and what it never does.
+- **Plain modules**, `import` and `export`, run by Node 22 with no build step.
+- **A comment says why**, not what the next line does.
+- **A line that turns a rule off names the rule** and says why on the line above. The test refuses one that does not.
+
+To run ESLint on its own:
+
+```bash
+node test/.lint-tools/node_modules/eslint/bin/eslint.js -c test/.lint-tools/eslint.config.mjs .
+```
 
 ## Keeping up with DSDS
 

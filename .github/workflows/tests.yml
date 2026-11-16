@@ -37,6 +37,9 @@ jobs:
       # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
       # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
       # test/vue-builds.test.mjs).
+      # ESLint, which test/lint.test.mjs runs over the engine's own code (docs/development.md#coding-standards).
+      - name: Install ESLint
+        run: npm ci --prefix test/.lint-tools --no-audit --no-fund
       - name: Install the Vue build tools the Vue tests use
         run: |
           npm ci --prefix test/.vue-tools --no-audit --no-fund
