@@ -324,3 +324,11 @@ test('a token renamed into the system\'s case: the whole name it takes', () => {
   assert.deepEqual(fixOf(r, { where: 'typography/xxxs/line-height', value: 'line-height' }), { what: null, from: 'typography/xxxs/line-height', to: 'typography/xxxs/lineHeight', say: 'Rename it to typography/xxxs/lineHeight' });
   assert.equal(fixOf(r, { where: 'tab/Icon/selected', value: 'Icon' }).to, 'tab/icon/selected');
 });
+
+// A token named with another word for the system's idea is said as the whole name it takes, never the two words.
+test('a token renamed with the system\'s word: the whole name it takes', () => {
+  const r = { id: 'token-one-name', says: 'One idea has one name: press, never pressed' };
+  assert.deepEqual(fixOf(r, { where: 'acme/link/text/pressed/color', value: 'pressed, where the system says press' }),
+    { what: null, from: 'acme/link/text/pressed/color', to: 'acme/link/text/press/color', say: 'Rename it to acme/link/text/press/color' });
+  assert.equal(fixOf(r, { where: 'acme/bg/pressed', value: 'bg, where the system says background; pressed, where the system says press' }).to, 'acme/background/press');
+});

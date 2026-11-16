@@ -13,7 +13,7 @@
     ovTitle.appendChild(ovActs);
   }
   // A page for some components only (--component X --styleguide): which ones, what they nest, and where the rest is.
-  if (DATA.scope) { var sc = DATA.scope, sp = document.createElement('div'); sp.className = 'sg-pending sg-scope'; sp.innerHTML = '<b>This page shows ' + esc(sc.asked.join(', ')) + (sc.nested.length ? ' and the components ' + (sc.asked.length > 1 ? 'they nest' : 'it nests') + ': ' + esc(sc.nested.join(', ')) : '') + '.</b> The whole system\'s style guide: <code>rms-design-system-engine --styleguide</code>'; ov.appendChild(sp); }
+  if (DATA.scope) { var sc = DATA.scope, sp = document.createElement('div'); sp.className = 'sg-pending sg-scope'; sp.innerHTML = '<b>This page shows ' + namePills(sc.asked) + (sc.nested.length ? ' and the components ' + (sc.asked.length > 1 ? 'they nest' : 'it nests') + ': ' + namePills(sc.nested) : '') + '.</b> The whole system\'s style guide: <code>rms-design-system-engine --styleguide</code>'; ov.appendChild(sp); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
   // Each group says what it holds (styleguide.groups in ds-config.json words it your way).

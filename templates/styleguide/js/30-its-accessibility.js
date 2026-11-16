@@ -124,8 +124,8 @@
     var m = c.migration; if (!m) return [];
     return m.products.map(function (p) {
       return { key: c.name + '\u0000migration:' + p.name, area: 'Migration', kind: 'Retired', figma: '', code: '<code>' + esc(p.name) + '</code><span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places')) + '</span>',
-        where: esc(p.name) + '<span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places') + ': ' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '')) + '</span>',
-        todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + ' (' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '') + ').') + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md.') + '</span>',
+        where: esc(p.name) + '<span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places') + (p.count > p.at.length ? ', the first ' + p.at.length + ': ' : ': ')) + namePills(p.at) + '</span>',
+        todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + (p.count > p.at.length ? ', in ' + p.count + ' places, the first ' + p.at.length + ' here: ' : ', at ')) + namePills(p.at) + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md.') + '</span>',
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null,
         scope: { scope: 'local', reason: 'Local: moving ' + (p.name === 'This system' ? "the system's own pages" : p.name) + ' off ' + c.name + ' changes ' + (p.name === 'This system' ? 'those pages' : p.name + "'s own code") + ' only: no other product gets it.' } };
     });
@@ -138,7 +138,7 @@
     return (c.copies || []).map(function (x) {
       return { key: c.name + '\u0000copy:' + x.product + ':' + x.cls, area: 'Products', kind: 'Near copy', figma: '', code: '<code>.' + esc(x.cls) + '</code><span class="pg-par-val">' + esc(x.product + ', ' + x.file + ':' + x.line) + '</span>',
         where: esc(x.product) + '<span class="pg-par-val"><code>.' + esc(x.cls) + '</code> ' + esc(x.file + ':' + x.line) + '</span>',
-        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ' (' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? ', and it differs in ' + x.differ.slice(0, 4).join(', ') : '') + ').') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Your team decides which.') + '</span>',
+        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ', ' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? ', and it differs in ' : '.')) + (x.differ.length ? namePills(x.differ) : '') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Your team decides which.') + '</span>',
         who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });
@@ -148,14 +148,6 @@
   // whoever keeps the Figma file. A rule still to decide is the team's question and stays on the Rules page alone. The
   // component links to its node in the Figma file, in a tab of its own with Figma's mark, so the person checks there
   // whether the task holds: this is a Figma task, the one kind that links to Figma.
-  // What every row of a component's Rules area shares, said once above them: who fixes them, where, and the link to
-  // the component's node in Figma, in a tab of its own with Figma's mark (a Figma task, the one kind that links there).
-  function rulesLead(c) {
-    var url = ((DATA.construction || {}).figmaUrls || {})[c.name];
-    var n = ruleRows(c).length;
-    return '<div class="pg-par-sum sg-rules-lead">' + esc(n + ' rule' + (n === 1 ? '' : 's') + ' of the system ' + c.name + ' breaks in Figma, each fixed there by whoever keeps the Figma file.') +
-      (url ? ' <a class="sg-uses-link sg-cx-figma" href="' + esc(url) + '" target="_blank" rel="noopener" title="' + esc('Open ' + c.name + ' in Figma') + '">' + FIGMA_SVG + esc('Open ' + c.name + ' in Figma') + '</a>' : '') + '</div>';
-  }
   function ruleRows(c) {
     var G = DATA.construction;
     if (!G || !G.rules) return [];
@@ -168,7 +160,8 @@
         out.push({ key: c.name + '\u0000rule:' + r.id + ':' + (t.value || i), area: 'Rules', kind: r.says, ruleArea: RULE_AREA[r.area] || capital(r.area), figma: '', code: '',
           // The rule is said once, as the row's kind; what to do says what this component does and the fix.
           // What this component does, unless the fix already says it (most fixes name the value they change).
-          todo: (t.value && String(fix).indexOf(t.value) < 0 ? esc(t.value) : '') + '<span class="pg-todo">' + esc(fix) + '</span>',
+          // A fix of its own says only what to do, the finding inside it (the owner's, 16 November 2026).
+          todo: (t.value && !(t.fix && t.fix.say) && String(fix).indexOf(t.value) < 0 ? esc(t.value) : '') + '<span class="pg-todo">' + esc(fix) + '</span>',
           who: WHO.figma, st: 'todo', rel: '', at: DATA.builtAt || null });
       });
     });

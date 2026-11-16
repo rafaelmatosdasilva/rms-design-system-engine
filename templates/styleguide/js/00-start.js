@@ -352,6 +352,18 @@
   // What a table would say, inside a panel that opens from a table's row: labelled values, never another table (the
   // owner's rule). kvOne: one item, each label over its value; kvList: several, each its own block. An empty value is left out.
   // A label is words, escaped; { html } when it is markup the page made itself (the components a change is for, linked).
+  // A list of names, the one way the guide sets one, on every page and in every panel (the owner's, 16 November 2026):
+  // each name a pill (.sg-name), the first five shown, the rest behind one chevron pill ("9 more") that opens them.
+  // A name in a sentence is namePill. One handler opens every list's rest.
+  var PILLS_SHOWN = 5;
+  var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
+  function pillsMore(n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; }
+  function namePill(n) { return '<code class="sg-name">' + esc(n) + '</code>'; }
+  function namePills(names) { names = names || []; return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-pills-more]'); if (!b || !b.parentNode) return;
+    Array.prototype.forEach.call(b.parentNode.querySelectorAll(':scope > [hidden]'), function (p) { p.hidden = false; }); b.remove();
+  });
   function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + (p[0] && typeof p[0] === 'object' ? p[0].html : esc(p[0])) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
   function kvList(items, cls) { return '<ul class="sg-kv-list' + (cls ? ' ' + cls : '') + '">' + items.map(function (pairs) { return '<li>' + kvOne(pairs) + '</li>'; }).join('') + '</ul>'; }
   // The components that use a token: each its name (its page when it has one) and where it is, in Figma and in the code.

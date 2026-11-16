@@ -72,7 +72,8 @@
       var vars = r.vars.length ? r.vars.map(function (v) { return '<code>' + esc(v.var) + '</code><span class="pg-par-val">' + esc(v.figma || 'not in Figma') + '</span>'; }).join('') : esc('Written as values');
       // The components that move so, each once and linked to its Motion tab: what moves and how is on that tab.
       var users = r.uses.map(function (u) { return u.component; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
-      var uses = users.length ? users.map(function (n) { return known(n) ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/motion">' + esc(n) + '</a>' : esc(n); }).join(', ') : esc('Nothing');
+      // The first five shown, the rest behind one "N more" pill, as every list of names on the page (namePills).
+      var uses = users.length ? '<span class="sg-motion-uses">' + users.map(function (n, i) { return '<span' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + (i ? ', ' : '') + (known(n) ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/motion">' + esc(n) + '</a>' : esc(n)) + '</span>'; }).join('') + (users.length > PILLS_SHOWN ? ' ' + pillsMore(users.length - PILLS_SHOWN) : '') + '</span>' : esc('Nothing');
       return '<tr' + (r.unused ? ' data-unused' : '') + '><td>' + dot + '<code>' + esc(timing) + '</code></td><td>' + vars + '</td><td>' + esc(r.purposes.join(', ') || 'Nothing yet') + '</td><td>' + uses + '</td><td>' + esc(FIGMA_SAYS[r.figma] || '') + (r.figmaTiming && r.figma === 'differs' ? '<span class="pg-par-val">' + esc(r.figmaTiming) + '</span>' : '') + '</td><td>' + esc(systemSays(r)) + '</td></tr>';
     }), 'sg-motion-system');
     while (mc.firstChild) mo.appendChild(mc.firstChild);

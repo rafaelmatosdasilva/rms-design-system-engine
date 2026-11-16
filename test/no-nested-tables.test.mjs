@@ -65,7 +65,7 @@ test('in Chrome: a token\'s panel and an issue\'s panel hold labelled values and
 
 // A component's Figma review findings: a Rules area on its own page, from the Rules page's Figma rules to fix, with who
 // acts and the link to its node in Figma said once above the rows, never on each.
-test('a component\'s Rules area lists the Figma rules it breaks, and says what every row shares once', async () => {
+test('a component\'s Rules area lists the Figma rules it breaks, with no line above the table', async () => {
   const { readFileSync } = await import('node:fs');
   const read = (f) => readFileSync(new URL(`../templates/styleguide/js/${f}`, import.meta.url), 'utf8');
   const tasks = read('30-its-accessibility.js'), page = read('33-a-component-the-build-went-through-with.js'), table = read('22-one-table-for-every-issue.js'), areas = read('27-changelog.js');
@@ -77,6 +77,7 @@ test('a component\'s Rules area lists the Figma rules it breaks, and says what e
   // Who acts, and the link to Figma, once above the table: never a column, and never on each row.
   assert.match(table, /Rules: \[\['Task nr', 'no'\], \['Rule', 'kind'\], \['What to do', 'todo'\], \['Status', 'status'\], \['Last checked', 'updated'\]\]/);
   assert.doesNotMatch(table.match(/todo: function \(r\) \{[^\n]*/)[0], /sg-todo-who/, 'What to do never says who acts');
-  assert.match(tasks, /function rulesLead\(c\)[\s\S]*?sg-cx-figma[\s\S]*?FIGMA_SVG/);
+  // No line above the table repeating who acts and where (the owner's, 16 November 2026): each rule's panel has See in Figma.
+  assert.doesNotMatch(tasks + page, /rulesLead|breaks in Figma, each fixed there/);
   assert.match(tasks, /area: 'Rules', kind: r\.says, ruleArea: RULE_AREA\[r\.area\] \|\| capital\(r\.area\), figma: '', code: ''/, 'each row says its kind of rule, for the Rules page\'s Area filter');
 });

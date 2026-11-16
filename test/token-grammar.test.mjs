@@ -55,7 +55,7 @@ test('in the grammar: under Tokens, a token a place, with what to do', () => {
   const r = g.figma.rules.find((x) => x.id === 'token-one-name');
   assert.equal(r.area, 'tokens');
   assert.deepEqual(r.toFix, [{ where: 'link/textColor/pressed', value: 'pressed, where the system says press' }]);
-  assert.equal(fixOf(r, r.toFix[0]).say, 'Rename it with the system\'s word: pressed, where the system says press');
+  assert.equal(fixOf(r, r.toFix[0]).say, 'Rename it to link/textColor/press', 'the whole name it takes');
 });
 
 test('where a state sits, a value off the scale, a surface with nothing for what sits on it', () => {

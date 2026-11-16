@@ -33,8 +33,11 @@
     return out;
   }
 
+  // How a row was checked, in words, never its date: the date is said once, in Last checked (the owner's, 16 November
+  // 2026). The table's status line and the panel's Where it was read say it alike.
+  function howChecked(x, st) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, st === 'done' ? 'Checked by a person' : 'To check by a person'); }
   function statusLine(r) {
-    var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
+    var how = function (x) { return howChecked(x, r.st); };
     return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || (r.writeTo || r.area === 'Documentation' ? '' : how((r.src || []).filter(Boolean)[0]));   // a Documentation row's Source says where
   }
   function statusHTML(st, sub, area) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(rowWord(st, area)) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
@@ -131,7 +134,7 @@
     // Each source on its own line, linked to where it is: its page in the intent layer (with its file), the component in
     // Figma; the row's own link when it carries one.
     var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
-    var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
+    var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; x = howChecked(x, r.st); return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
     var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
     // An accessibility task says, under what to do, the component it is on (a link to its page) and where it was read,
     // so a panel opened from the Accessibility page, where every component is listed, says whose it is (the owner's,
@@ -154,7 +157,7 @@
       if (k === 'todo') return card(col[0], (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource || A11Y_TOP ? '' : card('Where it was read', srcLines())); }
-      if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
+      if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(whenShort(r.at)) + '</p>' : '');   // the table's own format
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
     });

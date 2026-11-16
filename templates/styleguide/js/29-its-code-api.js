@@ -3,9 +3,9 @@
     var api = c.api; if (!api) return '';
     var req = (api.props || []).some(function (p) { return p.required; });
     var props = (api.props || []).map(function (p) {
-      var what = p.values ? p.values.join(', ') : p.type || '';
-      var def = p.default != null ? 'default ' + p.default : '';
-      return '<tr><td>' + esc(p.name) + (p.required ? '<span class="pg-req" aria-hidden="true"> *</span><span class="sg-hidden-text"> (required)</span>' : '') + '</td><td>' + esc([what, def].filter(Boolean).join('  ·  ') || '-') + '</td></tr>';
+      var what = p.values ? namePills(p.values) : esc(p.type || '');
+      var def = p.default != null ? esc('default ' + p.default) : '';
+      return '<tr><td>' + esc(p.name) + (p.required ? '<span class="pg-req" aria-hidden="true"> *</span><span class="sg-hidden-text"> (required)</span>' : '') + '</td><td>' + ([what, def].filter(Boolean).join(esc('  ·  ')) || '-') + '</td></tr>';
     }).join('');
     var box = function (head, body, legend) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + body + '</table>' + (legend || '') + '</div>'; };
     var list = function (xs) { return xs.map(function (x) { return '<tr><td>' + esc(x) + '</td></tr>'; }).join(''); };

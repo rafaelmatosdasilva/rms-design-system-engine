@@ -72,7 +72,8 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     // The button's own History: the change to its page.
     await run(`location.hash = '#c-button/history'`);
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-button .pg-inspect[data-hist="intent"]')`, { attempts: 200 }), true, 'the button\'s History has its row');
-    assert.match(await run(`document.querySelector('#c-button .pg-inspect[data-hist="intent"]').innerText.replace(/\\s+/g, ' ')`), /Intent layer c2d4e6f8 Its page and 1 more changed: button, Saving\. 2026-10-31/);
+    assert.match(await run(`document.querySelector('#c-button .pg-inspect[data-hist="intent"]').innerText.replace(/\\s+/g, ' ')`), /Intent layer c2d4e6f8 Changed: button ?Saving 2026-10-31/);
+    assert.match(await run(`document.querySelector('#c-button .pg-inspect[data-hist="intent"]').innerHTML`), /Changed: <span class="sg-il-codes"><code class="sg-name">button<\/code><code class="sg-name">Saving<\/code><\/span>/, 'its pages a list of pills');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

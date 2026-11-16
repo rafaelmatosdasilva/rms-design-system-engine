@@ -303,7 +303,7 @@
       off.forEach(function (b) { if (offs.indexOf(b.label) < 0) offs.push(b.label); });
       return off.length > 0;
     });
-    return every && offs.length ? 'With ' + offs.join(' or ') + ' off it shows no words, so nothing names it. Where a product uses it that way, give it a name there: an aria-label, or aria-labelledby on words beside it. Say so in its Usage.' : '';
+    return every && offs.length ? 'With ' + offs.map(namePill).join(' or ') + esc(' off it shows no words, so nothing names it. Where a product uses it that way, give it a name there: an aria-label, or aria-labelledby on words beside it. Say so in its Usage.') : '';
   }
   function showFirst(list, propOf) {
     var out = list.slice(), shows = showsText;
@@ -358,14 +358,16 @@
     // the description (else the note is what it is, above).
     var docRows = (figNotes.length ? '<div><dt>From Figma</dt><dd>' + figNotes.map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
       (c.slots ? '<div><dt>Slots</dt><dd>' + c.slots.map(function (sl) {
-        var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content, with ' + sl.preferred.join(', ') + ' suggested' : 'Takes any content the product puts in it');
         var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
-        return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
+        // HTML: the components it takes, a list of pills (namePills), the words around them escaped.
+        var what = sl.preferredOnly ? (sl.preferred.length ? esc('Takes only' + count + ': ') + namePills(sl.preferred) : esc((sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') + count + '.'))
+          : (sl.preferred.length ? esc('Takes any content' + count + ', with these suggested: ') + namePills(sl.preferred) : esc('Takes any content the product puts in it' + count + '.'));
+        return '<p><b>' + esc(sl.name) + '</b> ' + what + esc((sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
       (c.note && figDesc ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '') +
       // Its file and the props its code declares, for a component only the code has (no Figma props to show them by).
       (c.codeOnly ? '<div><dt>In the code</dt><dd><p><code>' + esc(c.codeOnly.file) + '</code></p>' + ((c.codeOnly.props || []).length ? '<ul class="pg-code-props">' + c.codeOnly.props.map(function (p) {
-        return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + esc(p.options.join(' | ')) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
+        return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + namePills(p.options) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
       }).join('') + '</ul>' : '<p>No props declared.</p>') + '</dd></div>' : '');
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
@@ -428,8 +430,9 @@
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
       // Rules: the Figma review's findings for this component, each rule it breaks with its fix, waiting on whoever
-      // keeps the Figma file; each opens the component's node in Figma (ruleRows).
-      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(ruleRows(c)) + '</div>' + rulesLead(c) + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
+      // keeps the Figma file; each opens the component's node in Figma (ruleRows). No line above the table saying so
+      // (the owner's, 16 November 2026): each rule's own panel has See in Figma.
+      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(ruleRows(c)) + '</div>' + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
@@ -1034,16 +1037,16 @@
       })(0);
       function finish() {
         var n = plan.combos.length, scope = function (where) {
-          if (where.length === n) return n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.';
-          return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
+          if (where.length === n) return esc(n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.');
+          return ' In ' + namePills(where);   // HTML: the variants a list of pills
         };
         // Each check's result as an item under its criterion, with the variants it holds in; the text contrast as one.
         // A control with no name only where an on/off prop hides its words (an icon-only button, a box with no text): it
         // fails as it is, and what to do is said: the product that uses it that way names it there.
-        liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: esc(say), html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
+        liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: say, html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + scope(g.where), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
         // What a screen reader says on its controls, in the variants tried: the words a person hears, name, role, state.
         if (spokenOrder.length) liveItems.push({ sc: '4.1.2', label: wcagLabelOf('4.1.2'), st: 'done', from: FROM_PAGE,
-          html: 'A screen reader says ' + spokenOrder.slice(0, 8).map(function (t) { return '“' + esc(t) + '”' + (spoken[t].length < n && n > 1 ? ' (' + esc(spoken[t].slice(0, 2).join('; ') + (spoken[t].length > 2 ? ' and ' + (spoken[t].length - 2) + ' more' : '')) + ')' : ''); }).join(', ') + (spokenOrder.length > 8 ? ', and ' + (spokenOrder.length - 8) + ' more' : '') + '.' });
+          html: 'A screen reader says ' + spokenOrder.slice(0, 8).map(function (t) { return '“' + esc(t) + '”' + (spoken[t].length < n && n > 1 ? ' (in ' + namePills(spoken[t]) + ')' : ''); }).join(', ') + (spokenOrder.length > 8 ? ', and ' + (spokenOrder.length - 8) + ' more' : '') + '.' });
         if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
@@ -1080,7 +1083,7 @@
         checking = false;
         order.forEach(function (key) {
           var f = found[key];
-          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ' + f.where.slice(0, 3).join('; ') + (f.where.length > 3 ? ' and ' + (f.where.length - 3) + ' more' : '') + '.')) + placesTag([placeOf(f.desc)]) });
+          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ')) + (f.where.length === combos.length ? '' : namePills(f.where)) + placesTag([placeOf(f.desc)]) });
         });
         a11yRender(live);
         if (bgRun) { var f = bgRun; bgRun = null; f(); }

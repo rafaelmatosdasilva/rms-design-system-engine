@@ -296,7 +296,7 @@
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var lines = function (l) { return (l || []).map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); };
       var u = x.usedBy, lib = u && u.library;
-      var used = u ? lines([u.products.length ? 'The code of ' + u.products.join(', ') : '', u.inside.length ? 'Inside ' + u.inside.join(', ') : '', u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
+      var used = u ? (u.products.length ? '<p class="sg-il-line">The code of ' + namePills(u.products) + '</p>' : '') + (u.inside.length ? '<p class="sg-il-line">Inside ' + namePills(u.inside) + '</p>' : '') + lines([u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
         lib && lib.instances != null ? lib.instances + ' instance' + (lib.instances === 1 ? '' : 's') + ' in ' + lib.files + ' team file' + (lib.files === 1 ? '' : 's') + ' (Figma\'s library analytics)' : 'Team files the engine does not read are not counted' + (lib && lib.unseen ? ': ' + lib.unseen : '') + '.'].filter(Boolean)) : '';
       var after = x.status === 'waiting' ? '<p class="sg-il-line">Not made yet: once the script runs and Figma is read again, rms-design-system-engine --change-report ' + esc(x.component) + ' fills this in.</p>'
         : diffTable(x.real) + (x.mismatch.length ? '<p class="sg-il-line"><strong>' + esc('Not what the change said (' + x.mismatch.length + ')') + '</strong></p>' + lines(x.mismatch.map(function (y) { return capital(y.change) + ' ' + y.what + (y.from != null || y.to != null ? ': ' + [y.from, y.to].filter(function (z) { return z != null; }).join(' → ') : ''); })) : '<p class="sg-il-line">It is what the change said.</p>');
@@ -377,10 +377,7 @@
     // one type; a ticket's count of commits shows that ticket's alone.
     // The components a change affects: links the table turns into pills (pillLinks), the first five shown, the rest one
     // click away ("9 more").
-    var PILLS_SHOWN = 5;
-    // A list's "N more": a pill with a chevron before its count, so it reads as opening the rest. History's and a task's alike.
-    var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
-    var pillsMore = function (n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; };
+    // The rest of a list behind pillsMore, one for the whole guide (00-start.js).
     var pillsHTML = function (names, area) {
       return names.map(function (n, i) { return '<a href="#' + esc(cid(n)) + (area ? '/' + area : '') + '"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</a>'; }).join(' ') +
         // The rest one click away, a pill as the ones beside it (their height, their words' size).
@@ -394,8 +391,8 @@
     };
     // A name in a sentence, the one pill the whole guide sets names in (.sg-name), and a list of names as Tasks shows one:
     // five pills, the rest behind a chevron pill (the owner's, 14 November 2026).
-    var pill = function (n) { return '<code class="sg-name">' + esc(n) + '</code>'; };
-    var pillList = function (names) { return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; };
+    var pill = namePill;
+    var pillList = namePills;
     // One change Figma made, its name a pill: "showLabel added", a property's values "a" → "b".
     // Its name and its values pills too: "breakpoint" "a" → "b", "showIcon" renamed "Show Icon" (the owner's, 15 November 2026).
     var figmaChangeHTML = function (t) {
@@ -641,11 +638,7 @@
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
     });
-    // Any "N more" pill on the page shows the rest of its list, History's and a task's alike: one handler for all.
-    document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-pills-more]'); if (!b) return;
-      Array.prototype.forEach.call(b.parentNode.querySelectorAll(':scope > [hidden]'), function (p) { p.hidden = false; }); b.remove();
-    });
+    // Any "N more" pill opens the rest of its list: one handler for the whole guide (00-start.js).
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
@@ -922,7 +915,7 @@
       ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
       return out;
     };
-    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(', ')) : '<span class="pg-missing">None</span>'; };
+    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? namePills(w) : '<span class="pg-missing">None</span>'; };
     // A page's status in one word, as the filter and the chips before it said it.
     var IL_WORD = { review: 'Review', write: 'Missing', remove: 'Remove', keep: 'Done' };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
@@ -1002,11 +995,7 @@
     // open: the page's proposals not answered yet. Its rule changes are Changes to rules; the others (a page to write, a
     // name to keep, a part's page, a page to review again) Decisions about the page, each with the same three actions.
     // A long list of names: the first five as pills, the rest behind one button to open (the owner's, 12 November 2026).
-    var namesShown = function (list) {
-      // The rest one click away, a pill as History's ("1,061 more"), the same button and the same handler.
-      return '<span class="sg-il-codes">' + list.map(function (m, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(m) + '</code>'; }).join('')
-        + (list.length > PILLS_SHOWN ? pillsMore(list.length - PILLS_SHOWN) : '') + '</span>';
-    };
+    var namesShown = namePills;   // the guide's one list of names (00-start.js)
     // A draft as a person reads it: a role is written "Role: cell" (a reader keeps it as a line, and lists it under
     // Rules), said here as what it means. "none" is no role at all, never a role called none.
     var ilDraftShown = function (t) {
@@ -1224,7 +1213,7 @@
     // Where the products use a component with no page, and its place among the pages to write (pages-to-write.mjs);
     // the first ones are started on the next run that writes the layer, their lines drafts to review.
     var ilReachOf = function (n) { var r = (IL.pagesToWrite || {})[n]; if (!r) return ''; var x = r.reach || {}, ps = x.products || [], k = function (v, one) { return v + ' ' + one + (v === 1 ? '' : 's'); };
-      return '<p class="sg-il-line"><strong>' + esc('Number ' + r.rank + ' of the pages to write, most used first') + '</strong><span class="pg-par-val">' + esc((ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + ' use it: ' + k(x.files || 0, 'file') + ', ' + k(x.uses || 0, 'use') + '.' : 'No product uses it yet.') + (r.next ? ' The next run that writes the layer starts its page, its lines drafts to review.' : '')) + '</span></p>'; };
+      return '<p class="sg-il-line"><strong>' + esc('Number ' + r.rank + ' of the pages to write, most used first') + '</strong><span class="pg-par-val">' + (ps.length ? namePills(ps) + esc(' use it: ' + k(x.files || 0, 'file') + ', ' + k(x.uses || 0, 'use') + '.') : esc('No product uses it yet.')) + esc(r.next ? ' The next run that writes the layer starts its page, its lines drafts to review.' : '') + '</span></p>'; };
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
@@ -1234,7 +1223,7 @@
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
         var held = (p.drafts || []).length;
         return { decision: decisionCell(held ? 'review' : 'write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
-          write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') }],
+          write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span>' + namePills(asked) : '') }],
           todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page. Agents won\'t use them until you decide.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
           why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',

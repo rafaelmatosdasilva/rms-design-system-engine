@@ -20,8 +20,10 @@ const loadReview = () => {
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
   // A sentence's names in pills, shared by the Documentation and Rules pages, from where the page says it once.
   const pillNamesIn = new Function('esc', `return (${/var pillNamesIn = (function \(t, names\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)(esc);
+  // The guide's one list of names (00-start.js), as the page defines it.
+  const namePills = new Function('esc', 'PILLS_SHOWN', 'pillsMore', `return (${/function namePills(\(names\) \{[^\n]*\})/.exec(tpl)[1].replace(/^/, 'function ')})`)(esc, 5, (n) => `<button data-pills-more>${n} more</button>`);
   const isRuleChange = new Function(`return (${/var isRuleChange = (function \(x\) \{[^\n]*\});/.exec(tpl)[1]})`)();
-  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', 'pillNamesIn', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom, ilDraftSources: ilDraftSources };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange, pillNamesIn);
+  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', 'pillNamesIn', 'namePills', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom, ilDraftSources: ilDraftSources };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange, pillNamesIn, namePills);
 };
 const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';
@@ -230,8 +232,9 @@ test('the pages to write are ordered most used first, with a chip and each one\'
   assert.match(tpl, /\{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' \}/);
   const src = /var ilReachOf = (function \(n\) \{[\s\S]*?'<\/span><\/p>'; \});/.exec(tpl)[1];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const reach = (IL) => new Function('IL', 'esc', `return (${src})`)(IL, esc);
-  assert.equal(reach({ pagesToWrite: { tileMedia: { rank: 2, reach: { products: ['Shop', 'Admin'], files: 6, uses: 12 }, next: true } } })('tileMedia'), '<p class="sg-il-line"><strong>Number 2 of the pages to write, most used first</strong><span class="pg-par-val">Shop, Admin use it: 6 files, 12 uses. The next run that writes the layer starts its page, its lines drafts to review.</span></p>');
+  const namePills = (ns) => '<span class="sg-il-codes">' + ns.map((n) => '<code class="sg-name">' + esc(n) + '</code>').join('') + '</span>';
+  const reach = (IL) => new Function('IL', 'esc', 'namePills', `return (${src})`)(IL, esc, namePills);
+  assert.equal(reach({ pagesToWrite: { tileMedia: { rank: 2, reach: { products: ['Shop', 'Admin'], files: 6, uses: 12 }, next: true } } })('tileMedia'), '<p class="sg-il-line"><strong>Number 2 of the pages to write, most used first</strong><span class="pg-par-val"><span class="sg-il-codes"><code class="sg-name">Shop</code><code class="sg-name">Admin</code></span> use it: 6 files, 12 uses. The next run that writes the layer starts its page, its lines drafts to review.</span></p>');
   assert.equal(reach({})('tileMedia'), '');
 });
 

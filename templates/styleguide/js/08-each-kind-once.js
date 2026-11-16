@@ -83,7 +83,7 @@
     var t = c.tokenDocs; if (!t || !t.total) return null;
     var n = t.total - t.missing.length, all = !t.missing.length;
     var head = '<p>' + n + ' of ' + t.total + (t.total === 1 ? ' token says' : ' tokens say') + ' what ' + (t.total === 1 ? 'it is' : 'they are') + ' for.</p>';
-    var miss = t.missing.length ? '<p class="pg-missing">No description: ' + t.missing.slice(0, 12).map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + (t.missing.length > 12 ? ', and ' + (t.missing.length - 12) + ' more' : '') + '.</p>' : '';
+    var miss = t.missing.length ? '<p class="pg-missing">No description: ' + namePills(t.missing) + '</p>' : '';
     var said = (t.described || []).slice(0, 8).map(function (d) { return '<p><code>' + esc(d.figma) + '</code> ' + esc(d.description) + '</p>'; }).join('');
     return { key: c.name + '\u0000doc:tokens', area: 'Documentation', kind: 'Its tokens', written: head + miss + said,
       todo: all ? '' : esc('Write what each token is for in its description in Figma. Agents read it to pick the right token.'), who: all ? '' : WHO.figma, st: all ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: n ? ['From the variables\' descriptions in Figma'] : [] };
@@ -112,7 +112,7 @@
     var k = c.contract;
     if (k && (k.props || []).length) {
       var where = k.href ? '<a href="' + esc(k.href) + '" target="_blank" rel="noopener"><code>' + esc(k.file) + '</code></a>' : '<code>' + esc(k.file) + '</code>';
-      var listed = k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ');
+      var listed = namePills(k.props);
       var publish = 'Publish the contracts again from the code project (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request.';
       var row = !k.shared && !DATA.intentLayer
         ? mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, ' + where + ', which the engine generates from Figma and the code on every run: ' + listed + '. Agents read them there, so there is nothing to write.</p>', 'done', '')
@@ -131,7 +131,7 @@
       var pmiss = pd.missing || [], pdrafts = pmiss.filter(function (m) { return m.draft; }), inPatch = pdrafts.filter(function (m) { return m.inPatch; });
       var pname = function (m) { return '<code>' + esc(m.prop) + '</code>' + (m.figma ? ' <span class="pg-dim">(Figma ' + esc(m.figma) + ')</span>' : ''); };
       var pwritten = '<p>' + pd.described + ' of ' + pd.total + (pd.total === 1 ? ' prop says what it is' : ' props say what they are') + ' for.</p>' +
-        (pmiss.length ? '<p class="pg-missing">No description:</p><ul>' + pmiss.map(function (m) { return '<li>' + pname(m) + ': <code>' + esc(m.where) + '</code></li>'; }).join('') + '</ul>' : '') +
+        (pmiss.length ? '<p class="pg-missing">No description:</p><ul>' + pmiss.map(function (m) { return '<li>' + pname(m) + ': ' + namePill(m.where) + '</li>'; }).join('') + '</ul>' : '') +
         (pdrafts.length ? '<p class="pg-par-val">Drafted, to approve</p><ul>' + pdrafts.map(function (m) { return '<li>' + pname(m) + ': ' + esc(m.draft) + (m.inPatch ? '' : ' <span class="pg-dim">(write it by hand)</span>') + '</li>'; }).join('') + '</ul>' : '');
       var ptodo = !pmiss.length ? '' : [inPatch.length && pd.patch ? 'Read each drafted line. To write them in the code, where the engine reads them on the next run, copy the request and paste it into Claude Code: it applies ' + pd.patch + '. A line that says it wrong: write the right words in the code instead.' : '',
         pmiss.length > inPatch.length ? 'Write the others where each line says: the comment above the prop in its code file, or contract.authored.json under propDescriptions.' : ''].filter(Boolean).join(' ');
@@ -167,7 +167,7 @@
     if (cov.length) {
       var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists', values: 'Values nothing helps choose between', keyboard: 'What the keyboard does', apart: 'What tells it apart', overflow: 'What it does when its content does not fit', oneAction: 'What it shows with one action only' };
       cov.forEach(function (m) { (groups[m.kind] = groups[m.kind] || []).push(m); });
-      rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + (groups[k].every(function (m) { return m.what === c.name; }) ? esc(groups[k][0].why.charAt(0).toUpperCase() + groups[k][0].why.slice(1)) + '.' : groups[k].map(function (m) { return '<code>' + esc(m.what) + '</code>'; }).join(', ')) + '</li>'; }).join('') + '</ul>', 'todo',
+      rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + (groups[k].every(function (m) { return m.what === c.name; }) ? esc(groups[k][0].why.charAt(0).toUpperCase() + groups[k][0].why.slice(1)) + '.' : namePills(groups[k].map(function (m) { return m.what; }))) + '</li>'; }).join('') + '</ul>', 'todo',
         Object.keys(groups).map(function (k) { var w = groups[k].map(function (m) { return m.what; }).filter(function (x) { return x !== c.name; }); return (LABEL[k] || k) + (w.length ? ' (' + w.join(', ') + ')' : '') + '. ' + groups[k][0].write; }).join(' ')));
       rows[rows.length - 1].src = ['Its code and its intent layer page'];
     }
@@ -176,7 +176,7 @@
     // Needs its own page names, for which agents picked another component: two pages claiming one use, or a purpose
     // that does not say enough (to review).
     if ((c.confusions || []).length) {
-      rows.push(mk('confused', 'Agents picked another component', '<p class="pg-missing">For ' + c.confusions.length + (c.confusions.length === 1 ? ' need' : ' needs') + ' its page names, agents chose another component:</p><ul>' + c.confusions.slice(0, 6).map(function (x) { return '<li>"' + esc(x.text) + '": <code>' + esc(x.chose || 'nothing') + '</code></li>'; }).join('') + '</ul>', 'check',
+      rows.push(mk('confused', 'Agents picked another component', '<p class="pg-missing">For ' + c.confusions.length + (c.confusions.length === 1 ? ' need' : ' needs') + ' its page names, agents chose another component:</p><ul>' + c.confusions.slice(0, 6).map(function (x) { return '<li>"' + esc(x.text) + '": ' + namePill(x.chose || 'nothing') + '</li>'; }).join('') + '</ul>', 'check',
         'Say in its purpose what sets it apart from ' + [...new Set(c.confusions.map(function (x) { return x.chose; }).filter(Boolean))].slice(0, 3).join(', ') + ', and name the other one in its "when not to use", or take the need off the page that does not own it.'));
       rows[rows.length - 1].src = ['The "which component?" test'];
     }
@@ -196,7 +196,7 @@
         'Keep the sentence that says more, and take the other out or point it at the first.'));
       rows[rows.length - 1].src = ['The rules read against each other'];
     }
-    if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
+    if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">Named in what is written, but the system has no token, property or component by that name: ' + namePills(a.unknown) + '</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;
   };
@@ -216,7 +216,7 @@
     var body = IL_READ.map(function (k) { var l = listOf(il[k[0]]); return l.length ? '<p class="pg-par-val">' + esc(k[1]) + '</p>' + paras(l) : ''; }).join('') +
       listOf(il.sections).map(function (x) { return '<p class="pg-par-val">' + esc(x.title) + ' (another section)</p>' + paras([x.text]); }).join('') +
       (il.status ? '<p class="pg-par-val">Status</p>' + paras([il.status]) : '') +
-      (listOf(il.facts).length || il.repeated ? '<p class="pg-par-val">Left out</p>' + paras([].concat(listOf(il.facts).length ? [listOf(il.facts).join(', ') + ': facts the engine reads from Figma and the code'] : [], il.repeated ? [il.repeated + ' lines the same on every page of its kind'] : [])) : '');
+      (listOf(il.facts).length || il.repeated ? '<p class="pg-par-val">Left out</p>' + (listOf(il.facts).length ? '<p>Facts the engine reads from Figma and the code: ' + namePills(listOf(il.facts)) + '</p>' : '') + paras(il.repeated ? [il.repeated + ' lines the same on every page of its kind'] : []) : '');
     // In the table: its page and how much was read; the row opens everything read, in the side panel (writtenFull).
     var none = said ? '' : '<p class="pg-missing">Its page says nothing an agent reads: the Intent layer page says why, and what to change.</p>';
     return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + '<p class="pg-par-val">' + n + (n === 1 ? ' line' : ' lines') + ' read from its page. Open the row to see them.</p>' + none,
@@ -233,8 +233,8 @@
     var cards = q.roots.map(function (r) { return card('approve', 'Part of ' + r, 'Shown and documented inside ' + r + ', never on its own.', run(r)); })
       .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Claude Code asks which component it belongs to.', ENGINE + ' on Component ' + c.name + ', Ask me which component it is a part of')])
       .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
-    var ask = q.roots.length ? 'Is ' + c.name + ' a part of ' + q.roots.join(' or ') + '?' : 'Is ' + c.name + ' a part of another component?';
-    return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + esc(ask) + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
+    var ask = esc('Is ' + c.name + ' a part of ') + (q.roots.length ? q.roots.map(namePill).join(' or ') + '?' : 'another component?');
+    return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + ask + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
       todo: esc('Say whether it is a part, then copy your decision and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
   };
   document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-part-copy]'); if (cp) copyText(cp.getAttribute('data-part-copy'), cp); });
@@ -366,7 +366,7 @@
         return '<li><span>' + name + '</span><span class="sg-status' + (st[1] ? ' sg-status--' + st[1] : '') + '">' + esc(st[0]) + '</span></li>';
       }).join('') + '</ol>' : '<p class="sg-template-note">Figma places none of the system\'s components in it.</p>';
       var notes = [];
-      if (t.order) notes.push('The code places them in another order: ' + t.order.code.map(esc).join(', ') + '.');
+      if (t.order) notes.push('The code places them in another order: ' + namePills(t.order.code));
       if (parts.some(function (p) { return p.state === 'missing'; })) notes.push('A developer uses each component marked Not in the code, or the team keeps it out on purpose with its reason.');
       if (!t.picture && t.pictureWhy) notes.push('No picture of the frame: ' + esc(t.pictureWhy) + '.');
       a.innerHTML = '<h3>' + esc(t.name) + '</h3>' + (meta.length ? '<p class="sg-template-meta">' + meta.join(' · ') + '</p>' : '') +

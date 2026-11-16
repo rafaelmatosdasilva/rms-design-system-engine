@@ -92,7 +92,7 @@ test('the style guide carries each template with its parts, its Figma link and i
     assert.equal(await run(`document.querySelector('#template-Settings .sg-template-parts a[href="#c-button"]') !== null`), true, 'a component with a page is linked');
     assert.match(await run(`document.querySelector('#template-Settings .sg-template-meta').textContent`), /Built in views\/SettingsPage\.vue, 2 of 2 components in the code · See in Figma/);
     assert.equal(await run(`document.querySelector('#template-Settings figure img').alt`), 'Settings in Figma');
-    assert.match(await run(`document.querySelector('#template-Settings').textContent`), /The code places them in another order: button, badge\./);
+    assert.match(await run(`document.querySelector('#template-Settings').innerHTML`), /The code places them in another order: <span class="sg-il-codes"><code class="sg-name">button<\/code><code class="sg-name">badge<\/code><\/span>/);
     assert.match(await run(`document.querySelector('#template-Profile').textContent`), /No code file found\. A developer names it in templates\[\]\.file in ds-config\.json/);
     assert.match(await run(`document.querySelector('#template-Profile').textContent`), /buttonNot compared/);
     assert.deepEqual(errors, []);

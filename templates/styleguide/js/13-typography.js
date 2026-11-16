@@ -34,7 +34,7 @@
     }
     if (TYPE_OFF.length) {
       var off = document.createElement('div'); off.className = 'sg-pending sg-type-off';
-      off.innerHTML = '<b>Left off until Figma and the code agree:</b> ' + TYPE_OFF.map(function (x) { return esc(x.style) + ' (' + esc(x.differs.length ? 'differs' : 'not compared') + ': ' + esc(x.fields.map(function (f) { return ({ size: 'size', weight: 'weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' })[f] || f; }).join(', ')) + ')'; }).join(', ') + '. Each is on the Status page.';
+      off.innerHTML = '<b>Left off until Figma and the code agree:</b> ' + TYPE_OFF.map(function (x) { return namePill(x.style) + ' (' + esc(x.differs.length ? 'differs' : 'not compared') + ': ' + esc(x.fields.map(function (f) { return ({ size: 'size', weight: 'weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' })[f] || f; }).join(', ')) + ')'; }).join(', ') + '. Each is on the Status page.';
       ts.appendChild(off);
     }
     var demo = document.createElement('div'); demo.className = 'type-list sg-token-cards';   // no frame around the list: each style is its own card

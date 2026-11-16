@@ -405,7 +405,7 @@ test('in the browser: no script error, a control changes the real component, the
     }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
-    assert.match(live, /Tested now/, 'each finding says where it comes from');
+    assert.match(live, /Tested in a browser/, 'each finding says where it comes from, its date said once, in Last checked');
     // The text contrast is measured on the same pass, as each variant is drawn, and joins the table with these results:
     // read with them, never from the table as first drawn.
     assert.match(live, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
@@ -1020,10 +1020,11 @@ test('To do: AAA advice is to check and to decide, never a must-fix; a component
 
 test('a control with no name only where an on/off prop hides its words fails, with what the product does about it', () => {
   const tpl = templateText();
-  const named = new Function(tpl.slice(tpl.indexOf('function showsText('), tpl.indexOf('function showFirst(')) + 'return namedWhereUsed;')();
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), namePill = (n) => `<code class="sg-name">${esc(n)}</code>`;
+  const named = new Function('esc', 'namePill', tpl.slice(tpl.indexOf('function showsText('), tpl.indexOf('function showFirst(')) + 'return namedWhereUsed;')(esc, namePill);
   const props = [{ label: 'Show Label', type: 'BOOLEAN', default: true }, { label: 'Label Content', type: 'TEXT' }, { label: 'Show Icon', type: 'BOOLEAN', default: true }];
   // Unnamed only with its label off: what to do is said, naming the prop.
-  assert.match(named([{ 'Show Label': false, 'Show Icon': true }, { 'Show Label': false, 'Show Icon': false }], props), /^With Show Label off it shows no words, so nothing names it\. Where a product uses it that way, give it a name there: an aria-label/);
+  assert.match(named([{ 'Show Label': false, 'Show Icon': true }, { 'Show Label': false, 'Show Icon': false }], props), /^With <code class="sg-name">Show Label<\/code> off it shows no words, so nothing names it\. Where a product uses it that way, give it a name there: an aria-label/);
   // Unnamed with its label shown too: the component's own fault, nothing more said.
   assert.equal(named([{ 'Show Label': false }, { 'Show Label': true }], props), '');
   // An on/off prop that shows no words (an icon) never counts.
@@ -1742,7 +1743,9 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
 
 test('History: a row per change, newest first, whatever its type: a commit to the code with its issues and release, what a read of Figma changed in each component, a commit to the intent layer, a decision', () => {
   const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 5;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
+  // The guide's one list of names and its "N more" pill (00-start.js), then History's own functions.
+  const shared = ['var PILLS_SHOWN', 'var PILLS_CHEV', 'function pillsMore(', 'function namePill(', 'function namePills('].map((k) => tpl.slice(tpl.indexOf('  ' + k), tpl.indexOf('\n', tpl.indexOf('  ' + k)) + 1)).join('');
+  const src = shared + tpl.slice(tpl.indexOf('    // The rest of a list behind pillsMore, one for the whole guide'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
     esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1), {});

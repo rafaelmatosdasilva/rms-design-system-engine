@@ -17,7 +17,7 @@
     var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
     // Figma: when it was last read, then every read that changed what Figma says of it, with what changed.
     var fig = (u.figmaRead ? '<tr><td>Last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') +
-      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + ((r.editors || []).length ? ' <span class="pg-log-date">changed in Figma by ' + esc(r.editors.join(', ')) + '</span>' : '') + doneByHTML(r) + what(/first time/.test(r.changed[0]) ? [] : r.changed.length > 4 ? r.changed.slice(0, 4).concat('and ' + (r.changed.length - 4) + ' more') : r.changed) + '</td></tr>'; }).join('');
+      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + ((r.editors || []).length ? ' <span class="pg-log-date">changed in Figma by ' + esc(r.editors.join(', ')) + '</span>' : '') + doneByHTML(r) + (/first time/.test(r.changed[0]) || !r.changed.length ? '' : '<span class="pg-par-val">' + namePills(r.changed) + '</span>') + '</td></tr>'; }).join('');
     // What the team decided about it, gathered from wherever each decision was made (decisions.mjs). First, because
     // a decision outlives every commit under it: an option somebody looked at and did not want is the one thing a
     // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
@@ -36,7 +36,7 @@
     // as every other change on the page says who did it.
     var lay = (DATA.intentChanges || []).filter(function (x) { return (x.components || []).indexOf(c.name) >= 0; }).map(function (x) {
       var sha = !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>';
-      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc((x.pages.length === 1 ? 'Its page changed: ' : 'Its page and ' + (x.pages.length - 1) + ' more changed: ') + x.pages.join(', ') + '.') + ' ' + day(x.at || '') + (x.by ? ' <span class="pg-log-date">' + esc(x.by) + '</span>' : '') + '</td></tr>';
+      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc(x.pages.length === 1 ? 'Its page changed: ' : 'Changed: ') + namePills(x.pages) + ' ' + day(x.at || '') + (x.by ? ' <span class="pg-log-date">' + esc(x.by) + '</span>' : '') + '</td></tr>';
     }).join('');
     // The comments left on it in Figma (figma-comments.mjs), each thread with its replies, open or resolved.
     var cm = (c.figmaComments || []).map(function (t) {
