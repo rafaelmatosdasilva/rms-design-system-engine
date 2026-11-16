@@ -103,3 +103,29 @@ test('a build with the browser pictures the guide\'s own pages in a folder that 
   assert.equal(ci.status, 0, ci.stdout + ci.stderr);
   assert.doesNotMatch(ci.stdout, /📸|own pages not pictured/);
 });
+
+// A picture of the same build must not depend on the clock. The same page shot twice a minute apart differed by 2%
+// of its pixels - ten times what counts as changed - because a cell reading "Just now" became "1 min ago", widened,
+// and reflowed the table around it. The words were already invisible under QUIET; the box they sat in was not.
+test('a time that ticks over between two pictures moves nothing', { timeout: budget(120000) }, async (t) => {
+  const { findChrome, launchChrome, connectCDP, openPage } = await import('../lib/cdp.mjs');
+  const { QUIET } = await import('../lib/styleguide-shots.mjs');
+  const chrome = findChrome({ playwright: true });
+  if (!chrome || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const b = await launchChrome(chrome, { tmpPrefix: 'sg-clock-' });
+  try {
+    const { send } = await connectCDP(b.wsUrl);
+    // The shape the style guide uses: a cell whose text is a time carries data-at, with something after it.
+    const where = async (words, css) => {
+      const { sessionId } = await openPage(send, 'about:blank');
+      await send('Page.navigate', { url: `data:text/html,<table style="width:600px"><tr><td data-at="x">${words}</td><td id="after">after</td></tr></table>` }, sessionId);
+      await new Promise((r) => setTimeout(r, 300));
+      // The stylesheet is handed to the browser as an argument, never written into the code it runs (styleguide-shots.mjs).
+      const global = (await send('Runtime.evaluate', { expression: 'globalThis' }, sessionId)).result.objectId;
+      const fn = function (css) { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); return Math.round(document.getElementById('after').getBoundingClientRect().left); };
+      return (await send('Runtime.callFunctionOn', { objectId: global, functionDeclaration: String(fn), arguments: [{ value: css }], returnByValue: true }, sessionId)).result.value;
+    };
+    assert.notEqual(await where('Just now', ''), await where('1 min ago', ''), 'the clock does move the page, with nothing holding it');
+    assert.equal(await where('Just now', QUIET), await where('1 min ago', QUIET), 'and QUIET holds it still');
+  } finally { b.kill(); }
+});
