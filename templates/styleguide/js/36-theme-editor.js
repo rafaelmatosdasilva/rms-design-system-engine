@@ -1477,7 +1477,7 @@
       (document.querySelector('.sg-layout') || document.body).appendChild(d);
       var done = function (h) { d.close(); d.remove(); ok(h); };
       d.addEventListener('click', function (e) {
-        if (e.target.closest('[data-no]')) return done(null);
+        if (e.target.closest('[data-no]')) return done('download');
         if (e.target.closest('[data-yes]')) window.showDirectoryPicker({ id: 'sg-ts-themes', mode: 'readwrite' }).then(function (h) { idb(h).catch(function () {}); done(h); }, function () { done(null); });
       });
       d.addEventListener('cancel', function (e) { e.preventDefault(); done(null); });
@@ -1496,11 +1496,14 @@
   // Kept: written to the folder (with every theme this browser holds that the folder lacks yet, the first time), else
   // downloaded. A theme renamed leaves its old file.
   var persist = function (t, was) {
+    // Cancelled (the dialog closed, the picker dismissed): the theme stays in this browser and no file is written.
+    // Only Download instead downloads it.
     folder(true).then(function (h) {
-      if (!h) return download(t);
+      if (h === 'download') return download(t);
+      if (!h) return;
       var first = !FILES.length ? savedThemes().filter(function (x) { return x.id !== t.id; }) : [];
       return writeTo(h, t).then(function () { return Promise.all(first.map(function (x) { return writeTo(h, x); })); }).then(function () { if (was && fileOf(was) !== fileOf(t)) return h.removeEntry(fileOf(was)).catch(function () {}); });
-    }).catch(function () { download(t); });
+    }).catch(function () { /* not written: the theme is still kept in this browser */ });
   };
   var unpersist = function (t) {
     if (!t) return;

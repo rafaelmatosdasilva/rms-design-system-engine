@@ -113,11 +113,12 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     await run(`document.querySelector('dialog.sg-dialog[open] [data-yes]').click()`);
     await until(`!document.querySelector('dialog.sg-dialog') || null`);
     assert.equal(await until(`document.getElementById('ts-btn-r-num') && document.getElementById('ts-btn-r-num').value`), r0, 'back as it opened');
-    // Named and made: the folder is asked for (Download instead here), and the theme is kept, applied and in the link.
+    // Named and made: the folder is asked for (cancelled here, so no file is written: Download instead would put one in the
+    // real Downloads folder on every run), and the theme is kept, applied and in the link.
     await run(`(() => { const n = document.getElementById('ts-name'); n.value = 'Coral Reef'; n.dispatchEvent(new Event('input', { bubbles: true })); const p = document.getElementById('ts-primary-hex'); p.value = '#e11d48'; p.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#sg-theme-panel [data-ts="create"]').click(); })()`);
     const asked = await until(`(() => { const d = document.querySelector('dialog.sg-dialog[open]'); return d ? d.textContent : null; })()`);
     assert.ok(asked.includes(`${themes.replace(homedir(), '~')}/${sys}`), 'the folder named as the setup writes it: ' + asked);
-    await run(`document.querySelector('dialog.sg-dialog[open] [data-no]').click()`);
+    await run(`document.querySelector('dialog.sg-dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true }))`);
     const kept = JSON.parse(await until(`localStorage.getItem('sg-ts-themes:' + '${sys}')`, (v) => v && v.includes('Coral Reef')));
     const made = kept.find((x) => x.name === 'Coral Reef');
     assert.ok(made && made.brief.primary === '#e11d48' && /data-ts-theme="/.test(made.css), 'kept with what was chosen, and its CSS worked out');
