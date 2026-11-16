@@ -31,5 +31,5 @@ test('each panel names itself in the address while it is open, and a link opens 
   assert.match(tpl, /if \(e\.isTrusted\) setHashQuery\(\{ show: k \}\);/, 'a page bar chip');
   assert.match(tpl, /setHashQuery\(\{ st: b\.dataset\.st \}\)/, 'an area chip');
   assert.match(tpl, /qWant\('show'\)\) whenThere/);
-  assert.match(tpl, /\/\^doc:\/\.test\(panelWant\) \? \(target\._openKey && target\._openKey\(panelWant\)\) : \/\^row:\/\.test\(panelWant\) \? openRowKey\(panelWant\)/);
+  assert.match(tpl, /\/\^doc:\/\.test\(panelWant\) \? \(\(target\._openKey && target\._openKey\(panelWant\)\) \|\| !!\(DOC_PAGE && DOC_PAGE\.open\(panelWant\)\)\) : \/\^row:\/\.test\(panelWant\) \? openRowKey\(panelWant\)/, 'a documentation row opens on the page or in a component\'s area');
 });

@@ -371,6 +371,9 @@
       }).join('') + '</ul>' : '<p>No props declared.</p>') + '</dd></div>' : '');
     // The rules that change it, as the Rules page has them (none when the system has no rules).
     var compRules = RULES_PAGE ? RULES_PAGE.of(c.name) : [];
+    // The Documentation page's rows for it, as the page has them (drawn first when it is not yet).
+    if (!DOC_PAGE && fillDocs) { fillDocs(); fillDocs = null; }
+    var compDocs = DOC_PAGE ? DOC_PAGE.of(c.name) : [];
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
@@ -415,9 +418,11 @@
       '</div>' +
       // Variants: every option of each variant prop and both sides of each on/off prop, one per row, the other props as the Playground sets them.
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
-      // Documentation: Figma's and the code's own words, and when each side last changed.
+      // Documentation: the Documentation page's own table, filtered to the rows it has for this component (its page in the
+      // intent layer, each decision on it a row, or the page still to write), with the page's filters, each row opening
+      // the same panel (DOC_PAGE, 07-second-in-the-list.js, the owner's, 16 November 2026).
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' + naInfo(states.doc) +
-        knowledgeHTML(c) +
+        (compDocs.length ? '<div class="pg-doc pg-par pg-knowledge" id="' + esc(cid(c.name)) + '-documentation">' + DOC_PAGE.tableHTML(compDocs) + '</div>' : states.doc.say === 'N/A' ? '' : areaInfo('The Documentation page has no row for it.')) +
         '</div></div>' +
       // API: its props (each one the code says must be given marked), the events it sends and its slots, as the code has them.
       // with its Details (its slots and what each takes), how it is built rather than how it is used.
@@ -438,8 +443,9 @@
       (compRules.length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par" id="' + esc(cid(c.name)) + '-rules">' + RULES_PAGE.tableHTML(compRules) + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
-    // Its Rules and History areas: the pages' own tables, wired as the pages wire them.
+    // Its Rules, Documentation and History areas: the pages' own tables, wired as the pages wire them.
     if (compRules.length) RULES_PAGE.wire(sec.querySelector('.pg-area[data-area="rules"] .pg-doc'), compRules);
+    if (compDocs.length) DOC_PAGE.wire(sec.querySelector('.pg-area[data-area="docs"] .pg-doc'), compDocs);
     fillHistoryArea(sec, c);
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // A component taller than the stage: the room above and below it shrinks first (to the stage's least), then the stage
@@ -860,9 +866,9 @@
       var cmpBar = compareEl.querySelector('.pg-compare-bar');
       segItems(cmpBar).forEach(function (b) { segSelect(b, b.dataset.v === compareMode); b.addEventListener('click', function () { compareMode = b.dataset.v; segItems(cmpBar).forEach(function (x) { segSelect(x, x === b); }); drawCompare(); }); });
     }
-    // The Accessibility table, drawn from the items the data gives and those this page's run finds, with a count of each
-    // status above it and when the last audit ran.
-    var a11yEl = sec.querySelector('.pg-a11y-rows'), a11ySumEl = sec.querySelector('.pg-a11y-sum'), a11yNote = sec.querySelector('.pg-a11y-note');
+    // The Accessibility area: the Accessibility page's own table, drawn from the items the data gives and those this
+    // page's run finds (a11yArea, 30-its-accessibility.js), with when the last audit ran above it.
+    var a11yEl = sec.querySelector('.pg-a11y'), a11yNote = sec.querySelector('.pg-a11y-note');
     // What this browser tried before (kept on the Status page) shows at once, until this page tries it again.
     var staticItems = c.a11y ? a11yStaticItems(c) : [], liveItems = (c.__a11y && c.__a11y.liveItems) || [], liveNow = (c.__a11y && c.__a11y.live) || null;
     // The parts of what is drawn that hold words (its label, its description), by their own class, for the rows a person
@@ -883,28 +889,27 @@
       if (live !== undefined) liveNow = live;
       var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
-      a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(function (r) { return issueRowHTML(r, 'Accessibility'); }).join('');
-      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the Status page lists what it shows
+      if (liveNow) c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) };
+      a11yArea(a11yEl, c);
+      if (liveNow) { fillTodo(); if (!checking) keepA11y(); }   // the Status page and the Accessibility page list what it shows
       // Its tab carries its state, as its Status row says it, once the browser has tried it.
       var accNow = componentStates(c).acc;
       areaState(sec.querySelector('.pg-areas [data-v="a11y"]'), accNow); areaNA(sec.querySelector('.pg-area[data-area="a11y"]'), accNow);
-      labelCells(a11yEl.closest('.pg-a11y'));
-      var n = {};
-      Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
-      // What meeting the standard rests on: a criterion a person answered is their word, and a claim that does not say
-      // so reads as though the engine measured all of it.
+      labelCells(a11yEl);
+      // Nothing to fix or to check in its criteria at A and AA, the checks a person makes included, and none still being
+      // tried: it meets WCAG 2.2 at A and AA, said with how much of that rests on a person's word.
+      var a11yRows = a11yEl.querySelector('.sg-a11y-table tbody').rows, n = {};
+      Array.prototype.forEach.call(a11yRows, function (r) { n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
       function saidRest(rows) {
         var said = 0;
         Array.prototype.forEach.call(rows, function (r) { if (r.hasAttribute('data-said')) said++; });
         return said ? ' \u00b7 ' + said + (said === 1 ? ' criterion on a person\'s word' : ' criteria on a person\'s word') : '';
       }
-      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility', whoChipsHTML(a11yEl.rows)) +
-        // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
-        (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA' + saidRest(a11yEl.rows) + '</span>' : '');
+      var meets = !n.todo && !n.check && !n.pending && n.done ? esc('Meets WCAG 2.2 at level A and AA' + saidRest(a11yRows) + '.') : '';
       var ch = c.a11y && c.a11y.checked;
       // Only what a row cannot say: when each check ran is in its own row.
-      a11yNote.innerHTML = [!ch ? esc('The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.') : ch.notRead ? '<span class="sg-mx-why">' + esc('The last audit (' + when(ch.at) + ') could not try it: ' + plainWhy(ch.why) + '. Run the audit again once that is fixed.') + whyTip(ch.why) + '</span>' : '',
-        (c.a11y && c.a11y.excused || []).length ? esc('Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.') : ''].filter(Boolean).join(' ');
+      a11yNote.innerHTML = [meets, !ch ? esc('The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.') : ch.notRead ? '<span class="sg-mx-why">' + esc('The last audit (' + when(ch.at) + ') could not try it: ' + plainWhy(ch.why) + '. Run the audit again once that is fixed.') + whyTip(ch.why) + '</span>' : '',
+        (c.a11y && c.a11y.excused || []).length ? esc('Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join(' · ') + '.') : ''].filter(Boolean).join(' ');
       a11yNote.hidden = !a11yNote.textContent;
       stickHeight(sec);   // its chips, now filled, measured for the table's head under them
     }

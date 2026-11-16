@@ -69,7 +69,9 @@ The style guide has a page of its own for accessibility, under Documentation in 
 - **Only A and AA.** The criteria WCAG 2.2 AA asks for, and nothing else. What the engine looks at beyond them (high contrast mode, reduced motion, AAA advice) and a Figma note no check reads stay on each component's own Accessibility area.
 - **Filters.** A chip for each status (Issues, Review, Met) and one for what differs by browser, then the level and who acts. They combine, and each says how many rows it would leave. The component is in each row, and the principle and what a criterion depends on are in its panel.
 - **A card a level.** Level A and Level AA, each the share of its criteria the system meets, with a bar for each principle (perceivable, operable, understandable, robust). The tip at each card's top right gives the sum in plain words.
-- **Filled once every component is tried.** Every row is one the browser tries as the page opens, so until each component has been, the page says how far it has got rather than drawing half a table.
+- **Drawn at once.** The table shows as the page opens, with every result already known (tried when the page was built, or kept by this browser).
+- **Being tried in this browser.** A component not tried yet has its rows say so, with a grey dot. When its try ends, each of its rows is drawn again where it is: nothing moves and nothing is sorted again while you read. The cards count only what is known.
+- **The same table on a component's page.** Its Accessibility area is this table, built by the same code and limited to that component.
 - **On the Status page.** Its Accessibility card counts the criteria that pass in one browser and fail in another, and opens this page with that filter on.
 
 **How the percentage is worked out.** The engine checks for WCAG 2.2 AA, and AA asks for every criterion of level A and of level AA. The numbers count criteria, never rows or components, the way an audit reads WCAG, and none is an average.

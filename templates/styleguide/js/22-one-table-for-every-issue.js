@@ -6,7 +6,10 @@
      rel, at, src, extra }. */
   // What each status says: ready to fix (the answer is known: the code follows Figma), needs a decision (someone says
   // which side is right first), done.
-  var STATUS = { todo: ['✕', 'Ready to fix', 'differs'], check: ['!', 'Needs a decision', 'figma'], done: ['✓', 'Done', 'match'], kept: ['≠', 'Kept on purpose', 'none'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
+  var STATUS = { todo: ['✕', 'Ready to fix', 'differs'], check: ['!', 'Needs a decision', 'figma'], done: ['✓', 'Done', 'match'], kept: ['≠', 'Kept on purpose', 'none'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'],
+    // A row of a component this browser is still trying (its Accessibility): a status of its own, a neutral dot, until
+    // its try ends and the row is drawn again in place.
+    pending: ['…', 'Being tried in this browser…', 'none'] };
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   // How long each open task has been open: when a build first found it (open-since.snapshot.json, put in the page as
   // sg-open-since). A task it does not list is as new as this build.
@@ -38,6 +41,7 @@
   function howChecked(x, st) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, st === 'done' ? 'Checked by a person' : 'To check by a person'); }
   function statusLine(r) {
     var how = function (x) { return howChecked(x, r.st); };
+    if (r.st === 'pending') return '';   // nothing is known yet of how it is checked
     return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || (r.writeTo || r.area === 'Documentation' ? '' : how((r.src || []).filter(Boolean)[0]));   // a Documentation row's Source says where
   }
   function statusHTML(st, sub, area) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(rowWord(st, area)) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }

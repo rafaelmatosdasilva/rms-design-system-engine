@@ -319,11 +319,6 @@
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
-  function knowledgeHTML(c) {
-    var rows = byStatus(docIssueRows(c));
-    if (!rows.length) return '';
-    return '<div class="pg-doc pg-par pg-knowledge"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + issueTableHTML(rows, '', '', 'Documentation') + '</div>';
-  }
   // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
   // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text. The same on a
   // component's page and on the Documentation page.

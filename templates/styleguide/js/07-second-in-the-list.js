@@ -689,40 +689,49 @@
   // column in data-f-<key>; a column a row can hold several of (a page read from Figma and the intent layer) is marked
   // multi, and its values are separated by a bar, so a value with a space in it is still one value. Rows are hidden, never drawn again, so the sort and the panel still find
   // them. A column every row answers the same way is no filter, so it is left out.
+  // bar._refresh(): the rows read again after they changed in place (a row whose try ended), the person's choices kept
+  // where they still apply.
   function filterBar(sec, o) {
     var h = sec.querySelector(':scope > h2');
     if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
-    var trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
     var val = function (tr, k) { return tr.getAttribute('data-f-' + k) || ''; };
     var has = function (tr, c, w) { return c.multi ? val(tr, c.key).split('|').indexOf(w) >= 0 : val(tr, c.key) === w; };
-    var cols = (o.cols || []).map(function (c) {
-      var seen = {}, words = [];
-      trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
-      var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
-      words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
-      return { key: c.key, label: c.label, multi: c.multi, words: words };
-    }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
-    if (!trs.length || !cols.length) return null;
-    var F = {}, C = '';
+    var trs, cols, chips;
     var colOf = function (k) { return (o.cols || []).filter(function (c) { return c.key === k; })[0] || { key: k }; };
     var onChip = function (tr, c) { return c.word ? has(tr, colOf(c.col), c.word) : !!tr.getAttribute('data-f-' + c.key); };
-    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    var read = function () {
+      trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
+      cols = (o.cols || []).map(function (c) {
+        var seen = {}, words = [];
+        trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
+        var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
+        words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
+        return { key: c.key, label: c.label, multi: c.multi, words: words };
+      }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
+      chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    };
+    read();
+    if (!trs.length || !cols.length) return null;
+    var F = {}, C = '';
     var chipOf = function (k) { return chips.filter(function (c) { return c.key === k; })[0]; };
     var inCols = function (tr, skip) { return cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
     var passes = function (tr, skip) { return (!C || onChip(tr, chipOf(C))) && inCols(tr, skip); };
     var bar = document.createElement('div'); bar.className = 'sg-todo-head';
-    bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
-      '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
-      cols.map(function (c) {
-        var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
-        return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
-          '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
-          '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
-          [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
-          '</span></span>';
-      }).join('') +
-      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
-      '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    var paint = function () {
+      bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
+        '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
+        cols.map(function (c) {
+          var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
+          return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+            '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+            '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
+            [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
+            '</span></span>';
+        }).join('') +
+        chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
+        '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    };
+    paint();
     if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
     var draw = function () {
       trs.forEach(function (tr) { tr.hidden = !passes(tr); });
@@ -730,6 +739,7 @@
       var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
       bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
       bar.querySelector('[data-f-clear]').hidden = !on;
+      var allN = bar.querySelector('[data-f-all] .sg-count'); if (allN && o.total == null) allN.outerHTML = countHTML(trs.length);
       chips.forEach(function (c) {
         var b = bar.querySelector('.sg-chip[data-chip="' + c.key + '"]');
         b.setAttribute('aria-pressed', C === c.key ? 'true' : 'false');
@@ -763,6 +773,17 @@
       draw();
     });
     draw();
+    bar._refresh = function () {
+      read();
+      // A choice the rows no longer offer is dropped. The bar is drawn again only when what it offers changed, so a
+      // list the person has open stays open.
+      Object.keys(F).forEach(function (k) { var c = cols.filter(function (x) { return x.key === k; })[0]; if (!c || c.words.indexOf(F[k]) < 0) delete F[k]; });
+      if (C && !chipOf(C)) C = '';
+      var offer = JSON.stringify([cols, chips.map(function (c) { return c.key; })]);
+      if (offer !== bar._offer) { paint(); bar._offer = offer; }
+      draw();
+    };
+    bar._offer = JSON.stringify([cols, chips.map(function (c) { return c.key; })]);
     return bar;
   }
   function pageBar(sec, o) {
@@ -821,6 +842,9 @@
     return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')' : '');
   };
   var IL = DATA.intentLayer, fillDocs = null;
+  // The Documentation page's own table and panel, for a component's Documentation area (33), as RULES_PAGE is for its
+  // Rules: set once the page is drawn (fillDocs), null when the system has no Documentation page.
+  var DOC_PAGE = null;
   // A system with no intent layer has the page too: one row a component, its documentation read from Figma and the code.
   var NO_LAYER = !(IL && (IL.pages || []).length);
   if (!NO_LAYER || COMPONENTS.some(function (c) { return !c.codeOnly; })) {
@@ -1331,16 +1355,38 @@
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i < 0) i = rows.findIndex(function (p, j) { return ilKey(p, j).indexOf(key + ':') === 0; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     // The rows to review, by who they wait on, as a filter of its own ("Waiting on Cards team"): a row that waits on
     // nobody answers it with nothing, so the chip offers only the teams there are.
-    var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    // The table, for this page and for a component's Documentation area alike (DOC_PAGE): the rows given, each keeping
+    // its number in the page's own list (data-il-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (p) { return rowHTML(p, rows.indexOf(p)); }).join('') + '</tbody></table></div></div>'; };
+    ilSec.insertAdjacentHTML('beforeend', tableHTML(rows));
     var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
     var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
     var srcWords = [], SRC_ORDER = ['Intent layer', 'Figma', 'Contract', 'Code'];
     rows.forEach(function (p) { ilSourceWords(p).forEach(function (w) { if (srcWords.indexOf(w) < 0) srcWords.push(w); }); });
     srcWords.sort(function (x, y) { var i = SRC_ORDER.indexOf(x), j = SRC_ORDER.indexOf(y); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j) || x.localeCompare(y); });
-    filterBar(ilSec, { links: sourceLinks(ilSrc.url, srcWords), total: rows.length, said: 'pages',
-      chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
-      cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
+    // A row opens its panel on a click or Enter, and the filters above the table: scoped to where the table is (this
+    // page, or a component's area), the same chips, lists and words.
+    var wire = function (scope, list, links) {
+      scope.addEventListener('click', function (e) { var tr = e.target.closest('table.sg-il tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('table.sg-il tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
+      filterBar(scope, { links: links || [], total: list.length, said: 'pages',
+        chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
+        cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
+    };
+    wire(ilSec, rows, sourceLinks(ilSrc.url, srcWords));
+    // The component a row is for, as its For column names it: its page's, the one a part's page belongs to, the one
+    // it is under another name, a template's built from the same file, a component with no page.
+    var forName = function (p) {
+      if (p.tokens || p.absent) return null;
+      if (p.missingFor || p.recheckFor) return p.missingFor || p.recheckFor;
+      if (p.component) return p.component;
+      if (p.about && (p.about.partOf || p.about.is)) return p.about.partOf || p.about.is;
+      if (p.layer === 'templates' && p.code) { var built = COMPONENTS.filter(function (c) { return ((c.api && c.api.file) || '') === p.code; })[0]; return built ? built.name : null; }
+      return null;
+    };
+    // A component's Documentation area (33): the rows this page has for it, in the page's own table, filters and panel
+    // (the owner's, 16 November 2026). of(name) · tableHTML(rows) · wire(scope, rows) · open(key).
+    DOC_PAGE = { of: function (name) { return rows.filter(function (p) { return forName(p) === name; }); }, tableHTML: tableHTML, wire: function (scope, list) { wire(scope, list); }, open: ilSec._openKey };
     // How far along the documentation is, as the Rules page shows its rules (doneCard, 00-start.js): a card a source,
     // as Rules has one for Figma and one for the code. Each counts the pages that source documents: the share with
     // nothing left to do, and each area's, above the filters.
@@ -1358,8 +1404,6 @@
       return list.some(isOpen) ? 'check' : 'done';
     };
     doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there, out of all of them. The bars split them by area.'); }).join(''));
-    ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
-    ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
   }
   // Accessibility: every criterion of every component in one table, as Rules and Documentation gather theirs, each row the

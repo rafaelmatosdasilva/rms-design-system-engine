@@ -17,14 +17,13 @@
   var FROM_PAGE = 'Tested now', FROM_AUDIT = 'Tested at the last audit';
   // The last audit's test, by its day: Tested on 15 Oct (the year only when it is not this one).
   var auditOn = function (at) { var d = new Date(at); if (!at || isNaN(d)) return FROM_AUDIT; return 'Tested on ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
-  // One Accessibility table, by WCAG criterion, the same table as Parity's and the Status page's: only the criteria that
-  // apply to the component (a page's own, video and sound it does not play, what it has nothing for, are left out), to
-  // fix first, then to check, then done; each with what Figma states, what was found, what to do, who acts, its status
-  // and when and where it was read. What a criterion means opens from its name. Above it a count of each, and when the
-  // last audit ran; in it, as rows of their own, what Figma and the team wrote that no check reads.
+  // A component's Accessibility area: the Accessibility page's own table, its filters and its sorting, limited to the
+  // component's rows and each opening the same panel (a11yArea, the owner's, 16 November 2026), then in a table of its
+  // own what the page leaves out (beyond A and AA, and what Figma and the team wrote that no check reads). Above them
+  // only what a row cannot say (the audit has not run, what is not asked of it).
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
-    return '<div class="pg-doc pg-par pg-a11y"><div class="pg-par-sum pg-a11y-sum"></div><p class="sg-info pg-wcag-note pg-a11y-note"></p>' + issueTableHTML([], 'pg-a11y-rows', '', 'Accessibility') + '</div>';
+    return '<div class="pg-doc pg-par pg-a11y" id="' + esc(cid(c.name)) + '-accessibility"><p class="sg-info pg-wcag-note pg-a11y-note"></p><div class="pg-a11y-more"></div></div>';
   }
   // What no check reads, each a row: each Figma annotation on it a check does not read (with the wording one reads, when
   // the engine can tell what it means) and the team's guidelines, which the agents read as design intent. One that states
@@ -401,88 +400,177 @@
     return by;
   }
   // ── The Accessibility page: every criterion of every component, one table ───────────────────────────────────────
-  // The rows a component's own Accessibility area shows (a11yIssueRows, and the notes no check reads), for every
-  // component, under the same task numbers, each opening the same panel (openRowPanel): one way to work out a row, two
-  // places to see it. Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by
-  // browser, then the level and who acts (what a criterion depends on, its component's name and its principle are in
-  // each row and its panel, never a filter: the owner's, 15 November 2026). Above them one card, the Status page's number. Every row is one the browser tries, so until every component is
-  // tried the page says how far the try has got, and draws its table once, so nothing moves under the reader.
+  // The rows a component's own Accessibility area shows (a11yIssueRows), for every component, under the same task
+  // numbers, each opening the same panel (openRowPanel): one way to work out a row, two places to see it. A component's
+  // Accessibility area is this table, built by the same code and limited to its rows (the owner's, 16 November 2026).
+  // Filtered as Rules and Documentation are (filterBar): a chip a status and one for what differs by browser, then the
+  // level and who acts (what a criterion depends on, its component's name and its principle are in each row and its
+  // panel, never a filter: the owner's, 15 November 2026). Above them one card a level, the Status page's number.
+  // The table is drawn at once with every result already known (baked into the page or kept by this browser). A
+  // component still being tried in this browser has its rows say so, and each of them is drawn again in place when its
+  // try ends: its own cells, never a row moved or the table sorted again under the reader.
   var A11Y_PRINCIPLE = { 1: 'Perceivable', 2: 'Operable', 3: 'Understandable', 4: 'Robust' };
   var A11Y_PRINCIPLES = ['Perceivable', 'Operable', 'Understandable', 'Robust'];
   var A11Y_LEVELS = ['A', 'AA', 'Beyond AA', 'Not a criterion'];
   var A11Y_ST = { todo: 'fix', check: 'check', done: 'done' };
-  function fillA11yPage() {
-    var sec = a11ySec; if (!sec) return;
-    var tried = COMPONENTS.filter(function (c) { return c.__a11y; }).length, wait = !ALL && tried < COMPONENTS.length;
-    var clear = function () { Array.prototype.forEach.call(sec.querySelectorAll(':scope > :not(h2):not(.sg-section-badge)'), function (n) { n.remove(); }); };
-    if (wait) {
-      var sayWait = esc('Each component is tried in this browser first, ' + tried + ' of ' + COMPONENTS.length + ' so far. The table shows once every one is.');
-      if (sec._sig === 'wait:' + tried) return;
-      clear(); sec._sig = 'wait:' + tried;
-      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><p class="sg-none" role="status">' + sayWait + '</p></div>');
-      return;
-    }
-    var rows = [];
-    COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
-      try {
-        var t = c.__a11y;
-        // The criteria WCAG 2.2 AA asks for, levels A and AA, and nothing else: what is looked at beyond them (forced
-        // colours, reduced motion, AAA advice) and a Figma note no check reads stay on the component's own Accessibility
-        // area, so every row here is one the page's numbers count (the owner's, 15 November 2026).
-        a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).forEach(function (r) { if (A11Y_ST[r.st] && !r.extra && r.k && (r.k.level === 'A' || r.k.level === 'AA')) rows.push({ c: c, r: r }); });
-      } catch (e) { /* its accessibility is read on its own page */ }
-    });
-    var sig = rows.map(function (x) { return x.r.key + ':' + x.r.st + ':' + (TODO_NO[x.r.key] || ''); }).join('|');
-    if (sec._sig === sig) return;
-    clear(); sec._sig = sig;
-    var BB = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null;
-    var levelOf = function (r) { return r.k ? (r.k.level || 'Beyond AA') : 'Not a criterion'; };
-    var principleOf = function (r) { var n = r.k && /^(\d)\./.exec(r.k.sc); return n ? A11Y_PRINCIPLE[n[1]] : ''; };
-    var whoOf = function (r) { return plainText(r.who || '').replace(/\s+/g, ' ').trim(); };
-    // Fails in one browser and passes in another: each browser's line says ✓ and ✕.
-    var differs = function (x) { var b = BB && x.r.k && BB[x.c.name] && BB[x.c.name][x.r.k.sc]; return !!(b && /✓/.test(b.line) && /✕/.test(b.line)); };
-    var stWord = function (r) { return rowWord(r.st, 'Accessibility'); };   // the rows' own words: Issues, Review, Met
-    var ORDER_ = { todo: 0, check: 1, done: 2 };
-    rows.sort(function (p, q) { return ORDER_[p.r.st] - ORDER_[q.r.st] || (TODO_NO[p.r.key] || 1e9) - (TODO_NO[q.r.key] || 1e9) || p.c.name.localeCompare(q.c.name); });
-    var rowHTML = function (x, i) {
-      var r = x.r, id = ROW_DETAIL.push({ r: r, area: 'Accessibility' }) - 1;
-      var f = { component: x.c.name, status: stWord(r), level: levelOf(r), principle: principleOf(r), who: whoOf(r) };
-      return '<tr class="sg-row-open" tabindex="0" data-row-detail="' + id + '" data-a11y-row="' + i + '" data-status="' + r.st + '" data-f' + Object.keys(f).map(function (k) { return f[k] ? ' data-f-' + k + '="' + esc(f[k]) + '"' : ''; }).join('') + (differs(x) ? ' data-f-differs="1"' : '') + '>' +
-        ISSUE_CELL.no(r) + '<td><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td>' + ISSUE_CELL.kind(r) + '<td>' + esc(levelOf(r)) + '</td>' + ISSUE_CELL.whoCell(r) + ISSUE_CELL.status(r) + ISSUE_CELL.updated(r) +
-        '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
-    };
-    // A column head sorts by it, again the other way round, as the Rules page's do.
-    var SORT = [
-      ['Task nr', function (x) { return TODO_NO[x.r.key] || 1e9; }],
-      ['Component', function (x) { return x.c.name.toLowerCase(); }],
-      ['WCAG', function (x) { return x.r.k ? x.r.k.sc.split('.').map(function (n) { return ('000' + n).slice(-3); }).join('.') : 'zzz' + x.r.kind; }],
-      ['Level', function (x) { return A11Y_LEVELS.indexOf(levelOf(x.r)); }],
-      ['Who acts', function (x) { return whoOf(x.r).toLowerCase() || 'zzz'; }],
-      ['Status', function (x) { return ORDER_[x.r.st]; }],
-      ['Last checked', function (x) { return x.r.at || ''; }]
-    ];
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-a11y-table"><colgroup><col class="sg-a11y-no"><col class="sg-a11y-comp"><col class="sg-a11y-sc"><col class="sg-a11y-level"><col class="sg-a11y-who"><col class="sg-a11y-st"><col class="sg-a11y-at"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
-    var table = sec.querySelector('.sg-a11y-table');
+  var A11Y_ORDER = { todo: 0, check: 1, done: 2, pending: 3 };
+  // A component this browser has not tried yet: its rows wait on the try (never with ?all, which tries nothing).
+  function a11yPending(c) { return !ALL && !c.__a11y; }
+  // The page's own rows for one component: the criteria WCAG 2.2 AA asks for, levels A and AA, and nothing else. What is
+  // looked at beyond them (forced colours, reduced motion, AAA advice) and a Figma note no check reads are the
+  // component's own area's, under this table, so every row here is one the page's numbers count (the owner's, 15
+  // November 2026). A row of a component still being tried reads Being tried in this browser, with no one to act yet.
+  function a11yPageRows(c) {
+    var out = [], t = c.__a11y, pending = a11yPending(c);
+    try {
+      a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).forEach(function (r) {
+        if (!(A11Y_ST[r.st] && !r.extra && r.k && (r.k.level === 'A' || r.k.level === 'AA'))) return;
+        out.push({ c: c, r: pending ? Object.assign({}, r, { st: 'pending', who: '', whoKey: '', at: null, rel: '', fresh: false }) : r });
+      });
+    } catch (e) { /* its accessibility is read on its own page */ }
+    return out;
+  }
+  // What a component's area shows under the page's table: its rows the page leaves out (beyond A and AA, and what no
+  // check reads), so nothing it used to say is lost.
+  function a11yMoreRows(c) {
+    var t = c.__a11y, pending = a11yPending(c), out = [];
+    try {
+      a11yIssueRows(c, t ? t.items : c.a11y ? a11yStaticItems(c) : [], t ? t.live : null).forEach(function (r) { if (!(A11Y_ST[r.st] && !r.extra && r.k && (r.k.level === 'A' || r.k.level === 'AA'))) out.push(pending && r.extra ? Object.assign({}, r, { st: 'pending', who: '', whoKey: '', at: null, rel: '' }) : r); });
+      unreadRows(c).forEach(function (r) { out.push(r); });
+    } catch (e) { /* its accessibility is read on its own page */ }
+    return out;
+  }
+  var a11yLevelOf = function (r) { return r.k ? (r.k.level || 'Beyond AA') : 'Not a criterion'; };
+  var a11yPrincipleOf = function (r) { var n = r.k && /^(\d)\./.exec(r.k.sc); return n ? A11Y_PRINCIPLE[n[1]] : ''; };
+  var a11yWhoOf = function (r) { return plainText(r.who || '').replace(/\s+/g, ' ').trim(); };
+  // Fails in one browser and passes in another: each browser's line says ✓ and ✕.
+  var a11yDiffers = function (x) { var BB = WCAG && WCAG.byBrowser ? WCAG.byBrowser.components : null, b = BB && x.r.k && BB[x.c.name] && BB[x.c.name][x.r.k.sc]; return !!(b && /✓/.test(b.line) && /✕/.test(b.line)); };
+  // The table's columns: its head, how it sorts (again the other way round, as the Rules page's do), its cell and its
+  // width. A table can leave a column out by its head (a component's area, every row of which is that component).
+  var A11Y_COLS = [
+    ['Task nr', function (x) { return TODO_NO[x.r.key] || 1e9; }, function (x) { return ISSUE_CELL.no(x.r); }, 'sg-a11y-no'],
+    ['Component', function (x) { return x.c.name.toLowerCase(); }, function (x) { return '<td><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td>'; }, 'sg-a11y-comp'],
+    ['WCAG', function (x) { return x.r.k ? x.r.k.sc.split('.').map(function (n) { return ('000' + n).slice(-3); }).join('.') : 'zzz' + x.r.kind; }, function (x) { return ISSUE_CELL.kind(x.r); }, 'sg-a11y-sc'],
+    ['Level', function (x) { return A11Y_LEVELS.indexOf(a11yLevelOf(x.r)); }, function (x) { return '<td>' + esc(a11yLevelOf(x.r)) + '</td>'; }, 'sg-a11y-level'],
+    ['Who acts', function (x) { return a11yWhoOf(x.r).toLowerCase() || 'zzz'; }, function (x) { return ISSUE_CELL.whoCell(x.r); }, 'sg-a11y-who'],
+    ['Status', function (x) { return A11Y_ORDER[x.r.st]; }, function (x) { return ISSUE_CELL.status(x.r); }, 'sg-a11y-st'],
+    ['Last checked', function (x) { return x.r.at || ''; }, function (x) { return ISSUE_CELL.updated(x.r); }, 'sg-a11y-at']
+  ];
+  var a11yColsOf = function (omit) { return A11Y_COLS.filter(function (col) { return (omit || []).indexOf(col[0]) < 0; }); };
+  // One row: its own panel's (ROW_DETAIL, as a component's area pushes it), its filters' words, then its cells.
+  function a11yRowEl(x, cols) {
+    var r = x.r, id = ROW_DETAIL.push({ r: r, area: 'Accessibility' }) - 1;
+    var f = { component: x.c.name, status: rowWord(r.st, 'Accessibility'), level: a11yLevelOf(r), principle: a11yPrincipleOf(r), who: a11yWhoOf(r) };
+    var tb = document.createElement('tbody');
+    tb.innerHTML = '<tr class="sg-row-open" tabindex="0" data-row-detail="' + id + '" data-status="' + r.st + '" data-a11y-comp="' + esc(x.c.name) + '"' + (r.said ? ' data-said="1"' : '') + ' data-f' + Object.keys(f).map(function (k) { return f[k] ? ' data-f-' + k + '="' + esc(f[k]) + '"' : ''; }).join('') + (a11yDiffers(x) ? ' data-f-differs="1"' : '') + '>' +
+      cols.map(function (col) { return col[2](x); }).join('') + '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
+    var tr = tb.firstChild; tr._x = x; tr._sig = a11ySig(x); return tr;
+  }
+  // What a row shows: when it changes, the row is drawn again (in its place).
+  function a11ySig(x) { var r = x.r; return [r.st, r.who || '', r.at || '', TODO_NO[r.key] || '', r.said ? 1 : 0, a11yLevelOf(r), a11yDiffers(x) ? 1 : 0, plainText(r.kindHTML || r.kind || '')].join('\u0001'); }
+  // Every table drawn by this code (the page's, and each component's area): '*' for the page, else the component's name.
+  var A11Y_TABLES = {};
+  var a11yStatusChips = function () { return ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]); };
+  var a11yBarOpts = function () { return { said: 'criteria', chips: a11yStatusChips(), cols: [{ key: 'status' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'who', label: 'Who acts' }] }; };
+  // The table in scope, drawn the first time with its filters, its sorting and its rows; after that its rows are
+  // brought up to date in place (a11yUpdate). only: a component's name, its rows alone and no Component column.
+  // Returns true when anything in the table changed.
+  function a11yTable(scope, only) {
+    var key = only || '*', e = A11Y_TABLES[key], c = only ? COMPONENTS.filter(function (k) { return k.name === only; })[0] : null;
+    var fresh = function () { return c ? a11yPageRows(c) : a11yAllRows(); };
+    if (e && e.scope === scope) return a11yUpdate(e, fresh());
+    var cols = a11yColsOf(only ? ['Component'] : []), list = fresh();
+    var card = document.createElement('div'); card.className = 'pg-par-card';
+    card.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-a11y-table' + (only ? ' sg-a11y-table--one' : '') + '"><colgroup>' + cols.map(function (col) { return '<col class="' + col[3] + '">'; }).join('') + '<col></colgroup><thead><tr>' + cols.map(function (col) { return '<th data-sort="' + esc(col[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(col[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody class="pg-a11y-rows"></tbody></table></div>';
+    var table = card.querySelector('table'), tb = table.tBodies[0];
+    list.forEach(function (x) { tb.appendChild(a11yRowEl(x, cols)); });
+    var before = scope.querySelector(':scope > .pg-a11y-more');
+    scope.insertBefore(card, before || null);
     tableNone(table, 'criteria', { head: 'No component has been tried yet', say: 'Each component\'s criteria are tried in the browser as the page opens, and the audit tries the rest.' });
-    var sortKey = null, sortDir = 1;
-    sec.onclick = function (e) {
-      var th = e.target.closest('.sg-a11y-table th[data-sort]'); if (!th) return;
-      var key = th.getAttribute('data-sort'), val = SORT.filter(function (c) { return c[0] === key; })[0][1];
-      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
-      var tb = table.tBodies[0];
-      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(rows[+a.getAttribute('data-a11y-row')]), v = val(rows[+b.getAttribute('data-a11y-row')]); return (u < v ? -1 : u > v ? 1 : 0) * sortDir; }).forEach(function (tr) { tb.appendChild(tr); });
-      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (h) { h.setAttribute('aria-sort', h.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+    e = A11Y_TABLES[key] = { scope: scope, table: table, cols: cols, only: only || null, gone: {} };
+    // A head sorts by it, again the other way round. The rows are moved, never built again.
+    scope.addEventListener('click', function (ev) {
+      var th = ev.target.closest('th[data-sort]'); if (!th || th.closest('table') !== table) return;
+      var name = th.getAttribute('data-sort'), val = cols.filter(function (col) { return col[0] === name; })[0][1];
+      table._sortDir = table._sortKey === name ? -table._sortDir : 1; table._sortKey = name;
+      var dir = table._sortDir;
+      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(a._x), v = val(b._x); return (u < v ? -1 : u > v ? 1 : 0) * dir; }).forEach(function (tr) { tb.appendChild(tr); });
+      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (h) { h.setAttribute('aria-sort', h.getAttribute('data-sort') === name ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
+    });
+    e.bar = filterBar(scope, a11yBarOpts());
+    return true;
+  }
+  // Every component's rows, in the page's order: to fix, to check, done, then what is still being tried, each by its
+  // task number and its component.
+  function a11yAllRows() {
+    var rows = [];
+    COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { a11yPageRows(c).forEach(function (x) { rows.push(x); }); });
+    return rows.sort(function (p, q) { return A11Y_ORDER[p.r.st] - A11Y_ORDER[q.r.st] || (TODO_NO[p.r.key] || 1e9) - (TODO_NO[q.r.key] || 1e9) || p.c.name.localeCompare(q.c.name); });
+  }
+  // The table's rows brought up to date where they are: a row whose result changed gets its own cells again, in its
+  // place, a row that no longer applies goes, and a new one comes in after its component's other rows. Nothing else
+  // moves. The filters, their counts and what the person chose in them stay.
+  function a11yUpdate(e, list) {
+    var tb = e.table.tBodies[0], have = {}, changed = false;
+    // A criterion's row whose key changed (owed to one person, then to two, each a row) keeps its place: matched on the
+    // component and the criterion.
+    var base = function (k) { return String(k).split('\u0000').slice(0, 2).join('\u0000'); };
+    Array.prototype.forEach.call(tb.rows, function (tr) { if (tr._x) have[tr._x.r.key] = tr; });
+    var swap = function (tr, x) {
+      var n = a11yRowEl(x, e.cols), hid = tr.hidden;
+      Array.prototype.slice.call(tr.attributes).forEach(function (a) { tr.removeAttribute(a.name); });
+      Array.prototype.forEach.call(n.attributes, function (a) { tr.setAttribute(a.name, a.value); });
+      tr.innerHTML = n.innerHTML; tr.hidden = hid; tr._x = x; tr._sig = n._sig; changed = true;
     };
-    var chips = ['todo', 'check', 'done'].map(function (k) { return { key: k, label: rowWord(k, 'Accessibility'), dot: STATUS[k][2], col: 'status', word: rowWord(k, 'Accessibility') }; }).concat([{ key: 'differs', label: 'Differs by browser' }]);
-    filterBar(sec, { total: rows.length, said: 'criteria', chips: chips, cols: [
-      { key: 'status' }, { key: 'level', label: 'Level', order: A11Y_LEVELS }, { key: 'who', label: 'Who acts' }] });
+    var lastOf = {};
+    list.forEach(function (x) {
+      var k = x.r.key, b = base(k), tr = have[k];
+      if (!tr) { var same = Object.keys(have).filter(function (h) { return base(h) === b && !list.some(function (y) { return y.r.key === h; }); })[0]; if (same) tr = have[same], k = same; }
+      if (tr) {
+        delete have[k]; lastOf[b] = tr;
+        if (tr._sig === a11ySig(x) && tr._x.r.key === x.r.key) { tr._x = x; return; }
+        swap(tr, x); return;
+      }
+      // A row that went before and is back (a try in two steps) takes the place it had, kept by a mark in the table.
+      var el = a11yRowEl(x, e.cols), mark = e.gone[k] || e.gone[b];
+      if (mark && mark.parentNode === tb) { tb.replaceChild(el, mark); delete e.gone[k]; delete e.gone[b]; }
+      else {
+        var mine = Array.prototype.filter.call(tb.rows, function (r) { return r._x && r._x.c.name === x.c.name; }), after = lastOf[b] || mine[mine.length - 1];
+        tb.insertBefore(el, after ? after.nextSibling : null);
+      }
+      lastOf[b] = el; changed = true;
+    });
+    // A row that no longer applies goes, a mark left where it was.
+    Object.keys(have).forEach(function (k) { var m = document.createComment(''); tb.replaceChild(m, have[k]); e.gone[k] = e.gone[base(k)] = m; changed = true; });
+    if (!changed) return false;
+    if (e.bar && e.bar.isConnected && e.bar._refresh) e.bar._refresh();
+    else e.bar = filterBar(e.scope, a11yBarOpts());
+    tableNone(e.table, 'criteria');
+    labelCells(e.scope);
+    return true;
+  }
+  // A component's Accessibility area: the page's table limited to it, then what the page leaves out of its own rows.
+  function a11yArea(box, c) {
+    a11yTable(box, c.name);
+    var more = box.querySelector(':scope > .pg-a11y-more'), extra = a11yMoreRows(c);
+    if (more) more.innerHTML = extra.length ? issueTableHTML(extra, 'pg-a11y-rows', esc('Beyond WCAG 2.2 at A and AA, and what no check reads'), 'Accessibility') : '';
+  }
+  // The page: drawn the first time it is asked for, then each table this code drew is brought up to date (every
+  // component's area too), and the cards counted again from what is known.
+  function fillA11yPage() {
+    Object.keys(A11Y_TABLES).forEach(function (k) { var e = A11Y_TABLES[k]; if (k !== '*') a11yUpdate(e, a11yPageRows(COMPONENTS.filter(function (c) { return c.name === k; })[0] || { name: k })); });
+    var sec = a11ySec; if (!sec) return;
+    var first = !A11Y_TABLES['*'];
+    var drawn = a11yTable(sec, null);
+    if (!first && !drawn) return;
     // A card a level, counting criteria across the system (a11yCriteria, the Status page's count), with a bar for each
-    // principle.
-    var bySc = a11yCriteria(rows.map(function (x) { return x.r; }));
+    // principle. Only what is known counts: a row still being tried counts once its try ends.
+    var bySc = a11yCriteria(Array.prototype.map.call(A11Y_TABLES['*'].table.tBodies[0].rows, function (tr) { return tr._x.r; }));
     // Levels build on each other, as WCAG conformance does: Level AA is every criterion of A and of AA, the Status page's
     // number, never the AA criteria alone (the owner's, 15 November 2026).
     var IN_LEVEL = { A: ['A'], AA: ['A', 'AA'] };
     var levelCard = function (lv) { return doneCard('Level ' + lv, Object.keys(bySc).filter(function (sc) { return IN_LEVEL[lv].indexOf(bySc[sc].level) >= 0 && bySc[sc].principle; }).map(function (sc) { return { area: bySc[sc].principle, state: A11Y_ST[bySc[sc].st] }; }), A11Y_LEVEL_HOW[lv]); };
+    Array.prototype.forEach.call(sec.querySelectorAll(':scope > .sg-health-box'), function (n) { n.remove(); });
     doneCards(sec, levelCard('A') + levelCard('AA'));
     labelCells(sec);
     if (route.last !== undefined && !sec.hidden) underTitle(sec);

@@ -282,7 +282,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(chipCode) > 40, 'its code, whole, once its page opened');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
     // Each row of its tables (Parity, Accessibility, Documentation…) opens in full in a side panel, a card per column.
-    const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
+    const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open[data-row-detail]'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
       return p && !p.hidden ? { title: p.querySelector('.sg-panel-head h2').textContent, cards: p.querySelectorAll('.sg-row-detail-body').length, sub: p.querySelector('.sg-panel-sub')?.textContent ?? '' } : null; })()`, (v) => !!v);
     assert.ok(rowPanel && rowPanel.title && rowPanel.cards >= 2, JSON.stringify(rowPanel));
     // Its cards' heads, and their tables' heads, stick under the panel's head as it scrolls, as the token panel's do: each
@@ -394,8 +394,10 @@ test('in the browser: no script error, a control changes the real component, the
     const a11yRead = await a11yFull();
     assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
     assert.match(a11y, /The audit has not run in a browser yet/);
-    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Met \(\d+\)/, 'its chips count what is met, in the Status page\'s word');
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
+    // Its filters are the Accessibility page's: the same chips, in the Status page's words, counting its rows.
+    assert.match(await until(`[...document.querySelectorAll('#c-chip .pg-a11y .sg-todo-head .sg-chip[data-chip]')].map((b) => b.textContent).join('|')`, (v) => /Met/.test(v)), /Met \(\d+\)/, 'its chips count what is met, in the Status page\'s word');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none|pending)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y .sg-a11y-table thead th[data-sort]')].map((th) => th.textContent).join('|')`), 'Task nr|WCAG|Level|Who acts|Status|Last checked', 'the Accessibility page\'s columns, the component left out');
     // The page tries the keyboard on every variant after it is drawn: wait for that result (its 2.1.1 row says what Tab
     // reached), never for a fixed time, so a busy machine reads it as a quiet one does.
     let live = '';
@@ -523,12 +525,15 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
     // Do and Don't from the references, each with its caption, the do first: in its row's panel (the table is its task,
     // kind, status and when it was checked).
-    await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].find((tr) => /Do and don't/.test(tr.cells[1].textContent)).click()`);
-    assert.equal(await run(`[...document.querySelectorAll('#sg-row-panel .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
-    await run(`(() => { const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } })()`);
+    // The Documentation page's own row for it, its panel the page's.
+    await run(`document.querySelector('#c-chip .pg-knowledge tbody tr[data-il-row]').cells[0].click()`);
+    await until(`!!document.querySelector('#sg-il-panel .pg-examples .pg-example')`, (v) => v === true);
+    assert.equal(await run(`[...document.querySelectorAll('#sg-il-panel .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
+    const docPanel = await run(`document.querySelector('#sg-il-panel .sg-row-detail').textContent`);
+    await run(`(() => { const m = document.getElementById('sg-il-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } })()`);
     // Its Documentation first, in the table every task shares (as Parity and Accessibility are), then each section of
     // rows in the Playground's tables, its title the head (Details).
-    assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc').matches('.pg-knowledge') && !!document.querySelector('#c-chip [data-area="docs"] .pg-knowledge table.sg-issues')`), true);
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc').matches('.pg-knowledge') && !!document.querySelector('#c-chip [data-area="docs"] .pg-knowledge table.sg-il')`), true);
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /^Details/);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-anatomy-doc')`), false, 'no Anatomy card under the Playground');
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
@@ -565,16 +570,14 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
     // kind here, written or not, what is to write first; the Status page lists the same rows, only those not written yet.
     // Where it is used is its own area, never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Type|Source|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), await run(`[...document.querySelectorAll('#documentation table.sg-il thead th')].map((d) => d.textContent).join('|')`), 'the Documentation page\'s own columns, and the arrow that opens the row');
     // A link in a table to another page of the guide is a link pill, its words then its arrow (a template rule); one out of
     // the guide stays an underlined link.
     assert.equal(await run(`[...document.querySelectorAll('.sg-section:not([hidden]) table a[href^="#"]')].filter((a) => !a.closest('thead, .sg-tip, .pg-preview, .pg-frame, .pg-variants, .pg-anat-wrap, .sg-showroom, .sg-thumb') && !a.classList.contains('sg-mx-go') && !(a.classList.contains('sg-link-pill') && a.querySelector('svg'))).length`), 0, 'every link in a table is a link pill');
-    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
-    // Its stage too, a task when the team has set none (the chip has no status in its contract).
-    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens', 'Stage'].sort().join('|'));
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*( check)?$/, 'what is to write first, then what is to check, what is written after; its stage, not counted, last');
-    // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
-    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
+    // What it is, when to use it, Do and don't, its role, an example and its stage (a task when the team has set none):
+    // what is still to write, and how, in the row's panel.
+    assert.match(docPanel, /What to do[\s\S]*Stage/);
+    assert.match(docPanel, /(Points to cover|How to write it)/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Review|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.

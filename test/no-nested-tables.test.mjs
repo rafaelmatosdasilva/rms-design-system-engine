@@ -56,7 +56,7 @@ test('in Chrome: a token\'s panel and an issue\'s panel hold labelled values and
     // Every issue table on a component's page: each row's panel holds no table.
     await run(`location.hash = '#c-button'`);
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-button tr.sg-row-open')`, { attempts: 200 }), true, 'the button has rows that open');
-    const issues = await run(`(() => { const out = []; for (const tr of [...document.querySelectorAll('#c-button tr.sg-row-open')].slice(0, 12)) { tr.cells[0].click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); out.push(d ? d.querySelectorAll('table').length : -1); } return out; })()`);
+    const issues = await run(`(() => { const out = []; for (const tr of [...document.querySelectorAll('#c-button tr.sg-row-open')].slice(0, 12)) { tr.cells[0].click(); const d = document.querySelector((tr.hasAttribute('data-il-row') ? '#sg-il-panel' : '#sg-row-panel') + ' .sg-row-detail'); out.push(d ? d.querySelectorAll('table').length : -1); } return out; })()`);
     assert.ok(issues.length > 0 && issues.every((n) => n === 0), `no table in any row's panel: ${issues.join(', ')}`);
     assert.deepEqual(errors, []);
     close();
