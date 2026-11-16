@@ -87,8 +87,8 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     for (const w of who) assert.match(w, /^(A designer, in Figma|A developer, in the code|A person checks it by hand|Whoever writes the words|Whoever owns the flow)/, w);
     assert.match(seen.comp, /^#c-/, 'a row names its component, a link to its page');
     // The rows are the component's own: the same criteria its Accessibility area lists.
-    const name = await run(`document.querySelector('#accessibility .sg-a11y-table tbody tr').cells[1].textContent.trim()`);
-    const here = await run(`[...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].filter((tr) => tr.cells[1].textContent.trim() === ${JSON.stringify(name)}).length`);
+    // Read and counted in the page, so nothing read from it is written back into the code that runs there.
+    const here = await run(`(() => { const rows = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')]; const name = rows[0].cells[1].textContent.trim(); return rows.filter((tr) => tr.cells[1].textContent.trim() === name).length; })()`);
     assert.ok(here > 0);
     // A status chip leaves only its rows; Clear filters brings them all back.
     const chip = seen.chips.includes('todo') ? 'todo' : 'check';
