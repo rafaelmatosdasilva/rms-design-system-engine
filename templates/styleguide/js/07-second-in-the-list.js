@@ -986,7 +986,7 @@
       ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
       return out;
     };
-    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? namePills(w) : '<span class="pg-missing">None</span>'; };
+    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(' · ')) : '<span class="pg-missing">None</span>'; };
     // A page's status in one word, as the filter and the chips before it said it.
     var IL_WORD = { review: 'Review', write: 'Missing', remove: 'Remove', keep: 'Done' };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
