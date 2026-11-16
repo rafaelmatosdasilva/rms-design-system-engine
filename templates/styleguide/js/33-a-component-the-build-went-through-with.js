@@ -41,6 +41,12 @@
   // A component the sweep draws out of sight can take the focus on its own (a modal that opens, a field that focuses
   // itself): while a person is on a control of the page, any focus that lands out of sight goes straight back to them.
   var personFocus = null;
+  // Whether the focus a person left on the page is one a try must wait on: moving it would close their list or take
+  // their typing (a field, a list or a menu they opened), or they touched the page a moment ago (as personBusy). Where
+  // the focus only rests (a row a closed panel gave it back to, a page's title the route moved it to, a button already
+  // pressed) costs them nothing: the check moves it and the page hands it straight back (personFocus).
+  var HOLDS = 'input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]),select,textarea,[contenteditable=""],[contenteditable=true],[role=textbox],[role=searchbox],[role=combobox],[role=listbox],[role=menu],[aria-expanded="true"]';
+  function personHolds(el) { return !!(el && el.matches && (el.matches(HOLDS) || el.closest('[role=listbox],[role=menu],[aria-expanded="true"]'))) || Date.now() - lastTouch < 2000; }
   document.addEventListener('focusin', function (e) {
     var t = e.target, away = t && t.closest && t.closest('.pg-offstage');
     if (away) { if (personFocus && personFocus.isConnected && personFocus !== t && !personFocus.closest('.pg-offstage')) personFocus.focus({ preventScroll: true }); return; }
@@ -396,6 +402,10 @@
       '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
+        // Documentation counts what its table shows, the Documentation page's rows for it in their words, as Rules does
+        // from its rules: Done when none is open, Missing when every one is still to write (or to remove), else Review.
+        if (a[0] === 'docs' && compDocs.length) { var dSt = compDocs.map(DOC_PAGE.status), dFix = dSt.filter(function (k) { return k === 'write' || k === 'remove'; }).length, dDec = dSt.filter(function (k) { return k === 'review'; }).length;
+          return { v: a[0], label: a[1], state: !dFix && !dDec ? { cls: 'match', say: 'Done' } : dFix === dSt.length ? { cls: 'differs', say: 'Missing' } : { cls: 'figma', say: 'Review' } }; }
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
         // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
         // Counted as its table counts them, in the Rules page's words: the rules to fix, else the rules to decide.
@@ -986,8 +996,21 @@
         // One the person cannot see any more (a closed panel gave the focus back to a button on a page since hidden) is
         // left until the browser's next frame takes it away: no one is on it, so nothing waits for it.
         if (inPage && (!document.contains(busy) || !busy.getClientRects().length)) inPage = false;
+        // Nor one where the focus only rests (personHolds): a row a closed panel gave it back to, the page's title the
+        // route moved it to, a button pressed. Waiting on it held the try for as long as the person stayed: its rows read
+        // "Being tried in this browser…" for minutes, and every component after it too.
+        if (inPage && !personHolds(busy)) inPage = false;
         // The build's own run has no person on the page: nothing to wait for.
-        if (inPage && !BAKING) { busy.addEventListener('blur', function () { setTimeout(again, 50); }, { once: true }); return false; }
+        // It waits for them to leave it: its blur, or, as the sweep waits on a person (personBusy, every half second), the
+        // moment it is no longer theirs. A control drawn again or hidden under them (a row of the Accessibility page
+        // redrawn as a try ends, a page left, a panel closed onto a row since replaced) never blurs, and the variant
+        // waiting on it waited for good: its try stayed "Being tried in this browser…" and every component after it too.
+        if (inPage && !BAKING) {
+          var left = false, leave = function () { if (left) return; left = true; setTimeout(again, 50); };
+          busy.addEventListener('blur', leave, { once: true });
+          (function stillOn() { if (left) return; if (document.activeElement !== busy || !busy.isConnected || !busy.getClientRects().length || !personHolds(busy)) leave(); else setTimeout(stillOn, 500); })();
+          return false;
+        }
         var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
         // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
         // applies then.
@@ -1115,7 +1138,7 @@
         // Never while a person is on a control of the page outside it: tried once they leave it; one they take mid-way
         // stops the try, which runs again from this variant once they leave.
         // The build's own run has no person: the focus its component's script moves is never taken for one.
-        var personOn = function () { if (BAKING) return null; var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) ? a : null; };
+        var personOn = function () { if (BAKING) return null; var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) && personHolds(a) ? a : null; };
         // A variant stopped by a person is tried again once they leave, three times at most: then it is left untried and
         // the rest go on, so a component whose own script keeps moving the focus never holds the others up.
         retried[i] = (retried[i] || 0);

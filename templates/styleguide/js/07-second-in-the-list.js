@@ -119,7 +119,7 @@
     var panel = function (i, from) {
       var r = rows[i]; if (!r) return;
       var m = panelShell('sg-cx-panel', 'Rules'); m._key = cxKey(r);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       var cs = comps(r), byC = {}, n = cs.length;
       r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
       var WAY_HEAD = { own: 'Variables made for each component', shared: 'Shared variables' };
@@ -215,7 +215,10 @@
       var decidedCard = dl ? card('Decided in the team\'s ' + (TOOL[dl.tool] || dl.tool) + ' config', kvOne([['Where', '<code>' + esc(dl.file + ':' + dl.line) + '</code>'], ['Setting', '<code>' + esc(dl.setting + ' ' + JSON.stringify(dl.value)) + '</code>']]
         .concat(dl.reported != null ? [[(TOOL[dl.tool] || dl.tool) + ' reports', esc(dl.reported === 0 ? 'Nothing for this setting' : dl.reported + (dl.reported === 1 ? ' finding' : ' findings') + ' for this setting')]] : []), 'sg-cx-kv')) : '';
       // What to do first, then the facts: its status, who owns it, why, and every component it changes.
-      var body = card('What to do', lead) + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
+      // A token order rule's detail, under what to do (token-grammar.mjs, places): each part where most names put it,
+      // with one of the system's own names that does. Labelled values, as the draft is.
+      var placesCard = (r.places || []).length ? card('Where most names put it', kvOne(r.places.map(function (p) { return [p.what, esc(p.at) + (p.example ? '<span class="pg-par-val">Like ' + namePill(p.example) + '</span>' : '')]; }), 'sg-cx-kv')) : '';
+      var body = card('What to do', lead) + placesCard + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + decidedCard + card('Why', why)
         + (fam ? card('How the ' + fam.components + ' in the family are built', ways) : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
@@ -235,7 +238,7 @@
     var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
-      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join(' · ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
         // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
         + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
     // The table, for this page and for a component's Rules area alike: the rows given, each keeping its number in the
@@ -311,18 +314,26 @@
     var panel = function (i, from) {
       var x = FCH[i]; if (!x) return;
       var m = panelShell('sg-fc-panel', 'Changes in Figma'); m._key = fcKey(x);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       var lines = function (l) { return (l || []).map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); };
       var u = x.usedBy, lib = u && u.library;
       var used = u ? (u.products.length ? '<p class="sg-il-line">The code of ' + namePills(u.products) + '</p>' : '') + (u.inside.length ? '<p class="sg-il-line">Inside ' + namePills(u.inside) + '</p>' : '') + lines([u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
         lib && lib.instances != null ? lib.instances + ' instance' + (lib.instances === 1 ? '' : 's') + ' in ' + lib.files + ' team file' + (lib.files === 1 ? '' : 's') + ' (Figma\'s library analytics)' : 'Team files the engine does not read are not counted' + (lib && lib.unseen ? ': ' + lib.unseen : '') + '.'].filter(Boolean)) : '';
       var after = x.status === 'waiting' ? '<p class="sg-il-line">Not made yet: once the script runs and Figma is read again, rms-design-system-engine --change-report ' + esc(x.component) + ' fills this in.</p>'
         : diffTable(x.real) + (x.mismatch.length ? '<p class="sg-il-line"><strong>' + esc('Not what the change said (' + x.mismatch.length + ')') + '</strong></p>' + lines(x.mismatch.map(function (y) { return capital(y.change) + ' ' + y.what + (y.from != null || y.to != null ? ': ' + [y.from, y.to].filter(function (z) { return z != null; }).join(' → ') : ''); })) : '<p class="sg-il-line">It is what the change said.</p>');
-      var body = card('Status', '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.readAt ? '<p class="sg-il-line"><span class="pg-dim">' + esc('Figma read again ' + String(x.readAt).slice(0, 10)) + '</span></p>' : ''))
+      // What to do, from its status: a person makes the change in Figma (the style guide never writes there), then Figma
+      // is read again. Its See in Figma opens the component's node, as every Figma task's does. Made or taken back: nothing.
+      var fcComp = HAS_PAGE[x.component], fcUrl = fcComp ? figmaUrlOf(fcComp) : null;
+      var fcTodo = x.status === 'waiting' ? 'Make its steps in Figma, then read Figma again.'
+        : x.status === 'not as said' ? 'Make in Figma what is not as said' + (x.mismatch.length ? ' (' + x.mismatch.length + ')' : '') + ', then read Figma again.' : '';
+      var fcSee = fcUrl ? '<p class="sg-see">' + sysButton('a', 'See in Figma', ' href="' + esc(fcUrl) + '" target="_blank" rel="noopener" title="' + esc('Open ' + x.component + ' in Figma') + '" data-see="sg-cx-figma"', null, null, FIGMA_SVG) + '</p>' : '';
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it changes and where, its status, the rest.
+      var body = card('What to do', fcTodo ? '<p class="sg-il-line">' + esc(fcTodo) + '</p>' : '', { see: fcSee })
         + card('Its steps', lines(x.steps))
         + card('What the change said it does', diffTable(x.report))
-        + card('What Figma shows once it was made', after)
         + card('Where it is used', used)
+        + card('Status', '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.readAt ? '<p class="sg-il-line"><span class="pg-dim">' + esc('Figma read again ' + String(x.readAt).slice(0, 10)) + '</span></p>' : ''))
+        + card('What Figma shows once it was made', after)
         + card('What it breaks', lines(x.breaking.map(function (b) { return b.what; })))
         + card('What it adds to the system', lines(x.held.map(function (h) { return h.what; })))
         + card('Local or shared', x.scope ? lines([x.scope.reason]) : '')
@@ -1179,7 +1190,7 @@
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim(), why: unescapeHTML(plainText(r.why || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -1207,7 +1218,9 @@
       return { what: x.kind, check: x.st === 'check', where: wherePlain(p, x), html: ''
       // The points to cover as a list, then how to write it.
       + ((x.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + x.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' : '')
-      + ((x.how || x.todo) ? ((x.notes || []).length ? '<span class="sg-il-label">How to write it</span>' : '') + '<span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '') }; }); };
+      + ((x.how || x.todo) ? ((x.notes || []).length ? '<span class="sg-il-label">How to write it</span>' : '') + '<span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '')
+      // What it was found from, after what to do: a task says only what to do, its finding is its Why.
+      + (x.why ? '<span class="sg-il-label">Why</span><span class="sg-il-text">' + esc(x.why) + '</span>' : '') }; }); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -1278,20 +1291,20 @@
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
           write: tm.length ? [{ what: 'Their descriptions (' + tm.length + ')', html: '<span class="sg-il-text">One sentence on what each token is for, so an agent picks the right one. A line that only repeats the token\'s name, its modes or what it points to does not count. Write it in Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ' or a text style\'s own Description' : '') + ', or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span>' + namesShown(tm)}] : [],
-          todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
-          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
+          todo: tm.length ? '<p class="sg-il-line"><strong>' + esc('Say what each of the ' + tm.length + (tm.length === 1 ? ' token with no description is for.' : ' tokens with no description is for.')) + '</strong></p>' : '',
+          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.' + (tm.length ? ' An agent asking which token to use for something finds nothing on the others yet.' : '')) + '</p>', gets: '' }; }
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
         var held = (p.drafts || []).length;
         return { decision: decisionCell(held ? 'review' : 'write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
           write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span>' + namePills(asked) : '') }],
-          todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page. Agents won\'t use them until you decide.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
-          why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
+          todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits.</strong></p>',
+          why: '<p class="sg-il-line">' + esc((held ? 'Agents won\'t use the drafts until you decide. ' : 'Today an agent asked for a component the system does not have builds one of its own. ') + ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: docAt(p), reads: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>' + ilReachOf(p.missingFor), gets: '<p class="pg-missing">Nothing.</p>' };
+        updated: docAt(p), reads: '', todo: '<p class="sg-il-line"><strong>' + esc('Write its page in the intent layer, titled as ' + (IL.namesFrom || 'Figma') + ' names it.') + '</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>' + ilReachOf(p.missingFor), gets: '<p class="pg-missing">Nothing.</p>' };
       if (p.recheckFor) { var rx = (IL.noPageRechecks || {})[p.recheckFor] || {};
         return { decision: decisionCell('review', p), write: [], notes: [], file: '<span class="pg-missing">—</span>', forWhat: compLink(p.recheckFor), updated: docAt(p), reads: '', gets: '',
-          todo: '<p class="sg-il-line"><strong>' + esc('Review a decision again: ' + ((rx.stale || {}).truth || '') + ' Confirm it still holds, or withdraw it.') + '</strong></p>',
-          why: '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
+          todo: '<p class="sg-il-line"><strong>' + esc('Confirm the decision still holds, or withdraw it.') + '</strong></p>',
+          why: ((rx.stale || {}).truth ? '<p class="sg-il-line">' + esc(rx.stale.truth) + '</p>' : '') + '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
       if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
@@ -1327,13 +1340,15 @@
       if (!ilLaterFailed && needLater('intentLayer', function (ok) { if (!ok) ilLaterFailed = true; ilPanel(i, from); })) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
       // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
       // page is and why.
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo, ilOpen(p)), task = own ? ilTodo(own) : c.todo;
-      var body = card('What to do', todo || task) + card('Where the new lines come from', ilDraftSources(p)) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      // Every panel's one order (panelCard, 00-start.js): what to do, where its new lines come from right under it (the
+      // owner's, 14 November 2026), what it is for, its status, then the rest.
+      var body = card('What to do', todo || task) + card('Where the new lines come from', ilDraftSources(p)) + card('For', c.forWhat) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       // A group's Approve all, Change or Drop all copies its decision on what it proposes (not what it has no ground for), said
       // beside them once copied.
       var detail = m.querySelector('.sg-row-detail');
@@ -1386,7 +1401,7 @@
     };
     // A component's Documentation area (33): the rows this page has for it, in the page's own table, filters and panel
     // (the owner's, 16 November 2026). of(name) · tableHTML(rows) · wire(scope, rows) · open(key).
-    DOC_PAGE = { of: function (name) { return rows.filter(function (p) { return forName(p) === name; }); }, tableHTML: tableHTML, wire: function (scope, list) { wire(scope, list); }, open: ilSec._openKey };
+    DOC_PAGE = { of: function (name) { return rows.filter(function (p) { return forName(p) === name; }); }, status: function (p) { return statusOf(p); }, tableHTML: tableHTML, wire: function (scope, list) { wire(scope, list); }, open: ilSec._openKey };
     // How far along the documentation is, as the Rules page shows its rules (doneCard, 00-start.js): a card a source,
     // as Rules has one for Figma and one for the code. Each counts the pages that source documents: the share with
     // nothing left to do, and each area's, above the filters.

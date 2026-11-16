@@ -28,7 +28,7 @@
     // A family the code writes by hand: said first, since what it draws keeps that font in every brand.
     if ((DATA.handFonts || []).length) {
       var hf = document.createElement('div'); hf.className = 'sg-pending sg-type-hand';
-      hf.innerHTML = '<span><b>The code writes the font by hand.</b> ' + DATA.handFonts.map(function (h) { return esc(h.value) + ' on <code>' + esc(h.selector) + '</code>'; }).join('; ') +
+      hf.innerHTML = '<span><b>The code writes the font by hand.</b> ' + DATA.handFonts.map(function (h) { return esc(h.value) + ' on <code>' + esc(h.selector) + '</code>'; }).join(' · ') +
         ', not the system\'s family token: what is drawn there, and every component that inherits it, keeps that font in every brand. Write it with the token.</span>';
       ts.appendChild(hf);
     }

@@ -1745,11 +1745,13 @@
       var r = tkRows.find(function (x) { return x.t.figma === name; }); if (!r) return;
       openTokenPanel._name = name;
       var m = document.getElementById('sg-tk-panel');
+      // Its own address (panel=tk:<its Figma name>), as every panel has, written as it opens and taken off as it closes.
+      var key = 'tk:' + name;
       if (!m) {
         m = document.createElement('div'); m.id = 'sg-tk-panel'; m.className = 'sg-comp-panel sg-comp-panel--narrow'; m.hidden = true;
         m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="Token details" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail"></div></div>';
         (document.querySelector('.sg-layout') || document.body).appendChild(m);
-        var shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
+        var shut = function () { if (m._key && new URLSearchParams(location.hash.split('?')[1] || '').get('panel') === m._key) setHashQuery({ panel: null }); m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
         m.addEventListener('click', function (e) {
           var cp = e.target.closest('.sg-tk-copy'); if (cp) { copyText(cp.getAttribute('data-copy-text'), cp, null); return; }
           // A component's whole row opens it, as a Status row does.
@@ -1771,10 +1773,11 @@
       var det = m.querySelector('.sg-tk-detail');
       det.innerHTML = sidePanelPage({ crumbs: trailHere(from).concat([r.coll || 'Tokens']).concat(r.path.slice(0, -1)), title: r.path[r.path.length - 1], sub: r.t.figma, body:
         // What it is, a label over each value: what it styles, its name in the code, what it is for.
-        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div>' + kvOne([['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']], 'sg-tk-facts') + '</div>' +
-        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
-        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
+        panelCard('Token', kvOne([['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']], 'sg-tk-facts'), { bare: true }) +
+        panelCard('Values', vals, { bare: true }) +
+        panelCard('Used by ' + plural(comps.length, 'component', 'components'), usersTable(comps), { bare: true }) });
       m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
+      m._key = key; setHashQuery({ panel: key });
       panelHeads(m);   // its tables' heads stuck under the panel's head as it scrolls
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
       m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -1785,6 +1788,7 @@
     var tkLink = function () {
       if (location.hash.indexOf('#tokens') !== 0) return;
       var q = []; if (state.coll) q.push('collection=' + encodeURIComponent(state.coll)); if (state.group) q.push('group=' + encodeURIComponent(state.group)); if (state.kind) q.push('show=' + encodeURIComponent(state.kind)); if (state.q) q.push('q=' + encodeURIComponent(state.q));
+      var pk = new URLSearchParams(location.hash.split('?')[1] || '').get('panel'); if (pk) q.push('panel=' + encodeURIComponent(pk).replace(/%2F/g, '/').replace(/%3A/g, ':'));   // an open panel's address stays
       var h = '#tokens' + (q.length ? '?' + q.join('&') : ''); if (h !== location.hash) history.replaceState(null, '', h);
     };
     var box = document.createElement('div'); box.className = 'sg-tk';
@@ -1925,6 +1929,8 @@
     });
     // Every foundation page shows its own tokens in the same tables (colours on Colors, and so on): an alias or a group's
     // path there opens it on this page; the arrow opens the same details. → the tables, or null with none of that kind.
+    // A token's panel the address names (panel=tk:<name>), on whichever page it was opened from.
+    tkPanelOpen = function (key) { var name = String(key).replace(/^tk:/, ''); if (!tkRows.some(function (r) { return r.t.figma === name; })) return false; openTokenPanel(name, null); return true; };
     tkFoundation = function (sec, type) {
       var rows = tkRows.filter(function (r) { return r.t.type === type; }); if (!rows.length) return null;
       var box = document.createElement('div'); box.className = 'sg-tk-tables sg-tk-found'; sec.appendChild(box);

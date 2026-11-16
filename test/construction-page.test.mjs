@@ -112,7 +112,7 @@ test('the page: in the menu by default, one table whose heads sort, chips for wh
   assert.match(page, /var cxStatusChips = \['fix', 'decide', 'rule'\]\.map\(function \(k\) \{ return \{ key: k, label: ST\[k\]\[1\], dot: ST\[k\]\[0\]/, 'each status a chip of its own, with its dot, read without opening a list');
   assert.match(page, /data-f data-f-area="' \+ esc\(AREA\[r\.area\] \|\| capital\(r\.area\)\)/, 'every row says its values to the filter');
   // What to do comes first, and right under it what it changes, then the facts (the owner's, 16 November 2026).
-  assert.match(page, /var body = card\('What to do', lead\) \+ \(r\.status === 'rule' \? '' : card\(\(byComponent\(r\) \? 'Components it changes \(' : 'Places it changes \('\) \+ n \+ '\)', list\)\) \+ card\('Status'/, 'What to do first, then every component it changes, then the facts');
+  assert.match(page, /var body = card\('What to do', lead\) \+ placesCard \+ \(r\.status === 'rule' \? '' : card\(\(byComponent\(r\) \? 'Components it changes \(' : 'Places it changes \('\) \+ n \+ '\)', list\)\) \+ card\('Status'/, 'What to do first, then every component it changes, then the facts');
   assert.match(page, /Hand each change back as a patch for a person to apply, and change no code yourself\./, 'the code\'s change is handed back, never written over the code people wrote');
   const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
   assert.match(gen, /const constructionShow = cfg\.styleguide\?\.construction \?\? 'listed';/, 'in the menu unless the team leaves it out');

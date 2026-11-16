@@ -706,7 +706,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(ROWS_FULL('#c-button .pg-a11y-rows')), /Tab reaches it once: "Save now"/, 'and every variant is tried');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
-    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /What to do.*Write it as Role: button.*What the Figma notes say.*Screen readers announce the hint after the label/s, 'what to do first, then what Figma says');
+    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /What to do.*Write it on a layer as one of Role: button.*What the Figma notes say.*Screen readers announce the hint after the label/s, 'what to do first, then what Figma says');
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
     const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);

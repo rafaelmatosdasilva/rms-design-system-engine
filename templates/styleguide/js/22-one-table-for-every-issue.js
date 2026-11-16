@@ -131,7 +131,7 @@
     // Its task number, as the table and the Status page number it.
     var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
-    var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+    var card = panelCard;
     // A source in the intent layer opens there: the component's own page, or the layer itself when no page is written yet.
     var ilHref = function (x) { if (!/intent layer/i.test(x)) return null; var own = HAS_PAGE[comp] && HAS_PAGE[comp].intentLayer; return (own && own.url) || (DATA.intentLayer && DATA.intentLayer.source && DATA.intentLayer.source.url) || null; };
     var ilFile = function (url) { var m = /\/-\/blob\/[^/]+\/(.+)$/.exec(url); return m ? decodeURIComponent(m[1]) : url.replace(/^https?:\/\//, ''); };
@@ -140,41 +140,48 @@
     var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
     var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; x = howChecked(x, r.st); return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
     var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
-    // An accessibility task says, under what to do, the component it is on (a link to its page) and where it was read,
+    // An accessibility task says, under what to do and what it affects, the component it is on (a link to its page),
     // so a panel opened from the Accessibility page, where every component is listed, says whose it is (the owner's,
     // 15 November 2026).
     var A11Y_TOP = d.area === 'Accessibility' && !!comp;
-    // A panel always opens with what to do (and, for something still to write, where); what it is, what it affects and
-    // why come after (the owner's, 12 November 2026). Who acts is a card of its own where the table has its column.
-    var order = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
-    order = order.filter(function (col) { return col[1] === 'todo'; }).concat(order.filter(function (col) { return col[1] !== 'todo'; }));
-    var cards = order.map(function (col) {
+    // Where to see it, in what to do, as a link it names for what it does (See, never Fix: nothing is fixed by a click).
+    // A designer's task: the component's node in the Figma file, with Figma's mark. A developer's: its file in the
+    // code, with the code's mark. In a tab of their own. A task of the code never links to Figma (the owner's,
+    // 15 November 2026). The system's own button, as a component's Figma and Code links at the top of its page are.
+    var see = '';
+    if (A11Y_TOP) {
+      var c0 = HAS_PAGE[comp], codeUrl = c0 ? ((c0.links || []).filter(function (l) { return l.label === 'Code'; })[0] || {}).url : null;
+      var seeOf = r.who && r.who.indexOf(WHO.designer) === 0 && figmaOf() ? ['sg-cx-figma', figmaOf(), FIGMA_SVG, 'See in Figma', 'Open ' + comp + ' in Figma']
+        : r.who && r.who.indexOf(WHO.developer) === 0 && codeUrl ? ['sg-cx-code', codeUrl, CODE_SVG, 'See in code', 'Open ' + comp + '\'s file in the code'] : null;
+      if (seeOf) see = '<p class="sg-see">' + sysButton('a', seeOf[3], ' href="' + esc(seeOf[1]) + '" target="_blank" rel="noopener" title="' + esc(seeOf[4]) + '" data-see="' + seeOf[0] + '"', null, null, seeOf[2]) + '</p>';
+    }
+    // Every panel's one order (panelCard, 00-start.js): what to do (and, for something still to write, where), what it
+    // affects and the component it is on, its status, then the rest in its table's order, why, where it was read and when
+    // it was last checked (the owner's, 12 and 16 November 2026). Who acts is a card of its own where the table has its column.
+    var cols = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
+    var colCard = function (col) {
       var k = col[1];
       // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
       if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
-      // Who acts has a column of its own, so it is its own card below, never inside this one.
       // A criterion's level and the WCAG principle it is under, the Accessibility page's Level and Principle filters, said
       // before who acts on it (the owner's, 15 November 2026).
       if (k === 'whoCell') return (r.k && r.k.sc ? card('Level and principle', '<p>' + esc(r.k.beyond || !r.k.level ? 'Beyond A and AA' : 'Level ' + r.k.level + (/^(\d)\./.test(r.k.sc) ? ' · ' + A11Y_PRINCIPLE[r.k.sc.charAt(0)] : '')) + '</p>') : '') + card(col[0], r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '');
-      if (k === 'todo') return card(col[0], (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
-      // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
-      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource || A11Y_TOP ? '' : card('Where it was read', srcLines())); }
-      if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(whenShort(r.at)) + '</p>' : '');   // the table's own format
+      if (k === 'todo') return card(col[0], (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''), { see: see });   // nothing to do: no card; a decision to copy after it (a pair to confirm)
+      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')); }
+      if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(whenShort(r.at)) + '</p>' : '');   // the table's own format, its one date
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
-    });
-    var firstTodo = order.length && order[0][1] === 'todo' && cards[0] ? 1 : 0;   // what it affects goes under what to do
-    var body = cards.join('');
-    // What it affects, for an accessibility check: each place the check found, in a table of what it is (the part, what
-    // of it, its element), the words on it, the state and mode it was seen in, and its measure against what it needs.
-    // What it affects: each place its findings carry (placesTag), in a table of the part, what of it, its element, the
-    // words on it, the state and mode it was seen in, and its measure against what it needs.
+    };
+    var colsAt = function (keys) { return cols.filter(function (col) { return keys.indexOf(col[1]) >= 0; }).map(colCard).join(''); };
+    // What it affects: each place its findings carry (placesTag), as labelled values: the part, what of it, its element,
+    // the words on it, the state and mode it was seen in, and its measure against what it needs.
     var hits = [], tmpP = document.createElement('div');
     tmpP.innerHTML = (r.its || []).map(function (it) { return it.html || ''; }).join('') + (r.code || '');
     Array.prototype.forEach.call(tmpP.querySelectorAll('.sg-places[data-places]'), function (n) { try { hits = hits.concat(JSON.parse(n.getAttribute('data-places'))); } catch (e) { /* none */ } });
     var seenP = {}; hits = hits.filter(function (x) { var k = JSON.stringify(x); if (seenP[k]) return false; seenP[k] = 1; return true; });
+    var affects = '';
     if (hits.length) {
       var COLS = [['Part', function (x) { return esc(x.part || '') + (x.places > 1 ? '<span class="pg-par-val">' + x.places + ' places</span>' : ''); }],
         ['What', function (x) { return esc(x.what || ''); }], ['Element', function (x) { return x.element ? '<code>' + esc(x.element) + '</code>' : ''; }],
@@ -183,23 +190,15 @@
         ['In the code', function (x) { return x.where ? '<code>' + esc(x.where) + '</code>' : ''; }]];
       var used = COLS.filter(function (cc) { return hits.some(function (x) { return cc[1](x); }); });
       // A list: the panel opens from a row of an issue table.
-      var tbl = kvList(hits.map(function (x) { return used.map(function (cc) { return [cc[0], cc[1](x)]; }); }), 'sg-affects');
-      cards.splice(firstTodo, 0, '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects</div>' + tbl + '</div>');
-      body = cards.join('');
+      affects = card('What it affects', kvList(hits.map(function (x) { return used.map(function (cc) { return [cc[0], cc[1](x)]; }); }), 'sg-affects'), { bare: true });
     }
-    if (A11Y_TOP) {
-      // Where to see it, in what to do, as a link it names for what it does (See, never Fix: nothing is fixed by a click).
-      // A designer's task: the component's node in the Figma file, with Figma's mark. A developer's: its file in the
-      // code, with the code's mark. In a tab of their own. A task of the code never links to Figma (the owner's,
-      // 15 November 2026).
-      var c0 = HAS_PAGE[comp], codeUrl = c0 ? ((c0.links || []).filter(function (l) { return l.label === 'Code'; })[0] || {}).url : null;
-      var see = r.who && r.who.indexOf(WHO.designer) === 0 && figmaOf() ? ['sg-cx-figma', figmaOf(), FIGMA_SVG, 'See in Figma', 'Open ' + comp + ' in Figma']
-        : r.who && r.who.indexOf(WHO.developer) === 0 && codeUrl ? ['sg-cx-code', codeUrl, CODE_SVG, 'See in code', 'Open ' + comp + '\'s file in the code'] : null;
-      // The system's own button, as a component's Figma and Code links at the top of its page are, its mark before it.
-      if (see && firstTodo) cards[0] = cards[0].replace(/<\/div><\/div>$/, '<p class="sg-see">' + sysButton('a', see[3], ' href="' + esc(see[1]) + '" target="_blank" rel="noopener" title="' + esc(see[4]) + '" data-see="' + see[0] + '"', null, null, see[2]) + '</p></div></div>');
-      cards.splice(firstTodo, 0, card('Component', '<p><a class="sg-uses-link" href="#' + esc(cid(comp)) + '">' + esc(comp) + '</a></p>') + card('Where it was read', srcLines()));
-      body = cards.join('');
-    }
+    var body = colsAt(['todo'])
+      + affects + colsAt(['where']) + (A11Y_TOP ? card('Component', '<p><a class="sg-uses-link" href="#' + esc(cid(comp)) + '">' + esc(comp) + '</a></p>') : '')
+      + colsAt(['status'])
+      + cols.filter(function (col) { return ['todo', 'where', 'status', 'source', 'updated'].indexOf(col[1]) < 0; }).map(colCard).join('')
+      + card('Why', r.why || '')
+      + (hasSource ? colsAt(['source']) : card('Where it was read', srcLines()))
+      + colsAt(['updated']);
     var det = m.querySelector('.sg-row-detail');
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);

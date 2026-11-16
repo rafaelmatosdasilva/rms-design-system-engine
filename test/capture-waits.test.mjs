@@ -64,7 +64,7 @@ test('in Chrome: the Rules page says which checks wait, with the request to copy
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#rules .sg-cx-wait')`, { attempts: 200 }), true, 'the note is on the Rules page');
     const note = await run(`(() => { const n = document.querySelector('#rules .sg-cx-wait'); return { text: n.innerText.replace(/\\s+/g, ' ').trim(), before: n.nextElementSibling && n.nextElementSibling.querySelector('.sg-cx-table') !== null, copy: n.querySelector('[data-cx-copy]').getAttribute('data-cx-copy') }; })()`);
-    assert.match(note.text, /^17 Figma checks wait on a fresh read of Figma The last capture predates what they read: what each layer binds;/);
+    assert.match(note.text, /^17 Figma checks wait on a fresh read of Figma The last capture predates what they read: what each layer binds · /, 'a list joined by · , never ;');
     assert.equal(note.before, true, 'above the rules\' table');
     assert.equal(note.copy, '/rms-design-system-engine refresh the Figma data');
     assert.deepEqual(errors, []);

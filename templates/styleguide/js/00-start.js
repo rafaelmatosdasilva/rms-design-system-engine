@@ -313,6 +313,18 @@
     return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + (o.titleTip ? ' ' + o.titleTip : '') + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
       '<div class="sg-panel-body">' + o.body + '</div>';
   }
+  // A card of a side panel, the one way every panel draws one: its head, then what it holds, nothing when it holds
+  // nothing. What to do is the panel's lead card. Every panel says its cards in one order: What to do (its See in Figma
+  // or See in code under it, opts.see), what it changes or where (the components, the places), its Status, then the
+  // rest (who, why, where it was read, when it was last checked).
+  // opts.see: the See button's markup, under what it holds. opts.bare: what it holds is a block of its own (a list of
+  // labelled values), set straight under the head.
+  function panelCard(head, html, opts) {
+    opts = opts || {};
+    if (!html) return '';
+    return '<div class="pg-inspect sg-token-card' + (head === 'What to do' || opts.lead ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div>' +
+      (opts.bare ? html + (opts.see || '') : '<div class="sg-row-detail-body">' + html + (opts.see || '') + '</div>') + '</div>';
+  }
   // The components a token is used by, as the Status table shows them: whether Figma has each (Found) and the code (Built), and an
   // arrow to its page (one only in Figma has none to open).
   var STATUS_PILL = function (ok, yes) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? yes || 'Found' : 'Missing') + '</span>'; };

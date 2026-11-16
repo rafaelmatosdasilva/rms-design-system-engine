@@ -63,7 +63,8 @@ test('in the browser: no stage in a component\'s header, and the stage the page 
     assert.equal(await waitForTrue(send, sessionId, `/Stage/.test(document.querySelector('#sg-il-panel .sg-row-detail')?.textContent || '')`, { attempts: 100 }), true, 'the stage is a task');
     const opened = `document.body.innerText.replace(/\\s+/g, ' ')`;
     assert.equal(await waitForTrue(send, sessionId, `/No stage yet/.test(${opened})`, { attempts: 100 }), true, 'its words');
-    assert.match(await run(opened), /No stage yet: what the page measures makes it (Beta|Stable) \(.+?\)\..*?Set its status in contract\.authored\.json \((beta|stable)\)\./);
+    // What to do first, then why: what the page measures (a list joined by · ).
+    assert.match(await run(opened), /Set its status in contract\.authored\.json \((beta|stable)\)\..*?No stage yet: what the page measures makes it (Beta|Stable) \(.+?\)\./);
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

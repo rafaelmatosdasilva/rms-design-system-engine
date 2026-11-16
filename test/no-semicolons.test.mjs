@@ -25,13 +25,19 @@ const NOT_WORDS = /px;|var\(--|^\s*[a-z-]+: [^;]+;|\{|=>|\bfunction\b|\breturn\b
 test('no sentence the style guide template writes has a ";" in it', () => {
   const dir = join(ROOT, 'templates', 'styleguide', 'js'), found = [];
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.js'))) {
-    for (const s of strings(join(dir, f))) if (SENTENCE.test(s.text) && !NOT_WORDS.test(s.text)) found.push(`${f}:${s.line}: ${s.text.slice(0, 90)}`);
+    const lines = readFileSync(join(dir, f), 'utf8').split('\n');
+    for (const s of strings(join(dir, f))) {
+      if (SENTENCE.test(s.text) && !NOT_WORDS.test(s.text)) found.push(`${f}:${s.line}: ${s.text.slice(0, 90)}`);
+      // A list joined with "; ", or a sentence ending on one before the next is added: words joined, never CSS (a
+      // declaration list, a style).
+      else if ((s.text === '; ' || /[A-Za-z)…]; $|^; [A-Za-z]/.test(s.text)) && !/decl|style|css/i.test(lines[s.line - 1])) found.push(`${f}:${s.line}: a list or sentence joined with "; "`);
+    }
   }
-  assert.deepEqual(found, [], 'write it as two sentences, or join it with "and" or "but"');
+  assert.deepEqual(found, [], 'write it as two sentences, or join it with "and" or "but", and a list with " · "');
 });
 
 test('the engine\'s own words on the page carry none either: a shared or local reason, a rule kept, a fix, an anatomy difference', () => {
-  const files = ['lib/local-shared.mjs', 'lib/rule-checks.mjs', 'lib/construction-grammar.mjs', 'lib/build-rules.mjs', 'lib/library-rules.mjs', 'lib/run-diff.mjs', 'lib/owed-states.mjs'];
+  const files = ['lib/local-shared.mjs', 'lib/rule-checks.mjs', 'lib/construction-grammar.mjs', 'lib/token-grammar.mjs', 'lib/build-rules.mjs', 'lib/library-rules.mjs', 'lib/run-diff.mjs', 'lib/owed-states.mjs'];
   const found = [];
   for (const f of files) for (const s of strings(join(ROOT, f))) {
     if (s.text === '; ') found.push(`${f}:${s.line}: a list joined with "; "`);

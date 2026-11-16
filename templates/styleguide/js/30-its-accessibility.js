@@ -31,11 +31,17 @@
   function unreadRows(c) {
     return ((c.a11y || {}).sources || []).filter(function (x) { return x.st === 'agents'; }).map(function (x) {
       var figma = /annotation|Figma/.test(x.from);
-      return { key: c.name + '\u0000u:' + x.from + ':' + x.what, area: 'Accessibility', kind: x.from, figma: figma ? esc(x.what) : '', code: '', todo: (figma ? '' : esc(x.what) + '<span class="pg-todo">') + unreadFix(x) + (figma ? '' : '</span>'),
+      return { key: c.name + '\u0000u:' + x.from + ':' + x.what, area: 'Accessibility', kind: x.from, figma: figma ? esc(x.what) : '', code: '', todo: unreadFix(x).todo, why: (figma ? '' : '<p>' + esc(x.what) + '</p>') + (unreadFix(x).why ? '<p>' + unreadFix(x).why + '</p>' : ''),
         who: x.todo ? (/annotation/.test(x.from) ? WHO.designer : WHO.a11y) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
     });
   }
-  function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
+  // What to do with it, only the action, and why when there is nothing to do. → { todo, why } (HTML)
+  function unreadFix(x) {
+    if (x.kind && x.kind !== 'accessibility') return { todo: 'Nothing to do.', why: 'Its Figma category, ' + namePill(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ', makes it design intent, which the agents read.' };
+    if (x.wording) return { todo: 'Write it in Figma as ' + namePill(x.wording) + '.', why: '<code>--figma-edits</code> lists it.' };
+    if (/annotation/.test(x.from)) return { todo: 'Write it on a layer as one of ' + ['Role: button', 'Alt: what it shows', 'Heading level 2', 'Escape closes', 'the arrow keys move', 'Enter and Space activate', 'Role: label'].map(namePill).join(' · ') + '.', why: '' };
+    return { todo: 'Nothing to do.', why: 'The agents read it as design intent.' };
+  }
   // Where a finding or a duty is, said with it: the component, its variant or the part it is on.
   function figmaOf(c) { var l = (c.links || []).find(function (x) { return /figma/i.test(x.label); }); return l ? l.url : null; }
   // What the data says about the component, each finding or duty as an item under its criterion: what the audit found
@@ -137,7 +143,8 @@
     return (c.copies || []).map(function (x) {
       return { key: c.name + '\u0000copy:' + x.product + ':' + x.cls, area: 'Products', kind: 'Near copy', figma: '', code: '<code>.' + esc(x.cls) + '</code><span class="pg-par-val">' + esc(x.product + ', ' + x.file + ':' + x.line) + '</span>',
         where: esc(x.product) + '<span class="pg-par-val"><code>.' + esc(x.cls) + '</code> ' + esc(x.file + ':' + x.line) + '</span>',
-        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ', ' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? ', and it differs in ' : '.')) + (x.differ.length ? namePills(x.differ) : '') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Your team decides which.') + '</span>',
+        todo: 'Decide: use ' + namePill(c.name) + ' in ' + namePill(x.product) + ', with a new option if it needs one, or add ' + namePill('.' + x.cls) + ' to the system on purpose.',
+        why: '<p>' + esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ', ' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? ', and it differs in ' : '.')) + (x.differ.length ? namePills(x.differ) : '') + '</p>',
         who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,
         scope: { scope: 'local', reason: 'Local: ' + x.product + "'s own class, so swapping it for " + c.name + ' changes ' + x.product + ' only. Adding it to the system instead would be shared.' } };
     });
@@ -160,7 +167,7 @@
           // The rule is said once, as the row's kind; what to do says what this component does and the fix.
           // What this component does, unless the fix already says it (most fixes name the value they change).
           // A fix of its own says only what to do, the finding inside it (the owner's, 16 November 2026).
-          todo: (t.value && !(t.fix && t.fix.say) && String(fix).indexOf(t.value) < 0 ? esc(t.value) : '') + '<span class="pg-todo">' + esc(fix) + '</span>',
+          todo: esc(fix), why: t.value && !(t.fix && t.fix.say) && String(fix).indexOf(t.value) < 0 ? '<p>' + esc(t.value) + '</p>' : '',
           who: WHO.figma, st: 'todo', rel: '', at: DATA.builtAt || null });
       });
     });
@@ -174,10 +181,10 @@
     // The system's own items (a control the page needs and the system lacks, a component only Figma has): rows of the
     // same table, the system's first.
     var sys = TODO.filter(function (t) { return !t.comp; }).map(function (t, i) {
-      var comp = /^Figma has the (.+) component; the code does not have it yet\.$/.exec(t.say || '');
+      var comp = /^Figma has the (.+) component[;.] [Tt]he code does not have it yet\.$/.exec(t.say || '');
       // A component only the code has: its file on the code's side, nothing on Figma's.
-      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
-      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: t.st || (t.who !== 'both' ? 'todo' : 'check'), rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
+      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(doWhat(t.todo)), why: '<p>' + esc(t.say) + '</p>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
+      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(doWhat(t.todo)), why: '<p>' + esc(t.say) + '</p>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: t.st || (t.who !== 'both' ? 'todo' : 'check'), rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
     });
     if (sys.length) order.push({ name: null, rows: sys });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
@@ -280,7 +287,7 @@
       // Only a CSS class in the code: Missing there, as one only Figma has; nothing compared or tried until it is built.
       if (cssOnly(c)) { parC = C('none', 'N/A', 0, 0, NA_WHY.cssOnly); accC = C('none', 'N/A', 0, 0, NA_WHY.cssOnlyA11y); docC = C('differs', 'Missing', 1, 0); fix = 1; dec = 0; untested = false; }
       return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'missing' : 'found', nocode: cssOnly(c), par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: cssOnly(c) ? null : '#' + cid(c.name),   // no component in the code: nothing to open, as one only Figma has
-        codeWhy: cssOnly(c) ? 'The code has only its CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', no component file: it is not a component of the code yet. Build it as one, with the props Figma gives it.' : c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
+        codeWhy: cssOnly(c) ? 'The code has only its CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', no component file: it is not a component of the code yet. Build it as one, with the props Figma gives it.' : c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '). Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
     });
     // A component of Figma's the code may have (a file suggested, or several as likely: Unsure, to confirm), one it has
     // no file for (Missing), or one only the code has (No Figma): its one row, what to do in a tip on its Code cell.

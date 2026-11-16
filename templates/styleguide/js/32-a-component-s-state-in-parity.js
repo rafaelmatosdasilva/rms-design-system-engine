@@ -84,10 +84,10 @@
   function stageRows(c) {
     var sug = suggestedStage(c), team = c.status;
     if (!sug || (team && team.kind === sug.kind)) return [];
-    var why = sug.why.join('; ');
+    var why = sug.why.join(' · ');
     var said = team ? 'Its stage says ' + team.status + ', but what the page measures makes it ' + sug.status + ' (' + why + ').' : 'No stage yet: what the page measures makes it ' + sug.status + ' (' + why + ').';
     var how = team ? 'Keep ' + team.status + ', or change its status in contract.authored.json.' : 'Set its status in contract.authored.json (' + sug.kind + ').';
-    return [{ key: c.name + '\u0000stage', area: 'System', kind: 'Stage', figma: '', code: '', todo: esc(said) + '<span class="pg-todo">' + esc(how + (sug.instead ? ' Use ' + sug.instead + ' instead.' : '')) + '</span>',
+    return [{ key: c.name + '\u0000stage', area: 'System', kind: 'Stage', figma: '', code: '', todo: esc(how + (sug.instead ? ' Use ' + sug.instead + ' instead.' : '')), why: '<p>' + esc(said) + '</p>',
       who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,
       scope: { scope: 'shared', reason: 'Shared: its stage is what every product reads before it uses ' + c.name + '.' } }];
   }

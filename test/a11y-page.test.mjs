@@ -108,7 +108,8 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     assert.ok(panel && panel.length, 'the panel opened');
     assert.ok(panel.includes('What to do'), panel.join());
     assert.ok(panel.includes('Level and principle'), 'the panel says the level and the principle, as the filters do');
-    assert.deepEqual(panel.slice(0, 3), ['What to do', 'Component', 'Where it was read'], 'whose it is and where it was read, right under what to do');
+    assert.deepEqual(panel.slice(0, 3), ['What to do', 'Component', 'Status'], 'whose it is right under what to do, then its status: where it was read is with the rest, after it');
+    assert.ok(panel.indexOf('Where it was read') > panel.indexOf('Status'), 'where it was read comes after its status');
     // A task for a designer links to the component in Figma in What to do, in a tab of its own with Figma's mark. A
     // task for a developer never links to Figma.
     const figma = await run(`(async () => {

@@ -126,6 +126,11 @@ What every page shares:
 - **Filters in one order.** All first, then the filters (Who acts), then the statuses, all as far apart as each other.
 - **Column widths by what they hold.** Each column has its share of the table, so leaving one out never squeezes the rest. A column with nothing in any row is left out (Motion's What to do when nothing is to do).
 - **A row's panel reads as text.** Every line in one colour and weight, and never a table or a box drawn like one: what a table would say is said as labelled values.
+- **Every panel in one order.** What to do comes first, with See in Figma or See in code when it has one. Then what it changes or where (the components, the places), then its Status, then the rest: who acts, why, where it was read and when it was last checked. A panel says each date once.
+- **What to do is the action only.** It says what to do, each name or value in it a pill. What was found is in Why, or is the value inside the action.
+- **Every panel has its own link.** A rule's, a task's, a documentation row's, a change in Figma's and a token's: copy the address and it opens again.
+- **Changes in Figma say what to do.** A change waiting to be made, or made but not as said, opens on what to do in Figma, with See in Figma.
+- **A token's naming rule says the new name.** A token whose parts are out of the system's order (its state, its size, its kind's word) is listed with the whole name it takes, beside the name it has. The rule's title is one short sentence. Its panel says, under What to do, where most names put each part, with one of your own names that does.
 
 ### Status
 
@@ -159,7 +164,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
 | Rules | The Rules page's own table, filtered to the rules that change this component, in Figma or in the code, to fix or to decide. The same columns, filters and sorting, and each row opens the same panel as on the Rules page, with its own link. Shown only when a rule changes it |
 | Accessibility | The Accessibility page's own table, limited to this component's criteria at A and AA: its task number, the criterion, its level, who acts, its status and when it was last checked (the Component column left out, every row being this one). The same filters and sorting, and each row opens the same panel as on the Accessibility page, with its own link. Under it, in a table of its own, what the page leaves out: what is looked at beyond A and AA and the Figma notes no check reads. Drawn at once with every result already known, a row still being tried in this browser saying so until its try ends |
-| Documentation | The Documentation page's own table, filtered to the rows it has for this component: its page in the intent layer (a row for each decision it asks for), or the page still to write. The same columns, filters (Source, Area) and status words (Missing, Review, Done), and each row opens the same panel as on the Documentation page, with its own link. What it is, when to use it, Do and Don't pictures, its role, an example and what is still to write are in that panel |
+| Documentation | The Documentation page's own table, filtered to the rows it has for this component: its page in the intent layer (a row for each decision it asks for), or the page still to write. The same columns, filters (Source, Area) and status words (Missing, Review, Done), and each row opens the same panel as on the Documentation page, with its own link. Its tab's dot counts those rows: Done when none is open, Missing when every one is still to write, else Review. What it is, when to use it, Do and Don't pictures, its role, an example and what is still to write are in that panel |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |

@@ -70,7 +70,7 @@
   // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
   // every kind, written or not; the Status page only the ones still to write, under the same numbers.
   // Every place the engine reads it from, any one of them: the page shows each under its source.
-  var GUIDE_HINT = 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section with that title (When to use, When not to use…); ' : '') +
+  var GUIDE_HINT = 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section with that title (When to use, When not to use…), ' : '') +
     'its description in Figma, as a line that starts with that title (When to use: …), the comment above its rule in the code, the same way, or contract.authored.json under guidance.';
   var WRITE_HOW = {
     'What it is': 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer (an Intent or Overview section), ' : '') + 'its description in Figma, or its note in the code.',
@@ -119,7 +119,7 @@
         : !k.shared
         ? mk('props', 'Properties', '<p class="pg-missing">Its properties are only in the engine\'s local contract, ' + where + ', which nobody else reads.</p>', 'todo', 'Publish the contracts to the intent layer (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request, so everybody reads the same one.')
         : (k.drift || []).length
-          ? mk('props', 'Properties', '<p class="pg-missing">Its contract in the intent layer, ' + where + ', is out of date: ' + k.drift.map(esc).join('; ') + '.</p>', 'todo', publish)
+          ? mk('props', 'Properties', '<p class="pg-missing">Its contract in the intent layer, ' + where + ', is out of date: ' + k.drift.map(esc).join(' · ') + '.</p>', 'todo', publish)
           : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there, so there is nothing to write.</p>', 'done', '');
       rows.push(Object.assign(row, { src: ['Its contract (' + k.file + ')'] }));
     }
@@ -149,7 +149,7 @@
         protos.slice(0, 8).map(function (p) {
           return '<li>' + esc(p.name) + ' <span class="pg-dim">' + (p.times > 1 ? '×' + p.times + ' · ' : '') + (p.ok ? 'ready' : p.mistakes + (p.mistakes === 1 ? ' mistake' : ' mistakes')) + (p.at ? ' · ' + esc(String(p.at).slice(0, 10)) : '') + '</span></li>';
         }).join('') + '</ul>', open.length ? 'check' : 'ok',
-        open.length ? 'Open each prototype that is not ready: what it got wrong with this component is what its documentation does not say plainly enough.' : 'Nothing to do: every prototype that uses it passed its last check.'));
+        open.length ? 'Open each prototype that is not ready: what it got wrong with this component is what its documentation does not say plainly enough.' : 'Nothing to do.'));
       rows[rows.length - 1].src = ['Each prototype\'s own record'];
     }
     // What agents got wrong with it in prototypes, and why: what its documentation lacked (to write), or what is written
@@ -159,7 +159,7 @@
       var needs = Object.keys(inv.needs || {}), WRITE = { example: 'an example of it in use (the engine writes one from the product\'s own code with --intent-changes)', fields: 'what each item of its lists holds, in its code comment', page: 'its page in the intent layer' };
       rows.push(mk('invented', 'What agents got wrong', '<p' + (needs.length ? ' class="pg-missing"' : '') + '>' + inv.count + (inv.count === 1 ? ' mistake' : ' mistakes') + ' in prototypes' + (needs.length ? ', because ' + needs.map(function (n) { return esc(inv.needs[n].why); }).join(', and ') : ', with what they needed written') + ':</p>' +
         '<ul>' + (inv.last || []).map(function (l) { return '<li>' + esc(l.message) + ' <span class="pg-dim">(' + esc(l.page) + ')</span></li>'; }).join('') + '</ul>',
-        needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join(', and ') + '.' : 'What agents needed is written, and they still got it wrong: say it more plainly, or higher on its page.'));
+        needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join(', and ') + '.' : 'Say what agents needed more plainly on its page, or higher on it.'));
       rows[rows.length - 1].src = ['The prototypes\' checks'];
     }
     // What an agent cannot learn about it (its props, events, slots and lists no comment and no page explains).
@@ -168,7 +168,7 @@
       var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists', values: 'Values nothing helps choose between', keyboard: 'What the keyboard does', apart: 'What tells it apart', overflow: 'What it does when its content does not fit', oneAction: 'What it shows with one action only' };
       cov.forEach(function (m) { (groups[m.kind] = groups[m.kind] || []).push(m); });
       rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + (groups[k].every(function (m) { return m.what === c.name; }) ? esc(groups[k][0].why.charAt(0).toUpperCase() + groups[k][0].why.slice(1)) + '.' : namePills(groups[k].map(function (m) { return m.what; }))) + '</li>'; }).join('') + '</ul>', 'todo',
-        Object.keys(groups).map(function (k) { var w = groups[k].map(function (m) { return m.what; }).filter(function (x) { return x !== c.name; }); return (LABEL[k] || k) + (w.length ? ' (' + w.join(', ') + ')' : '') + '. ' + groups[k][0].write; }).join(' ')));
+        Object.keys(groups).map(function (k) { var w = groups[k].map(function (m) { return m.what; }).filter(function (x) { return x !== c.name; }); return groups[k][0].write + (w.length ? ' ' + (LABEL[k] || k) + ': ' + w.join(' · ') + '.' : ''); }).join(' ')));
       rows[rows.length - 1].src = ['Its code and its intent layer page'];
     }
     // Its "when to use" lines are all its family's: nothing tells an agent when this one and not a sibling (Missing).
@@ -291,7 +291,7 @@
     var g = function (key) { var x = guideOf(c, key); return x ? [].concat(x.text || []) : []; };
     if (kind === 'Limitations') {
       ctl.forEach(function (k) { (k.onlyWith || []).forEach(function (w) { out.push(k.label + ' applies only while ' + w.label + ' is ' + (w.on ? 'on' : 'off') + '.'); }); });
-      ctl.forEach(function (k) { var p = propOf(k.prop), fig = (k.options || []).map(function (o) { return String(o.label); }); var extra = p && fig.length ? (p.values || []).filter(function (v) { return fig.indexOf(String(v)) < 0; }) : []; if (extra.length) out.push('The code also accepts ' + k.prop + ' ' + extra.join(', ') + '; Figma does not draw ' + (extra.length > 1 ? 'them' : 'it') + '.'); });
+      ctl.forEach(function (k) { var p = propOf(k.prop), fig = (k.options || []).map(function (o) { return String(o.label); }); var extra = p && fig.length ? (p.values || []).filter(function (v) { return fig.indexOf(String(v)) < 0; }) : []; if (extra.length) out.push('The code also accepts ' + k.prop + ' ' + extra.join(', ') + '. Figma does not draw ' + (extra.length > 1 ? 'them' : 'it') + '.'); });
       props.filter(function (p) { return p.required; }).forEach(function (p) { out.push(p.name + ' must always be given.'); });
       if (api.file && !(api.slots || []).length) { var txt = props.filter(function (p) { return /string/.test(p.type || '') && /label|text|title|content|icon/i.test(p.name); }).map(function (p) { return p.name; }); out.push('It takes no content of its own' + (txt.length ? ': only ' + txt.join(' and ') : '') + '.'); }
     } else if (kind === 'Example' && c.import && c.import.line) {
@@ -315,7 +315,7 @@
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && (k[0] === 'Role' ? !!roleClash(c) : k[0] !== 'Do and don\'t' && WEAK(body));   // a role is one word by nature: it is to check only when two sources name two roles
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), notes: has && !weak ? [] : docNotes(k[0], c), how: has && !weak ? '' : (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
+        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (WRITE_HOW[k[0]] || GUIDE_HINT)), notes: has && !weak ? [] : docNotes(k[0], c), how: has && !weak ? '' : (WRITE_HOW[k[0]] || GUIDE_HINT), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }

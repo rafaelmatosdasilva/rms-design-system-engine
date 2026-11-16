@@ -57,7 +57,7 @@
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + ', but the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code, remove it from Figma, or keep it as a known exception.' }); });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
-    if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' });
+    if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '). Figma has no component for it.', todo: 'Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' });
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   // A control the page draws itself (its segmented control, tooltip, card) is the template's, never the system's work:
@@ -67,7 +67,7 @@
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
-  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.', scope: k.scope || null }); });
+  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '). Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.', scope: k.scope || null }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, figmaOnly: n, say: 'Figma has the ' + n + ' component. The code does not have it yet.', todo: 'Build ' + n + ' in the code.', scope: (DATA.notAgreed.scopes || {})[n] || null }); });
   // A Figma name with a slash is a part of the component named before it (chartBars/bar is chartBars's), never a
   // component of its own: counted and listed with its parent. The parent is the component of that name, a leading mark
