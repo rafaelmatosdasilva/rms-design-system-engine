@@ -535,7 +535,7 @@ Now the needs are gathered by what they say:
    Each is the design team's to decide: a component of its own, an option on one that exists, or left as it is.
 ```
 
-The same lines are in `gaps.json` under `repeated`, so you can read it without running anything.
+You are told this wherever you are already being shown what your system lacks: after a prototype is drawn, under **--flow** when you look at the whole journey, and in the report that turns Figma screens into starting points. The same lines are in `gaps.json` under `repeated`, so you can read it without running anything.
 
 **It builds nothing.** It does not create a component, name one, or write anything into your system — it counts, and hands you the count. Whether your system grows a component is yours to decide, as everything on that list already is.
 

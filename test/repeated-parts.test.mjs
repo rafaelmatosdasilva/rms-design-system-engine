@@ -2,6 +2,11 @@
 // they are spelled, counted, and handed to a person. Nothing here creates or names a component.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 import { jobOf, sameJob, clearest, byJob, builtAgain, repeatedLines, AGAIN, NOISE } from '../lib/repeated-parts.mjs';
 
 const gap = (need, prototypes, extra = {}) => ({ kind: 'component', need, prototypes, closest: null, ...extra });
@@ -86,4 +91,20 @@ test('it proposes no component: no name is invented anywhere in what it says', (
   // Every word of the need comes from the team; the engine adds no name of its own.
   assert.ok(said.includes('a top bar'));
   assert.ok(!/\b[a-z]+[A-Z][a-zA-Z]*\b/.test(said.replace('pageHeader', '')), 'no component-shaped name is coined');
+});
+
+// Where the recap is said. It reached only the report that turns Figma screens into starting points, so a designer
+// drawing prototypes one at a time never saw it and the count sat in a file nobody opens. It is said now wherever
+// a person is already being shown what the system lacks.
+test('the recap is said where a person is shown the gaps, not only where Figma screens are read', () => {
+  const src = readFileSync(join(ENGINE, 'lib', 'prototype.mjs'), 'utf8');
+  const said = [...src.matchAll(/repeatedSoFar\(ROOT\)|repeatedLines\(byJob\(/g)].length;
+  assert.ok(said >= 3, `the recap reaches ${said} report(s): the Figma starting points, a prototype drawn, and the flow`);
+  // Each of the three places a person is told what the system lacks reaches it.
+  for (const fn of ['fromScreens', 'flowReport']) {
+    const at = src.indexOf(`function ${fn}`);
+    assert.ok(at > 0, fn);
+    const body = src.slice(at, src.indexOf('\n}', at));
+    assert.match(body, /repeatedSoFar\(ROOT\)|repeatedLines\(byJob\(/, `${fn} says nothing of what repeats`);
+  }
 });
