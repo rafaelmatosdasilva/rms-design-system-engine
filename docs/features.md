@@ -495,8 +495,8 @@ Two things it will not do. It never shows a zero where it means *not yet*: a ste
 
 Your tools stay as they are, and the engine fits around them.
 
-*Today: every browser check runs in Chrome.*
-
+- Checks in a real browser: Chrome for every check, and Firefox and Safari for the match with Figma and six accessibility checks. Firefox runs whenever it is installed, Safari when you ask, and only what differs from Chrome is said.
+- Writes and reads DSDS, and tries each new DSDS release before moving to it.
 - Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
