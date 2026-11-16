@@ -97,7 +97,7 @@ export function askCompany(dir) {
 const BOT = /\[bot\]|^(dependabot|renovate|github-actions|gitlab-bot|semantic-release|greenkeeper|snyk)\b|@(users\.)?noreply\.github(usercontent)?\.com$/i;
 const MAILBOX = /^(info|dev|devs|admin|noreply|no-reply|root|git|ci|cd|build|builds|team|hello|contact|support|design|deploy|release|bot)$/i;
 export function authorsOf(root, { git = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }) } = {}) {
-  let log = '';
+  let log;
   try { log = git(['-C', root, 'log', '--all', '--format=%an%x09%ae']); } catch { return []; }
   // This computer's own person: who commits from the engine's checkout here, set there or for the whole computer.
   const self = new Set(), engine = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -254,7 +254,7 @@ export function projectTerms(root) {
   const snaps = [];
   const walk = (d, depth) => {
     if (depth > 6) return;
-    let ns = []; try { ns = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    let ns; try { ns = readdirSync(d, { withFileTypes: true }); } catch { return; }
     for (const n of ns) {
       if (n.name === 'node_modules' || n.name === '.git' || n.name.startsWith('.design-system-engine-out')) continue;
       const p = join(d, n.name);
@@ -364,7 +364,7 @@ let LOADED;
 // → { has(word), find(text) → [{ term, from }] } over the terms of this computer; empty where there are none (CI).
 export function localTerms() {
   if (LOADED !== undefined) return LOADED;
-  let t = null;
+  let t;
   try { t = existsSync(PROJECTS()) ? buildTerms() : readJson(TERMS(), null); } catch { t = null; }
   const map = new Map(Object.entries(t?.terms ?? {}));
   const allow = new Set((t?.allow ?? []).map(norm));
@@ -426,7 +426,7 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
   if (a.includes('--add')) { const ok = rememberProject(at('--add')); console.log(ok ? 'remembered' : 'already remembered, or not a project (no ds-config.json)'); buildTerms({ force: true }); }
   else if (a.includes('--scan')) {
     const found = [];
-    const walk = (d, depth) => { if (depth > 6) return; let ns = []; try { ns = readdirSync(d, { withFileTypes: true }); } catch { return; } if (ns.some((n) => n.name === 'ds-config.json')) found.push(d); for (const n of ns) if (n.isDirectory() && !/^(node_modules|\.git|\.Trash|Library)$/.test(n.name)) walk(join(d, n.name), depth + 1); };
+    const walk = (d, depth) => { if (depth > 6) return; let ns; try { ns = readdirSync(d, { withFileTypes: true }); } catch { return; } if (ns.some((n) => n.name === 'ds-config.json')) found.push(d); for (const n of ns) if (n.isDirectory() && !/^(node_modules|\.git|\.Trash|Library)$/.test(n.name)) walk(join(d, n.name), depth + 1); };
     walk(resolve(at('--scan')), 0);
     for (const d of found) if (rememberProject(d)) console.log('remembered', d);
     buildTerms({ force: true });

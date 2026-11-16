@@ -2,8 +2,8 @@
   "private": true,
   "description": "ESLint, for test/lint.test.mjs: the engine's own code held to its written coding standards (docs/development.md#coding-standards). A test tool only: the engine itself has no dependency.",
   "dependencies": {
-    "@eslint/js": "9",
-    "eslint": "9",
+    "@eslint/js": "10",
+    "eslint": "10",
     "globals": "17"
   }
 }

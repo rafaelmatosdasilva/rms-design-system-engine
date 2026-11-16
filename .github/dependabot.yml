@@ -78,6 +78,12 @@ updates:
       lint-tools:
         patterns:
           - '*'
+    # A major version of ESLint changes which rules are recommended, and the engine's code is held to them: it is the
+    # owner's call, made in a pull request of its own with the fixes it asks for (ESLint 10 was).
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
