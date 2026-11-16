@@ -9,4 +9,22 @@ reason = "deepmerge prototype poisoning (low). No fixed release exists; it reach
 [[IgnoredVulns]]
 id = "GHSA-vjh5-4x84-xrqp"
 ignoreUntil = 2027-01-31
-reason = "Fixed in Nuxt 4.6.2, and this folder runs 4.6.3. The advisory's 3.x range has no upper bound, so it also matches 4.x. The harness never serves Nuxt's server routes either: it builds client-side."
+reason = "Fixed in Nuxt 4.6.2, and this folder runs 4.6.4. The advisory's 3.x range has no upper bound, so it also matches 4.x. The harness never serves Nuxt's server routes either: it builds client-side."
+
+# The same shape as the one above: fixed in 4.6.4, which this folder runs (nuxt, @nuxt/nitro-server and
+# @nuxt/vite-server), but each advisory's 3.x range is written "introduced 3.0.0" with no end, so it also matches 4.6.4.
+
+[[IgnoredVulns]]
+id = "GHSA-f3x9-2chm-73c8"
+ignoreUntil = 2027-01-31
+reason = "Fixed in Nuxt 4.6.4, which this folder runs. The advisory's 3.x range has no upper bound, so it also matches 4.6.4. The harness builds client-side and never serves Nuxt's server routes."
+
+[[IgnoredVulns]]
+id = "GHSA-hf59-9xwc-2g4p"
+ignoreUntil = 2027-01-31
+reason = "Fixed in Nuxt 4.6.4, which this folder runs. The advisory's 3.x range has no upper bound, so it also matches 4.6.4. The harness builds client-side and never renders server islands."
+
+[[IgnoredVulns]]
+id = "GHSA-96x6-fvhx-49hg"
+ignoreUntil = 2027-01-31
+reason = "Fixed in Nuxt 4.6.4, which this folder runs. The advisory's 3.x range has no upper bound, so it also matches 4.6.4. The harness builds client-side and never serves a server error page."
