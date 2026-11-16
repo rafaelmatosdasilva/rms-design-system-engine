@@ -18,6 +18,11 @@ test('a control with no accessible name', () => {
   const sprite = markupFindings('<svg><symbol id="icon-info"><path fill="#333" d="M0"/></symbol>\n<symbol id="icon-ok"><path fill="currentColor" d="M0"/></symbol>\n<symbol id="logo"><path fill="#f00" d="M0"/><path fill="#00f" d="M1"/></symbol>\n<symbol id="icon-line" stroke="none"><path style="stroke: #222" d="M0"/></symbol></svg>');
   assert.deepEqual(kinds(sprite), [[1, 'contrast'], [4, 'contrast']]);
   assert.match(sprite[0].desc, /icon-info paints itself #333/);
+  // A clip path, a mask and what <defs> holds are never drawn: an export's white clip rectangle is no colour of the icon's,
+  // while a path that does paint white is still one.
+  const clipped = markupFindings('<svg><symbol id="m-spin"><g clip-path="url(#c)"><path fill="var(--neutral800)" d="M0"/></g><defs><clipPath id="c"><rect width="24" height="24" fill="white"/></clipPath></defs></symbol>\n<symbol id="m-mask"><mask id="k"><rect fill="#fff"/></mask><path fill="currentColor" mask="url(#k)" d="M0"/></symbol>\n<symbol id="m-white"><path fill="white" d="M0"/><clipPath id="d"><rect fill="black"/></clipPath></symbol></svg>');
+  assert.deepEqual(kinds(clipped), [[3, 'contrast']], 'only the icon that draws in white');
+  assert.match(clipped[0].desc, /m-white paints itself white/);
   assert.deepEqual(kinds(markupFindings('<button type="button"><span aria-hidden="true"></span><span>Save</span></button>')), []);
   assert.deepEqual(kinds(markupFindings('<button onClick={f}>{label}</button>')), []);           // text from a prop
   assert.deepEqual(kinds(markupFindings('<button {...props}><Icon /></button>')), []);           // attributes from outside
