@@ -40,8 +40,10 @@ a.pg-usage-name { color: var(--sg-text); }
 /* On the Status page its counts and filter stay under the title, so the filter is always at hand; each card's head row
    stays under them. */
 .sg-todo-head { top: calc(var(--sg-sticky-top, 0px) + var(--sg-title-h, 0px)); margin-bottom: 0; }
+.pg-area .sg-todo-head { top: calc(var(--sg-sticky-top, 0px) + var(--pg-head-h, 0px) + var(--pg-tabs-h, 0px)); }   /* in a component's area, under its title row and its areas, as the page's sits under its title */
 .sg-todo-head .pg-par-filter { margin-bottom: 0; }   /* its words 8px under the tag, as on every page; the bar's own padding above it */
 .sg-todo-head .sg-todo-sum { margin-top: 0; }
+.sg-todo-head .pg-par-sum.sg-todo-sum:not(:empty) { position: static; }   /* its counts move with the bar, never stuck again on their own */
 /* The bar keeps one height, stuck or not (the tables' heads stick right under it): close under the title (half the
    gap it had), and a card gap under its chips, which is the gap to the first table too. */
 .sg-todo-head { padding-top: 0; padding-bottom: var(--sg-card-gap); }

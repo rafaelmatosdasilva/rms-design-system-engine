@@ -18,7 +18,7 @@ const lines = () => PARTS.flatMap((f) => readFileSync(join(DIR, f), 'utf8').spli
 test('a date is said only by the shared helpers (when, whenShort, dayShort)', () => {
   const HELPERS = /var (when|whenShort|dayShort) = function/;
   const found = lines().filter((l) => /toLocaleDateString|toLocaleString\('en-GB'|\.getMonth\(\)/.test(l.text) && !HELPERS.test(l.text));
-  assert.deepEqual(found.map((l) => `${l.f}:${l.n}`), [], 'format the date with when, whenShort or dayShort (18-component-playground.js)');
+  assert.deepEqual(found.map((l) => `${l.f}:${l.n}`), [], 'format the date with when, whenShort or dayShort (00-start.js)');
 });
 
 test('"N more" is only the shared pills chevron', () => {

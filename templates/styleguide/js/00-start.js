@@ -272,6 +272,7 @@
   function stickHeight(sec) {
     if (!sec) return;
     var headRow = sec.querySelector('.pg-header > .pg-head'); if (headRow && headRow.offsetParent) sec.style.setProperty('--pg-head-h', stuckH(headRow) + 'px');   // a component's title row, the areas sticking under it
+    var tabs = sec.querySelector('.pg-areas'); if (tabs && tabs.offsetParent) sec.style.setProperty('--pg-tabs-h', stuckH(tabs) + 'px');   // a component's areas: an area's filters stick under them
     var top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sg-sticky-top')) || 0, low = top;
     Array.prototype.forEach.call(sec.querySelectorAll(STICK_BARS), function (el) {
       if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
@@ -279,7 +280,7 @@
     });
     sec.style.setProperty('--pg-bars-h', (low - top) + 'px');   // the page's own bars: a component's chips stick under them
     Array.prototype.forEach.call(sec.querySelectorAll('.pg-card-section .pg-par-sum'), function (el) {
-      if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
+      if (!el.offsetParent || getComputedStyle(el).position !== 'sticky' || el.closest('.sg-todo-head')) return;   // counts in a filter bar stick with it
       low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + stuckH(el));
     });
     sec.style.setProperty('--pg-areas-h', (low - top) + 'px');   // with its chips: the cards' heads stick under all of them
@@ -367,6 +368,13 @@
   // A list of names, the one way the guide sets one, on every page and in every panel (the owner's, 16 November 2026):
   // each name a pill (.sg-name), the first five shown, the rest behind one chevron pill ("9 more") that opens them.
   // A name in a sentence is namePill. One handler opens every list's rest.
+  // A date and time in the reader's own clock (two changes on one day read apart).
+  var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
+  // A date as a row says it, short: 16 Oct, 22:11 (the year only when it is not this one).
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var whenShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ', ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
+  // A day as a sentence says it: 15 Oct (the year only when it is not this one).
+  var dayShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
   var PILLS_SHOWN = 5;
   var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
   function pillsMore(n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; }
