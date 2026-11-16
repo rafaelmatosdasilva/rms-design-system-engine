@@ -165,3 +165,37 @@ test('what did not work in the browser is named: nothing opened, the focus left 
     '⚠️  the field at 0.2 in rename takes no typing',
   ]);
 });
+
+// What a control is called, in the line a person reads. The engine's own canvas marks every part with a path; a
+// page running in the product has none, so an icon-only control - a close, a back chevron - came out as
+// "undefined changes nothing when it is clicked". That names nothing and reads as a fault in the engine, so the
+// finding was ignored: it was pointing at a real control with no accessible name.
+test('a control is named by what it says, carries, or is - never undefined', async (t) => {
+  const { findChrome, launchChrome, connectCDP, openPage } = await import('../lib/cdp.mjs');
+  const { INTERACT_EXPRESSION } = await import('../lib/prototype-render.mjs');
+  const chrome = findChrome({ playwright: true });
+  if (!chrome || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const page = `data:text/html,<div id="pt-canvas">
+    <button id="said">Aprovar</button>
+    <button id="labelled" aria-label="Fechar"></button>
+    <button id="titled" title="Voltar"></button>
+    <button id="icony"><span class="icon arrow-left-m"></span></button>
+    <button id="bare"></button>
+  </div>`;
+  const b = await launchChrome(chrome, { tmpPrefix: 'pt-name-' });
+  try {
+    const { send } = await connectCDP(b.wsUrl);
+    const { sessionId } = await openPage(send, 'about:blank');
+    await send('Page.navigate', { url: page }, sessionId);
+    await new Promise((r) => setTimeout(r, 300));
+    const got = (await send('Runtime.evaluate', { expression: INTERACT_EXPRESSION(), awaitPromise: true, returnByValue: true }, sessionId)).result?.value;
+    const names = (got?.interactions ?? got ?? []).map((i) => i.by).filter(Boolean);
+    const said = names.join(' | ');
+    assert.ok(!said.includes('undefined'), `nothing is called undefined: ${said}`);
+    assert.ok(names.includes('Aprovar'), said);
+    assert.ok(names.includes('Fechar'), 'an aria-label is what it is called');
+    assert.ok(names.includes('Voltar'), 'then its title');
+    assert.ok(names.some((n) => /arrow-left/.test(n)), `then the icon it carries: ${said}`);
+    assert.ok(names.some((n) => /unnamed button/.test(n)), `and one with nothing at all is said plainly: ${said}`);
+  } finally { b.kill(); }
+});
