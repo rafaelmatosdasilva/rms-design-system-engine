@@ -104,7 +104,19 @@ A Figma property that no code prop is paired with may still have a near name in 
 
 ### The contracts in DSDS too
 
-Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.
+Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23.1, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.
+
+Every file it writes passes DSDS's own schema for that version:
+
+- **A deprecated component** says why (`deprecationNotice`) and names what replaces it (`replacedBy`).
+- **Each link** uses a `rel` DSDS names: `design` for the Figma component, `relates-to` for your page, `file` from the index.
+- **Each value of a variant** is an object of its own, with a description.
+- **An id** is in the form DSDS allows. A Figma name with a space keeps its words, joined by a dash (`Show icon` becomes `Show-icon`).
+- **The engine's own fields** sit under one namespaced key in `$extensions`.
+
+**Your intent layer keeps its own version.** It is read in the DSDS version its files declare, never asked to move. When that differs from the engine's, the run says so in one line.
+
+**A new DSDS release is tried before the engine moves to it.** DSDS is before 1.0, so a minor release may break. Once a week a job looks for a new release, tests the engine against it and opens a pull request. Until a person merges it, nothing changes. See [Keeping up with DSDS](development.md#keeping-up-with-dsds).
 
 ### The contracts in the open component specs format
 

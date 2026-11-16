@@ -15,6 +15,10 @@ node_modules
 .env.*
 !.env.example
 
+# DSDS's published schema, suite and examples, fetched for the DSDS tests (node lib/dsds-release.mjs fetch), never
+# kept here: its licence and comments name people and companies, and this repository names none.
+test/.dsds/
+
 # private parity plans/roadmap (local-only, never published)
 plans/
 

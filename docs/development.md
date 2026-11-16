@@ -9,6 +9,7 @@ This page is for whoever is changing the engine itself: the maintainer, or anyon
 - [Where things are](#where-things-are)
 - [Run the tests](#run-the-tests)
 - [What a change needs](#what-a-change-needs)
+- [Keeping up with DSDS](#keeping-up-with-dsds)
 - [Release labels](#release-labels)
 - [What a release asks of you](#what-a-release-asks-of-you)
 
@@ -29,10 +30,11 @@ The guide Claude reads is `rms-design-system-engine.md`, with `cookbook/` and `r
 
 ## Run the tests
 
-The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools once, then run the suite and the docs check:
+The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the pinned DSDS release once, then run the suite and the docs check:
 
 ```bash
 for d in .ci-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
+node lib/dsds-release.mjs fetch
 node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
 ```
@@ -59,6 +61,34 @@ Actions are pinned by commit, so they are updated on purpose rather than by drif
 The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
 
 The privacy check reads Dependabot's release notes like any other text. A package quoted at its version (`pinia@4.1.0`) is not an address there, since a domain ends in letters and a version in a number. An address beside one is still found.
+
+## Keeping up with DSDS
+
+The engine writes and reads [DSDS](https://designsystemdocspec.org), pinned to one version (`DSDS_VERSION` in `lib/contract-dsds.mjs`). DSDS is before 1.0, and a minor release may break, so the pin never moves by itself.
+
+- **Every Monday**, the DSDS release workflow (`.github/workflows/dsds-release.yml`) asks DSDS's repository for its newest release.
+- **When it is newer than the pin**, a read-only job fetches that release's schema, conformance suite and examples. It moves the pin in its own copy, runs the DSDS tests, and runs DSDS's own reference validator over the view of a sample system.
+- **Then a second job opens a pull request** (`dsds/v<version>`) that moves the pin, with what passed and what did not. It is a draft when something failed. That job runs none of DSDS's code.
+- **DSDS's files are fetched, never committed.** Its licence and its comments name people and companies, and this repository names none. They go in `test/.dsds/`, which git ignores, and the Tests workflow fetches the pinned release before the suite runs.
+- **It starts the test suite on the branch**, since a pull request a workflow opens starts no other workflow by itself.
+
+Before running the DSDS tests on your computer, fetch the pinned release once. A DSDS test with nothing fetched fails and says this command:
+
+```bash
+node lib/dsds-release.mjs fetch
+```
+
+To see whether a newer release is out, and to try one by hand:
+
+```bash
+node lib/dsds-release.mjs check
+```
+
+```bash
+node lib/dsds-release.mjs update 0.24.0
+```
+
+`fetch` and `update` turn DSDS's YAML examples into JSON with Ruby, which macOS and the CI runner have. The tests then hold the view, and the validator in `lib/json-schema.mjs`, to that release: every example DSDS publishes as valid passes, and every fixture its suite says the schema rejects is rejected.
 
 ## Release labels
 
