@@ -1,0 +1,36 @@
+# The engine pins outside facts - an accessibility rule set's version, a report format, a table of which browser runs
+# what - and a pin nobody asks about goes stale unseen. DSDS has a watch of its own that proposes the move; this asks
+# about every other pin once a week and keeps one issue current while any is behind (lib/pinned-standards.mjs).
+#
+# It proposes nothing: moving a pin changes what the engine writes or checks, so a person decides it. Reading the
+# state rather than a failure event means a week that never ran and a source that answered badly look different.
+name: Pinned standards
+
+on:
+  schedule:
+    # Monday, off the hour (a schedule on the hour waits longest and is dropped most).
+    - cron: '41 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pinned-standards
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Has a pinned standard moved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node lib/pinned-standards.mjs check
