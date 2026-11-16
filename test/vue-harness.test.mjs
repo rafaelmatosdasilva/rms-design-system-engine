@@ -11,7 +11,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { variantsFromCode, startHarness, loadTypeScript } from '../lib/component-harness.mjs';
-import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSamples } from '../lib/vue-harness.mjs';
+import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSamples, startVueHarness } from '../lib/vue-harness.mjs';
 import { harnessCases } from '../lib/component-harness.mjs';
 import { textComponentApi } from '../lib/component-source.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -625,4 +625,54 @@ test('an error a component throws as it draws is said in its terms, the message 
   assert.match(plain('Maximum call stack size exceeded'), /^it draws or calls itself without end/);
   assert.match(plain('Failed to fetch dynamically imported module: http://localhost/a.js'), /^a file it loads as it draws did not load/);
   assert.equal(plain('something else'), null, 'one it does not know stays as it was');
+});
+
+// A prototype's pages lead to each other by the name their router gives them (router.push({ name: 'OrderDetail' })).
+// The page is drawn by the showroom and not by a route, so it is given a router of its own - and that router knew one
+// route, a catch-all, so every push by name threw "No match for" inside the click handler, the app's own error handler
+// swallowed it, and the check that clicks a control reported the control as changing nothing. A designer was told
+// their linked flow was a set of dead buttons. The router is still never installed (the test above): what the page is
+// given now is what the project's own router knows, each route drawing nothing.
+test('a control that leads to a route by name moves the page it is drawn in, and is not reported as doing nothing', { skip: STORES, timeout: budget(300000) }, async () => {
+  const dir = tempDir('vue-routed-');
+  mkdirSync(join(dir, 'src', 'router'), { recursive: true });
+  mkdirSync(join(dir, 'src', 'components'), { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme', private: true, dependencies: { vue: '^3.5.0', 'vue-router': '^4.0.0' } }));
+  writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nexport default { plugins: [vue()] }");
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(dir, 'src', 'router', 'router.js'), `import { createRouter, createWebHashHistory } from 'vue-router'
+export default createRouter({ history: createWebHashHistory(), routes: [
+  { path: '/orders', name: 'OrderList', component: { render: () => null } },
+  { path: '/orders/:id', name: 'OrderDetail', component: { render: () => null } },
+] })`);
+  writeFileSync(join(dir, 'src', 'main.js'), "import { createApp } from 'vue'\nimport router from './router/router'\nconst app = createApp({})\napp.use(router)\napp.mount('#app')");
+  writeFileSync(join(dir, 'src', 'components', 'OrderCard.vue'), `<script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
+const open = () => router.push({ name: 'OrderDetail', params: { id: '7' } })
+</script><template><button class="open" type="button" @click="open">Open</button></template>`);
+
+  const { launchChrome, connectCDP, openPage, waitForTrue } = await import('../lib/cdp.mjs');
+  const h = await startVueHarness(dir, {}, ['OrderCard'], { locate: () => join(dir, 'src', 'components', 'OrderCard.vue'), alone: true });
+  assert.ok(h.url, h.why);
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-routed-' });
+  try {
+    const { send } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, h.url);
+    await waitForTrue(send, sessionId, 'window.__dseHarnessReady === true', { attempts: 1200, intervalMs: 50, tolerateErrors: true });
+    const inPage = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+
+    assert.equal(await inPage("(() => { try { return window.__dseRouter.resolve({ name: 'OrderDetail', params: { id: '7' } }).fullPath; } catch (e) { return 'threw: ' + String(e.message).split('\\n')[0]; } })()"),
+      '/orders/7', 'the page is given the routes its project\'s router knows, by name and by path');
+
+    assert.deepEqual(JSON.parse(await inPage(`(async () => {
+      const was = window.__dseRouter.currentRoute.value.fullPath;
+      let swallowed = null;
+      const box = document.querySelector('[data-dse-case]');
+      box.__vue_app__.config.errorHandler = (e) => { swallowed = String(e && e.message || e).split('\\n')[0]; };
+      document.querySelector('button.open').click();
+      await new Promise((done) => setTimeout(done, 300));
+      return JSON.stringify({ moved: window.__dseRouter.currentRoute.value.fullPath !== was, now: window.__dseRouter.currentRoute.value.fullPath, swallowed });
+    })()`)), { moved: true, now: '/orders/7', swallowed: null }, 'the click moves the page it is drawn in, and nothing is thrown for the app to swallow');
+  } finally { browser.kill(); await h.close?.(); }
 });
