@@ -72,8 +72,10 @@ test('a component\'s Rules area lists the Figma rules it breaks, with no line ab
   assert.match(areas, /\['parity', 'Parity'\], \['rules', 'Rules'\]/);
   // Only Figma's rules that are to fix; one still to decide stays the team's question on the Rules page.
   assert.match(tasks, /if \(\(r\.side \|\| 'figma'\) !== 'figma' \|\| r\.status !== 'fix'\) return;/);
-  // Shown only when the component breaks one, as Products is.
-  assert.match(page, /\(a\[0\] !== 'rules' \|\| ruleRows\(c\)\.length\)/);
+  // Shown only when a rule changes the component, as Products is: the Rules page's own table, filtered to it.
+  assert.match(page, /\(a\[0\] !== 'rules' \|\| compRules\.length\)/);
+  assert.match(page, /var compRules = RULES_PAGE \? RULES_PAGE\.of\(c\.name\) : \[\];/);
+  assert.match(page, /RULES_PAGE\.tableHTML\(compRules\)/);
   // Who acts, and the link to Figma, once above the table: never a column, and never on each row.
   assert.match(table, /Rules: \[\['Task nr', 'no'\], \['Rule', 'kind'\], \['What to do', 'todo'\], \['Status', 'status'\], \['Last checked', 'updated'\]\]/);
   assert.doesNotMatch(table.match(/todo: function \(r\) \{[^\n]*/)[0], /sg-todo-who/, 'What to do never says who acts');

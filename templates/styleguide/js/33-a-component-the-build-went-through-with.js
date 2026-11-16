@@ -369,6 +369,8 @@
       (c.codeOnly ? '<div><dt>In the code</dt><dd><p><code>' + esc(c.codeOnly.file) + '</code></p>' + ((c.codeOnly.props || []).length ? '<ul class="pg-code-props">' + c.codeOnly.props.map(function (p) {
         return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + namePills(p.options) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
       }).join('') + '</ul>' : '<p>No props declared.</p>') + '</dd></div>' : '');
+    // The rules that change it, as the Rules page has them (none when the system has no rules).
+    var compRules = RULES_PAGE ? RULES_PAGE.of(c.name) : [];
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
@@ -388,12 +390,13 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || ruleRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
         // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
-        if (a[0] === 'rules') { var nr = ruleRows(c).length; return { v: a[0], label: a[1], state: { cls: 'differs', say: nr + ' to fix in Figma' } }; }
+        // Counted as its table counts them, in the Rules page's words: the rules to fix, else the rules to decide.
+        if (a[0] === 'rules') { var nf = compRules.filter(function (r) { return r.status === 'fix'; }).length; return { v: a[0], label: a[1], state: nf ? { cls: 'differs', say: nf + ' to fix' } : { cls: 'figma', say: compRules.length + ' to decide' } }; }
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
         return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
@@ -429,12 +432,15 @@
       ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
-      // Rules: the Figma review's findings for this component, each rule it breaks with its fix, waiting on whoever
-      // keeps the Figma file; each opens the component's node in Figma (ruleRows). No line above the table saying so
-      // (the owner's, 16 November 2026): each rule's own panel has See in Figma.
-      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(ruleRows(c)) + '</div>' + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
+      // Rules: the Rules page's own table, filtered to the rules that change this component, on either side, to fix or
+      // to decide (RULES_PAGE, 07-second-in-the-list.js), with the page's filters and sorting, each row opening the same
+      // panel (the owner's, 16 November 2026). No line above the table: each rule's own panel has See in Figma.
+      (compRules.length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par" id="' + esc(cid(c.name)) + '-rules">' + RULES_PAGE.tableHTML(compRules) + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
+    // Its Rules and History areas: the pages' own tables, wired as the pages wire them.
+    if (compRules.length) RULES_PAGE.wire(sec.querySelector('.pg-area[data-area="rules"] .pg-doc'), compRules);
+    fillHistoryArea(sec, c);
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // A component taller than the stage: the room above and below it shrinks first (to the stage's least), then the stage
     // grows to it, so it always shows whole and centred, never cut at the bottom with the room left at the top.

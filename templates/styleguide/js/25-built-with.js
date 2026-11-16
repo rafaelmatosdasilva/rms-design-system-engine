@@ -1,13 +1,5 @@
   // ── Built with: the system's components it is made of, each the card the overview shows (its own preview, drawn
   // small, and its name), linked to its page ──────────────────────────────────────────────────────────────────────────
-  // A component's History chips: its changes, its decisions, or both.
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest && e.target.closest('.sg-chip[data-hist]'); if (!b) return;
-    var area = b.closest('.pg-area'), k = b.getAttribute('data-hist'); if (!area) return;
-    Array.prototype.forEach.call(area.querySelectorAll('.sg-chip[data-hist]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-    Array.prototype.forEach.call(area.querySelectorAll('.pg-inspect[data-hist]'), function (card) { card.hidden = k !== 'all' && card.getAttribute('data-hist') !== k; });
-    if (e.isTrusted) setHashQuery({ show: k });
-  });
   function builtWithHTML(c) {
     return '<div class="sg-card-grid">' + builtUses(c).map(function (n) {
       return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : ' sg-card--own') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';

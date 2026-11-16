@@ -429,7 +429,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Accessibility,Documentation,Motion,Code,Used in,History', 'Specs is part of the Playground, not an area of its own');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Rules,Accessibility,Documentation,Motion,Code,Used in,History', 'Specs is part of the Playground, not an area of its own, and Rules there since a rule to fix or to decide changes the chip');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -1288,7 +1288,9 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /aria-sort="' \+ \(name === 'Date' \? 'descending' : 'none'\)/, 'newest first as the page opens, and the head says which column it is sorted by');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
-  assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
+  // A component's History is the History page's own table, filtered to the changes that affect it.
+  assert.match(tpl, /function historyTable\(wn, only, before\) \{/, 'one builder for the page and a component\'s area');
+  assert.match(tpl, /if \(!historyTable\(box, c\.name, box\.firstChild\)\)/, 'a component\'s own History is that table, filtered to it');
   assert.match(tpl, /var releaseTag = function \(rel\) \{/, 'each commit says the release it shipped in, as a tag under the day it was made');
   assert.match(tpl, /return '<td class="sg-log-when">' \+ line\(esc\(s\.slice\(0, 10\)\)\) \+ tag \+ '<\/td>';/, 'the tag sits in the Date cell, the column that already answers when');
   assert.doesNotMatch(tpl, /Not released yet/, 'a commit not released yet says nothing of it');
@@ -1745,7 +1747,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   const tpl = templateText();
   // The guide's one list of names and its "N more" pill (00-start.js), then History's own functions.
   const shared = ['var PILLS_SHOWN', 'var PILLS_CHEV', 'function pillsMore(', 'function namePill(', 'function namePills('].map((k) => tpl.slice(tpl.indexOf('  ' + k), tpl.indexOf('\n', tpl.indexOf('  ' + k)) + 1)).join('');
-  const src = shared + tpl.slice(tpl.indexOf('    // The rest of a list behind pillsMore, one for the whole guide'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
+  const src = shared + tpl.slice(tpl.indexOf('    // The rest of a list behind pillsMore, one for the whole guide'), tpl.indexOf("    // A component's History: only the rows of the changes that affect it"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
     esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1), {});

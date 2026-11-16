@@ -157,14 +157,14 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
-| Rules | Each of the system's rules the component breaks in Figma (from the Rules page), with its fix. Each rule opens its own panel, with See in Figma. Shown only when it breaks one |
+| Rules | The Rules page's own table, filtered to the rules that change this component, in Figma or in the code, to fix or to decide. The same columns, filters and sorting, and each row opens the same panel as on the Rules page, with its own link. Shown only when a rule changes it |
 | Accessibility | One table by WCAG 2.2 criterion: its task number, the criterion, who acts, its status and when it was last checked. What to do, what Figma states and what was found are in the row's panel |
 | Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when. A change to its page in the intent layer (its contract) names who made it too |
+| History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it, its changes in Figma and code not committed yet |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 

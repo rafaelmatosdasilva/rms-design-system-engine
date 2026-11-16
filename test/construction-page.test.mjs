@@ -105,7 +105,7 @@ test('the page: in the menu by default, one table whose heads sort, chips for wh
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// Changes in Figma: each change made'));
   assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'Source', 'Follow it', 'Owned by', 'Status'], 'one head a column, each sorting by it; no To do column');
   assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
-  assert.match(page, /sortDir = sortKey === key \? -sortDir : 1;/, 'the same head again sorts the other way round');
+  assert.match(page, /table\._sortDir = table\._sortKey === key \? -table\._sortDir : 1;/, 'the same head again sorts the other way round, each table its own order');
   assert.ok(!/data-chip-group=/.test(page), 'which side a rule is on is a column, never a chip');
   assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'which side a rule is on is a filter of its own, never a chip beside the statuses');
   assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['source', 'Source'], ['area', 'Area']], 'where it was read from, then the area: lists');

@@ -36,6 +36,10 @@
     }
     return out.join('');
   };
+  // The Rules page's own table and panel, for a component's Rules area (33): the same rows, filters, sorting and panel,
+  // filtered to the rules that change that component (the owner's, 16 November 2026). Set by the page below, null with
+  // no rules. of(name): the rows that change it, to fix or to decide · tableHTML(rows) · wire(scope, rows) · open(key).
+  var RULES_PAGE = null;
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('rules', 'rules');
@@ -234,33 +238,47 @@
       sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
         // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
         + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
-    tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
+    // The table, for this page and for a component's Rules area alike: the rows given, each keeping its number in the
+    // page's own list (data-cx-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (r) { return rowHTML(r, rows.indexOf(r)); }).join('') + '</tbody></table></div></div>'; };
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
-    // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still finds it.
-    var sortKey = null, sortDir = 1;
-    var sortBy = function (key) {
-      var val = sortOf[key]; if (!val) return;
-      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
-      var tb = sec.querySelector('.sg-cx-table tbody');
+    // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still
+    // finds it. Each table keeps its own order.
+    var sortBy = function (table, key) {
+      var val = sortOf[key]; if (!val || !table) return;
+      table._sortDir = table._sortKey === key ? -table._sortDir : 1; table._sortKey = key;
+      var tb = table.tBodies[0], dir = table._sortDir;
       Array.prototype.slice.call(tb.children).sort(function (a, b) {
         var x = rows[+a.getAttribute('data-cx-row')], y = rows[+b.getAttribute('data-cx-row')], u = val(x), v = val(y);
-        return (u < v ? -1 : u > v ? 1 : 0) * sortDir || ORDER[x.status] - ORDER[y.status];
+        return (u < v ? -1 : u > v ? 1 : 0) * dir || ORDER[x.status] - ORDER[y.status];
       }).forEach(function (tr) { tb.appendChild(tr); });
-      Array.prototype.forEach.call(sec.querySelectorAll('.sg-cx-table th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
-    sec.addEventListener('click', function (e) {
-      // The request to read Figma again, copied as a rule's decision is.
-      var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) { copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); return; }
-      var th = e.target.closest('th[data-sort]'); if (th) { sortBy(th.getAttribute('data-sort')); return; }
-      if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
-    });
-    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
-    sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    // A head sorts, a row opens its panel on a click or Enter, and the filters above the table: scoped to where the
+    // table is (this page, or a component's area).
     // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
     // and each says how many rows it would leave beside the others.
     var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
-    filterBar(sec, { total: rows.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'area', label: 'Area', order: AREA_ORDER }] });
+    var wire = function (scope, list) {
+      scope.addEventListener('click', function (e) {
+        var th = e.target.closest('.sg-cx-table th[data-sort]'); if (th) { sortBy(th.closest('table'), th.getAttribute('data-sort')); return; }
+        if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
+      });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+      filterBar(scope, { total: list.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'area', label: 'Area', order: AREA_ORDER }] });
+    };
+    var openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    sec.insertAdjacentHTML('beforeend', tableHTML(rows));
+    tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
+    // The request to read Figma again, copied as a rule's decision is.
+    sec.addEventListener('click', function (e) { var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); });
+    sec._openKey = openKey;
+    wire(sec, rows);
+    // A component's Rules area: the rules that change it, on either side, to fix or to decide.
+    RULES_PAGE = {
+      of: function (name) { return rows.filter(function (r) { return r.status !== 'rule' && r.toFix.some(function (t) { return t.component === name; }); }); },
+      tableHTML: tableHTML, wire: wire, open: openKey
+    };
     // The health above the filters: it says where the system stands; the filters, under it, stay as the table scrolls.
     doneCards(sec, cards);
   })();
@@ -333,7 +351,11 @@
   var DECISIONS = (DATA.decisions || []).slice();
   if (CHANGES.length || RLOG.length || DECISIONS.length || (DATA.intentChanges || []).length) {
     hr(); navLink('history', 'history');
-    var wn = section('history', 'Changes', 'History', '');
+    historyTable(section('history', 'Changes', 'History', ''));
+  }
+  // Every change in the order History reads them: the code's releases, the decisions of each day, each read of Figma
+  // and each change of the intent layer, a group each.
+  function historyOrder() {
     // The components each commit changed, from their changelogs.
     var compsOf = {};
     CHANGES.forEach(function (x) { var k = x.r.sha || x.r.subject, l = compsOf[k] = compsOf[k] || []; if (l.indexOf(x.comp) < 0) l.push(x.comp); });
@@ -370,7 +392,16 @@
     // Each change read from the intent layer (DATA.intentChanges): a card of its own too, dated by its commit, with the
     // pages it changed and the components they document.
     (DATA.intentChanges || []).forEach(function (x) { order.push({ k: '', on: '', at: String(x.at || ''), commits: [], layer: x }); });
-    order = order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
+    return order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
+  }
+  // History's one table, built here for the History page and for a component's History area alike (the owner's, 16
+  // November 2026: a component's area is the page of the same name, filtered to it). wn: where it goes, its chips at its
+  // top. only: a component's name, its table then the changes that affect it alone. before: what the table goes above.
+  // Returns the table's box, or null when no change is left.
+  function historyTable(wn, only, before) {
+    var order = historyOrder();
+    // A component's own: only the commits that changed it, so an issue counts its commits as this table shows them.
+    if (only) order.forEach(function (g) { g.commits = g.commits.filter(function (x) { return (x.comps || []).indexOf(only) >= 0; }); });
     // One table, a row each, newest first: a commit to the code, what a read of Figma changed in a component, a commit to
     // the intent layer, a decision. Its date and time, its type, what it did, what it affects, who did it (last, so the
     // rows of one moment run unbroken across What and Affects). The chips show
@@ -444,7 +475,8 @@
     };
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
-    var add = function (at, chip, type, what, bys, affects, tickets, group, release) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null }); };
+    // names: the components it affects, for a component's own History.
+    var add = function (at, chip, type, what, bys, affects, tickets, group, release, names) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null, names: names || [] }); };
     // The code: each commit, the issues it names (each linked, with how many commits it has when more than one), what it
     // says, and the release it shipped in, once it has shipped.
     var ticketsOf = function (r) { return r.tickets || (r.ticket ? [{ ticket: r.ticket, ticketUrl: r.ticketUrl }] : []); };
@@ -469,7 +501,7 @@
     order.forEach(function (g) { g.commits.forEach(function (x) {
       var r = x.r, comps = (x.comps || []).slice().sort();
       var affects = (comps.length ? pillsHTML(comps) : '') + ((r.where || []).length ? (comps.length ? ' ' : '') + whereHTML(r.where) : '');
-      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r));
+      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r), comps);
     }); });
     // Figma: what each read changed in each component, a row each; the components read for the first time, one row.
     // Who did it: the designers who saved the versions since the read before (figma-versions.mjs), then whoever ran the read.
@@ -477,16 +509,16 @@
     order.forEach(function (g) {
       if (!g.read) return;
       var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
-      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', figmaChangesHTML(c.changed) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', figmaChangesHTML(c.changed) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date), null, [c.name]); });
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
-      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
+      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date), null, first);
     });
     // The comments left on a component in Figma (figma-comments.mjs): a thread a row, what it says, its replies, and
     // whether it is resolved; who wrote it and who answered. No link to the file: only a Figma task carries one.
     COMPONENTS.forEach(function (c) { (c.figmaComments || []).forEach(function (t) {
       var said = esc('“' + t.text + '”') + ((t.replies || []).length ? ' ' + quiet(t.replies.length + ' repl' + (t.replies.length === 1 ? 'y' : 'ies')) : '') + ' ' + quiet(t.resolved ? 'Resolved' : 'Open');
       var bys = [t.by].concat((t.replies || []).map(function (r) { return r.by; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
-      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at);
+      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at, null, [c.name]);
     }); });
     // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
     // A change the engine sent in parts (GitLab refuses one commit that large: "… (part 2 of 3)") is one change: one row,
@@ -538,7 +570,7 @@
         return (made.length ? line(quiet('Added: ') + pagesSaid(made, comps)) : '') + (edited.length ? line(quiet('Changed: ') + pagesSaid(edited, comps)) : '');
       })() : null;
       add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) : '') + (split != null ? split : (x.says && saysCount ? '' : line(x.says ? quiet(esc(count)) : esc(count))) + (others.length ? line(quiet('Also changed: ') + pagesSaid(others)) : '')) +
-        (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
+        (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'), null, null, null, x.components);
     });
     // The decisions: what was decided, ruled out and why, and what it is about.
     order.forEach(function (g) { (g.decisions || []).forEach(function (d) {
@@ -557,7 +589,7 @@
         (d.review ? line('<span class="pg-par-val">' + esc(d.review) + '</span>') : '') +
         // A sign-off: who made the change and who reviewed it, never the same one.
         (d.author ? line(esc('Made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by) + '.')) : '') +
-        line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
+        line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''), null, [d.component || pageComp].filter(Boolean));
     }); });
     // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
     // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the person
@@ -572,12 +604,15 @@
         var items = (c.items || []).map(function (x) { return line(whatHTML(x.what) + esc(' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
-          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at, null, known ? [c.name] : []);
       });
     });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
-    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
+    // A component's History: only the rows of the changes that affect it, the page's table otherwise as it is.
+    if (only) ROWS = ROWS.filter(function (x) { return x.names.indexOf(only) >= 0; });
+    if (!ROWS.length) return null;
+    var box = document.createElement('div'); box.className = 'pg-cards'; wn.insertBefore(box, before || null);
     // Sorted by Date, newest first, as the page opens. Only the columns rows of one moment share can sort: What and
     // Affects are one row's own, so ordering by them would tear a moment apart.
     // The columns in the words the other tables use (the owner's, 11 November 2026): Source, as the Documentation table
@@ -600,8 +635,7 @@
         return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
           (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(sourceOf(x)) + '</td>') : '') + '<td class="sg-log-what">' + (kindOf(x) ? line(quiet(esc(kindOf(x)))) : '') + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
-    // The table itself, held now: box is a var another page reuses, so by the time a head is measured or a column is
-    // clicked it may name another page's. Everything below works from this table, never from box.
+    // The table itself, held now: everything below works from this table.
     var logHeadEl = box.querySelector('table.sg-log > thead'), logTable = logHeadEl.parentNode;
     // Sorted in place, a moment at a time: a lead row and the rows under it move together, so the cells they share
     // keep the rows they span. The rows are moved, never built again, so a row a chip or a ticket hid stays hidden.
@@ -640,6 +674,7 @@
     });
     // Any "N more" pill opens the rest of its list: one handler for the whole guide (00-start.js).
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
+    return box;
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
@@ -705,7 +740,8 @@
         b.querySelector('.sg-chip-word').textContent = w || 'All';
         b.setAttribute('aria-pressed', w ? 'true' : 'false');
         b.querySelector('.sg-chip-n').innerHTML = '';
-        Array.prototype.forEach.call(document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('[role="option"]'), function (op) {
+        // Its list found in the bar itself: a component's area is drawn before its page is in the document.
+        Array.prototype.forEach.call(bar.querySelector('#' + CSS.escape(b.getAttribute('aria-controls'))).querySelectorAll('[role="option"]'), function (op) {
           var ow = op.getAttribute('data-f').slice(c.key.length + 1);
           var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;   // what the other chips leave it
           op.querySelector('.sg-count').outerHTML = countHTML(n);

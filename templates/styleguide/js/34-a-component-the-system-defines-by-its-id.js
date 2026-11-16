@@ -405,11 +405,12 @@
     // The filter and the panel the address names, once they are drawn: the page bar's chip (show), a Showroom screen's
     // kind of note (kind), the side panel (panel).
     var qWant = function (k) { return at.q && at.q.get(k); };
-    if (qWant('show')) whenThere(function () { return target.querySelector('.sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"], .pg-area:not([hidden]) .sg-chip[data-hist="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
+    if (qWant('show')) whenThere(function () { return target.querySelector('.pg-area:not([hidden]) .sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"], .sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     if (qWant('kind')) whenThere(function () { return target.querySelector('.sg-showroom-filter .sg-chip[data-v="' + qWant('kind') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     var panelWant = qWant('panel'), openPanel = document.querySelector('.sg-comp-panel:not([hidden])');
     if (panelWant && !(openPanel && openPanel._open && openPanel._key === panelWant)) whenThere(function () {
-      return /^doc:/.test(panelWant) ? (target._openKey && target._openKey(panelWant)) : /^row:/.test(panelWant) ? openRowKey(panelWant) : false;
+      // A rule's panel (cx:<id>) opens wherever its row is, the Rules page or a component's Rules area.
+      return /^doc:/.test(panelWant) ? (target._openKey && target._openKey(panelWant)) : /^row:/.test(panelWant) ? openRowKey(panelWant) : /^cx:/.test(panelWant) ? !!(RULES_PAGE && RULES_PAGE.open(panelWant)) : false;
     }, function () {});
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     pageTop();
