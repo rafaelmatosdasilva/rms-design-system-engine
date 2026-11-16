@@ -125,3 +125,38 @@ test('a prototype drawn from product copies: parts inside their component, slots
     assert.ok(!review.findings.some((x) => x.kind === 'touching' && /Page/.test(x.message)), JSON.stringify(review.findings));
   } finally { close(); chrome.kill(); }
 });
+
+// A component is captured under the names its design file uses (Label, Disabled) and the catalog hands an agent the
+// names its code uses (label, disabled). The drawn page matched them exactly, so a page written from the catalog -
+// which is every page written the way the engine asks for - matched none of them: the words a designer wrote were
+// dropped without a word, the placeholder drew instead, and every check passed. Found by a model reading the
+// pictures and saying every button said "Save".
+test('a prop is found by the component, whatever the catalog called it', async () => {
+  const { propWord, drawsIt } = await import('../lib/prototype-pieces.mjs');
+  assert.equal(propWord('label'), propWord('Label'));
+  assert.equal(propWord('showIcon'), propWord('Icon'), 'a show-prefixed name is the thing it shows');
+  assert.equal(propWord('read only'), propWord('readOnly'));
+  assert.notEqual(propWord('label'), propWord('title'));
+
+  const button = { textProps: { Label: 'Save' }, enumProps: { Disabled: 'False' }, boolProps: {}, slotProps: {} };
+  assert.ok(drawsIt(button, 'label'), 'the code name finds the captured one');
+  assert.ok(drawsIt(button, 'disabled'));
+  assert.ok(!drawsIt(button, 'onClick'), 'and a prop the component draws nothing for is still nothing');
+});
+
+test('the drawn page and the check agree on what is the same prop', async () => {
+  const { propWord } = await import('../lib/prototype-pieces.mjs');
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const engine = dirname(dirname(fileURLToPath(import.meta.url)));
+  const page = readFileSync(join(engine, 'templates', 'prototype.template.html'), 'utf8');
+  // The page's own normaliser, run here, so the two cannot drift apart without this failing.
+  const body = /function keyWord\(prop\) \{ (return [^\n]*?) \}/.exec(page)?.[1];
+  assert.ok(body, 'the drawn page still has keyWord');
+  // eslint-disable-next-line no-new-func
+  const keyWord = new Function('prop', body);
+  for (const k of ['label', 'Label', 'showIcon', 'Icon', 'read only', 'readOnly', 'title', 'Disabled']) {
+    assert.equal(keyWord(k), propWord(k), k);
+  }
+});

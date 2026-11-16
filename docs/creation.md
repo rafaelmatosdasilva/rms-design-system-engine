@@ -206,6 +206,14 @@ Two things it leaves alone:
 
 On a real system of 275 components this found two. It is meant to: a check that flags a tenth of your library is measuring your writing style, not finding a gap.
 
+### The words you write are the words it draws
+
+Your components are captured under the names your design file uses (`Label`, `Disabled`). Your catalog hands an agent the names your code uses (`label`, `disabled`) — because that is what a developer writes. The drawn page used to match those exactly, so a page written from the catalog matched none of them: **the words were dropped and the component's placeholder drew instead.**
+
+Every check passed. A prototype could read `Save` on every button, and nothing said so — the component was yours, the prop was real, nothing was invented. It took a model reading the pictures to notice.
+
+A prop is now found by the component whatever your catalog called it, for text, choices, switches and slots alike.
+
 ### The flow is told to you, not asked for
 
 A designer is building a journey, not a page. So every time a page is drawn, you are told what it did to the flow it belongs to — no command to remember:

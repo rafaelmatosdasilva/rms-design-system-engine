@@ -153,6 +153,16 @@ html, body { margin: 0; }
   // element whose class says title, "Show Description" off removes the one that says description, a label goes where
   // the component's text is. A page instance's own state (hidden, placed absolutely on its page) is taken off.
   function keyWord(prop) { return String(prop).replace(/^show[\s_-]*/i, '').replace(/[\s_-]*content$/i, '').replace(/[\s_-]+/g, '').toLowerCase(); }
+  // The component's own name for a prop a composition wrote. A component is captured under the names its design
+  // file uses (Label, Disabled) and a catalog hands an agent the names its code uses (label, disabled), so a page
+  // written from the catalog - which is every page written the way the engine asks - matched none of them, and the
+  // words a designer wrote were dropped without a word. The page drew its placeholder and every check passed.
+  function ownKey(bag, k) {
+    if (!bag) return null;
+    if (Object.prototype.hasOwnProperty.call(bag, k)) return k;
+    var want = keyWord(k);
+    return Object.keys(bag).find(function (n) { return keyWord(n) === want; }) || null;
+  }
   function partFor(e, word) {
     if (!word) return null;
     var all = Array.prototype.slice.call(e.querySelectorAll('[class]'));
@@ -212,10 +222,13 @@ html, body { margin: 0; }
     Object.keys(p).forEach(function (k) {
       if (done[k] || k === 'standInFor') return;
       var word = keyWord(k);
-      if ((c.boolProps || {})[k]) { if (!truthy(p[k])) { var gone = partFor(e, word); if (gone && gone !== e) gone.remove(); } else modifier(e, c, k, 'true'); return; }
-      if (Object.prototype.hasOwnProperty.call(c.enumProps || {}, k)) { modifier(e, c, k, p[k]); return; }
-      if (!Object.prototype.hasOwnProperty.call(c.textProps || {}, k) || p[k] == null || p[k] === '') return;
-      var dflt = String(c.textProps[k] || '').trim().toLowerCase();
+      var bk = ownKey(c.boolProps, k);
+      if (bk && (c.boolProps || {})[bk]) { if (!truthy(p[k])) { var gone = partFor(e, word); if (gone && gone !== e) gone.remove(); } else modifier(e, c, bk, 'true'); return; }
+      var ek = ownKey(c.enumProps, k);
+      if (ek) { modifier(e, c, ek, p[k]); return; }
+      var tk = ownKey(c.textProps, k);
+      if (!tk || p[k] == null || p[k] === '') return;
+      var dflt = String(c.textProps[tk] || '').trim().toLowerCase();
       var target = partFor(e, word);
       if (!target && dflt) target = Array.prototype.slice.call(e.querySelectorAll('*')).find(function (x) { return !x.children.length && x.textContent.trim().toLowerCase() === dflt; }) || null;
       if (!target && (word === 'label' || word === 'title' || word === 'text')) target = firstWords(e) || e;
