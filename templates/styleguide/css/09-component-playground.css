@@ -1200,11 +1200,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 @media (max-width: 720px) { .sg-health-tiles.sg-cx-scores { grid-template-columns: minmax(0, 1fr); } }
 .sg-cx-score-body { display: flex; flex-wrap: wrap; gap: var(--sg-space-xl); align-items: center; }   /* the areas beside the ring, under it when the card is too narrow for both */
 .sg-cx-score-body > .sg-cx-score-areas { flex: 1 1 calc(var(--sg-space-xxl) * 6); }
-.sg-cx-ring { position: relative; display: block; width: calc(var(--sg-space-xxl) * 4.5); aspect-ratio: 1; }   /* 144px at the default scale */
+.sg-cx-ring { position: relative; display: block; flex: none; width: calc(var(--sg-space-xxl) * 4.5); aspect-ratio: 1; }   /* 144px at the default scale, always: the areas beside it take what is left, never the ring (the owner's, 16 November 2026) */
 .sg-cx-ring svg { display: block; width: 100%; height: 100%; fill: none; stroke-width: 5.5; }   /* about 9px drawn at 184px */
 .sg-cx-ring-track { stroke: var(--sg-a4); }
 /* Each state's arc, from the top, in the Status bars' colours (06-health.css): done, to check, to fix. */
 .sg-cx-ring svg > circle:not(.sg-cx-ring-track) { transform: rotate(-90deg); transform-origin: center; }
+.sg-cx-ring-text .sg-health-sub { white-space: nowrap; }   /* "1343 of 1503" on one line, inside the ring */
 .sg-cx-ring-done { stroke: var(--sg-positive); } .sg-cx-ring-check { stroke: var(--sg-warning-ink); } .sg-cx-ring-fix { stroke: var(--sg-negative); }
 .sg-cx-ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .sg-cx-ring-text .sg-health-num { font-size: calc(var(--sg-space-xxl) * 1.25); line-height: normal; column-gap: var(--sg-space-xxs); }   /* sized by the ring it sits in (40px in its 144px), never by the system's own title size, so every guide draws it the same (the owner's, 11 November 2026); its % small beside it, as the Status page sets a unit */
