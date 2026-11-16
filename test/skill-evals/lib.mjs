@@ -50,29 +50,11 @@ export function sdkOptions({ model, maxTurns = 40, budget = 3, resume = null, ro
 // for the SDK and not for Claude Code, so `claude -p` on that key is refused. Otherwise through `claude -p`, on the
 // plan's own login (CLAUDE_CODE_OAUTH_TOKEN), as before.
 export function runnerOf(env = withKeyFile(process.env)) { return env.ANTHROPIC_API_KEY ? 'sdk' : 'cli'; }
-// The API key for the evaluation only, from a file only its owner reads (~/.config/rms-engine/anthropic-key, or the
-// file DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE names), when the environment holds none. Kept out of the shell's profile,
-// so nothing else on the machine (Claude Code itself in a terminal) picks the key up and bills the API instead of the plan.
-export const KEY_FILE = join(homedir(), '.config', 'rms-engine', 'anthropic-key');
-export function withKeyFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE || KEY_FILE) {
-  if (env.ANTHROPIC_API_KEY) return env;
-  let key = '';
-  try { key = readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).find(Boolean) ?? ''; } catch { /* no file: the plan's login */ }
-  return key ? { ...env, ANTHROPIC_API_KEY: key } : env;
-}
-// The plan's login, kept the same way. A run gets a fresh HOME, so on macOS - whose login lives in the keychain -
-// it has none, and `claude setup-token` prints a long-lived one to carry in CLAUDE_CODE_OAUTH_TOKEN. Held only in
-// the shell that started a run, that is a token re-exported in every new tab, and the sign-in done again whenever
-// somebody forgets: this reads it from a file beside the API key, so it is set up once and never again.
-export const TOKEN_FILE = join(homedir(), '.config', 'rms-engine', 'oauth-token');
-export function withTokenFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_TOKEN_FILE || TOKEN_FILE) {
-  if (env.ANTHROPIC_API_KEY || env.CLAUDE_CODE_OAUTH_TOKEN) return env;
-  let token = '';
-  try { token = readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#')) ?? ''; } catch { /* no file: whatever login the run inherits */ }
-  return token ? { ...env, CLAUDE_CODE_OAUTH_TOKEN: token } : env;
-}
-// Both, in the order the runner prefers them: an API key wins, because a run on one must never be billed to the plan.
-export const withCredentials = (env = process.env) => withTokenFile(withKeyFile(env));
+// The credentials a measured run uses, read from the engine's own copy (lib/model-login.mjs): the API key where
+// there is one, else the plan's login. They were read here, and only here, so the engine's own model calls had no
+// login while evaluations did - the same command on the same machine, one able to ask a model and the other not.
+export { KEY_FILE, TOKEN_FILE, withKeyFile, withTokenFile, withCredentials } from '../../lib/model-login.mjs';
+import { withKeyFile, withCredentials } from '../../lib/model-login.mjs';
 // The SDK, installed for the evaluation only (npm ci --prefix test/.eval-tools): the engine itself has no dependencies.
 const SDK = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
 // The CLI that runs each task, found once on this machine - where it is installed, not only on the PATH, the way
