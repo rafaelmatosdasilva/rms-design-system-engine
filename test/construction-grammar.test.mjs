@@ -317,3 +317,10 @@ test('a row of content inside a variant placed by hand is to lay out with auto l
   const g = grammarOf({ props, structure: { ...structure, crumbTrail: { layout: 'HORIZONTAL' } }, values, skeleton: { crumbTrail: sk } });
   assert.deepEqual(rule(g, 'auto-layout').toFix.find((e) => e.component === 'crumbTrail'), { component: 'crumbTrail', value: 'Content/step2, Content/Stack' });
 });
+
+// A token's name out of the system's case is said as the whole name it takes, as the other renames are.
+test('a token renamed into the system\'s case: the whole name it takes', () => {
+  const r = { id: 'token-name-case', says: 'A token\'s name is written in camelCase' };
+  assert.deepEqual(fixOf(r, { where: 'typography/xxxs/line-height', value: 'line-height' }), { what: null, from: 'typography/xxxs/line-height', to: 'typography/xxxs/lineHeight', say: 'Rename it to typography/xxxs/lineHeight' });
+  assert.equal(fixOf(r, { where: 'tab/Icon/selected', value: 'Icon' }).to, 'tab/icon/selected');
+});
