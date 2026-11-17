@@ -1,0 +1,1 @@
+{ "private": true, "description": "The React and Vite a React project uses, for test/react-harness.test.mjs.", "dependencies": { "vite": "8", "@vitejs/plugin-react": "5", "react": "19", "react-dom": "19" } }

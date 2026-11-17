@@ -1,0 +1,3 @@
+.bc-menu__button { height: var(--bc-field-height); padding: 0 var(--bc-space-m); border-radius: var(--bc-radius-m); border: 1px solid var(--bc-ink); background: var(--bc-surface); color: var(--bc-ink); }
+.bc-menu__sheet { position: absolute; margin: 0; padding: var(--bc-space-s); list-style: none; border-radius: var(--bc-radius-m); background: var(--bc-surface); border: 1px solid var(--bc-ink); }
+.bc-menu__item { padding: var(--bc-space-s) var(--bc-space-m); }

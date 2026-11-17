@@ -54,7 +54,10 @@ node --test --test-reporter=./test/shard.mjs test/*.test.mjs > test/shard-weight
 
 - **A test for new behaviour,** one that fails without the change. A new check is tested with a mistake planted on purpose, so it is known to catch what it claims.
 - **A test for a fixed bug,** one that reproduces it.
-- **Every test passing,** none skipped for want of Chrome or the test tools.
+- **Every test passing,** none skipped for want of Chrome or the test tools. The browser tests need the tool folders
+  installed (`npm ci --prefix test/.vue-tools`, and the same for `.react-tools`, `.vue-cli-tools`, `.nuxt-tools`,
+  `.ci-tools`, `.lint-tools`) — each skips rather than fails without them, so a run can read as clean while missing
+  whole groups.
 - **No new npm dependency.** The engine has none, and that is part of what it promises.
 - **Nothing private.** No client, product, person, host or token name, in code, tests, examples or messages. Examples use invented names (Acme, cardTile). The required Privacy check refuses anything else.
 - **Docs that match.** A change people can see updates the README, `docs/` or the guide files in the same change.
