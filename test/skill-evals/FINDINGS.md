@@ -679,3 +679,24 @@ Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **1
 - A watch that proposes the fix is right where something can prove the fix (a conformance suite) and wrong where nothing can. Proposing a move that silently drops a finding would be worse than the staleness it cures.
 
 **What changed.** `pinned-standards.mjs` holds every pin with how its source is asked - a registry's newest version, a repository's newest tag, or, for a curated table with no version at all, how many months since it was read - and a weekly workflow keeps one issue current while anything is behind. A pin whose line is renamed fails the suite rather than silently reading nothing, because a watch that reads nothing and says nothing is worse than no watch.
+
+## A fixture written by the same hand as the harness proves only that the hand is consistent
+
+**The case.** A harness to draw React components with a project's own React was built, with a fixture made for it: three components needing state, context and a portal. Every test passed. Run against a public open-source React design system — a real one, nobody's client, MIT — it drew **nothing at all**, and took four fixes to draw anything.
+
+**The four, and why a fixture could not have shown them.**
+
+- **A component behind `forwardRef` is an object, not a function.** The reader accepted functions, so it reported "no component exported" for every component that takes a ref, which is most of a real system. The fixture's components were plain functions, because that is what one writes when writing three components to prove a point.
+- **A CommonJS package imported by a *dependency*** has no named exports until the build converts it. The list of packages to convert was built by reading the project's own source, which by construction cannot contain a package only a dependency imports. The fixture had no dependencies.
+- **A build-time flag the ecosystem is written against** (`__DEV__`) is replaced by every bundler and defined by none of the engine's own config. A component that mentions it throws before it draws. The fixture mentioned nothing it did not define.
+- **A published design system keeps its tokens in a package**, and a stylesheet asked for by path under the installed packages answers 404: the import throws and the page then draws nothing. The fixture kept its tokens in its own source, as a fixture would.
+
+**The shape they share.** Each is a thing a real system has and a small invented one does not: a dependency, a published package, a convention from the wider ecosystem, a component written the way the ecosystem writes them. The fixture tested the harness against the author's idea of a design system, which is the same idea that produced the harness.
+
+**What it teaches.**
+
+- A fixture proves the thing works on what its author thought of. It cannot find what its author did not think of, and that is exactly the set a real system is made of.
+- "All tests pass" and "it works on a real system" are different claims, and the first is often used to imply the second. Writing the item to demand a real run before the badge was right, and the badge would have been wrong without it.
+- The four fixes are each a line or two. What was expensive was not knowing they were needed.
+
+**What changed.** The reader accepts anything React draws, the build converts what it finds rather than only what the source names, the flag is defined, and a stylesheet inside a package is asked for by the package's name. All four are pinned by tests, and the fixture gained a component behind `forwardRef` so the first can never come back.
