@@ -24,8 +24,10 @@ test('the badge is written from main only, after the suite, and says what the ru
   assert.equal(wf.slice(0, wf.indexOf('  badge:')).includes('contents: write'), false, 'the test job stays read-only');
 });
 
+// The passing colour is the README's own green, the one its other badges use; a failing run stays red, and the README
+// leaves the badge's colour to the run, so a red run shows red (the owner's, 17 November 2026).
 test('the badge reads as one phrase, "Tests passed 2,807", and a red run never shows a count as failures', () => {
-  assert.match(wf, /label="Tests passed"; message="\$pretty"; color=brightgreen/);
+  assert.match(wf, /label="Tests passed"; message="\$pretty"; color=316A17/);
   assert.match(wf, /label="Tests"; message="failing"; color=red/);
   assert.match(wf, /"label":"%s","message":"%s"/);
 });
