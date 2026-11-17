@@ -15,8 +15,8 @@ body:
       options:
         - Check your Figma library rules
         - Measure Figma-code parity
-        - Test accessibility
         - Lint your codebase rules
+        - Test accessibility
         - Write component specs
         - Gather usage guidelines
         - Annotate Figma from the code
