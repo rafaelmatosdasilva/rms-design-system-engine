@@ -5,7 +5,7 @@ How the engine writes each component's contract and gathers the intent layer. Wh
 **On this page**
 
 - [Write component specs](#write-component-specs)
-- [Gather usage guidelines](#gather-usage-guidelines)
+- [Maintain usage guidelines](#maintain-usage-guidelines)
 - [Annotate Figma from the code](#annotate-figma-from-the-code)
 
 ## Write component specs
@@ -275,7 +275,7 @@ Each build of the style guide compares the contracts with the ones the last buil
 - **Only real changes.** A build that writes the same contracts again adds nothing, and the first build only records what it read.
 - **Done by a person, never the engine.** Where your contracts are kept in a GitLab store (`stores.contracts`, a project and a path in it, your intent layer's repository included), the author GitLab recorded on the store's newest commit there: the person whose run wrote them, named as your intent layer's commits are. Without a store: in a pipeline, whoever pushed or started it; on your computer, the GitLab account whose token the engine reads with (the token needs the `read_user` scope to say whose it is), else your git name (`git config --global user.name`). A scheduled build names the schedule. A scheduled build names the schedule.
 
-## Gather usage guidelines
+## Maintain usage guidelines
 
 The intent layer says why each component exists, when to use it and when not, and what was decided. It gathers from three places: your own pages wherever they live, Figma's descriptions and notes, and the comments your engineers wrote in the code. The engine writes what it is sure of; what needs judgement is a draft, and a person reviews and approves it.
 
@@ -353,7 +353,7 @@ Some components exist only as pieces of another: a dropdown's row, a table's cel
 
 The engine finds them when two things agree. Either the name sits under the other's in Figma (`grid/Row`), or the name carries the other's and the other holds it. A part is shown inside its root, in a Parts area, and leaves the menu and the counts. Its documentation goes in the root's page, under Parts, one section per part, so it can say how that piece is used. Agents are told to place the root.
 
-When only one thing agrees, the engine asks instead of guessing: a card on the component with an answer to copy. [Tell Claude](features.md#gather-usage-guidelines) and it records the answer in your intent layer, so it is never asked again.
+When only one thing agrees, the engine asks instead of guessing: a card on the component with an answer to copy. [Tell Claude](features.md#maintain-usage-guidelines) and it records the answer in your intent layer, so it is never asked again.
 
 ### What the team already decided
 
@@ -361,7 +361,7 @@ Every decision somebody makes is recorded where it is made: a difference kept on
 
 Now they come together in one log, written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
 
-A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](features.md#gather-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
+A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](features.md#maintain-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
 The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Contracts, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 

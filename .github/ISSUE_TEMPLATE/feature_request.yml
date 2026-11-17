@@ -14,11 +14,11 @@ body:
       description: The part of the [features page](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md) it belongs to, or Not sure.
       options:
         - Check your Figma library rules
-        - Measure Figma-code parity
         - Lint your codebase rules
+        - Measure Figma-code parity
         - Test accessibility
         - Write component specs
-        - Gather usage guidelines
+        - Maintain usage guidelines
         - Annotate Figma from the code
         - Publish a living style guide
         - Try components in a playground

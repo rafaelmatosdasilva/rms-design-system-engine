@@ -237,7 +237,7 @@ With no intent layer, every row can still be finished.
 
 ### Guidance for agents
 
-Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](features.md#gather-usage-guidelines) to rate them, and each component gets a class.
+Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](features.md#maintain-usage-guidelines) to rate them, and each component gets a class.
 
 | Class | What it means |
 |---|---|
