@@ -1,6 +1,6 @@
 # From fragmented tools to shared design system intelligence
 
-<a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide"><img src="https://raw.githubusercontent.com/rafaelmatosdasilva/rafaelmatosdasilva/main/assets/engine-harbor-status.png" width="49%" alt="The style guide the engine builds, its Status page: parity with Figma, code, documentation and accessibility, scored for every component" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide"><img src="https://raw.githubusercontent.com/rafaelmatosdasilva/rafaelmatosdasilva/main/assets/engine-harbor-identity.png" width="49%" alt="The style guide the engine builds, its Identity page: the system's type, brand colour, neutral scale and semantic colours" /></a>
+<a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide"><img src="https://raw.githubusercontent.com/rafaelmatosdasilva/rafaelmatosdasilva/main/assets/engine-status-sidebar.png" width="49%" alt="The style guide the engine builds, its Status page: parity with Figma, code, documentation and accessibility, scored for every component" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide"><img src="https://raw.githubusercontent.com/rafaelmatosdasilva/rafaelmatosdasilva/main/assets/engine-identity-sidebar.png" width="49%" alt="The style guide the engine builds, its Identity page: the system's type, brand colour, neutral scale and semantic colours" /></a>
 
 <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/actions/workflows/tests.yml"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/badges/tests.json&style=flat" /></a> <a href="https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine"><img src="https://img.shields.io/ossf-scorecard/github.com/rafaelmatosdasilva/rms-design-system-engine?label=OpenSSF%20Scorecard&style=flat" /></a> <a href="https://www.bestpractices.dev/projects/16082"><img src="https://img.shields.io/cii/level/16082?label=OpenSSF%20Best%20Practices&style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/security.md#security-and-data"><img src="https://img.shields.io/badge/Local--first-555555?style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/package.json"><img src="https://img.shields.io/badge/Zero%20dependencies-555555?style=flat" /></a>
 <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#works-with-your-tools"><img src="https://img.shields.io/badge/Figma-A259FF?logo=figma&logoColor=white&style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/accessibility.md#accessibility-never-gets-worse"><img src="https://img.shields.io/badge/GitHub-313131?logo=github&logoColor=white&style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/setup.md#code-on-gitlab"><img src="https://img.shields.io/badge/GitLab-FC6D26?logo=gitlab&logoColor=white&style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines"><img src="https://img.shields.io/badge/Notion-313131?logo=notion&logoColor=white&style=flat" /></a> <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines"><img src="https://img.shields.io/badge/Confluence-172B4D?logo=confluence&logoColor=white&style=flat" /></a>
@@ -17,32 +17,32 @@ Teams often rely on separate tools and AI skills to check Figma, validate code a
 See what is ready at work in the [live style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/), which the engine automatically builds.<br>
 <sub>🟢 Ready to use &nbsp;&nbsp; 🟡 Early development &nbsp;&nbsp; ⚪ Coming soon</sub>
 
-| Audit | | |
-|:---|---|:---:|
-| [Check your Figma library rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | 🟢 |
-| [Measure Figma-code parity](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | 🟢 |
-| [Test accessibility](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | 🟡 |
-| [Lint your codebase rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | 🟡 |
+| Audit | |
+|:---|:---:|
+| **[Check your Figma library rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#check-your-figma-library-rules)**<br>The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | 🟢 |
+| **[Measure Figma-code parity](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#measure-figma-code-parity)**<br>A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | 🟢 |
+| **[Test accessibility](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#test-accessibility)**<br>Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | 🟡 |
+| **[Lint your codebase rules](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#lint-your-codebase-rules)**<br>The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | 🟡 |
 
-| Documentation | | |
-|:---|---|:---:|
-| [Write component specs](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | 🟢 |
-| [Gather usage guidelines](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | 🟢 |
-| [Annotate Figma from the code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#annotate-figma-from-the-code) | Accessibility specs written into Figma, problems pinned on your screens and each component linked to its code, after you approve. | ⚪ |
+| Documentation | |
+|:---|:---:|
+| **[Write component specs](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#write-component-specs)**<br>A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | 🟢 |
+| **[Gather usage guidelines](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#gather-usage-guidelines)**<br>The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | 🟢 |
+| **[Annotate Figma from the code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#annotate-figma-from-the-code)**<br>Accessibility specs written into Figma, problems pinned on your screens and each component linked to its code, after you approve. | ⚪ |
 
-| Collaboration | | |
-|:---|---|:---:|
-| [Publish a living style guide](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | 🟢 |
-| [Try components in a playground](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | 🟡 |
+| Collaboration | |
+|:---|:---:|
+| **[Publish a living style guide](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#publish-a-living-style-guide)**<br>The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | 🟢 |
+| **[Try components in a playground](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#try-components-in-a-playground)**<br>A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | 🟡 |
 
-| Creation | | |
-|:---|---|:---:|
-| [Design themes over your system](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#design-themes-over-your-system) | A new theme of your system's tokens, its colours, type, corners and spacing, set live in light and dark. | ⚪ |
-| [Turn Figma into code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | ⚪ |
-| [Turn code into Figma](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | ⚪ |
-| [Generate in Figma from a prompt](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | ⚪ |
-| [Generate in code from a prompt](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#generate-in-code-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and written in code from its rules. | ⚪ |
-| [Prototype with your real components](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#prototype-with-your-real-components) | Prototypes built by AI from your real components, with nothing invented getting past the checks. | ⚪ |
+| Creation | |
+|:---|:---:|
+| **[Design themes over your system](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#design-themes-over-your-system)**<br>A new theme of your system's tokens, its colours, type, corners and spacing, set live in light and dark. | ⚪ |
+| **[Turn Figma into code](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-figma-into-code)**<br>A Figma-only system turned into code, piece by piece, with each one checked. | ⚪ |
+| **[Turn code into Figma](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#turn-code-into-figma)**<br>Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | ⚪ |
+| **[Generate in Figma from a prompt](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#generate-in-figma-from-a-prompt)**<br>Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | ⚪ |
+| **[Generate in code from a prompt](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#generate-in-code-from-a-prompt)**<br>Anything your system holds, a component, pattern, template or foundation, described by you and written in code from its rules. | ⚪ |
+| **[Prototype with your real components](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#prototype-with-your-real-components)**<br>Prototypes built by AI from your real components, with nothing invented getting past the checks. | ⚪ |
 ---
 
 # Get started
