@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Tokens for a team's own pipeline, and GitHub read as GitLab is (continuous evaluation)
+
+What changed since the entry below (engine 9cb6583): Style Dictionary and Tokens Studio exports, and a GitHub link read through its API. The guide changed in `reference/config.md`.
+
+Guide set measured: `8cd6f2a3ffcd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md c92fab2f` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md dd1fcdbe` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md eb435b0a` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine fef91a1 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 77/79 | 77/79 |
+| Mean cost a run | 0.063 | 0.063 |
+| Input a run | 114k | 107k |
+| Turns a run | 4.1 | 3.9 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 2 of 79 runs failed. Failed: audit-all #2: names a measured difference; no-cli-on-path #1: ran the engine by its path. no task changed state; 2 runs moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/tokens-and-github`.
+
 ## 2026-11: A spec DSDS's own tools read, and the advisories Dependabot cannot close (continuous evaluation)
 
 What changed since the entry below (engine 112d31c): The Chrome badge, and three Nuxt advisories that name a version already fixed (#536); The engine's own code style written down and checked by ESLint (#537); Two screens of the style guide under the README title (#538); test-tools: bump @anthropic-ai/claude-agent-sdk (#540); test-tools: bump vue-router in /test/.vue-tools in the vue-tools group (#539); ESLint 10, with the fixes its recommended rules ask for (#542); The OpenSSF Best Practices badge in the README (#544); Six graders that had never seen a wrong answer, and two fixtures named like backlog codes (#545); The run's findings where the team already reviews code, and its result in the team's chat (#546); The accessibility rules move to 4.14.1, and the two pins that must move together say so (#548); The README's features in two columns, each name above its description, and the screens without their scrollbar (#549); The style guide draws each pattern one way, everywhere, and opens faster (#550); A spec DSDS's own tools read, and the advisories Dependabot cannot close; The kind specs' tests read the engine's part where it now lives. The guide changed in `reference/usage.md`.

@@ -56,7 +56,12 @@ folder it runs in for the code by a guess: told nothing, it says what the folder
 with a NEXT line asking where the code is. Told the code is in a folder with none (no manifest,
 stylesheet, page or script), it asks whether the code is elsewhere or starts there (`--build`).
 
-A GitHub link (`owner/repo` means GitHub) is cloned beside that folder once. A GitLab link (gitlab.com, a host named
+A **GitHub link** (`https://github.com/<owner>/<repo>`, with or without `.git`, `/tree/<branch>` for another branch
+than the default) is read the same way a GitLab one is, and needs no git and no clone: a mirror of the branch's latest
+commit beside that folder through GitHub's API, fetched again only when the branch moved, with the commit it checked
+said in the run. A private repository needs `GITHUB_TOKEN` (`contents:read` is enough) in the `.env` of the folder the
+engine runs in, never one asked for in the chat, and for a GitHub Enterprise Server `GITHUB_HOST=<its host>` — the only
+host besides github.com the token is ever sent to. A public repository needs neither. A GitLab link (gitlab.com, a host named
 `gitlab.<domain>`, a host in `GITLAB_HOST`, or any link with GitLab's `/-/`; `/-/tree/<branch>` for another branch than
 the default) is never cloned and needs no git: the engine keeps a mirror of the branch's latest commit beside that
 folder through GitLab's API, asks GitLab for the latest commit on every run and downloads it again only when the branch
@@ -125,6 +130,11 @@ Once `ds-config.json` exists, extract:
 - `figma.componentsPage` *(optional)* - node id of the DS components page (e.g. `"1:439"`). Enables Gate [1] (Data is up to date)'s **component inventory** check: the live component list on that page is diffed against the structure snapshot so an added/removed DS component always surfaces by name. Without it, the check is skipped (a new component can slip through unaudited).
 - `figma.namingConvention` *(optional)* - overrides for how Figma token paths are converted to CSS var names:
   - `dropSegments` - array of path segments to strip from the end of a token path before deriving the var name. Default: `["color", "default"]`. Set to `[]` to preserve all segments (e.g. when CSS vars end in `-color`).
+- `contracts.styleDictionaryOut` - writes the same tokens in Style Dictionary's own JSON (`value`, `type`, `comment`),
+  beside `tokens.json` when set to `true`, or at a path you give. For a pipeline built on Style Dictionary.
+- `contracts.tokensStudioOut` - the same for Tokens Studio: one set, each token with the type Tokens Studio uses for
+  it (a dimension is `spacing`, `borderRadius` or `sizing` by the group it sits in, never all three as one).
+  Neither format carries a second mode, so a token with one keeps it in `tokens.json`, and the run says how many.
   - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
   - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is; setup sets it when the theme CSS does.
   - `aliases` - per-segment renames (`{ figmaSegment: cssSegment }`). `iconTextAlias` is shorthand for `{ iconText: "text" }`; use `aliases` for any other rename the DS needs.

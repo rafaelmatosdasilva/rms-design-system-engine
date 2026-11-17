@@ -293,5 +293,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-15-what-a-destructive-action-owes` | The 24 guide tasks on Haiku (engine d500ad2) | "What a destructive action owes, by how much damage it does, and mistakes that look right, written for agents" |
 | `findings-and-pins` | The 24 guide tasks on Haiku (engine 112d31c) | "Findings in the review surface, the result in chat, and every pin watched" |
 | `specs-as-dsds` | The 24 guide tasks on Haiku (engine 9cb6583) | "A spec DSDS's own tools read, and the advisories Dependabot cannot close" |
+| `tokens-and-github` | The 24 guide tasks on Haiku (engine fef91a1) | "Tokens for a team's own pipeline, and GitHub read as GitLab is" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
