@@ -75,3 +75,17 @@ test('state, context and a portal all run: the component behaves as it does in t
     assert.equal(await inPage(`getComputedStyle(document.querySelector('.bc-field__input')).height`), '36px');
   } finally { browser.kill(); await h.close?.(); }
 });
+
+// Drawing with real React is only half of it: the checks have to be the ones reading it. This runs the accessibility
+// check itself against the React fixture and asserts it drew with the project's own React, not the stand-in - the
+// wiring, not the harness.
+test('the accessibility check reads the components React drew, and says which drew them', { skip: READY, timeout: budget(300000) }, async () => {
+  const dir = beacon('react-a11y-');
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--json'], {
+    cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(280000),
+  });
+  const said = `${r.stdout}\n${r.stderr}`;
+  assert.match(said, /drawn with the project's own React/, said.slice(0, 600));
+  assert.doesNotMatch(said, /drawn by the stand-in/, 'the stand-in is for a project with no React, and this one has React');
+});

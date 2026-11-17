@@ -1,0 +1,22 @@
+{
+  "_note": "Beacon, an invented React design system for test/react-harness.test.mjs. Every name is invented.",
+  "_updated": "2026-11-17T00:00:00.000Z",
+  "Disclosure": {
+    "nodeId": "1:1",
+    "properties": {
+      "label#1:0": { "type": "TEXT", "defaultValue": "Details" }
+    }
+  },
+  "FieldSize": {
+    "nodeId": "1:2",
+    "properties": {
+      "label#1:0": { "type": "TEXT", "defaultValue": "Name" }
+    }
+  },
+  "MenuSheet": {
+    "nodeId": "1:3",
+    "properties": {
+      "label#1:0": { "type": "TEXT", "defaultValue": "More" }
+    }
+  }
+}
