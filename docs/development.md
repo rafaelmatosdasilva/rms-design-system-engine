@@ -11,6 +11,7 @@ This page is for whoever is changing the engine itself: the maintainer, or anyon
 - [What a change needs](#what-a-change-needs)
 - [Coding standards](#coding-standards)
 - [Keeping up with DSDS](#keeping-up-with-dsds)
+- [Every other standard the engine pins](#every-other-standard-the-engine-pins)
 - [Release labels](#release-labels)
 - [What a release asks of you](#what-a-release-asks-of-you)
 
@@ -120,6 +121,40 @@ node lib/dsds-release.mjs update 0.24.0
 ```
 
 `fetch` and `update` turn DSDS's YAML examples into JSON with Ruby, which macOS and the CI runner have. The tests then hold the view, and the validator in `lib/json-schema.mjs`, to that release: every example DSDS publishes as valid passes, and every fixture its suite says the schema rejects is rejected.
+
+## Every other standard the engine pins
+
+DSDS has a watch of its own because it moves often and may break in a minor release. The engine pins other outside
+facts too, and until November 2026 nothing asked about any of them — which is how a pin goes stale unseen.
+
+`lib/pinned-standards.mjs` is the one list of them: what each is, which file holds the pin, and how its source is
+asked. See them all, with what their sources say now:
+
+```bash
+node lib/pinned-standards.mjs
+```
+
+It exits 1 when one is behind. `.github/workflows/pinned-standards.yml` runs it every Monday and keeps **one** issue
+current while anything is behind, closing it when nothing is. A new issue each week for the same standard is how a
+watch gets muted.
+
+**It proposes nothing.** Moving a pin changes what the engine writes or checks — a newer accessibility rule set finds
+different things — so a person decides it and it goes through a pull request that says what passed. DSDS keeps its own
+watch, which does propose, because it has a conformance suite to prove the move against.
+
+Three kinds of pin, because they go stale in different ways:
+
+| Kind | How it is asked | Example |
+|---|---|---|
+| A version with a registry | Its newest published version | `axe-core`, the accessibility rules the browser checks run |
+| A version with a repository | Its newest tag that is a version | DSDS |
+| A date | How many months since it was read | The table of which browser version runs which web feature |
+
+A pin nothing can ask about stays in the list and is reported as unwatched, rather than left out. "Nothing can ask
+about this" is the finding, not a reason to hide it — and the list is what says the engine pins it at all.
+
+**When you add a pin**, add it to `PINNED` in the same change. A test reads every entry against the engine's own
+files, so a pin whose line is renamed fails the suite rather than silently reading nothing.
 
 ## Release labels
 

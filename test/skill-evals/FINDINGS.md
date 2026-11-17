@@ -663,3 +663,19 @@ Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **1
 - Guessing is cheap until it is three guesses deep. The one probe that settled it took less time than any of the three guesses took to write.
 
 **What changed.** The stub router is given what the project's own router knows, by name and by path, each route drawing nothing — the router is still never installed, so the product's history is still not driven. The acts check listens on the app's own error handler for the length of the click and names a control whose handler threw as wired rather than inert, because the two want opposite fixes.
+
+## The first thing the watch asked was four versions behind
+
+**The case.** A watch was built for every outside fact the engine pins, because DSDS had one and nothing else did. Run against the real repository on its first day it found the accessibility rule set pinned four minor versions back - and nothing in the repository, the suite or any workflow had said so for as long as it had been true.
+
+**What else it found, which was not the point of it.** One pin has **no source recorded anywhere**: a format version with no repository, registry or page the engine knows to ask. It had been invisible precisely because nothing listed it. The list now carries it and reports it as unwatched, and that reads as the open question it is rather than as nothing at all.
+
+**The bump is not a version string.** Moving the pin in a scratch copy and running the accessibility tests failed five of them. One is a real change of behaviour, not a stale fixture: the rule set no longer reports a list violation the engine surfaces, so a blocker under 1.3.1 that the check currently catches would stop being caught. Whether that is the standard correcting itself or the engine losing a finding is a question for a person, and it is exactly why the watch proposes nothing where the DSDS watch proposes a pull request: DSDS has a conformance suite to prove a move against, and a rule set has only its own judgement.
+
+**What it teaches.**
+
+- A watch's value is not the alert it sends later, it is the inventory it forces now. Listing what is pinned found a pin nobody could ask about, which no amount of asking would ever have surfaced.
+- "Pinned and current" and "pinned and nobody asks" look identical from inside a repository, and so do "frozen on purpose" and "forgotten". Only a list that says which is which tells them apart.
+- A watch that proposes the fix is right where something can prove the fix (a conformance suite) and wrong where nothing can. Proposing a move that silently drops a finding would be worse than the staleness it cures.
+
+**What changed.** `pinned-standards.mjs` holds every pin with how its source is asked - a registry's newest version, a repository's newest tag, or, for a curated table with no version at all, how many months since it was read - and a weekly workflow keeps one issue current while anything is behind. A pin whose line is renamed fails the suite rather than silently reading nothing, because a watch that reads nothing and says nothing is worse than no watch.
