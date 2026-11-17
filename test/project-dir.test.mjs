@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { hasCode, projectFor, POINTER } from '../lib/project-dir.mjs';
+import { hasCode, projectFor, POINTER, codeCheckedLine } from '../lib/project-dir.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -53,4 +53,13 @@ test('a profile that cannot be read is said, and the run carries on with the set
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stderr, /Profile not read: no file at/);
   assert.doesNotMatch(r.stdout + r.stderr, /TypeError/, 'a profile with nothing in it is never read for where the project is');
+});
+
+// The summary closes on the commit it checked, under the host it was read from: a GitHub project once said GitLab.
+test('the closing line names the host the code was read from', () => {
+  const at = { path: 'acme/ui-kit', ref: 'main', sha: 'a62fbcfb1234567890', committedAt: '2026-11-17T12:00:00Z' };
+  assert.equal(codeCheckedLine({ ...at, host: 'GitHub' }), '\nCode checked: GitHub acme/ui-kit @ main a62fbcfb (2026-11-17)\n');
+  assert.equal(codeCheckedLine({ ...at, host: 'GitLab' }), '\nCode checked: GitLab acme/ui-kit @ main a62fbcfb (2026-11-17)\n');
+  assert.match(codeCheckedLine({ ...at, host: 'GitHub', stale: true }), /GitHub was not reached/);
+  assert.equal(codeCheckedLine(null), '', 'a project in a folder has no such line');
 });
