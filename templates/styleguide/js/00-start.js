@@ -376,8 +376,18 @@
   // A day as a sentence says it: 15 Oct (the year only when it is not this one).
   var dayShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
   var PILLS_SHOWN = 5;
-  // A table's rows shown at once: the rest behind the same chevron, so a page of thousands opens at once (the owner's, 17 November 2026).
+  // A table's rows shown at first: the rest behind the same chevron, so a page of thousands opens at once, and one click
+  // on it shows every row left, never another batch (the owner's, 17 November 2026). History opens the same way.
   var ROWS_SHOWN = 100;
+  // The one "N more" under a long table, on every page and on History alike: hidden when nothing is left.
+  function rowsFoot(t, rest, attr) {
+    if (!t) return;
+    var foot = t.querySelector(':scope > tfoot.sg-rows-more');
+    if (rest <= 0) { if (foot) foot.hidden = true; return; }
+    if (!foot) { foot = document.createElement('tfoot'); foot.className = 'sg-rows-more'; t.appendChild(foot); }
+    foot.hidden = false;
+    foot.innerHTML = '<tr><td colspan="' + ((t.tHead && t.tHead.rows[0] && t.tHead.rows[0].cells.length) || 1) + '">' + pillsMore(rest, attr) + '</td></tr>';
+  }
   // A table's rows put in another order: its filter bar shows the first ones again.
   function rowsMoved(el) { if (el) el.dispatchEvent(new CustomEvent('sg-sorted', { bubbles: true })); }
   var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
