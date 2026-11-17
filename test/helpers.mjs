@@ -163,7 +163,9 @@ export function normalise(text, dir) {
     .replace(/\(([0-9a-f]{7})\)/g, '(<HASH>)')
     .replace(/\d+h (old|ago)/g, '<AGE>h $1')
     .replace(/\d+ ?(day|days|hour|hours) ago/g, '<AGE> ago')
-    .replace(/^.*newer version of the engine.*\n/gm, '');
+    // The once-a-day update notice, with the blank line it prints before itself (audit.mjs): which run of the suite
+    // gets it depends on which audit runs first on a machine, so a report never carries either.
+    .replace(/\n?^.*newer version of the engine.*\n/gm, '');
 }
 
 // The whole audit on a fresh copy, its output normalised.
