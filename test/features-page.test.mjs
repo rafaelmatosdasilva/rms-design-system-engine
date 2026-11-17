@@ -78,14 +78,15 @@ test('the technical documentation covers every usable part, on its group\'s page
 
 // The README's feature list is this page's overview, word for word: the same groups, names, descriptions and stages,
 // only its links pointing here. It is the short index of this page, never a second description that drifts from it.
-// The README draws it its own way, the owner's: a table per group with the group's name as its header, and each stage
+// The README draws it its own way, the owner's: a two-column table per group with the group's name as its header, each name in bold above its
+// description, and each stage
 // as a mark its legend line names (🟢 Ready to use). So both are read down to group, name, description and stage.
 const listed = (text, stageOf) => {
   const groups = [];
   for (const line of text.split('\n')) {
     const group = line.match(/^### (.+)$/)?.[1] ?? line.match(/^\| ([^[|]+?) \|(?: *\|)+$/)?.[1];
     if (group) { groups.push({ group, rows: [] }); continue; }
-    const row = line.match(/^\| \[(.+?)\]\([^)]*\) \| (.+?) \| ([^|]+?) \|$/);
+    const row = line.match(/^\| (?:\*\*)?\[(.+?)\]\([^)]*\)(?:\*\*)?(?: \| |<br>)(.+?) \| ([^|]+?) \|$/);
     if (row && groups.length) groups.at(-1).rows.push([row[1], row[2], stageOf(row[3])]);
   }
   return groups;
