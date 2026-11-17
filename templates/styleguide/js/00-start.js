@@ -107,15 +107,17 @@
   var COMP_DATA = {};
   COMPONENTS.forEach(function (c) {
     var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
-    // Where a render was placed on the page it was measured in (top: 112665px) is not the component: left out.
-    var renders = c.renders ? JSON.parse(JSON.stringify(c.renders).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*')) : null;
-    COMP_DATA[c.name] = noScopeIds(JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(renders ? [renders] : [])));
+    // Where a render, or the markup copied from a page, was placed on the page it was measured in (top: 112665px) is not
+    // the component: left out of both, so a component moved down a page is not tried again (it was, on every build).
+    var renders = c.renders ? JSON.parse(noPlace(JSON.stringify(c.renders))) : null;
+    COMP_DATA[c.name] = noScopeIds(JSON.stringify([c.name, c.cls, c.role, c.markup && noPlace(c.markup), c.markups && c.markups.map(function (m) { return typeof m === 'string' ? noPlace(m) : JSON.parse(noPlace(JSON.stringify(m))); }), c.controls, a].concat(renders ? [renders] : [])));
   });
   // The system's CSS as its rules, in any order: a bundler can write the same rules in another order on each build
   // (the project's Vite does), which changes nothing a result rests on.
   // A Vue component's scoped id (data-v-1a2b3c4d) is a hash of where its file sits on the computer that built the page:
   // the same component built in another folder, or by the team's pipeline, gets another one. Left out of every
   // signature, so results saved anywhere hold wherever the page is built.
+  function noPlace(text) { return String(text).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*'); }
   function noScopeIds(text) { return String(text).replace(/data-v-[0-9a-f]{6,}/g, 'data-v'); }
   function cssSigText(css) { return noScopeIds(css).split('}').map(function (x) { return x.trim(); }).filter(Boolean).sort().join('}'); }
   // What a component's accessibility result rests on beyond its own data: the system's CSS and the checks themselves
