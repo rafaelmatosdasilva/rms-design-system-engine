@@ -12,6 +12,7 @@ This page is for whoever is changing the engine itself: the maintainer, or anyon
 - [Coding standards](#coding-standards)
 - [Keeping up with DSDS](#keeping-up-with-dsds)
 - [Every other standard the engine pins](#every-other-standard-the-engine-pins)
+- [When a pull request stops merging](#when-a-pull-request-stops-merging)
 - [Release labels](#release-labels)
 - [What a release asks of you](#what-a-release-asks-of-you)
 
@@ -92,6 +93,29 @@ To run ESLint on its own:
 
 ```bash
 node test/.lint-tools/node_modules/eslint/bin/eslint.js -c test/.lint-tools/eslint.config.mjs .
+```
+
+## When a pull request stops merging
+
+Every pull request here merges itself: it is opened, labelled, auto-merge goes on, and GitHub merges it the moment
+its checks are green. Nobody watches one afterwards — until it cannot merge, and then it looks exactly like one
+that is about to.
+
+Three ways that happens, all of them silent:
+
+| What stopped it | What it looks like | The fix |
+|---|---|---|
+| It conflicts with main | Green ticks, auto-merge on | Rebase the branch onto main |
+| A required check failed | Auto-merge still on, waiting | Push the fix |
+| Auto-merge was never turned on | Nothing at all | `gh pr merge <n> --auto --squash` |
+
+`.github/workflows/merge-stalled.yml` asks daily and keeps **one** issue current while any is stuck. A pull request
+younger than six hours is not stalled, it is new — saying otherwise would teach everyone to ignore the issue.
+
+See them from your own machine:
+
+```bash
+node lib/merge-stalled.mjs
 ```
 
 ## Keeping up with DSDS
