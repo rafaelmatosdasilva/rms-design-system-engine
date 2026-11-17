@@ -8,36 +8,36 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | Ready to use |
-| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Ready to use |
-| [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
-| [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | Early development |
+| [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, each break listed, with a score for how well you follow them. | Ready to use |
+| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, each break listed, with a score for how well you follow them. | Ready to use |
+| [Measure Figma-code parity](#measure-figma-code-parity) | Every difference between Figma and the code in colours, sizes, states and spacing, in every mode, with the fix for each. | Ready to use |
+| [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component and state, each failure tied to its WCAG criterion. | Early development |
 
 ### Documentation
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Write component specs](#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | Ready to use |
-| [Maintain usage guidelines](#maintain-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | Ready to use |
-| [Annotate Figma from the code](#annotate-figma-from-the-code) | Accessibility specs written into Figma, problems pinned on your screens and each component linked to its code, after you approve. | Coming soon |
+| [Write component specs](#write-component-specs) | One contract per component, its props, states, tokens and decisions, that developers and AI agents build from without guessing. | Ready to use |
+| [Maintain usage guidelines](#maintain-usage-guidelines) | The intent layer, why each component exists and when to use it, kept current where your docs live, with drafts for the gaps. | Ready to use |
+| [Annotate Figma from the code](#annotate-figma-from-the-code) | Accessibility specs in Figma, problems pinned on your screens and each component linked to its code, all after you approve. | Coming soon |
 
 ### Collaboration
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, with Figma, the code, your docs, accessibility and decisions in one place, updated on every push. | Ready to use |
-| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and QA. | Early development |
+| [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, each component's parity, accessibility, docs and decisions in one place, with who acts on what. | Ready to use |
+| [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and visual and functional QA. | Early development |
 
 ### Creation
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Design themes over your system](#design-themes-over-your-system) | A new theme of your system's tokens, its colours, type, corners and spacing, set live in light and dark. | Coming soon |
-| [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, with each one checked. | Coming soon |
-| [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, turned into Figma with its props as properties and its tokens as variables. | Coming soon |
+| [Design themes over your system](#design-themes-over-your-system) | A new theme over your system's tokens, its colours, type, corners and spacing, set live in light and dark and kept readable. | Coming soon |
+| [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, from Figma's exact names and values, with each piece checked once built. | Coming soon |
+| [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, drawn in Figma with its props as properties and its tokens as variables, for review. | Coming soon |
 | [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | Coming soon |
 | [Generate in code from a prompt](#generate-in-code-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and written in code from its rules. | Coming soon |
-| [Prototype with your real components](#prototype-with-your-real-components) | Prototypes built by AI from your real components, with nothing invented getting past the checks. | Coming soon |
+| [Prototype with your real components](#prototype-with-your-real-components) | Prototypes built by AI from your real components, each edit checked as it is made, so nothing invented gets past the checks. | Coming soon |
 
 ## Set up
 
@@ -497,7 +497,7 @@ Your tools stay as they are, and the engine fits around them.
 
 - Checks in a real browser: Chrome for every check, and Firefox and Safari for the match with Figma and six accessibility checks. Firefox runs whenever it is installed, Safari when you ask, and only what differs from Chrome is said.
 - Writes and reads DSDS, and tries each new DSDS release before moving to it.
-- Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
+- Reads code straight from GitHub or GitLab, on their own sites or your own host, without a clone.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
 - Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
