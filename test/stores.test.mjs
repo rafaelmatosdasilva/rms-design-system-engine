@@ -634,6 +634,34 @@ test('no token: a store is written by git push, built without checking anything 
   assert.match(no.why, /not allowed to push code to protected branches/);
 });
 
+// A setup that names no branch means the default one. Pushing to "HEAD" made a branch called HEAD on GitHub, beside
+// main, and the next publish, built on main, was refused as behind it: a real run publishing contracts found it.
+test('no token, no branch named: every push lands on the default branch, by its name, and the next builds on it', () => {
+  const home = tempDir('git-default-home-');
+  const remote = tempDir('git-default-remote-');
+  const seed = tempDir('git-default-seed-');
+  const run = (args, cwd) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  run(['init', '--bare', '-q', '-b', 'main', remote]);
+  run(['init', '-q', '-b', 'main'], seed);
+  run(['config', 'user.email', 'demo@example.com'], seed); run(['config', 'user.name', 'Demo'], seed);
+  writeFileSync(join(seed, 'README.md'), '# specs');
+  run(['add', '-A'], seed); run(['commit', '-qm', 'one'], seed); run(['push', '-q', remote, 'main'], seed);
+  const git = (args, input, env) => execFileSync('git', args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? remote : a)), { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+  const p = { host: 'github.com', path: 'acme/specs', origin: 'https://github.com' };
+  const place = { path: 'specs/contracts' };
+
+  const first = gitStorePush(p, place, new Map([['card.contract.json', '{"a":1}']]), 'Contracts (1)', { git, home });
+  assert.equal(first.ok, true, first.why);
+  const second = gitStorePush(p, place, new Map([['card.contract.json', '{"a":2}'], ['chip.contract.json', '{}']]), 'Contracts (2)', { git, home });
+  assert.equal(second.ok, true, second.why);
+
+  const branches = String(run(['for-each-ref', '--format=%(refname:short)', 'refs/heads'], remote)).split('\n').filter(Boolean);
+  assert.deepEqual(branches, ['main'], 'no branch called HEAD');
+  assert.equal(String(run(['rev-parse', 'main'], remote)).trim(), second.sha);
+  assert.deepEqual(String(run(['log', '--format=%s', 'main'], remote)).split('\n').filter(Boolean), ['Contracts (2)', 'Contracts (1)', 'one']);
+  assert.equal(String(run(['show', 'main:specs/contracts/card.contract.json'], remote)).trim(), '{"a":2}');
+});
+
 test('no token, a protected branch on GitLab: the push goes to a branch of its own with a merge request asked for through push options', () => {
   const home = tempDir('git-mr-home-');
   const remote = tempDir('git-mr-remote-');

@@ -134,6 +134,14 @@ Anything else is left out, never guessed: where a part sits, a part whose kind t
 
 A test holds every spec the demo builds to a schema written from the format's published types, where each prop must read as exactly one kind.
 
+### Sent to GitHub or GitLab
+
+`--contracts-out` with no folder sends the contracts to the team's contracts store (`--store contracts.write=<GitHub or GitLab link>`), as one commit.
+
+- **One per component.** Published, the contracts are one per code file. A system that keeps several components in one file sets `contracts.layout` to `"name"`, for one per component name.
+- **The default branch, unless you name one.** With no branch in the setup, they go to the repository's default branch, by the name the host gives it.
+- **What you may push is the host's to say.** On GitLab, a protected branch gets a merge request. On GitHub, it refuses as it would from your terminal, and the run says what it said.
+
 ### Code Connect drafts
 
 The engine reads the Figma Code Connect files your project commits: each code prop and the Figma property it reads, a property that only decides whether another is written (in either form), and, in the template form, what fills a slot between the component's tags. A text or a swapped instance written into a slot the code has pairs with that slot. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](features.md#write-component-specs)).
