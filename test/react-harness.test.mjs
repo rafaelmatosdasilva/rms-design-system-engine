@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startReactHarness, reactBuild, harnessModule, styleSpecifier } from '../lib/react-harness.mjs';
+import { startReactHarness, reactBuild, harnessModule, styleSpecifier, componentsInCode } from '../lib/react-harness.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -110,4 +110,19 @@ test('the build is given what a real React system needs: its dependencies conver
   assert.match(src, /define: \{ __DEV__/, 'a component that mentions __DEV__ throws before it draws without it');
   assert.match(src, /optimizeDeps: \{ include/, 'and a CommonJS dependency has no named exports until it is converted');
   assert.doesNotMatch(src, /noDiscovery: true/, 'a package a dependency imports is in no project source, so Vite finds those itself');
+});
+
+// A published React library names its components nowhere the engine used to read: no Figma capture, no structure
+// contract, no selectors. Run against one, every browser check said "no render targets" about a system with hundreds
+// of components. Its own code names them, and that is the layout React systems use.
+test('a system that names its components nowhere else still names them in its code', () => {
+  const files = [
+    'src/Button/Button.tsx', 'src/Button/Button.stories.tsx', 'src/Button/Button.test.tsx',
+    'src/Button/Button.figma.tsx', 'src/Button/ButtonBase.tsx', 'src/Banner/Banner.tsx',
+    'src/Avatar/Avatar.jsx', 'src/utils/helpers.tsx', 'src/Banner/Banner.module.css',
+  ];
+  assert.deepEqual(componentsInCode(files), ['Avatar', 'Banner', 'Button'],
+    'a file named for its folder is that folder\'s component; a story, a test, a Figma mapping and a helper are not');
+  assert.equal(componentsInCode(files.concat(['src/Chip/Chip.tsx']), { most: 2 }).length, 2, 'and a cap is a cap');
+  assert.deepEqual(componentsInCode([]), []);
 });

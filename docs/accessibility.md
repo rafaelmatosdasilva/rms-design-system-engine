@@ -26,6 +26,10 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **Across your system, not its first corner.** When there are more stories than the check will open in one run, it
   takes one state of each component before a second of any, so a cap covers the system rather than whichever
   components the index lists first. The run says how many components it reached.
+- **Components it can find even when nothing lists them.** The engine learns your components from your Figma
+  capture, your structure contract or your config. A published library often has none of those, and its own code is
+  then the list: a file named for the folder it sits in is that folder's component. The run says how many it read
+  that way.
 - **Your React, not an imitation of it.** React components are drawn with the React and the Vite your project has
   installed, so a component that keeps state, reads a context or renders through a portal behaves here as it does in
   your product. Without React installed, a smaller stand-in draws what it can and the run says what it left out.
