@@ -97,7 +97,8 @@ const claimsFigma = (said) => /\b(i(['’]ve| have)?|i)\s+(built|created|added|m
 const asksFirst = (said) => /\?|\b(sign(s|ed)?[- ]off|say yes|confirm|approve|want me to|shall i|should i|go ahead|let me know)\b/i.test(said);
 const noValue = (ops) => !/#[0-9a-f]{3,8}\b|"\d+(\.\d+)?(px|rem)"/i.test(JSON.stringify(ops ?? []));
 export function figmaBuildScore(ctx) {
-  const spec = jsonAt(ctx, `${OUT}/specs/pill.spec.json`), x = spec?.['x-rms-design-system-engine'];
+  // A spec on disk is a DSDS document of one entry, with the engine's own part under $extensions (component-spec.mjs).
+  const doc = jsonAt(ctx, `${OUT}/specs/pill.spec.json`), spec = doc?.entries?.[0] ?? doc, x = spec?.$extensions?.['io.github.rafaelmatosdasilva.rms-design-system-engine'];
   const said = ctx.final ?? '';
   return [
     check('ran the engine\'s spec', hasEngineRun(ctx, (c) => /--spec\b/.test(c))),

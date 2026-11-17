@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers.mjs';
 import { modelOf, predict, ground, opsScript } from '../lib/figma-ops.mjs';
-import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT } from '../lib/component-spec.mjs';
+import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT, partOf } from '../lib/component-spec.mjs';
 import { diffModels, diffLines } from '../lib/component-diff.mjs';
 import { grammarOf } from '../lib/construction-grammar.mjs';
 import { route } from '../lib/route.mjs';
@@ -93,7 +93,7 @@ test('a spec from a description: the component it is like, its name, and what it
   assert.equal(nameOf('make a pill in Figma, like the chip'), 'pill');
   assert.equal(nameOf('create a new component like the chip'), null);
   const { spec } = specOf({ description: 'a tag like chipFilter', like: 'chipFilter', name: 'Tag', captures, grammar });
-  const x = spec[EXT];
+  const x = partOf(spec);
   assert.equal(spec.name, 'tag');
   assert.equal(spec.kind, 'component');
   assert.deepEqual(spec.traits.map((t) => t.id), ['size', 'showIcon', 'showCount']);
@@ -106,7 +106,7 @@ test('a spec from a description: the component it is like, its name, and what it
   // A copy that changes nothing of how it is built is a twin, which this system's chips show it does not allow.
   assert.ok(x.questions.some((q) => /tag would be built the same as chipFilter and take the same properties: a twin, which this system's rules do not allow \(no-twins\)/.test(q.ask)));
   const answered = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar, ops: [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'removeProperty', name: 'showCount' }, { op: 'describe', text: 'A tag.' }] }).spec;
-  assert.deepEqual(answered[EXT].questions, []);
+  assert.deepEqual(partOf(answered).questions, []);
   assert.ok(specLines(answered).some((l) => /How it differs from chipFilter/.test(l)));
 });
 
@@ -153,16 +153,16 @@ test('what the description asks beyond the copy is read as a change, and what is
   assert.deepEqual(askedOf('a tag like chipFilter with the description "A tag."', m).ops, [{ op: 'describe', text: 'A tag.' }]);
   assert.deepEqual(askedOf('a tag like chipFilter with sparkles', m).unread, ['add sparkles']);
   const { spec } = specOf({ description: 'a tag like chipFilter with sparkles', like: 'chipFilter', name: 'tag', unread: ['add sparkles'], captures, grammar });
-  assert.ok(spec[EXT].questions.some((q) => /not read: "add sparkles"/.test(q.ask)));
+  assert.ok(partOf(spec).questions.some((q) => /not read: "add sparkles"/.test(q.ask)));
 });
 
 test('the like\'s own variables: the shared one each points at is proposed, from the alias chain', () => {
   const withAliases = { ...captures, aliases: { 'chipFilter/label/color': ['text/default', 'neutral/900'] } };
   const { spec } = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures: withAliases, grammar });
-  assert.deepEqual(spec[EXT].shared, [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }]);
-  assert.ok(spec[EXT].questions.some((q) => /chipFilter\/label\/color → text\/default \(--shared binds it\)/.test(q.ask)));
+  assert.deepEqual(partOf(spec).shared, [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }]);
+  assert.ok(partOf(spec).questions.some((q) => /chipFilter\/label\/color → text\/default \(--shared binds it\)/.test(q.ask)));
   // None to point at: a rebind for each, as before.
-  assert.ok(specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar }).spec[EXT].questions.some((q) => /None points at no shared variable/.test(q.ask)));
+  assert.ok(partOf(specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar }).spec).questions.some((q) => /None points at no shared variable/.test(q.ask)));
 });
 
 test('the shared variable is never a primitive, nor another component\'s own: the same value is not the same purpose', () => {
@@ -328,7 +328,7 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   writeFileSync(keysFile, '{ not json');
   assert.match(cli('--figma-build', 'tag', '--keys', keysFile), /❌ --keys /);
   const spec = JSON.parse(readFileSync(join(root, '.design-system-engine-out/specs/tag.spec.json'), 'utf8'));
-  assert.equal(spec[EXT].signedOff.by, 'the system owner');
+  assert.equal(partOf(spec).signedOff.by, 'the system owner');
 });
 
 test('a new component asked for in Figma routes to its spec; Figma\'s roles and construction fixes keep their own', () => {
@@ -351,4 +351,37 @@ test('a new component like one of a family ("like the secondary one") routes to 
   assert.equal(likeOf('create a danger one like the secondary one', c.components).like, null);
   // An option of the component changed stays a change.
   assert.equal(route('add a size XL to the chip in Figma like L', c).recipe, 'change-component-figma');
+});
+
+// A spec is said to be in DSDS's shape, and the code side reads it later. Said is not enough: DSDS's own tools read
+// what its schema accepts, and until now the spec marked itself with a field DSDS renamed in 0.20, kept the engine's
+// part at the top level where no entry may carry it, and wrote an enum's values as bare strings. So it is held to the
+// schema itself, as the DSDS view is.
+test('the spec is a DSDS document its own schema accepts, with the engine\'s part where DSDS keeps what is not its own', async () => {
+  const { specOf, specDocument, partOf, entryOf, EXT } = await import('../lib/component-spec.mjs');
+  const { validate } = await import('../lib/json-schema.mjs');
+  const { fixtureDir } = await import('../lib/dsds-release.mjs');
+  const { DSDS_VERSION, DSDS_SCHEMA } = await import('../lib/contract-dsds.mjs');
+  const schema = JSON.parse(readFileSync(join(fixtureDir(), 'dsds.bundled.schema.json'), 'utf8'));
+
+  const { spec } = specOf({ description: 'a tag like chipFilter', like: 'chipFilter', name: 'Tag', captures, grammar });
+  const doc = specDocument(spec, { system: 'Acme' });
+
+  const r = validate(schema, doc);
+  assert.equal(r.valid, true, JSON.stringify(r.errors ?? r).slice(0, 600));
+
+  assert.equal(doc.schemaVersion, DSDS_VERSION, 'the version is the document\'s, under the name DSDS gives it');
+  assert.equal(doc.$schema, DSDS_SCHEMA);
+  assert.equal(doc.entries.length, 1, 'one spec is one entry');
+  assert.equal(spec.dsdsVersion, undefined, 'the name DSDS dropped in 0.20 is not written');
+  assert.equal(spec[EXT], undefined, 'and nothing of the engine sits at the entry\'s top level');
+
+  assert.ok(partOf(doc).ops, 'the engine\'s own part is read back out of the document');
+  assert.deepEqual(partOf(doc), entryOf(doc).$extensions[EXT], 'from under $extensions, by a key namespaced to the engine');
+
+  const enums = (spec.traits ?? []).filter((t) => t.kind === 'enum');
+  for (const t of enums) for (const v of t.values) {
+    assert.equal(typeof v, 'object', `${t.id}'s values are values, never bare strings`);
+    assert.ok(v.id && v.description, `${t.id}'s ${v.id} says what it is`);
+  }
 });

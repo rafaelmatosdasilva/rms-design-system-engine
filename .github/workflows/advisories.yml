@@ -1,0 +1,40 @@
+# Dependabot closes every advisory a newer version closes, and its pull requests merge themselves. Two kinds slip
+# past it: one with no newer version to move to (or whose range is the advisory's own mistake, a "3.x" with no end
+# that matches 4.x too), and one already answered in an osv-scanner.toml whose date to look again has passed. Both
+# are found today only when somebody happens to look at the score.
+#
+# This asks once a week and keeps one issue current while there is something to act on (lib/advisories-watch.mjs).
+# It proposes nothing: an advisory is fixed, reported upstream, or answered with a reason and a date, and which of
+# the three is a person's call.
+name: Advisories
+
+on:
+  schedule:
+    # Monday, off the hour, after the pinned standards watch.
+    - cron: '53 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advisories
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Is an advisory waiting on nobody
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        # Exit 1 says there is something to act on, which the issue already carries: the run itself is not a failure.
+        run: node lib/advisories-watch.mjs check || true

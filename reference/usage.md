@@ -1655,9 +1655,12 @@ GitLab `major`), one that only advises a `warning` (a `minor`). What blocks a me
 #### A component built in Figma (`--spec`, `--figma-build`)
 
 **--spec.** `--spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>] [--shared]` writes the spec of a new
-component to `.design-system-engine-out/specs/<name>.spec.json`, in DSDS's shape (its traits and what it nests), with the
-engine's own part: what was asked, the component it is like, the operations that make it, its questions, what it adds to
-the system and the names it wrote the system's way. It starts as a copy of the component it is most like (named with
+component to `.design-system-engine-out/specs/<name>.spec.json` as a **DSDS document of one entry** — the schema it is
+written to, its `schemaVersion`, the system's name and the component itself (its traits and what it nests) — which
+DSDS's own tools read, because it is held to DSDS's schema in the tests the way the view is. The engine's own part
+(what was asked, the component it is like, the operations that make it, its questions, what it adds to the system and
+the names it wrote the system's way) sits under `$extensions`, by a key namespaced to the engine, where DSDS keeps
+what is not its own. It starts as a copy of the component it is most like (named with
 `like`, else the one whose name shares its words, else it asks), and takes only the operations that make it what was
 asked. Each is checked against the system: a variable, a component, a text style or a layer it names must be the
 system's, else it is a question with the nearest the system has; a value (`#ff0000`, `16px`) is always a question, never
