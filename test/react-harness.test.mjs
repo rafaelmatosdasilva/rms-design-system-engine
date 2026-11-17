@@ -4,10 +4,10 @@
 //   npm ci --prefix test/.react-tools
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startReactHarness, reactBuild, harnessModule } from '../lib/react-harness.mjs';
+import { startReactHarness, reactBuild, harnessModule, styleSpecifier } from '../lib/react-harness.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -25,7 +25,7 @@ const beacon = (prefix) => {
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
   return dir;
 };
-const NAMES = ['Disclosure', 'FieldSize', 'MenuSheet'];
+const NAMES = ['Disclosure', 'FieldSize', 'MenuSheet', 'CardTile'];
 const locate = (dir) => (n) => join(dir, 'src', 'components', `${n}.jsx`);
 
 test('a project with no React of its own is said so, and keeps the stand-in', async () => {
@@ -59,6 +59,9 @@ test('state, context and a portal all run: the component behaves as it does in t
 
     assert.deepEqual(JSON.parse(await inPage(`JSON.stringify([...document.querySelectorAll('[data-dse-component]')].map((s) => s.getAttribute('data-dse-component')))`)), NAMES);
     assert.deepEqual(JSON.parse(await inPage('JSON.stringify(window.__dseHarnessFailed)')), [], 'every component drew');
+    // forwardRef gives an object, not a function: a reader that takes only functions calls this "no component
+    // exported", which is most of a real system (found on one).
+    assert.equal(await inPage(`Boolean(document.querySelector('[data-dse-component="CardTile"] .bc-card'))`), true, 'a component behind forwardRef draws like any other');
 
     // The project's own token, resolved by the browser: what parity reads.
     assert.equal(await inPage(`getComputedStyle(document.querySelector('.bc-disclosure__summary')).height`), '36px');
@@ -88,4 +91,23 @@ test('the accessibility check reads the components React drew, and says which dr
   const said = `${r.stdout}\n${r.stderr}`;
   assert.match(said, /drawn with the project's own React/, said.slice(0, 600));
   assert.doesNotMatch(said, /drawn by the stand-in/, 'the stand-in is for a project with no React, and this one has React');
+});
+
+// Everything below was found by running this against a real public design system, and none of it could have been
+// found on a fixture written by the same hand as the harness.
+test("a stylesheet inside a package is asked for by the package's name, which is how a published system ships tokens", () => {
+  assert.equal(styleSpecifier('/node_modules/@acme/primitives/dist/tokens.css'), '@acme/primitives/dist/tokens.css');
+  assert.equal(styleSpecifier('node_modules/@acme/primitives/dist/tokens.css'), '@acme/primitives/dist/tokens.css');
+  assert.equal(styleSpecifier('/src/styles/tokens.css'), '/src/styles/tokens.css', "the project's own keeps its path");
+  assert.equal(styleSpecifier('/src/node_modules_notes.css'), '/src/node_modules_notes.css', 'and a path that merely reads like one is left alone');
+});
+
+test('the build is given what a real React system needs: its dependencies converted, and the flag they are written against', () => {
+  const mod = harnessModule([], []);
+  assert.ok(mod.includes("from 'react-dom/client'"));
+  // __DEV__ and the dependency conversion live in the server options, not the module: asserted where they are set.
+  const src = readFileSync(join(ENGINE, 'lib', 'react-harness.mjs'), 'utf8');
+  assert.match(src, /define: \{ __DEV__/, 'a component that mentions __DEV__ throws before it draws without it');
+  assert.match(src, /optimizeDeps: \{ include/, 'and a CommonJS dependency has no named exports until it is converted');
+  assert.doesNotMatch(src, /noDiscovery: true/, 'a package a dependency imports is in no project source, so Vite finds those itself');
 });
