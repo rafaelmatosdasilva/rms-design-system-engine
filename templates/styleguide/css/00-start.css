@@ -63,7 +63,8 @@
   --sg-dot: calc(var(--sg-space-xs) * 1.5);   /* every status dot (a parity sign, a chip's, a legend's): one size, 6px on an 8px system */
   --sg-underline-offset: 3px;   /* every underline the page draws (a link, a hovered action): one distance under its words */
   --sg-focus-offset: 1px;   /* every focus ring's distance from what it rings */
-  --sg-panel-w: min(80vw, 72rem);   /* every side panel's width (a component, a token, a task): one width, the whole window on a narrow one */
+  --sg-panel-w: min(80vw, 72rem);
+  --sg-panel-page-w: 80vw;   /* a component's whole page opened in a panel (from the Status page): a page, as wide as before */   /* every side panel's width (a component, a token, a task): one width, the whole window on a narrow one */
   --sg-card-gap: calc(var(--sg-space-xl) + var(--sg-space-s));   /* the room between any two cards or tables, side by side or one under another (32px on an 8px system) */
   --sg-control-h: calc(var(--sg-space-xxl) + var(--sg-space-s));   /* every capsule control's height: a switch, a select, a search, a button (40px on an 8px system) */   /* every table row at least this tall, from the system's spacing */
   --sg-icon-btn: calc(var(--sg-control-h) - 2 * var(--sg-space-xxs) - 2 * var(--sg-line-width, 1px));   /* the page's icon button: square, as tall as a control leaves inside its 4px inset */
