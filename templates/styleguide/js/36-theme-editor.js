@@ -7,6 +7,10 @@
 // Its own script, after the page's (which it builds on: window.SG); its themes are in #sg-theme-editor-data.
 (function () {
   var SG = window.SG; if (!SG || !SG.themeBar) return;
+  // A token's link to one of the system's colours, as a theme keeps it: one name for every mode (as themes saved it
+  // before), or one per mode, so Light and Dark are pointed apart (the owner's, 17 November 2026).
+  function linkIn(a, mode) { return typeof a === 'string' ? a : a ? a[mode === 'dark' ? 'dark' : 'light'] : undefined; }
+  function linkSet(a, mode, to) { if (!mode) return to; var both = typeof a === 'string' ? { light: a, dark: a } : Object.assign({}, a || {}); both[mode] = to; return both; }
   var DATA_EL = document.getElementById('sg-theme-editor-data'), EDITOR = (function () { try { return JSON.parse((DATA_EL && DATA_EL.textContent) || '{}') || {}; } catch (e) { return {}; } })();
   // What this browser keeps is kept per system: every style guide opened from disk shares one storage, so a theme made
   // on one guide never shows on another's Theme list. (What the keys held before, for every system at once, is left as
@@ -500,7 +504,9 @@
       });
     }
     var tk = b.tokens || {}, applyTok = function () {
-      Object.keys(tk.alias || {}).forEach(function (k) { set[k] = 'var(' + tk.alias[k] + ')'; });   // pointed at one of the system's colours, as Figma links a variable
+      // Pointed at one of the system's colours, as Figma links a variable: each mode its own (a single name, as a theme saved
+      // it before, is both), and a mode with none keeps what the system links it to.
+      Object.keys(tk.alias || {}).forEach(function (k) { var to = linkIn(tk.alias[k], mode); if (to) set[k] = 'var(' + to + ')'; });
       Object.keys(tk.all || {}).forEach(function (k) { set[k] = tk.all[k]; });
       if (mode !== 'light') Object.keys(tk.light || {}).forEach(function (k) { if (!(tk[mode] || {})[k] && BYVAR[k]) set[k] = tokenDark({ v: k }, tk.light[k]); });
       Object.keys(tk[mode] || {}).forEach(function (k) { set[k] = tk[mode][k]; });
@@ -1092,7 +1098,8 @@
         return '<label class="sg-ts-colour sg-input"><input type="color" data-tok="' + esc(x.v.var) + '" data-kind="colour" data-mode="' + md + '" value="' + esc(hex6(val)) + '" aria-label="' + esc(x.label + (dark ? ' in dark' : ' in light')) + '"><input type="text" class="sg-ts-hex" data-tok="' + esc(x.v.var) + '" data-kind="colour-hex" data-mode="' + md + '" value="' + esc(val) + '" spellcheck="false" aria-label="' + esc(x.label + (dark ? ' in dark, hex' : ' in light, hex')) + '">' +
           '<button type="button" class="sg-icon-btn sg-ts-auto" data-tok-reset="' + esc(x.v.var) + '" data-kind="colour" data-mode="' + md + '" title="' + (dark ? 'Back to automatic' : 'Back to the theme') + '" aria-label="' + (dark ? 'Back to the automatic dark colour' : 'Back to the theme\'s colour') + '"' + (hand ? '' : ' hidden') + '>' + RESET + '</button><span class="sg-ts-mode-tag">' + (dark ? 'Dark' : 'Light') + '</span></label>';
       };
-      var aliasOf = function (v) { if (tokOver.alias[v.var] && BYVAR[tokOver.alias[v.var]]) return BYVAR[tokOver.alias[v.var]]; var to = v.aliases && v.aliases[0] && BY[v.aliases[0]]; return to && to.var ? to : null; };
+      // What a token follows in a mode (light when none is named): the theme's own link for that mode, else the system's.
+      var aliasOf = function (v, md) { var mine = linkIn(tokOver.alias[v.var], md || 'light'); if (mine && BYVAR[mine]) return BYVAR[mine]; var m = modeIndex(md || 'light'), to = v.aliases && v.aliases[m] && BY[v.aliases[m]]; return to && to.var ? to : null; };
       var shortName = function (v) { var p = String(v.figma).split('/'); return (p.length > 2 && OWNER[v.var] ? p.slice(2) : p).join(' / '); };
       var rowOf = function (x) {
         var cur = nowOf(x.v), over = tokOver.all[x.v.var], ctl;
@@ -1111,7 +1118,7 @@
           // A colour: its light and its dark apart, side by side as an own value's pair is, each the name it follows with
           // that mode's swatch and the mode under it; the detach button after them.
           if (x.kind === 'colour') {
-            var modeChip = function (md) { var val = md === 'dark' ? darkOf(x.v) : lightOf(x.v); return '<div class="sg-ts-chipfield sg-input sg-ts-chip-mode" data-mode="' + md + '"><button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" title="' + esc(src.figma) + ': choose another of the system\'s colours"><span class="sg-ts-chip"><span class="sg-ts-chip-swatch" style="background:' + esc(val) + '" title="' + esc(hex6(val)) + '"></span><span>' + esc(shortName(src)) + '</span></span></button><span class="sg-ts-mode-tag">' + (md === 'dark' ? 'Dark' : 'Light') + '</span></div>'; };
+            var modeChip = function (md) { var val = md === 'dark' ? darkOf(x.v) : lightOf(x.v), msrc = aliasOf(x.v, md) || src; return '<div class="sg-ts-chipfield sg-input sg-ts-chip-mode" data-mode="' + md + '"><button type="button" class="sg-ts-alias-chip" data-lib="' + esc(x.v.var) + '" data-lib-mode="' + md + '" title="' + esc(msrc.figma) + ': choose another of the system\'s colours for ' + md + '"><span class="sg-ts-chip"><span class="sg-ts-chip-swatch" style="background:' + esc(val) + '" title="' + esc(hex6(val)) + '"></span><span>' + esc(shortName(msrc)) + '</span></span></button><span class="sg-ts-mode-tag">' + (md === 'dark' ? 'Dark' : 'Light') + '</span></div>'; };
             ctl = '<div class="sg-ts-pair">' + modeChip('light') + (COLOUR_AXIS ? modeChip('dark') : '') + '</div><button type="button" class="sg-icon-btn sg-ts-link-btn" data-detach="' + esc(x.v.var) + '" title="Detach: set it on its own" aria-label="Detach ' + esc(x.label) + ' from ' + esc(shortName(src)) + '">' + UNLINK + '</button>';
           }
         }
@@ -1186,13 +1193,13 @@
       var c = fdoc.defaultView.getComputedStyle(pr).color; pr.remove(); return c || shown(v, 'light');
     };
     var openLib = function (btn) {
-      var row = btn.closest('.sg-ts-tok'), forVar = btn.getAttribute('data-lib'), same = libOpen && libOpen._for === forVar;
+      var row = btn.closest('.sg-ts-tok'), forVar = btn.getAttribute('data-lib'), forMode = btn.getAttribute('data-lib-mode') || '', same = libOpen && libOpen._for === forVar && libOpen._mode === forMode;
       closeLib(); if (same) return;
       var lib = VARS.filter(function (v) { return v.var && !OWNER[v.var] && !/^(advanced|components?)\//i.test(v.figma) && !/shadow|statelayer/i.test(v.figma) && hexOf(v.values && v.values[0]); });
-      var item = function (v) { return '<button type="button" class="sg-ts-lib-item" role="option" data-pick-alias="' + esc(v.var) + '" data-for="' + esc(forVar) + '"><span class="sg-ts-chip-swatch" style="background:' + esc(nowColour(v)) + '"></span><span>' + esc(v.figma) + '</span></button>'; };
+      var item = function (v) { return '<button type="button" class="sg-ts-lib-item" role="option" data-pick-alias="' + esc(v.var) + '" data-for="' + esc(forVar) + '"' + (forMode ? ' data-for-mode="' + forMode + '"' : '') + '><span class="sg-ts-chip-swatch" style="background:' + esc(nowColour(v)) + '"></span><span>' + esc(v.figma) + '</span></button>'; };
       row.insertAdjacentHTML('afterend', '<div class="sg-select-list sg-ts-lib" popover="manual"><input type="search" class="sg-input sg-ts-lib-q" placeholder="Search the system\'s colours" aria-label="Search the system\'s colours"><div class="sg-ts-lib-list" role="listbox" aria-label="The system\'s colours">' + lib.map(item).join('') + '</div></div>');
       var box = row.nextElementSibling, q = box.querySelector('.sg-ts-lib-q'), field = row.querySelector('.sg-ts-tok-field') || row;
-      box._for = forVar; libOpen = box; box.showPopover();
+      box._for = forVar; box._mode = forMode; libOpen = box; box.showPopover();
       var place = function () {
         var r = field.getBoundingClientRect(), gap = parseFloat(getComputedStyle(field).paddingTop) || 4, below = innerHeight - r.bottom - gap * 2, above = r.top - gap * 2;
         box.style.left = r.left + 'px'; box.style.width = r.width + 'px';
@@ -1248,7 +1255,8 @@
       e.stopPropagation();
       var br = e.target.closest('[data-bp-reset]'); if (br) { var bv = br.getAttribute('data-bp-reset'); if (tokOver.bp[bv]) { delete tokOver.bp[bv][br.getAttribute('data-bp')]; if (!Object.keys(tokOver.bp[bv]).length) delete tokOver.bp[bv]; } changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var lb = e.target.closest('[data-lib]'); if (lb) { openLib(lb); return; }
-      var pa = e.target.closest('[data-pick-alias]'); if (pa) { var tv = pa.getAttribute('data-for'); closeLib(); tokOver.alias[tv] = pa.getAttribute('data-pick-alias'); delete tokOver.detached[tv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][tv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
+      // A colour picked from the system's list: a mode's chip changes that mode only, any other both.
+      var pa = e.target.closest('[data-pick-alias]'); if (pa) { var tv = pa.getAttribute('data-for'); closeLib(); var pm = pa.getAttribute('data-for-mode'); tokOver.alias[tv] = linkSet(tokOver.alias[tv], pm, pa.getAttribute('data-pick-alias')); (pm ? [pm] : ['light', 'dark', 'all']).forEach(function (k) { delete tokOver[k][tv]; }); delete tokOver.detached[tv]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var dt = e.target.closest('[data-detach]'); if (dt) { tokOver.detached[dt.getAttribute('data-detach')] = 1; changed(); pick(picked, true); return; }
       var rl = e.target.closest('[data-relink]'); if (rl) { var rv = rl.getAttribute('data-relink'); delete tokOver.detached[rv]; delete tokOver.alias[rv]; ['light', 'dark', 'all'].forEach(function (k) { delete tokOver[k][rv]; }); changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }
       var tr = e.target.closest('[data-text-reset]'); if (tr) { delete tokOver.text[tr.getAttribute('data-text-reset')]; changed(); repaint(); setTimeout(function () { if (picked) pick(picked, true); }, 80); return; }

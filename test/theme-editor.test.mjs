@@ -133,3 +133,31 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     close();
   } finally { c.kill(); }
 });
+
+// A token linked to one of the system's colours keeps a link per mode: the Light chip and the Dark chip each point their own
+// mode, and picking for one never moves the other (the owner's, 17 November 2026). A theme saved before, with one name for
+// both modes, still reads as both.
+test('a linked colour\'s Light and Dark are pointed apart: picking for one mode leaves the other', () => {
+  const src = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '36-theme-editor.js'), 'utf8');
+  const fn = (name) => /^ {2}(function [\s\S]*?\{[^\n]*\})$/m.exec(src.split('\n').find((l) => l.startsWith(`  function ${name}(`)))[1];
+  const { linkIn, linkSet } = new Function(`${fn('linkIn')}\n${fn('linkSet')}\nreturn { linkIn, linkSet };`)();
+  // An older theme: one name, both modes.
+  assert.equal(linkIn('--blue-500', 'light'), '--blue-500');
+  assert.equal(linkIn('--blue-500', 'dark'), '--blue-500');
+  // Dark picked on its own: light keeps what it followed.
+  const dark = linkSet('--blue-500', 'dark', '--blue-200');
+  assert.deepEqual(dark, { light: '--blue-500', dark: '--blue-200' });
+  // Then light: dark stays as picked.
+  const both = linkSet(dark, 'light', '--blue-700');
+  assert.deepEqual(both, { light: '--blue-700', dark: '--blue-200' });
+  assert.deepEqual(dark, { light: '--blue-500', dark: '--blue-200' }, 'the link before is not changed in place');
+  // A mode never picked follows the system's own link (nothing of the theme's).
+  assert.equal(linkIn(linkSet(undefined, 'dark', '--blue-200'), 'light'), undefined);
+  // No mode named (a colour with one mode only): one name for all, as before.
+  assert.equal(linkSet({ light: '--a', dark: '--b' }, null, '--c'), '--c');
+  // The page uses them: each chip says its mode, the theme writes each mode its own link, a pick changes its mode only.
+  assert.match(src, /data-lib-mode="' \+ md \+ '"/, 'each chip names its mode');
+  assert.match(src, /var to = linkIn\(tk\.alias\[k\], mode\); if \(to\)/, 'the theme writes the mode\'s own link');
+  assert.match(src, /tokOver\.alias\[tv\] = linkSet\(tokOver\.alias\[tv\], pm, /, 'a pick moves its mode only');
+  assert.match(src, /var aliasOf = function \(v, md\)/, 'a chip names what its own mode follows');
+});
