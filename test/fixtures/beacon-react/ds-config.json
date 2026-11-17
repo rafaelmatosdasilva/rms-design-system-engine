@@ -1,0 +1,13 @@
+{
+  "_note": "Beacon, an invented React design system for test/react-harness.test.mjs. Every name is invented. Its components need real React: state, a context, a portal and a ref.",
+  "figma": {
+    "modes": [
+      { "name": "Light", "snapshotKey": "light", "cssSelector": "root" }
+    ],
+    "namingConvention": { "prefix": "--bc-" }
+  },
+  "paths": {
+    "themeCSS": "src/styles/tokens.css",
+    "compPropsSnapshot": "src/figma-component-props.snapshot.json"
+  }
+}

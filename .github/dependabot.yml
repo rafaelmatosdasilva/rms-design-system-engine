@@ -138,3 +138,19 @@ updates:
       - 'after: nothing'
     commit-message:
       prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.react-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      react-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
