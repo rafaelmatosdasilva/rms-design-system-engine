@@ -181,5 +181,9 @@ export function golden(fixture, name, out) {
   if (out === want) return;
   const actual = join(tempDir('ds-actual-'), name);
   writeFileSync(actual, out);
-  assert.fail(`the report differs from ${name} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff`);
+  // Where they first part, in the message itself: on CI the run's file is gone with the machine.
+  const a = want.split('\n'), b = out.split('\n');
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  const near = (lines) => lines.slice(Math.max(0, i - 2), i + 6).join('\n');
+  assert.fail(`the report differs from ${name} at line ${i + 1} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff\n--- expected\n${near(a)}\n--- this run\n${near(b)}`);
 }
