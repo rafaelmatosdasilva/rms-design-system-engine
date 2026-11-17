@@ -80,10 +80,13 @@ test('the technical documentation covers every usable part, on its group\'s page
 // only its links pointing here. It is the short index of this page, never a second description that drifts from it.
 // The README draws it its own way, the owner's: a two-column table per group with the group's name as its header, each name in bold above its
 // description, and each stage
-// as a mark its legend line names (🟢 Ready to use). So both are read down to group, name, description and stage.
+// as a mark its legend line names (🟢 Ready to use). Under each description the README shows the tools that part works with,
+// as badges, with a little room around them (empty paragraphs), and neither is part of the description (the owner's,
+// 17 November 2026). So both are read down to group, name, description and stage.
+const bare = (line) => line.replace(/<p><\/p>|<sub><\/sub>/g, '').replace(/(?:\s*<img [^>]*\/>)+(?= \|)/, '');
 const listed = (text, stageOf) => {
   const groups = [];
-  for (const line of text.split('\n')) {
+  for (const line of text.split('\n').map(bare)) {
     const group = line.match(/^### (.+)$/)?.[1] ?? line.match(/^\| ([^[|]+?) \|(?: *\|)+$/)?.[1];
     if (group) { groups.push({ group, rows: [] }); continue; }
     const row = line.match(/^\| (?:\*\*)?\[(.+?)\]\([^)]*\)(?:\*\*)?(?: \| |<br>)(.+?) \| ([^|]+?) \|$/);
