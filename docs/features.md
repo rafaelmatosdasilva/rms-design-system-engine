@@ -9,8 +9,8 @@ What the engine does for design and product teams. Every part reads the same kno
 | Feature | What it does | Status |
 |---|---|---|
 | [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | Ready to use |
-| [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
 | [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Ready to use |
+| [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
 | [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | Early development |
 
 ### Documentation
@@ -18,7 +18,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | Feature | What it does | Status |
 |---|---|---|
 | [Write component specs](#write-component-specs) | A contract per component with its props, states and tokens, written from Figma's descriptions and the code. | Ready to use |
-| [Gather usage guidelines](#gather-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | Ready to use |
+| [Maintain usage guidelines](#maintain-usage-guidelines) | The intent layer, why each component exists and when to use it, gathered from Figma, your code's comments and your docs. | Ready to use |
 | [Annotate Figma from the code](#annotate-figma-from-the-code) | Accessibility specs written into Figma, problems pinned on your screens and each component linked to its code, after you approve. | Coming soon |
 
 ### Collaboration
@@ -75,40 +75,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
 | `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
 
-## Measure Figma-code parity
-
-**Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
-
-*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
-
-- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
-- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
-- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
-- Finds the code file of each Figma component on its own, so nobody writes a map.
-- Checks icons, slots and the parts inside each component.
-- Compares what each property may hold, so a Figma text that takes words and a code prop that takes anything are a difference, not a match.
-- Compares a turned part at its angle, an icon's box and its glyph as two sizes, and a font by its face, however each side names it.
-- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
-- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
-- Warns when a Figma frame changed since the version you approved.
-- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
-- Runs 25 checks, called gates, each listed in the [technical documentation](audit.md#the-gates).
-- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
-- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
-
-### What to ask
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine check everything` | Every check, a summary and every difference in `differences.md` |
-| `/rms-design-system-engine check the button` | The same, for one component |
-| `/rms-design-system-engine check the button against Figma, without accessibility` | Every check against Figma, without accessibility |
-| `/rms-design-system-engine run only the token values check` | One check, by number or name |
-| `/rms-design-system-engine which component should I fix first?` | The component with the most left to fix |
-| `/rms-design-system-engine what did the last audit find?` | The last run's summary again, with nothing run anew |
-| `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
-| `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
-
 ## Lint your codebase rules
 
 **Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
@@ -159,6 +125,40 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
 | `/rms-design-system-engine inspect our design system` | One rating for each of ten questions (coverage, accessibility, governance, adoption and more), with the evidence behind it and what only an interview answers |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
+
+## Measure Figma-code parity
+
+**Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
+
+*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
+
+- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
+- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
+- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
+- Finds the code file of each Figma component on its own, so nobody writes a map.
+- Checks icons, slots and the parts inside each component.
+- Compares what each property may hold, so a Figma text that takes words and a code prop that takes anything are a difference, not a match.
+- Compares a turned part at its angle, an icon's box and its glyph as two sizes, and a font by its face, however each side names it.
+- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
+- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
+- Warns when a Figma frame changed since the version you approved.
+- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
+- Runs 25 checks, called gates, each listed in the [technical documentation](audit.md#the-gates).
+- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
+- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine check everything` | Every check, a summary and every difference in `differences.md` |
+| `/rms-design-system-engine check the button` | The same, for one component |
+| `/rms-design-system-engine check the button against Figma, without accessibility` | Every check against Figma, without accessibility |
+| `/rms-design-system-engine run only the token values check` | One check, by number or name |
+| `/rms-design-system-engine which component should I fix first?` | The component with the most left to fix |
+| `/rms-design-system-engine what did the last audit find?` | The last run's summary again, with nothing run anew |
+| `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
+| `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
 
 ## Test accessibility
 
@@ -219,7 +219,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
 | `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
 
-## Gather usage guidelines
+## Maintain usage guidelines
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
