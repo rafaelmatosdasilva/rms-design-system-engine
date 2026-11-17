@@ -79,14 +79,15 @@ test('the technical documentation covers every usable part, on its group\'s page
 // The README's feature list is this page's overview, word for word: the same groups, names, descriptions and stages,
 // only its links pointing here. It is the short index of this page, never a second description that drifts from it.
 // The README draws it its own way, the owner's: a one-column table per group with the group's name as its header, each
-// name a heading that opens on its stage, a mark its legend line names (🟢 Ready to use), above its description. Under
-// each description the README shows what that part reads, runs, writes and follows, a line of badges each, after an
-// empty paragraph, and an empty heading closes the cell to even its spacing; the whole of it sits in a definition list's
-// block for its side padding. None of it is part of the description (the owner's, 17 November 2026). So both are read
-// down to group, name, description and stage.
+// name a heading with its stage above it, a small badge that says the stage in one word (README_STAGE below), above its
+// description. Under each description the README shows what that part reads, runs, writes and follows, a line of badges
+// each, after an empty paragraph, and an empty heading closes the cell to even its spacing; the whole of it sits in a
+// definition list's block for its side padding. None of it is part of the description (the owner's, 17 November 2026).
+// So both are read down to group, name, description and stage.
 const bare = (line) => line
   .replace(/^\| <dl><dd>(.*)<\/dd><\/dl> \|$/, '| $1 |')
   .replace(/^\| <h3>(\S+?)&nbsp; <a href="([^"]+)">(.+?)<\/a><\/h3>(.*) \|$/u, '| **[$3]($2)**<br>$4 | $1 |')
+  .replace(/^\| <h3><img [^>]*alt="([^"]+)" \/><br><a href="([^"]+)">(.+?)<\/a><\/h3>(.*) \|$/, '| **[$3]($2)**<br>$4 | $1 |')
   .replace(/^\| <h3><a href="([^"]+)">(.+?)<\/a><\/h3>/, '| **[$2]($1)**<br>')
   .replace(/<p><\/p>.*?(?= \| [^|]+ \|$)/, '')
   .replace(/<p><\/p>|<sub><\/sub>/g, '').replace(/(?:\s*<img [^>]*\/>)+(?= \|)/, '');
@@ -101,13 +102,15 @@ const listed = (text, stageOf) => {
   return groups;
 };
 
+// The README says each stage in one word, the owner's (17 November 2026): the page's stage, as the README's badge says it.
+const README_STAGE = { Stable: 'Ready to use', Beta: 'Early development', Soon: 'Coming soon' };
+
 test('the README lists the features exactly as this page does', () => {
   const readme = read('README.md');
   const at = readme.search(/^#{1,2} Features$/m), end = readme.indexOf("\n# ", at + 1), own = readme.slice(at, end < 0 ? undefined : end);
-  const legend = new Map([...own.matchAll(/(\p{Extended_Pictographic}\uFE0F?) ([A-Z][a-z]+(?: [a-z]+)*)/gu)].map((m) => [m[1], m[2]]));
   const page = listed(OVERVIEW, (s) => s);
-  const mine = listed(own, (s) => legend.get(s) ?? s);
+  const mine = listed(own, (s) => README_STAGE[s] ?? s);
   assert.ok(page.length > 0, 'the page has its overview');
-  for (const stage of new Set(page.flatMap((g) => g.rows.map((r) => r[2])))) assert.ok([...legend.values()].includes(stage), `the README's legend names ${stage}`);
+  for (const stage of new Set(page.flatMap((g) => g.rows.map((r) => r[2])))) assert.ok(Object.values(README_STAGE).includes(stage), `the README has a word for ${stage}`);
   assert.deepEqual(mine, page);
 });
