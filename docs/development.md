@@ -40,6 +40,12 @@ node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
 ```
 
+On a pull request, CI runs the suite on four machines at once, each a quarter of the files. `test/shard.mjs` splits them so each machine gets about a quarter of the time, by how long each file took when last measured. When the quarters drift apart, measure again:
+
+```bash
+node --test --test-reporter=./test/shard.mjs test/*.test.mjs > test/shard-weights.json
+```
+
 `sync-docs.mjs --check` exits non-zero if the gate counts or gate labels in `README.md`, the pages in `docs/` or the guide no longer match `lib/audit.mjs`. Run it without `--check` to patch them.
 
 ## What a change needs

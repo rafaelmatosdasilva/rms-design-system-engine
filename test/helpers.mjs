@@ -163,7 +163,9 @@ export function normalise(text, dir) {
     .replace(/\(([0-9a-f]{7})\)/g, '(<HASH>)')
     .replace(/\d+h (old|ago)/g, '<AGE>h $1')
     .replace(/\d+ ?(day|days|hour|hours) ago/g, '<AGE> ago')
-    .replace(/^.*newer version of the engine.*\n/gm, '');
+    // The once-a-day update notice, with the blank line it prints before itself (audit.mjs): which run of the suite
+    // gets it depends on which audit runs first on a machine, so a report never carries either.
+    .replace(/\n?^.*newer version of the engine.*\n/gm, '');
 }
 
 // The whole audit on a fresh copy, its output normalised.
@@ -181,5 +183,9 @@ export function golden(fixture, name, out) {
   if (out === want) return;
   const actual = join(tempDir('ds-actual-'), name);
   writeFileSync(actual, out);
-  assert.fail(`the report differs from ${name} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff`);
+  // Where they first part, in the message itself: on CI the run's file is gone with the machine.
+  const a = want.split('\n'), b = out.split('\n');
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  const near = (lines) => lines.slice(Math.max(0, i - 2), i + 6).join('\n');
+  assert.fail(`the report differs from ${name} at line ${i + 1} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff\n--- expected\n${near(a)}\n--- this run\n${near(b)}`);
 }

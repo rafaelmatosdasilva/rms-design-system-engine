@@ -15,11 +15,18 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # The suite is split by file across four machines that run at once: one machine took about sixteen minutes, most of it
+  # waiting on browsers, and a shared runner has only four cores. test/shard.mjs gives each machine an equal share of the
+  # time each file last took. Each quarter is a whole run of its own, with every tool installed, so a file never
+  # depends on which quarter it lands in.
+  suite:
+    name: suite ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    # What the run counted, for the badge job below.
-    outputs:
-      count: ${{ steps.suite.outputs.count }}
+    strategy:
+      # A failing quarter does not stop the others: the run then names every failing test, not just the first ones.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -63,7 +70,7 @@ jobs:
         run: |
           set -o pipefail
           code=0
-          node --test test/*.test.mjs 2>&1 | tee test.log || code=$?
+          node --test $(node test/shard.mjs ${{ matrix.shard }} 4) 2>&1 | tee test.log || code=$?
           if [ "$code" != 0 ]; then
             grep -n '^not ok' test.log | while IFS= read -r line; do
               n=${line%%:*}
@@ -80,8 +87,42 @@ jobs:
           # "2,000+" for as long as somebody remembered to change it. Read before the exit, so a failed run still
           # reports what it managed to count.
           count=$(grep -m1 '^# tests ' test.log | awk '{print $3}')
-          echo "count=${count:-0}" >> "$GITHUB_OUTPUT"
+          echo "${count:-0}" > count-${{ matrix.shard }}.txt
           exit $code
+      # What this quarter counted, for the test job below to add up. Kept even when the quarter failed.
+      - name: Keep the count
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: count-${{ matrix.shard }}
+          path: count-${{ matrix.shard }}.txt
+          retention-days: 1
+
+  # The check a pull request waits for (main's ruleset requires `test`): it passes only when all four quarters passed,
+  # and it adds up what they counted, for the badge job below. A quarter that never reported counts nothing.
+  test:
+    needs: suite
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.total.outputs.count }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        # None to fetch (every quarter cancelled) is not this step's failure: the result below decides.
+        continue-on-error: true
+        with:
+          pattern: count-*
+          merge-multiple: true
+      - name: Add up the quarters
+        id: total
+        shell: bash
+        env:
+          RESULT: ${{ needs.suite.result }}
+        run: |
+          count=$(cat count-*.txt 2>/dev/null | awk '{s+=$1} END{print s+0}')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "The four quarters ran $count tests: $RESULT."
+          [ "$RESULT" = success ]
 
   # The README's tests badge reads one file on the `badges` branch (an orphan branch holding nothing else). Only main
   # writes it, and only when the number or the outcome actually changed, so the branch does not take a commit per push.

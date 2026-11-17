@@ -138,3 +138,11 @@ test('--init on the demo writes the modes its theme CSS really uses (a data attr
   assert.match(r.stdout, /Mode Dark: :root\[data-theme="dark"\] in src\/theme\.css/);
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).figma.modes, want);
 });
+
+// The audit's once-a-day update notice prints a blank line before itself. Which audit gets it depends on which runs
+// first on a machine: on CI's quarters it was this report's, and the blank line it left made the golden differ.
+test('the update notice leaves nothing in a report, its blank line included', () => {
+  const report = 'Ask for the findings (only when they ask).\n\n';
+  const notice = '\n⚠️  A newer version of the engine is available - run: rms-design-system-engine --update (it did not update itself)\n';
+  assert.equal(normalise(report + notice, '/nowhere'), normalise(report, '/nowhere'));
+});
