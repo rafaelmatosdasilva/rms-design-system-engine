@@ -23,7 +23,7 @@ test('every filter that hides rows says so when it hides them all', () => {
   assert.match(tpl, /var none = bare \? !!yet : !Array\.prototype\.some\.call\(rows, function \(tr\) \{ return !tr\.hidden; \}\);/, 'and says nothing unless its page says what it waits for');
   assert.match(tpl, /note\.innerHTML = bare \? '<strong>' \+ esc\(yet\.head\)/, 'its own words, never the filters ones');
   // The four places rows are hidden: a column filter, a chip, a ticket, the Status page's own filters.
-  assert.match(tpl, /trs\.forEach\(function \(tr\) \{ tr\.hidden = !passes\(tr\); \}\);\n\s+if \(trs\.length\) tableNone\(trs\[0\]\.closest\('table'\), o\.said\);/, 'a column filter');
+  assert.match(tpl, /function \(tr\) \{ var ok = passes\(tr\); if \(ok\) n\+\+; tr\.hidden = !ok \|\| n > shown; \}\);\n\s+rowsMore\(n - shown\);\n\s+if \(trs\.length\) tableNone\(trs\[0\]\.closest\('table'\), o\.said\);/, 'a column filter (its first ROWS_SHOWN rows drawn)');
   assert.match(tpl, /chipped\.forEach\(function \(t\) \{ tableNone\(t, o\.said\); \}\);/, 'a chip');
   assert.match(tpl, /tableNone\(logTable, 'changes'\);/, 'a ticket, on History');
   assert.match(tpl, /tableNone\(body\.parentNode, 'components'\);/, 'the Status page\'s table');
