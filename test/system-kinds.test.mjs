@@ -10,7 +10,7 @@ import { tempDir } from './helpers.mjs';
 import { kindOf, examplesOf, kindRules, composeOps, foundationOps, kindSpec } from '../lib/system-kinds.mjs';
 import { ground, opsScript, opWords } from '../lib/figma-ops.mjs';
 import { undoScript } from '../lib/figma-undo.mjs';
-import { EXT } from '../lib/component-spec.mjs';
+import { partOf } from '../lib/component-spec.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const components = ['headerPage', 'actionBar', 'toast', 'dataTable', 'emptyState', 'chip'];
@@ -66,9 +66,9 @@ test('a template built like one of the system\'s: its components, what the reque
   // Grounded as a component's spec is: a frame of the system's components, held for sign-off, asked where it goes.
   const { spec } = kindSpec({ kind: 'template', description: 'a template like settings', name: 'billing', like: 'settings', ops: c.ops, captures: { props } });
   assert.equal(spec.kind, 'template');
-  assert.equal(spec[EXT].made, 'template');
-  assert.ok(spec[EXT].held.some((h) => /a new template, billing, made of the system's own components/.test(h.what)));
-  assert.ok(spec[EXT].questions.some((q) => /Which page and section does billing go on/.test(q.ask)));
+  assert.equal(partOf(spec).made, 'template');
+  assert.ok(partOf(spec).held.some((h) => /a new template, billing, made of the system's own components/.test(h.what)));
+  assert.ok(partOf(spec).questions.some((q) => /Which page and section does billing go on/.test(q.ask)));
   assert.deepEqual(spec.uses.map((u) => u.to), ['header-page', 'data-table', 'toast']);
   assert.match(opWords(c.ops[0]), /billing, a new template: a frame laid out top to bottom/);
 });
@@ -149,7 +149,7 @@ test('--spec for a template and a foundation, then --figma-build: the same path 
   assert.match(t, /Which page and section does billing go on/);
   const opsFile = join(root, 'ops.json');
   const spec = JSON.parse(readFileSync(join(root, '.design-system-engine-out/specs/billing.spec.json'), 'utf8'));
-  writeFileSync(opsFile, JSON.stringify([...spec[EXT].ops, { op: 'place', page: 'Templates' }]));
+  writeFileSync(opsFile, JSON.stringify([...partOf(spec).ops, { op: 'place', page: 'Templates' }]));
   assert.match(cli('--spec', '--name', 'billing', '--ops', opsFile), /--figma-build billing --signed-off/);
   assert.match(cli('--figma-build', 'billing', '--signed-off', 'the system owner'), /Building billing in Figma \(6 steps\), signed off by the system owner/);
   assert.match(readFileSync(join(root, '.design-system-engine-out/handback/figma-apply.js'), 'utf8'), /"as": "template"/);
