@@ -36,7 +36,7 @@ The guide Claude reads is `rms-design-system-engine.md`, with `cookbook/` and `r
 The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the pinned DSDS release once, then run the suite and the docs check:
 
 ```bash
-for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
+for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools .react-tools; do npm ci --prefix test/$d; done
 node lib/dsds-release.mjs fetch
 node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
