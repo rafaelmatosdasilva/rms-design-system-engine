@@ -598,3 +598,21 @@ test('graders that had no case: each passes a right answer and fails the wrong o
   assert.equal(passes('figma-remove-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --remove-option Size=L')], final: `This breaks every use of the chip at size L. ${ask}`, files: { [`${OUT}/changes/chip.change.json`]: removal } })), true);
   assert.equal(passes('figma-remove-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --remove-option Size=L')], final: ask, files: { [`${OUT}/changes/chip.change.json`]: removal } })), false, 'says nothing about what it breaks');
 });
+
+// A long audit started in the background answers with "task started", not the audit, and its output arrives in a
+// file the agent reads next. Reading only that one call's result, this check said the engine had not been run by its
+// path when it had - one run in three, in three evaluations running, each written off as noise until the records
+// were read. A grader that fails a right answer measures as little as one that passes a wrong one.
+test('an engine run started in the background counts as run: its answer is a task, and its output arrives in a file', () => {
+  const said = 'The rule `.tp-button:hover` at src/theme.css:44 has no `:not(:disabled)` guard, so the button still changes on hover when it is disabled.';
+  const withCalls = (calls) => fakeCtx({ calls: calls.map(([command, result]) => run(command, result)), final: said });
+  const engine = 'node //engine/audit.mjs --component button';
+
+  assert.equal(passes('no-cli-on-path', withCalls([[engine, 'PARITY AUDIT\n❌  [3] chip height']])), true, 'run and answered in the same call');
+  assert.equal(passes('no-cli-on-path', withCalls([
+    [engine, 'Command running in background with ID: bq1. Output is being written to: /tmp/tasks/bq1.output'],
+    ['tail -f /tmp/tasks/bq1.output', 'NEXT: fix the chip height'],
+  ])), true, 'started in the background, then read: the same work, and it counts');
+  assert.equal(passes('no-cli-on-path', withCalls([['echo "the button looks fine"', '']])), false, 'never running it is still never running it');
+  assert.equal(passes('no-cli-on-path', withCalls([['node /engine/audit.mjs --component chip', 'PARITY AUDIT']])), false, 'a run about another component is not this one');
+});

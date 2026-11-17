@@ -36,7 +36,7 @@ The guide Claude reads is `rms-design-system-engine.md`, with `cookbook/` and `r
 The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the pinned DSDS release once, then run the suite and the docs check:
 
 ```bash
-for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
+for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools .react-tools; do npm ci --prefix test/$d; done
 node lib/dsds-release.mjs fetch
 node --test test/*.test.mjs
 node lib/sync-docs.mjs --check
@@ -54,7 +54,10 @@ node --test --test-reporter=./test/shard.mjs test/*.test.mjs > test/shard-weight
 
 - **A test for new behaviour,** one that fails without the change. A new check is tested with a mistake planted on purpose, so it is known to catch what it claims.
 - **A test for a fixed bug,** one that reproduces it.
-- **Every test passing,** none skipped for want of Chrome or the test tools.
+- **Every test passing,** none skipped for want of Chrome or the test tools. The browser tests need the tool folders
+  installed (`npm ci --prefix test/.vue-tools`, and the same for `.react-tools`, `.vue-cli-tools`, `.nuxt-tools`,
+  `.ci-tools`, `.lint-tools`) — each skips rather than fails without them, so a run can read as clean while missing
+  whole groups.
 - **No new npm dependency.** The engine has none, and that is part of what it promises.
 - **Nothing private.** No client, product, person, host or token name, in code, tests, examples or messages. Examples use invented names (Acme, cardTile). The required Privacy check refuses anything else.
 - **Docs that match.** A change people can see updates the README, `docs/` or the guide files in the same change.

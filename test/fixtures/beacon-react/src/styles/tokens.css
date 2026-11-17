@@ -1,0 +1,10 @@
+:root {
+  --bc-space-s: 8px;
+  --bc-space-m: 16px;
+  --bc-radius-m: 6px;
+  --bc-field-height: 36px;
+  --bc-field-height-small: 28px;
+  --bc-ink: #11181c;
+  --bc-surface: #ffffff;
+  --bc-accent: #2b5cff;
+}

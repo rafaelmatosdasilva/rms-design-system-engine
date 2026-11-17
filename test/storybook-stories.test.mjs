@@ -91,3 +91,26 @@ test('the pages a run opens: a story named by its component and state, a page fo
     { label: '/', url: 'http://localhost:3000', page: true },
   ], 'a page found another way is unchanged: its path, and a whole page');
 });
+
+// Found on a real public design system: its `storybook` script is the bare CLI, which prints its usage and exits,
+// while the one that serves is `start:storybook`. Picking a script by its name alone left that project with no page
+// to check at all, and the run said "no render targets" about a system with hundreds of components and a Storybook.
+test('the script that serves is chosen by what it runs, never by what it is called', async () => {
+  const { serveScript, servesPages } = await import('../lib/a11y-check.mjs');
+
+  assert.equal(serveScript({
+    'start:storybook': 'STORYBOOK=true storybook dev -p 6006 --no-open',
+    'build:storybook': 'storybook build',
+    storybook: 'storybook',
+  }), 'start:storybook', 'the bare CLI serves nothing, whatever it is named');
+
+  assert.equal(serveScript({ storybook: 'storybook dev -p 6006' }), 'storybook');
+  assert.equal(serveScript({ storybook: 'start-storybook -p 9001' }), 'storybook', 'the older command still serves');
+  assert.equal(serveScript({ dev: 'vite', build: 'vite build' }), 'dev');
+  assert.equal(serveScript({ dev: 'vite', 'sb:dev': 'storybook dev' }), 'sb:dev', 'a Storybook is preferred: its pages are the components');
+  assert.equal(serveScript({ test: 'node --test' }), null, 'nothing that serves is nothing, never a guess');
+  assert.equal(serveScript({ start: 'some-tool-we-do-not-know' }), 'start', 'a command this does not know still answers by its name');
+
+  assert.equal(servesPages('storybook build'), false, 'building is not serving');
+  assert.equal(servesPages('storybook dev -p 6006'), true);
+});
