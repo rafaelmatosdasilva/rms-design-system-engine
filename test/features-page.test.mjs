@@ -81,9 +81,11 @@ test('the technical documentation covers every usable part, on its group\'s page
 // The README draws it its own way, the owner's: a one-column table per group with the group's name as its header, each
 // name a heading that opens on its stage, a mark its legend line names (🟢 Ready to use), above its description. Under
 // each description the README shows what that part reads, runs, writes and follows, a line of badges each, after an
-// empty paragraph, and an empty heading closes the cell to even its spacing; none of it is part of the description (the
-// owner's, 17 November 2026). So both are read down to group, name, description and stage.
+// empty paragraph, and an empty heading closes the cell to even its spacing; the whole of it sits in a definition list's
+// block for its side padding. None of it is part of the description (the owner's, 17 November 2026). So both are read
+// down to group, name, description and stage.
 const bare = (line) => line
+  .replace(/^\| <dl><dd>(.*)<\/dd><\/dl> \|$/, '| $1 |')
   .replace(/^\| <h3>(\S+?)&nbsp; <a href="([^"]+)">(.+?)<\/a><\/h3>(.*) \|$/u, '| **[$3]($2)**<br>$4 | $1 |')
   .replace(/^\| <h3><a href="([^"]+)">(.+?)<\/a><\/h3>/, '| **[$2]($1)**<br>')
   .replace(/<p><\/p>.*?(?= \| [^|]+ \|$)/, '')

@@ -145,9 +145,10 @@ jobs:
           pretty=$(echo "${COUNT:-0}" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')
           # Read as one phrase, "Tests passed 2,807": the count is of tests that passed. A red run says only that it
           # failed, never a count that reads as that many failures.
-          # Green is the README's own green (its badges' contrast rule), red stays red: the colour is the result.
+          # The value's colour is the result: a lighter green beside the README's dark green label (4.5:1 with white
+          # text), red when the suite fails.
           if [ "$RESULT" = success ]; then
-            label="Tests passed"; message="$pretty"; color=316A17
+            label="Tests passed"; message="$pretty"; color=3D841D
           else
             label="Tests"; message="failing"; color=red
           fi
