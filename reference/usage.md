@@ -1622,6 +1622,36 @@ rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check
 `working-directory` names the folder with `ds-config.json`); it runs the engine from its own checkout, installs nothing
 and changes nothing.
 
+#### The run's findings where the team already reviews code (`--sarif`, `--code-quality`, `--notify`)
+
+A finding on a page of its own is read less than one beside the line it is about. A full audit already writes every
+finding once (`.design-system-engine-out/findings.json`, `run-diff.mjs`), and these write those same findings in the
+file the team's own review surface reads, inventing nothing.
+
+- **`--sarif [file]`** writes SARIF 2.1.0 (`findings.sarif` by default) for **GitHub code scanning**: upload it with
+  `github/codeql-action/upload-sarif` and each finding shows on its line in the pull request, with a check a branch rule
+  can wait on.
+- **`--code-quality [file]`** writes **GitLab's code quality** report (`code-quality.json` by default): name it as the
+  job's `artifacts.reports.codequality` and each finding shows in the merge request's widget and on the line.
+- **`--notify`** posts one line to the team's chat saying what failed, what is open, where the whole of it is and
+  which job said so. The address is read from `DSE_CHAT_WEBHOOK` in the run's environment and from nowhere else: never
+  `ds-config.json`, never a file, never printed, so a public repository cannot carry it. It must be `https`, or nothing
+  is sent and the run says why. What it posts is one field of JSON, `{ "text": "…" }`, which is what most services
+  read; a service that reads another is named by the team (`DSE_CHAT_FORMAT=content`, which is what Discord reads).
+  The engine keeps no list of which service is at which address: such a list ages, and a team whose chat is its own
+  would be refused by one for no reason. With `DSE_CHAT_WEBHOOK` unset the run says what to set and posts nothing.
+
+Where each finding is placed: the file and line its own words name (`cardTile override (src/CardTile.vue:3)`), else the
+file the catalog says that component lives in, with no line, since the run never read one. A finding that is about the
+system rather than a file (`3 of 3 semantic tokens have no description`) has no place: it is carried in the SARIF with
+no line, left out of GitLab's report, which has no entry without a path, and **counted in the line the run prints**, so
+a report holding fewer findings than the run found is never read as all of them. A line that points at a finding rather
+than being one (what was skipped, how much was compared, who last changed it) is in neither: it carries its gate's
+verdict, and a report that kept it would badge "skipped on CI" as an error of the code under review.
+
+Severity is the verdict the run already reached and never a judgement of its own: a check that fails is an `error` (a
+GitLab `major`), one that only advises a `warning` (a `minor`). What blocks a merge stays the team's own CI rule.
+
 #### A component built in Figma (`--spec`, `--figma-build`)
 
 **--spec.** `--spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>] [--shared]` writes the spec of a new

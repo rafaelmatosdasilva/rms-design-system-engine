@@ -58,6 +58,38 @@ is no new blocker (or no base kept yet), exit 2 that this run measured nothing. 
 engine's `docs/accessibility.md`, under *Accessibility never gets worse*; the options are in `--reference usage`.
 
 
+**The findings on the line they are about.** The audit writes them in the file each host already reads, so a reviewer
+meets a finding in the diff rather than on a page of its own.
+
+GitHub, after the audit step in the same job:
+
+```yaml
+      - run: rms-design-system-engine --sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .design-system-engine-out/findings.sarif
+```
+
+GitLab, in the audit's job:
+
+```yaml
+    script:
+      - rms-design-system-engine --code-quality
+    artifacts:
+      reports:
+        codequality: .design-system-engine-out/code-quality.json
+```
+
+A check that fails is an error, one that only advises a warning, and what blocks a merge stays the team's own rule. A
+finding about the system rather than a file keeps no line, and the run says how many of those there are, so a shorter
+report is never read as every finding.
+
+**The result in the team's chat.** Add `--notify` to a scheduled run and it posts one line saying what failed, what is
+open, where to read it and which job said so. The address goes in the job's secrets as `DSE_CHAT_WEBHOOK` and is read
+from there alone, never from `ds-config.json` and never printed, and it must be `https`. It posts `{ "text": "…" }`,
+which is what most chat services read; one that reads another field is named with `DSE_CHAT_FORMAT=content`. With
+`DSE_CHAT_WEBHOOK` unset the run says so and posts nothing.
+
 **The construction rules on every pull request, in one line.** After `actions/checkout@v4`, add
 `- uses: rafaelmatosdasilva/rms-design-system-engine/templates/actions/construction-check@main`. It fails on a component
 that breaks a rule the team decided and warns on the rest, each as an annotation on the pull request; it reads the
