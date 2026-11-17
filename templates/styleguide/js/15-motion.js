@@ -10,6 +10,18 @@
   // what moves and the part), the code's timing with its variables, the rule it is in and whether it stops for less
   // motion, Figma's timing and where in Figma it comes from, what to do and who does it, and its status. The component
   // shows every row; the Status page only those still to do, under the same numbers.
+  // What to do where a component moves otherwise than Figma's design, said in the same words on its Motion area and in
+  // its Parity (a component with no Motion table): the action alone, each value in it a pill. kind: 'differs' (another
+  // timing), 'duration', 'easing', 'figma-none' (only the code moves) or 'code-none' (only Figma moves). o: { ms, easing,
+  // what (what the code animates), anim ('an animation', 'a transition'), from (where Figma has it) }. → HTML
+  function motionTodo(kind, o) {
+    var from = o.from ? ' (' + esc(o.from) + ')' : '';
+    if (kind === 'figma-none') return 'Animate it in Figma as the code does, ' + [o.what, o.ms + 'ms', o.easing].filter(Boolean).map(namePill).join(' · ') + ', on its Motion timeline or in its prototype, or stop it in the code.';
+    if (kind === 'code-none') return 'Give it ' + esc(o.anim) + ' of ' + namePill(o.ms + 'ms') + ', ' + namePill(o.easing) + ', as Figma has it' + from + '.';
+    if (kind === 'duration') return 'Make it ' + namePill(o.ms + 'ms') + ', as Figma has it' + from + '.';
+    if (kind === 'easing') return 'Ease it ' + namePill(o.easing) + ', as Figma has it' + from + '.';
+    return 'Make it ' + namePill(o.ms + 'ms') + ', ' + namePill(o.easing) + ', as Figma has it' + from + '.';
+  }
   function motionIssueRows(c) {
     var at0 = DATA.builtAt || null, val = function (t) { return t ? '<span class="pg-par-val">' + esc(t) + '</span>' : ''; };
     // The motion tokens the code names after it that Figma has no variables for: one task, for whoever keeps Figma.
@@ -19,14 +31,13 @@
     var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
     return varRows.concat((c.moves || []).map(function (r) {
       var anim = /^(Repeats|Opens|Closes)$/.test(r.when) ? 'an animation' : 'a transition';
-      var todo = r.status === 'differs' ? 'Make it ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + ').'
-        : r.status === 'figma-none' ? 'Animate it in Figma as the code does (' + r.what + ', ' + r.code.ms + 'ms, ' + r.code.easing + '), on its Motion timeline or in its prototype, or stop it in the code.'
-        : r.status === 'code-none' ? 'Give it ' + anim + ' of ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + ').' : '';
+      var todo = r.status === 'differs' || r.status === 'code-none' ? motionTodo(r.status, { ms: r.figma.ms, easing: r.figma.easing, from: r.figma.from, anim: anim })
+        : r.status === 'figma-none' ? motionTodo('figma-none', { what: r.what, ms: r.code.ms, easing: r.code.easing }) : '';
       var st = r.status === 'same' ? 'done' : r.status === 'differs' || r.status === 'figma-none' || r.status === 'code-none' ? 'todo' : 'none';
       return { key: c.name + '\u0000motion:' + r.when + ':' + (r.part || '') + ':' + r.what, area: 'Motion', kind: r.when, kindHTML: esc(r.when) + val(r.what) + (r.part ? '<span class="pg-par-val"><code>' + esc(r.part) + '</code></span>' : ''),
         code: r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) + val(r.code.calm ? 'Stops for less motion' : 'Keeps moving for less motion') : '<span class="pg-par-none">None</span>',
         figma: r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : '<span class="pg-par-none">' + esc(r.status === 'unread' ? 'Not read yet' : 'None') + '</span>',
-        todo: esc(todo), who: st === 'todo' ? (r.status === 'figma-none' ? WHO.figma : WHO.code) : '', st: st,
+        todo: todo, who: st === 'todo' ? (r.status === 'figma-none' ? WHO.figma : WHO.code) : '', st: st,
         rel: r.status === 'code-only' ? 'Only in the code' : r.status === 'unread' ? 'Figma not read yet' : r.status === 'figma-none' ? PAR_REL.code : r.status === 'code-none' ? PAR_REL.figma : r.status === 'differs' ? PAR_REL.differs : '', at: at0, unrun: r.status === 'unread' };
     }));
   }
@@ -72,7 +83,8 @@
       var vars = r.vars.length ? r.vars.map(function (v) { return '<code>' + esc(v.var) + '</code><span class="pg-par-val">' + esc(v.figma || 'not in Figma') + '</span>'; }).join('') : esc('Written as values');
       // The components that move so, each once and linked to its Motion tab: what moves and how is on that tab.
       var users = r.uses.map(function (u) { return u.component; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
-      var uses = users.length ? users.map(function (n) { return known(n) ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/motion">' + esc(n) + '</a>' : esc(n); }).join(', ') : esc('Nothing');
+      // The first five shown, the rest behind one "N more" pill, as every list of names on the page (namePills).
+      var uses = users.length ? '<span class="sg-motion-uses">' + users.map(function (n, i) { return '<span' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + (i ? ', ' : '') + (known(n) ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/motion">' + esc(n) + '</a>' : esc(n)) + '</span>'; }).join('') + (users.length > PILLS_SHOWN ? ' ' + pillsMore(users.length - PILLS_SHOWN) : '') + '</span>' : esc('Nothing');
       return '<tr' + (r.unused ? ' data-unused' : '') + '><td>' + dot + '<code>' + esc(timing) + '</code></td><td>' + vars + '</td><td>' + esc(r.purposes.join(', ') || 'Nothing yet') + '</td><td>' + uses + '</td><td>' + esc(FIGMA_SAYS[r.figma] || '') + (r.figmaTiming && r.figma === 'differs' ? '<span class="pg-par-val">' + esc(r.figmaTiming) + '</span>' : '') + '</td><td>' + esc(systemSays(r)) + '</td></tr>';
     }), 'sg-motion-system');
     while (mc.firstChild) mo.appendChild(mc.firstChild);

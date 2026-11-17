@@ -36,6 +36,10 @@
     }
     return out.join('');
   };
+  // The Rules page's own table and panel, for a component's Rules area (33): the same rows, filters, sorting and panel,
+  // filtered to the rules that change that component (the owner's, 16 November 2026). Set by the page below, null with
+  // no rules. of(name): the rows that change it, to fix or to decide · tableHTML(rows) · wire(scope, rows) · open(key).
+  var RULES_PAGE = null;
   if (DATA.construction) (function () {
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('rules', 'rules');
@@ -115,7 +119,7 @@
     var panel = function (i, from) {
       var r = rows[i]; if (!r) return;
       var m = panelShell('sg-cx-panel', 'Rules'); m._key = cxKey(r);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       var cs = comps(r), byC = {}, n = cs.length;
       r.toFix.forEach(function (t) { var a = atOf(t); (byC[a] = byC[a] || []).push(t); });
       var WAY_HEAD = { own: 'Variables made for each component', shared: 'Shared variables' };
@@ -211,7 +215,10 @@
       var decidedCard = dl ? card('Decided in the team\'s ' + (TOOL[dl.tool] || dl.tool) + ' config', kvOne([['Where', '<code>' + esc(dl.file + ':' + dl.line) + '</code>'], ['Setting', '<code>' + esc(dl.setting + ' ' + JSON.stringify(dl.value)) + '</code>']]
         .concat(dl.reported != null ? [[(TOOL[dl.tool] || dl.tool) + ' reports', esc(dl.reported === 0 ? 'Nothing for this setting' : dl.reported + (dl.reported === 1 ? ' finding' : ' findings') + ' for this setting')]] : []), 'sg-cx-kv')) : '';
       // What to do first, then the facts: its status, who owns it, why, and every component it changes.
-      var body = card('What to do', lead) + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
+      // A token order rule's detail, under what to do (token-grammar.mjs, places): each part where most names put it,
+      // with one of the system's own names that does. Labelled values, as the draft is.
+      var placesCard = (r.places || []).length ? card('Where most names put it', kvOne(r.places.map(function (p) { return [p.what, esc(p.at) + (p.example ? '<span class="pg-par-val">Like ' + namePill(p.example) + '</span>' : '')]; }), 'sg-cx-kv')) : '';
+      var body = card('What to do', lead) + placesCard + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + decidedCard + card('Why', why)
         + (fam ? card('How the ' + fam.components + ' in the family are built', ways) : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
@@ -231,36 +238,50 @@
     var cards = sideCard('figma', 'Figma') + sideCard('code', 'Code');
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
-      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join('; ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
+      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join(' · ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
         // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
         + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
-    tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
+    // The table, for this page and for a component's Rules area alike: the rows given, each keeping its number in the
+    // page's own list (data-cx-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (r) { return rowHTML(r, rows.indexOf(r)); }).join('') + '</tbody></table></div></div>'; };
     var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
-    // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still finds it.
-    var sortKey = null, sortDir = 1;
-    var sortBy = function (key) {
-      var val = sortOf[key]; if (!val) return;
-      sortDir = sortKey === key ? -sortDir : 1; sortKey = key;
-      var tb = sec.querySelector('.sg-cx-table tbody');
+    // Sorted in place: the rows are moved, never built again, so a row the filter hid stays hidden and the panel still
+    // finds it. Each table keeps its own order.
+    var sortBy = function (table, key) {
+      var val = sortOf[key]; if (!val || !table) return;
+      table._sortDir = table._sortKey === key ? -table._sortDir : 1; table._sortKey = key;
+      var tb = table.tBodies[0], dir = table._sortDir;
       Array.prototype.slice.call(tb.children).sort(function (a, b) {
         var x = rows[+a.getAttribute('data-cx-row')], y = rows[+b.getAttribute('data-cx-row')], u = val(x), v = val(y);
-        return (u < v ? -1 : u > v ? 1 : 0) * sortDir || ORDER[x.status] - ORDER[y.status];
-      }).forEach(function (tr) { tb.appendChild(tr); });
-      Array.prototype.forEach.call(sec.querySelectorAll('.sg-cx-table th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
+        return (u < v ? -1 : u > v ? 1 : 0) * dir || ORDER[x.status] - ORDER[y.status];
+      }).forEach(function (tr) { tb.appendChild(tr); }); rowsMoved(tb);
+      Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
-    sec.addEventListener('click', function (e) {
-      // The request to read Figma again, copied as a rule's decision is.
-      var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) { copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); return; }
-      var th = e.target.closest('th[data-sort]'); if (th) { sortBy(th.getAttribute('data-sort')); return; }
-      if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
-    });
-    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
-    sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    // A head sorts, a row opens its panel on a click or Enter, and the filters above the table: scoped to where the
+    // table is (this page, or a component's area).
     // All, then a chip a status with its own dot, read at a glance, then the area and the side as lists. They combine,
     // and each says how many rows it would leave beside the others.
     var cxStatusChips = ['fix', 'decide', 'rule'].map(function (k) { return { key: k, label: ST[k][1], dot: ST[k][0], col: 'status', word: ST[k][1] }; });
-    filterBar(sec, { total: rows.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'area', label: 'Area', order: AREA_ORDER }] });
+    var wire = function (scope, list) {
+      scope.addEventListener('click', function (e) {
+        var th = e.target.closest('.sg-cx-table th[data-sort]'); if (th) { sortBy(th.closest('table'), th.getAttribute('data-sort')); return; }
+        if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]'));
+      });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+      filterBar(scope, { total: list.length, said: 'rules', chips: cxStatusChips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'area', label: 'Area', order: AREA_ORDER }] });
+    };
+    var openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    sec.insertAdjacentHTML('beforeend', tableHTML(rows));
+    tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
+    // The request to read Figma again, copied as a rule's decision is.
+    sec.addEventListener('click', function (e) { var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); });
+    sec._openKey = openKey;
+    wire(sec, rows);
+    // A component's Rules area: the rules that change it, on either side, to fix or to decide.
+    RULES_PAGE = {
+      of: function (name) { return rows.filter(function (r) { return r.status !== 'rule' && r.toFix.some(function (t) { return t.component === name; }); }); },
+      tableHTML: tableHTML, wire: wire, open: openKey
+    };
     // The health above the filters: it says where the system stands; the filters, under it, stay as the table scrolls.
     doneCards(sec, cards);
   })();
@@ -293,18 +314,26 @@
     var panel = function (i, from) {
       var x = FCH[i]; if (!x) return;
       var m = panelShell('sg-fc-panel', 'Changes in Figma'); m._key = fcKey(x);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       var lines = function (l) { return (l || []).map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); };
       var u = x.usedBy, lib = u && u.library;
-      var used = u ? lines([u.products.length ? 'The code of ' + u.products.join(', ') : '', u.inside.length ? 'Inside ' + u.inside.join(', ') : '', u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
+      var used = u ? (u.products.length ? '<p class="sg-il-line">The code of ' + namePills(u.products) + '</p>' : '') + (u.inside.length ? '<p class="sg-il-line">Inside ' + namePills(u.inside) + '</p>' : '') + lines([u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
         lib && lib.instances != null ? lib.instances + ' instance' + (lib.instances === 1 ? '' : 's') + ' in ' + lib.files + ' team file' + (lib.files === 1 ? '' : 's') + ' (Figma\'s library analytics)' : 'Team files the engine does not read are not counted' + (lib && lib.unseen ? ': ' + lib.unseen : '') + '.'].filter(Boolean)) : '';
       var after = x.status === 'waiting' ? '<p class="sg-il-line">Not made yet: once the script runs and Figma is read again, rms-design-system-engine --change-report ' + esc(x.component) + ' fills this in.</p>'
         : diffTable(x.real) + (x.mismatch.length ? '<p class="sg-il-line"><strong>' + esc('Not what the change said (' + x.mismatch.length + ')') + '</strong></p>' + lines(x.mismatch.map(function (y) { return capital(y.change) + ' ' + y.what + (y.from != null || y.to != null ? ': ' + [y.from, y.to].filter(function (z) { return z != null; }).join(' → ') : ''); })) : '<p class="sg-il-line">It is what the change said.</p>');
-      var body = card('Status', '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.readAt ? '<p class="sg-il-line"><span class="pg-dim">' + esc('Figma read again ' + String(x.readAt).slice(0, 10)) + '</span></p>' : ''))
+      // What to do, from its status: a person makes the change in Figma (the style guide never writes there), then Figma
+      // is read again. Its See in Figma opens the component's node, as every Figma task's does. Made or taken back: nothing.
+      var fcComp = HAS_PAGE[x.component], fcUrl = fcComp ? figmaUrlOf(fcComp) : null;
+      var fcTodo = x.status === 'waiting' ? 'Make its steps in Figma, then read Figma again.'
+        : x.status === 'not as said' ? 'Make in Figma what is not as said' + (x.mismatch.length ? ' (' + x.mismatch.length + ')' : '') + ', then read Figma again.' : '';
+      var fcSee = fcUrl ? '<p class="sg-see">' + sysButton('a', 'See in Figma', ' href="' + esc(fcUrl) + '" target="_blank" rel="noopener" title="' + esc('Open ' + x.component + ' in Figma') + '" data-see="sg-cx-figma"', null, null, FIGMA_SVG) + '</p>' : '';
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it changes and where, its status, the rest.
+      var body = card('What to do', fcTodo ? '<p class="sg-il-line">' + esc(fcTodo) + '</p>' : '', { see: fcSee })
         + card('Its steps', lines(x.steps))
         + card('What the change said it does', diffTable(x.report))
-        + card('What Figma shows once it was made', after)
         + card('Where it is used', used)
+        + card('Status', '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.readAt ? '<p class="sg-il-line"><span class="pg-dim">' + esc('Figma read again ' + String(x.readAt).slice(0, 10)) + '</span></p>' : ''))
+        + card('What Figma shows once it was made', after)
         + card('What it breaks', lines(x.breaking.map(function (b) { return b.what; })))
         + card('What it adds to the system', lines(x.held.map(function (h) { return h.what; })))
         + card('Local or shared', x.scope ? lines([x.scope.reason]) : '')
@@ -333,7 +362,11 @@
   var DECISIONS = (DATA.decisions || []).slice();
   if (CHANGES.length || RLOG.length || DECISIONS.length || (DATA.intentChanges || []).length) {
     hr(); navLink('history', 'history');
-    var wn = section('history', 'Changes', 'History', '');
+    historyTable(section('history', 'Changes', 'History', ''));
+  }
+  // Every change in the order History reads them: the code's releases, the decisions of each day, each read of Figma
+  // and each change of the intent layer, a group each.
+  function historyOrder() {
     // The components each commit changed, from their changelogs.
     var compsOf = {};
     CHANGES.forEach(function (x) { var k = x.r.sha || x.r.subject, l = compsOf[k] = compsOf[k] || []; if (l.indexOf(x.comp) < 0) l.push(x.comp); });
@@ -370,17 +403,23 @@
     // Each change read from the intent layer (DATA.intentChanges): a card of its own too, dated by its commit, with the
     // pages it changed and the components they document.
     (DATA.intentChanges || []).forEach(function (x) { order.push({ k: '', on: '', at: String(x.at || ''), commits: [], layer: x }); });
-    order = order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
+    return order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
+  }
+  // History's one table, built here for the History page and for a component's History area alike (the owner's, 16
+  // November 2026: a component's area is the page of the same name, filtered to it). wn: where it goes, its chips at its
+  // top. only: a component's name, its table then the changes that affect it alone. before: what the table goes above.
+  // Returns the table's box, or null when no change is left.
+  function historyTable(wn, only, before) {
+    var order = historyOrder();
+    // A component's own: only the commits that changed it, so an issue counts its commits as this table shows them.
+    if (only) order.forEach(function (g) { g.commits = g.commits.filter(function (x) { return (x.comps || []).indexOf(only) >= 0; }); });
     // One table, a row each, newest first: a commit to the code, what a read of Figma changed in a component, a commit to
     // the intent layer, a decision. Its date and time, its type, what it did, what it affects, who did it (last, so the
     // rows of one moment run unbroken across What and Affects). The chips show
     // one type; a ticket's count of commits shows that ticket's alone.
     // The components a change affects: links the table turns into pills (pillLinks), the first five shown, the rest one
     // click away ("9 more").
-    var PILLS_SHOWN = 5;
-    // A list's "N more": a pill with a chevron before its count, so it reads as opening the rest. History's and a task's alike.
-    var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
-    var pillsMore = function (n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; };
+    // The rest of a list behind pillsMore, one for the whole guide (00-start.js).
     var pillsHTML = function (names, area) {
       return names.map(function (n, i) { return '<a href="#' + esc(cid(n)) + (area ? '/' + area : '') + '"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</a>'; }).join(' ') +
         // The rest one click away, a pill as the ones beside it (their height, their words' size).
@@ -394,8 +433,8 @@
     };
     // A name in a sentence, the one pill the whole guide sets names in (.sg-name), and a list of names as Tasks shows one:
     // five pills, the rest behind a chevron pill (the owner's, 14 November 2026).
-    var pill = function (n) { return '<code class="sg-name">' + esc(n) + '</code>'; };
-    var pillList = function (names) { return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; };
+    var pill = namePill;
+    var pillList = namePills;
     // One change Figma made, its name a pill: "showLabel added", a property's values "a" → "b".
     // Its name and its values pills too: "breakpoint" "a" → "b", "showIcon" renamed "Show Icon" (the owner's, 15 November 2026).
     var figmaChangeHTML = function (t) {
@@ -443,11 +482,12 @@
       if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + tag + '</td>';
       var d = new Date(t);
       // The day and its time on one line, the release under them when there is one (the owner's, 11 November 2026).
-      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) + tag + '</td>';
+      return '<td class="sg-log-when">' + line(when(d)) + tag + '</td>';
     };
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
-    var add = function (at, chip, type, what, bys, affects, tickets, group, release) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null }); };
+    // names: the components it affects, for a component's own History.
+    var add = function (at, chip, type, what, bys, affects, tickets, group, release, names) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null, names: names || [] }); };
     // The code: each commit, the issues it names (each linked, with how many commits it has when more than one), what it
     // says, and the release it shipped in, once it has shipped.
     var ticketsOf = function (r) { return r.tickets || (r.ticket ? [{ ticket: r.ticket, ticketUrl: r.ticketUrl }] : []); };
@@ -472,7 +512,7 @@
     order.forEach(function (g) { g.commits.forEach(function (x) {
       var r = x.r, comps = (x.comps || []).slice().sort();
       var affects = (comps.length ? pillsHTML(comps) : '') + ((r.where || []).length ? (comps.length ? ' ' : '') + whereHTML(r.where) : '');
-      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r));
+      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }), null, releaseOf(g, r), comps);
     }); });
     // Figma: what each read changed in each component, a row each; the components read for the first time, one row.
     // Who did it: the designers who saved the versions since the read before (figma-versions.mjs), then whoever ran the read.
@@ -480,16 +520,16 @@
     order.forEach(function (g) {
       if (!g.read) return;
       var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
-      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', figmaChangesHTML(c.changed) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date)); });
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', figmaChangesHTML(c.changed) + saved, figmaBys(x.r), pillsHTML([c.name], 'history'), null, 'figma:' + (x.r.sha || x.r.date), null, [c.name]); });
       var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
-      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date));
+      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, figmaBys(x.r), pillsHTML(first, 'history'), null, 'figma:' + (x.r.sha || x.r.date), null, first);
     });
     // The comments left on a component in Figma (figma-comments.mjs): a thread a row, what it says, its replies, and
     // whether it is resolved; who wrote it and who answered. No link to the file: only a Figma task carries one.
     COMPONENTS.forEach(function (c) { (c.figmaComments || []).forEach(function (t) {
       var said = esc('“' + t.text + '”') + ((t.replies || []).length ? ' ' + quiet(t.replies.length + ' repl' + (t.replies.length === 1 ? 'y' : 'ies')) : '') + ' ' + quiet(t.resolved ? 'Resolved' : 'Open');
       var bys = [t.by].concat((t.replies || []).map(function (r) { return r.by; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
-      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at);
+      add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at, null, [c.name]);
     }); });
     // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
     // A change the engine sent in parts (GitLab refuses one commit that large: "… (part 2 of 3)") is one change: one row,
@@ -541,7 +581,7 @@
         return (made.length ? line(quiet('Added: ') + pagesSaid(made, comps)) : '') + (edited.length ? line(quiet('Changed: ') + pagesSaid(edited, comps)) : '');
       })() : null;
       add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) : '') + (split != null ? split : (x.says && saysCount ? '' : line(x.says ? quiet(esc(count)) : esc(count))) + (others.length ? line(quiet('Also changed: ') + pagesSaid(others)) : '')) +
-        (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
+        (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'), null, null, null, x.components);
     });
     // The decisions: what was decided, ruled out and why, and what it is about.
     order.forEach(function (g) { (g.decisions || []).forEach(function (d) {
@@ -560,7 +600,7 @@
         (d.review ? line('<span class="pg-par-val">' + esc(d.review) + '</span>') : '') +
         // A sign-off: who made the change and who reviewed it, never the same one.
         (d.author ? line(esc('Made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by) + '.')) : '') +
-        line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''));
+        line(quiet(esc(capital(d.said)))), [d.by], about, null, 'decisions:' + String(d.at || '').slice(0, 10) + ':' + (d.by || ''), null, [d.component || pageComp].filter(Boolean));
     }); });
     // What changed in the contracts, a build at a time (contract-history.mjs): what an agent reads differently from then
     // on. One row a contract, the build's rows side by side; a change that breaks a product said so. Done by the person
@@ -575,12 +615,15 @@
         var items = (c.items || []).map(function (x) { return line(whatHTML(x.what) + esc(' ' + x.change + (x.detail ? ': ' + x.detail : '')) + (x.breaking ? ' <span class="pg-missing">' + esc('Breaks a product') + '</span>' : '')); }).join('');
         var known = c.kind === 'component' && COMPONENTS.some(function (x) { return x.name === c.name; });
         add(b.at, 'contracts', 'Contract', line('<strong>' + esc(head) + '</strong>') + items + (c.change === 'removed' && c.kind === 'component' ? line('<span class="pg-missing">' + esc('Breaks a product that uses it') + '</span>') : ''),
-          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at);
+          b.by ? ['Done by ' + b.by] : b.run ? ['Done by the ' + b.run] : [], known ? pillsHTML([c.name]) : esc(kind + c.name), null, 'contracts:' + b.at, null, known ? [c.name] : []);
       });
     });
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
-    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
+    // A component's History: only the rows of the changes that affect it, the page's table otherwise as it is.
+    if (only) ROWS = ROWS.filter(function (x) { return x.names.indexOf(only) >= 0; });
+    if (!ROWS.length) return null;
+    var box = document.createElement('div'); box.className = 'pg-cards'; wn.insertBefore(box, before || null);
     // Sorted by Date, newest first, as the page opens. Only the columns rows of one moment share can sort: What and
     // Affects are one row's own, so ordering by them would tear a moment apart.
     // The columns in the words the other tables use (the owner's, 11 November 2026): Source, as the Documentation table
@@ -603,8 +646,7 @@
         return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
           (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(sourceOf(x)) + '</td>') : '') + '<td class="sg-log-what">' + (kindOf(x) ? line(quiet(esc(kindOf(x)))) : '') + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
-    // The table itself, held now: box is a var another page reuses, so by the time a head is measured or a column is
-    // clicked it may name another page's. Everything below works from this table, never from box.
+    // The table itself, held now: everything below works from this table.
     var logHeadEl = box.querySelector('table.sg-log > thead'), logTable = logHeadEl.parentNode;
     // Sorted in place, a moment at a time: a lead row and the rows under it move together, so the cells they share
     // keep the rows they span. The rows are moved, never built again, so a row a chip or a ticket hid stays hidden.
@@ -618,7 +660,7 @@
         cur = { x: ROWS[+tr.getAttribute('data-log-row')], trs: [tr] }; blocks.push(cur);
       });
       blocks.sort(function (a, b) { var u = val(a.x), v = val(b.x); return (u < v ? -1 : u > v ? 1 : 0) * logDir || stamp(b.x.at) - stamp(a.x.at); });
-      blocks.forEach(function (b) { b.trs.forEach(function (tr) { tb.appendChild(tr); }); });
+      blocks.forEach(function (b) { b.trs.forEach(function (tr) { tb.appendChild(tr); }); }); rowsMoved(tb);
       Array.prototype.forEach.call(logTable.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (logDir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
     // The shared cells stick under the table's head: how tall the head is, again whenever it changes (shown, resized).
@@ -641,12 +683,9 @@
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
     });
-    // Any "N more" pill on the page shows the rest of its list, History's and a task's alike: one handler for all.
-    document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-pills-more]'); if (!b) return;
-      Array.prototype.forEach.call(b.parentNode.querySelectorAll(':scope > [hidden]'), function (p) { p.hidden = false; }); b.remove();
-    });
+    // Any "N more" pill opens the rest of its list: one handler for the whole guide (00-start.js).
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
+    return box;
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
@@ -661,47 +700,61 @@
   // column in data-f-<key>; a column a row can hold several of (a page read from Figma and the intent layer) is marked
   // multi, and its values are separated by a bar, so a value with a space in it is still one value. Rows are hidden, never drawn again, so the sort and the panel still find
   // them. A column every row answers the same way is no filter, so it is left out.
+  // bar._refresh(): the rows read again after they changed in place (a row whose try ended), the person's choices kept
+  // where they still apply.
   function filterBar(sec, o) {
     var h = sec.querySelector(':scope > h2');
     if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
-    var trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
     var val = function (tr, k) { return tr.getAttribute('data-f-' + k) || ''; };
     var has = function (tr, c, w) { return c.multi ? val(tr, c.key).split('|').indexOf(w) >= 0 : val(tr, c.key) === w; };
-    var cols = (o.cols || []).map(function (c) {
-      var seen = {}, words = [];
-      trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
-      var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
-      words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
-      return { key: c.key, label: c.label, multi: c.multi, words: words };
-    }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
-    if (!trs.length || !cols.length) return null;
-    var F = {}, C = '';
+    var trs, cols, chips;
     var colOf = function (k) { return (o.cols || []).filter(function (c) { return c.key === k; })[0] || { key: k }; };
     var onChip = function (tr, c) { return c.word ? has(tr, colOf(c.col), c.word) : !!tr.getAttribute('data-f-' + c.key); };
-    var chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    var read = function () {
+      trs = Array.prototype.slice.call(sec.querySelectorAll('tbody > tr[data-f]'));
+      cols = (o.cols || []).map(function (c) {
+        var seen = {}, words = [];
+        trs.forEach(function (tr) { (c.multi ? val(tr, c.key).split('|') : [val(tr, c.key)]).forEach(function (w) { if (w && !seen[w]) { seen[w] = 1; words.push(w); } }); });
+        var at = function (w) { var i = (c.order || []).indexOf(w); return i < 0 ? 99 : i; };
+        words.sort(function (a, b) { return at(a) - at(b) || a.localeCompare(b); });
+        return { key: c.key, label: c.label, multi: c.multi, words: words };
+      }).filter(function (c) { return c.label && c.words.length > 1; });   // a column with no name is not drawn: a chip beside it matches on it
+      chips = (o.chips || []).filter(function (c) { return trs.some(function (tr) { return onChip(tr, c); }); });
+    };
+    read();
+    if (!trs.length || !cols.length) return null;
+    var F = {}, C = '';
     var chipOf = function (k) { return chips.filter(function (c) { return c.key === k; })[0]; };
     var inCols = function (tr, skip) { return cols.every(function (c) { return c.key === skip || !F[c.key] || has(tr, c, F[c.key]); }); };
     var passes = function (tr, skip) { return (!C || onChip(tr, chipOf(C))) && inCols(tr, skip); };
     var bar = document.createElement('div'); bar.className = 'sg-todo-head';
-    bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
-      '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
-      cols.map(function (c) {
-        var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
-        return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
-          '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
-          '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
-          [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
-          '</span></span>';
-      }).join('') +
-      chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
-      '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    var paint = function () {
+      bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Filter">' +
+        '<button type="button" class="sg-chip" data-f-all aria-pressed="true">All' + countHTML(o.total == null ? trs.length : o.total) + '</button>' +
+        cols.map(function (c) {
+          var id = 'sg-f-' + (sec.id || 'page') + '-' + c.key;
+          return '<span class="sg-chip-dd"><button type="button" class="sg-chip sg-chip-menu" data-fg="' + esc(c.key) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+            '<span class="sg-chip-label">' + esc(c.label) + '</span><span class="sg-chip-word"></span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+            '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(c.label) + '" tabindex="-1" hidden>' +
+            [''].concat(c.words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-f="' + esc(c.key + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') +
+            '</span></span>';
+        }).join('') +
+        chips.map(function (c) { return '<button type="button" class="sg-chip" data-chip="' + esc(c.key) + '" aria-pressed="false">' + (c.dot ? '<span class="pg-par-status pg-par--' + esc(c.dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(c.label) + '<span class="sg-count"></span></button>'; }).join('') +
+        '<button type="button" class="sg-mx-clear" data-f-clear hidden>Clear filters</button></span></p>';
+    };
+    paint();
     if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
+    var shown = ROWS_SHOWN;
+    // The rows the filters leave, in the table's order now, the first ROWS_SHOWN of them drawn and the rest behind "N more".
     var draw = function () {
-      trs.forEach(function (tr) { tr.hidden = !passes(tr); });
+      var n = 0;
+      Array.prototype.forEach.call(sec.querySelectorAll('tbody > tr[data-f]'), function (tr) { var ok = passes(tr); if (ok) n++; tr.hidden = !ok || n > shown; });
+      rowsMore(n - shown);
       if (trs.length) tableNone(trs[0].closest('table'), o.said);
       var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
       bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
       bar.querySelector('[data-f-clear]').hidden = !on;
+      var allN = bar.querySelector('[data-f-all] .sg-count'); if (allN && o.total == null) allN.outerHTML = countHTML(trs.length);
       chips.forEach(function (c) {
         var b = bar.querySelector('.sg-chip[data-chip="' + c.key + '"]');
         b.setAttribute('aria-pressed', C === c.key ? 'true' : 'false');
@@ -712,7 +765,8 @@
         b.querySelector('.sg-chip-word').textContent = w || 'All';
         b.setAttribute('aria-pressed', w ? 'true' : 'false');
         b.querySelector('.sg-chip-n').innerHTML = '';
-        Array.prototype.forEach.call(document.getElementById(b.getAttribute('aria-controls')).querySelectorAll('[role="option"]'), function (op) {
+        // Its list found in the bar itself: a component's area is drawn before its page is in the document.
+        Array.prototype.forEach.call(bar.querySelector('#' + CSS.escape(b.getAttribute('aria-controls'))).querySelectorAll('[role="option"]'), function (op) {
           var ow = op.getAttribute('data-f').slice(c.key.length + 1);
           var n = trs.filter(function (tr) { return passes(tr, c.key) && (!ow || has(tr, c, ow)); }).length;   // what the other chips leave it
           op.querySelector('.sg-count').outerHTML = countHTML(n);
@@ -723,7 +777,18 @@
       });
       sec.dispatchEvent(new CustomEvent('sg-filter', { detail: F }));
     };
+    var rowsMore = function (rest) {
+      var t = trs.length ? trs[0].closest('table') : null; if (!t) return;
+      var foot = t.querySelector(':scope > tfoot.sg-rows-more');
+      if (rest <= 0) { if (foot) foot.hidden = true; return; }
+      if (!foot) { foot = document.createElement('tfoot'); foot.className = 'sg-rows-more'; t.appendChild(foot); }
+      foot.hidden = false;
+      foot.innerHTML = '<tr><td colspan="' + ((t.tHead && t.tHead.rows[0] && t.tHead.rows[0].cells.length) || 1) + '">' + pillsMore(rest, 'data-rows-more') + '</td></tr>';
+    };
+    sec.addEventListener('click', function (e) { if (e.target.closest('[data-rows-more]') && sec.contains(e.target)) { shown += ROWS_SHOWN; draw(); } });
+    sec.addEventListener('sg-sorted', function () { draw(); });
     bar.addEventListener('click', function (e) {
+      if (!e.target.closest('.sg-chip-menu')) shown = ROWS_SHOWN;   // a new filter starts from the first rows again
       var m = e.target.closest('.sg-chip-menu'); if (m) { mxMenu(m, m.getAttribute('aria-expanded') !== 'true'); return; }
       if (e.target.closest('[data-f-all], [data-f-clear]')) { F = {}; C = ''; draw(); return; }
       var ch = e.target.closest('.sg-chip[data-chip]'); if (ch) { C = C === ch.getAttribute('data-chip') ? '' : ch.getAttribute('data-chip'); draw(); return; }
@@ -734,6 +799,17 @@
       draw();
     });
     draw();
+    bar._refresh = function () {
+      read();
+      // A choice the rows no longer offer is dropped. The bar is drawn again only when what it offers changed, so a
+      // list the person has open stays open.
+      Object.keys(F).forEach(function (k) { var c = cols.filter(function (x) { return x.key === k; })[0]; if (!c || c.words.indexOf(F[k]) < 0) delete F[k]; });
+      if (C && !chipOf(C)) C = '';
+      var offer = JSON.stringify([cols, chips.map(function (c) { return c.key; })]);
+      if (offer !== bar._offer) { paint(); bar._offer = offer; }
+      draw();
+    };
+    bar._offer = JSON.stringify([cols, chips.map(function (c) { return c.key; })]);
     return bar;
   }
   function pageBar(sec, o) {
@@ -789,9 +865,12 @@
     var t = (drafts || []).map(function (d) { return d.task || ''; }), one = t[0];
     if (!one || t.some(function (x) { return x.toLowerCase() !== one.toLowerCase(); })) return '';
     var at = (drafts[0] || {}).at, d = at ? new Date(at + 'T12:00:00') : null;
-    return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')' : '');
+    return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + dayShort(d) + ')' : '');
   };
   var IL = DATA.intentLayer, fillDocs = null;
+  // The Documentation page's own table and panel, for a component's Documentation area (33), as RULES_PAGE is for its
+  // Rules: set once the page is drawn (fillDocs), null when the system has no Documentation page.
+  var DOC_PAGE = null;
   // A system with no intent layer has the page too: one row a component, its documentation read from Figma and the code.
   var NO_LAYER = !(IL && (IL.pages || []).length);
   if (!NO_LAYER || COMPONENTS.some(function (c) { return !c.codeOnly; })) {
@@ -922,7 +1001,7 @@
       ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); });
       return out;
     };
-    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(', ')) : '<span class="pg-missing">None</span>'; };
+    var ilSources = function (p) { var w = ilSourceWords(p); return w.length ? esc(w.join(' · ')) : '<span class="pg-missing">None</span>'; };
     // A page's status in one word, as the filter and the chips before it said it.
     var IL_WORD = { review: 'Review', write: 'Missing', remove: 'Remove', keep: 'Done' };
     // Everything a page asks to change, in one place, in groups each under its own heading and count: New text for the
@@ -1002,11 +1081,7 @@
     // open: the page's proposals not answered yet. Its rule changes are Changes to rules; the others (a page to write, a
     // name to keep, a part's page, a page to review again) Decisions about the page, each with the same three actions.
     // A long list of names: the first five as pills, the rest behind one button to open (the owner's, 12 November 2026).
-    var namesShown = function (list) {
-      // The rest one click away, a pill as History's ("1,061 more"), the same button and the same handler.
-      return '<span class="sg-il-codes">' + list.map(function (m, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(m) + '</code>'; }).join('')
-        + (list.length > PILLS_SHOWN ? pillsMore(list.length - PILLS_SHOWN) : '') + '</span>';
-    };
+    var namesShown = namePills;   // the guide's one list of names (00-start.js)
     // A draft as a person reads it: a role is written "Role: cell" (a reader keeps it as a line, and lists it under
     // Rules), said here as what it means. "none" is no role at all, never a role called none.
     var ilDraftShown = function (t) {
@@ -1130,7 +1205,7 @@
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim(), why: unescapeHTML(plainText(r.why || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -1158,7 +1233,9 @@
       return { what: x.kind, check: x.st === 'check', where: wherePlain(p, x), html: ''
       // The points to cover as a list, then how to write it.
       + ((x.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + x.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' : '')
-      + ((x.how || x.todo) ? ((x.notes || []).length ? '<span class="sg-il-label">How to write it</span>' : '') + '<span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '') }; }); };
+      + ((x.how || x.todo) ? ((x.notes || []).length ? '<span class="sg-il-label">How to write it</span>' : '') + '<span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '')
+      // What it was found from, after what to do: a task says only what to do, its finding is its Why.
+      + (x.why ? '<span class="sg-il-label">Why</span><span class="sg-il-text">' + esc(x.why) + '</span>' : '') }; }); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -1217,32 +1294,32 @@
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
-    var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    var ilWhen = function (x) { return isNaN(new Date(x)) ? '' : whenShort(x); };
     // When a row with no file of its own (the Tokens, a component with no page or no intent layer) was last checked: its
     // documentation's latest check, else the build's.
     var docAt = function (p) { var at = null, c = !p.tokens && docComp(p); if (c) try { docIssueRows(c).forEach(function (r) { if (r.at && (!at || r.at > at)) at = r.at; }); } catch (e) { /* none */ } at = at || DATA.builtAt; return at ? esc(ilWhen(at)) : ''; };
     // Where the products use a component with no page, and its place among the pages to write (pages-to-write.mjs);
     // the first ones are started on the next run that writes the layer, their lines drafts to review.
     var ilReachOf = function (n) { var r = (IL.pagesToWrite || {})[n]; if (!r) return ''; var x = r.reach || {}, ps = x.products || [], k = function (v, one) { return v + ' ' + one + (v === 1 ? '' : 's'); };
-      return '<p class="sg-il-line"><strong>' + esc('Number ' + r.rank + ' of the pages to write, most used first') + '</strong><span class="pg-par-val">' + esc((ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + ' use it: ' + k(x.files || 0, 'file') + ', ' + k(x.uses || 0, 'use') + '.' : 'No product uses it yet.') + (r.next ? ' The next run that writes the layer starts its page, its lines drafts to review.' : '')) + '</span></p>'; };
+      return '<p class="sg-il-line"><strong>' + esc('Number ' + r.rank + ' of the pages to write, most used first') + '</strong><span class="pg-par-val">' + (ps.length ? namePills(ps) + esc(' use it: ' + k(x.files || 0, 'file') + ', ' + k(x.uses || 0, 'use') + '.') : esc('No product uses it yet.')) + esc(r.next ? ' The next run that writes the layer starts its page, its lines drafts to review.' : '') + '</span></p>'; };
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
           write: tm.length ? [{ what: 'Their descriptions (' + tm.length + ')', html: '<span class="sg-il-text">One sentence on what each token is for, so an agent picks the right one. A line that only repeats the token\'s name, its modes or what it points to does not count. Write it in Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ' or a text style\'s own Description' : '') + ', or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span>' + namesShown(tm)}] : [],
-          todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
-          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
+          todo: tm.length ? '<p class="sg-il-line"><strong>' + esc('Say what each of the ' + tm.length + (tm.length === 1 ? ' token with no description is for.' : ' tokens with no description is for.')) + '</strong></p>' : '',
+          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.' + (tm.length ? ' An agent asking which token to use for something finds nothing on the others yet.' : '')) + '</p>', gets: '' }; }
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
         var held = (p.drafts || []).length;
         return { decision: decisionCell(held ? 'review' : 'write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
-          write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') }],
-          todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page. Agents won\'t use them until you decide.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
-          why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
+          write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span>' + namePills(asked) : '') }],
+          todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits.</strong></p>',
+          why: '<p class="sg-il-line">' + esc((held ? 'Agents won\'t use the drafts until you decide. ' : 'Today an agent asked for a component the system does not have builds one of its own. ') + ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: docAt(p), reads: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>' + ilReachOf(p.missingFor), gets: '<p class="pg-missing">Nothing.</p>' };
+        updated: docAt(p), reads: '', todo: '<p class="sg-il-line"><strong>' + esc('Write its page in the intent layer, titled as ' + (IL.namesFrom || 'Figma') + ' names it.') + '</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>' + ilReachOf(p.missingFor), gets: '<p class="pg-missing">Nothing.</p>' };
       if (p.recheckFor) { var rx = (IL.noPageRechecks || {})[p.recheckFor] || {};
         return { decision: decisionCell('review', p), write: [], notes: [], file: '<span class="pg-missing">—</span>', forWhat: compLink(p.recheckFor), updated: docAt(p), reads: '', gets: '',
-          todo: '<p class="sg-il-line"><strong>' + esc('Review a decision again: ' + ((rx.stale || {}).truth || '') + ' Confirm it still holds, or withdraw it.') + '</strong></p>',
-          why: '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
+          todo: '<p class="sg-il-line"><strong>' + esc('Confirm the decision still holds, or withdraw it.') + '</strong></p>',
+          why: ((rx.stale || {}).truth ? '<p class="sg-il-line">' + esc(rx.stale.truth) + '</p>' : '') + '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
       if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
@@ -1278,13 +1355,15 @@
       if (!ilLaterFailed && needLater('intentLayer', function (ok) { if (!ok) ilLaterFailed = true; ilPanel(i, from); })) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
-      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card' + (head === 'What to do' ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var card = panelCard;
       // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
       // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
       // page is and why.
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo, ilOpen(p)), task = own ? ilTodo(own) : c.todo;
-      var body = card('What to do', todo || task) + card('Where the new lines come from', ilDraftSources(p)) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      // Every panel's one order (panelCard, 00-start.js): what to do, where its new lines come from right under it (the
+      // owner's, 14 November 2026), what it is for, its status, then the rest.
+      var body = card('What to do', todo || task) + card('Where the new lines come from', ilDraftSources(p)) + card('For', c.forWhat) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       // A group's Approve all, Change or Drop all copies its decision on what it proposes (not what it has no ground for), said
       // beside them once copied.
       var detail = m.querySelector('.sg-row-detail');
@@ -1306,16 +1385,38 @@
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i < 0) i = rows.findIndex(function (p, j) { return ilKey(p, j).indexOf(key + ':') === 0; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     // The rows to review, by who they wait on, as a filter of its own ("Waiting on Cards team"): a row that waits on
     // nobody answers it with nothing, so the chip offers only the teams there are.
-    var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    // The table, for this page and for a component's Documentation area alike (DOC_PAGE): the rows given, each keeping
+    // its number in the page's own list (data-il-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th><th>Area</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (p) { return rowHTML(p, rows.indexOf(p)); }).join('') + '</tbody></table></div></div>'; };
+    ilSec.insertAdjacentHTML('beforeend', tableHTML(rows));
     var IL_STATUS_DOT = { write: IL_DOT.missing, review: IL_DOT.review, remove: IL_DOT['delete'], keep: IL_DOT.keep };
     var ilStatusChips = ['write', 'review', 'remove', 'keep'].map(function (k) { return { key: k, label: IL_WORD[k], dot: IL_STATUS_DOT[k], col: 'status', word: IL_WORD[k] }; });
     var srcWords = [], SRC_ORDER = ['Intent layer', 'Figma', 'Contract', 'Code'];
     rows.forEach(function (p) { ilSourceWords(p).forEach(function (w) { if (srcWords.indexOf(w) < 0) srcWords.push(w); }); });
     srcWords.sort(function (x, y) { var i = SRC_ORDER.indexOf(x), j = SRC_ORDER.indexOf(y); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j) || x.localeCompare(y); });
-    filterBar(ilSec, { links: sourceLinks(ilSrc.url, srcWords), total: rows.length, said: 'pages',
-      chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
-      cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
+    // A row opens its panel on a click or Enter, and the filters above the table: scoped to where the table is (this
+    // page, or a component's area), the same chips, lists and words.
+    var wire = function (scope, list, links) {
+      scope.addEventListener('click', function (e) { var tr = e.target.closest('table.sg-il tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('table.sg-il tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
+      filterBar(scope, { links: links || [], total: list.length, said: 'pages',
+        chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
+        cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
+    };
+    wire(ilSec, rows, sourceLinks(ilSrc.url, srcWords));
+    // The component a row is for, as its For column names it: its page's, the one a part's page belongs to, the one
+    // it is under another name, a template's built from the same file, a component with no page.
+    var forName = function (p) {
+      if (p.tokens || p.absent) return null;
+      if (p.missingFor || p.recheckFor) return p.missingFor || p.recheckFor;
+      if (p.component) return p.component;
+      if (p.about && (p.about.partOf || p.about.is)) return p.about.partOf || p.about.is;
+      if (p.layer === 'templates' && p.code) { var built = COMPONENTS.filter(function (c) { return ((c.api && c.api.file) || '') === p.code; })[0]; return built ? built.name : null; }
+      return null;
+    };
+    // A component's Documentation area (33): the rows this page has for it, in the page's own table, filters and panel
+    // (the owner's, 16 November 2026). of(name) · tableHTML(rows) · wire(scope, rows) · open(key).
+    DOC_PAGE = { of: function (name) { return rows.filter(function (p) { return forName(p) === name; }); }, status: function (p) { return statusOf(p); }, tableHTML: tableHTML, wire: function (scope, list) { wire(scope, list); }, open: ilSec._openKey };
     // How far along the documentation is, as the Rules page shows its rules (doneCard, 00-start.js): a card a source,
     // as Rules has one for Figma and one for the code. Each counts the pages that source documents: the share with
     // nothing left to do, and each area's, above the filters.
@@ -1333,8 +1434,6 @@
       return list.some(isOpen) ? 'check' : 'done';
     };
     doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there, out of all of them. The bars split them by area.'); }).join(''));
-    ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
-    ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
     };
   }
   // Accessibility: every criterion of every component in one table, as Rules and Documentation gather theirs, each row the

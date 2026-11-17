@@ -55,15 +55,22 @@ test('in the grammar: under Tokens, a token a place, with what to do', () => {
   const r = g.figma.rules.find((x) => x.id === 'token-one-name');
   assert.equal(r.area, 'tokens');
   assert.deepEqual(r.toFix, [{ where: 'link/textColor/pressed', value: 'pressed, where the system says press' }]);
-  assert.equal(fixOf(r, r.toFix[0]).say, 'Rename it with the system\'s word: pressed, where the system says press');
+  assert.equal(fixOf(r, r.toFix[0]).say, 'Rename it to link/textColor/press', 'the whole name it takes');
 });
 
 test('where a state sits, a value off the scale, a surface with nothing for what sits on it', () => {
   const r = Object.fromEntries(nameRules({ tokens: [...system().tokens, t('chip/hover/textColor'),
     t('radius/s', 4), t('radius/m', 8), t('radius/full', 9999), t('space/gap/xl', 18),
     t('card/fillColor/default'), t('card/textColor/default'), t('menu/textColor/rest'), t('menu/fillColor/rest'), t('sheet/fillColor/default')] }).map((x) => [x.id, x]));
-  assert.equal(r['token-segment-order'].says, 'A token\'s name puts its state as the last part and its size as the last part');
+  // One short sentence for its title; where each part goes, with a name that does, is its panel's (places).
+  assert.equal(r['token-segment-order'].says, 'A state and a size each sit in the same place in every token\'s name');
+  assert.deepEqual(r['token-segment-order'].places.map((p) => [p.what, p.at]), [['A state', 'The last part'], ['A size', 'The last part']]);
+  assert.ok(r['token-segment-order'].places.every((p) => p.example && r['token-segment-order'].items.some((i) => i.fits && i.where === p.example)), 'each with a name of the system that follows it');
   assert.deepEqual(off(r['token-segment-order']), [['chip/hover/textColor', 'its state is the part before the last, where most names have it as the last part']]);
+  // Its fix is the whole name it takes, as a rename.
+  const seg = r['token-segment-order'].items.find((i) => !i.fits);
+  assert.equal(seg.to, 'chip/textColor/hover');
+  assert.deepEqual(fixOf({ id: 'token-segment-order' }, seg), { what: null, from: 'chip/hover/textColor', to: 'chip/textColor/hover', say: 'Rename it to chip/textColor/hover' });
   assert.equal(r['token-on-scale'].says, 'A spacing or radius value is a step of the system\'s 4px scale');
   assert.deepEqual(off(r['token-on-scale']), [['space/gap/xl', '18, between 16 and 20']], 'a pill radius (9999) is no step');
   // tag and menu fill with no text beside them in the system tokens, sheet as well; card and menu/rest have theirs.
@@ -74,18 +81,23 @@ test('where a state sits, a value off the scale, a surface with nothing for what
 
 test('a category word where most names do not put it', () => {
   const r = nameRules({ tokens: ['button/fill/color', 'chip/fill/color', 'card/fill/color', 'color/tag/fill', 'radius/s', 'radius/m', 'radius/l'].map((n) => t(n)) }).find((x) => x.id === 'token-category-order');
-  assert.equal(r.says, 'A token\'s name puts color as the last part, radius as the part before the last');
+  assert.equal(r.says, 'Each kind of token puts its kind\'s word in the same place in its name');
+  assert.deepEqual(r.places, [{ what: 'color', at: 'The last part', example: 'button/fill/color' }, { what: 'radius', at: 'The part before the last', example: 'radius/s' }]);
   assert.deepEqual(off(r), [['color/tag/fill', 'color is part 3 from the end, where most names have it as the last part']]);
+  assert.equal(fixOf({ id: 'token-category-order' }, r.items.find((i) => !i.fits)).say, 'Rename it to tag/fill/color');
 });
 
 test('a state before what a colour is for, where most names put it after', () => {
   const r = nameRules({ tokens: ['button/background/hover', 'chip/background/hover', 'card/text/hover', 'tag/hover/background'].map((n) => t(n)) }).find((x) => x.id === 'token-property-order');
-  assert.equal(r.says, 'A token\'s name puts what a colour is for before its state (background/hover)');
+  assert.equal(r.says, 'What a colour is for comes before its state in every token\'s name');
+  assert.deepEqual(r.places, [{ what: 'What it is for, then its state', at: 'background/hover', example: 'button/background/hover' }]);
   assert.deepEqual(off(r), [['tag/hover/background', 'its state comes before what it is for']]);
+  assert.equal(fixOf({ id: 'token-property-order' }, r.items.find((i) => !i.fits)).say, 'Rename it to tag/background/hover');
 });
 
 test('a variant before what a colour is for, where most names put it after', () => {
   const r = nameRules({ tokens: ['button/text/primary', 'chip/text/negative', 'card/background/brand', 'tag/positive/text'].map((n) => t(n)) }).find((x) => x.id === 'token-variant-order');
-  assert.equal(r.says, 'A token\'s name puts what a colour is for before its variant (text/negative)');
+  assert.equal(r.says, 'What a colour is for comes before its variant in every token\'s name');
   assert.deepEqual(off(r), [['tag/positive/text', 'its variant comes before what it is for']]);
+  assert.equal(fixOf({ id: 'token-variant-order' }, r.items.find((i) => !i.fits)).say, 'Rename it to tag/text/positive');
 });

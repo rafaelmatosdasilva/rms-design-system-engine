@@ -28,13 +28,13 @@
     // A family the code writes by hand: said first, since what it draws keeps that font in every brand.
     if ((DATA.handFonts || []).length) {
       var hf = document.createElement('div'); hf.className = 'sg-pending sg-type-hand';
-      hf.innerHTML = '<span><b>The code writes the font by hand.</b> ' + DATA.handFonts.map(function (h) { return esc(h.value) + ' on <code>' + esc(h.selector) + '</code>'; }).join('; ') +
+      hf.innerHTML = '<span><b>The code writes the font by hand.</b> ' + DATA.handFonts.map(function (h) { return esc(h.value) + ' on <code>' + esc(h.selector) + '</code>'; }).join(' · ') +
         ', not the system\'s family token: what is drawn there, and every component that inherits it, keeps that font in every brand. Write it with the token.</span>';
       ts.appendChild(hf);
     }
     if (TYPE_OFF.length) {
       var off = document.createElement('div'); off.className = 'sg-pending sg-type-off';
-      off.innerHTML = '<b>Left off until Figma and the code agree:</b> ' + TYPE_OFF.map(function (x) { return esc(x.style) + ' (' + esc(x.differs.length ? 'differs' : 'not compared') + ': ' + esc(x.fields.map(function (f) { return ({ size: 'size', weight: 'weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' })[f] || f; }).join(', ')) + ')'; }).join(', ') + '. Each is on the Status page.';
+      off.innerHTML = '<b>Left off until Figma and the code agree:</b> ' + TYPE_OFF.map(function (x) { return namePill(x.style) + ' (' + esc(x.differs.length ? 'differs' : 'not compared') + ': ' + esc(x.fields.map(function (f) { return ({ size: 'size', weight: 'weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' })[f] || f; }).join(', ')) + ')'; }).join(', ') + '. Each is on the Status page.';
       ts.appendChild(off);
     }
     var demo = document.createElement('div'); demo.className = 'type-list sg-token-cards';   // no frame around the list: each style is its own card

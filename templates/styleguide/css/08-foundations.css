@@ -38,12 +38,16 @@
    The cell has no bottom border at all, so the line is its last pixel: a border left under it, even a transparent one,
    is a pixel the rows show through as they scroll. */
 :is(.pg-inspect.sg-token-card thead th, .pg-inspect.sg-token-card :is(.sg-tk-group, .sg-tk-collhead) > th, .pg-par-table th) { --sg-th-line: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid); border-bottom-width: 0; box-shadow: var(--sg-th-line); }
-.pg-inspect.sg-token-card thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 5; background: var(--sg-bg-2); }   /* Name and the modes stay in view under the card's head */
+/* Every table's head that stays in view (a page's table, a component's areas, History, a token card) sits over its rows:
+   above anything a cell holds (a pill, a name, a date that sticks), on a solid fill, so no row's content paints over it as
+   it scrolls under. One rule for all; only its top differs, by what sticks above the table. */
+:is(.pg-par-table th, .pg-inspect.sg-token-card thead th) { position: sticky; z-index: 5; background: var(--sg-bg-2); }
+.pg-inspect.sg-token-card thead th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }   /* Name and the modes stay in view under the card's head */
 .pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
 .pg-inspect.sg-token-card .sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
 /* Every token table alike: its columns named, as every table with columns is, and its rows one height whatever the
    preview (a swatch, a radius, a bar), the preview's 32px and the cell's room. */
-.pg-inspect.sg-token-card th { text-align: left; background: var(--sg-tint); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; }
+:is(.pg-par-table, .pg-inspect.sg-token-card) th { text-align: left; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; }   /* every table's head alike: its words, colour and room */
 .pg-inspect.sg-token-card :is(th, td):first-child { padding-left: var(--sg-cell-x); } .pg-inspect.sg-token-card :is(th, td):last-child { padding-right: var(--sg-cell-x); }   /* as the tables above: in line with the card's head */
 .pg-inspect.sg-token-card td { height: calc(var(--sg-space-xxl) + var(--sg-space-l)); }
 .pg-inspect.sg-token-card td.sg-token-value { overflow-wrap: normal; }
@@ -66,7 +70,7 @@
 .pg-inspect.sg-token-card table:has(.sg-motion-sample) :is(td, th):nth-child(2), .pg-inspect.sg-token-card table:has(.sg-motion-sample) :is(td, th):nth-child(3) { width: 25%; }
 .sg-token-sample > .sg-motion-sample { display: flex; align-items: center; gap: var(--sg-space-s); }
 .sg-motion-sample > .sg-motion-track { display: flex; align-items: center; flex: 1; min-width: 96px; height: var(--sg-space-xxl); background: var(--sg-tint); border-radius: var(--sg-radius-s); }
-.sg-motion-track > .sg-motion-dot { display: block; flex: none; width: var(--sg-space-m); height: var(--sg-space-m); border-radius: 50%; background: var(--sg-accent); }
+.sg-motion-track > .sg-motion-dot { display: block; flex: none; width: var(--sg-space-m); height: var(--sg-space-m); border-radius: var(--sg-radius-pill); background: var(--sg-accent); }
 .sg-motion-curve { flex: none; width: var(--sg-space-xxl); height: var(--sg-space-xxl); fill: none; stroke: var(--sg-text); stroke-width: 2; }
 .sg-motion-curve .sg-motion-axis { stroke: var(--sg-muted); stroke-width: 1; }
 .sg-thumb .sg-motion-curve { width: 36px; height: 36px; }
@@ -92,5 +96,4 @@
 .sg-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sg-space-xxl) * 6), 1fr)); }   /* equal cells: every icon lines up across and down */
 .sg-icon-strokes { margin-bottom: var(--sg-space-m); }
 .icon-chip svg { width: var(--sg-icon); height: var(--sg-icon); color: var(--sg-text); }
-.token-pill { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); padding: 1px var(--sg-space-xs); border-radius: var(--sg-radius-s); background: var(--sg-bg-2); color: var(--sg-muted); border: var(--sg-line); }
 

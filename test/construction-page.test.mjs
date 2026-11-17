@@ -105,14 +105,14 @@ test('the page: in the menu by default, one table whose heads sort, chips for wh
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// Changes in Figma: each change made'));
   assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'Source', 'Follow it', 'Owned by', 'Status'], 'one head a column, each sorting by it; no To do column');
   assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
-  assert.match(page, /sortDir = sortKey === key \? -sortDir : 1;/, 'the same head again sorts the other way round');
+  assert.match(page, /table\._sortDir = table\._sortKey === key \? -table\._sortDir : 1;/, 'the same head again sorts the other way round, each table its own order');
   assert.ok(!/data-chip-group=/.test(page), 'which side a rule is on is a column, never a chip');
   assert.ok(!/label: 'In Figma'|label: 'In the code'|label: 'Notes'/.test(page), 'which side a rule is on is a filter of its own, never a chip beside the statuses');
   assert.deepEqual([...page.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((m) => [m[1], m[2]]), [['source', 'Source'], ['area', 'Area']], 'where it was read from, then the area: lists');
   assert.match(page, /var cxStatusChips = \['fix', 'decide', 'rule'\]\.map\(function \(k\) \{ return \{ key: k, label: ST\[k\]\[1\], dot: ST\[k\]\[0\]/, 'each status a chip of its own, with its dot, read without opening a list');
   assert.match(page, /data-f data-f-area="' \+ esc\(AREA\[r\.area\] \|\| capital\(r\.area\)\)/, 'every row says its values to the filter');
   // What to do comes first, and right under it what it changes, then the facts (the owner's, 16 November 2026).
-  assert.match(page, /var body = card\('What to do', lead\) \+ \(r\.status === 'rule' \? '' : card\(\(byComponent\(r\) \? 'Components it changes \(' : 'Places it changes \('\) \+ n \+ '\)', list\)\) \+ card\('Status'/, 'What to do first, then every component it changes, then the facts');
+  assert.match(page, /var body = card\('What to do', lead\) \+ placesCard \+ \(r\.status === 'rule' \? '' : card\(\(byComponent\(r\) \? 'Components it changes \(' : 'Places it changes \('\) \+ n \+ '\)', list\)\) \+ card\('Status'/, 'What to do first, then every component it changes, then the facts');
   assert.match(page, /Hand each change back as a patch for a person to apply, and change no code yourself\./, 'the code\'s change is handed back, never written over the code people wrote');
   const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
   assert.match(gen, /const constructionShow = cfg\.styleguide\?\.construction \?\? 'listed';/, 'in the menu unless the team leaves it out');

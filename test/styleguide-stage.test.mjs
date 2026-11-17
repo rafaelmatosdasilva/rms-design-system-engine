@@ -57,13 +57,14 @@ test('in the browser: no stage in a component\'s header, and the stage the page 
     for (const id of ['c-badge', 'c-button', 'c-iconButton']) assert.doesNotMatch(await headerOf(id), /\b(Stable|Beta|Deprecated|Suggested)\b/, id);
     // The stage the page measures is a task in its Documentation area: one to set when the team gave none.
     await run(`location.hash = '#c-badge/docs'`);
-    const stageRow = `[...document.querySelectorAll('#c-badge .pg-area[data-area="docs"] tbody')].map((b) => b.textContent.replace(/\\s+/g, ' ')).join(' ')`;
-    assert.equal(await waitForTrue(send, sessionId, `/Stage/.test(${stageRow})`, { attempts: 300 }), true, 'the stage is a task');
-    // Opened, it says what the page measures and where the team sets it.
-    await run(`[...document.querySelectorAll('#c-badge .pg-area[data-area="docs"] tr')].find((r) => /Stage/.test(r.textContent)).click()`);
+    // It is in the Documentation page's own row for badge, which its Documentation area shows: its panel says it.
+    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-badge .pg-area[data-area="docs"] tbody tr[data-il-row]')`, { attempts: 300 }), true, 'the area has its row');
+    await run(`document.querySelector('#c-badge .pg-area[data-area="docs"] tbody tr[data-il-row]').cells[0].click()`);
+    assert.equal(await waitForTrue(send, sessionId, `/Stage/.test(document.querySelector('#sg-il-panel .sg-row-detail')?.textContent || '')`, { attempts: 100 }), true, 'the stage is a task');
     const opened = `document.body.innerText.replace(/\\s+/g, ' ')`;
     assert.equal(await waitForTrue(send, sessionId, `/No stage yet/.test(${opened})`, { attempts: 100 }), true, 'its words');
-    assert.match(await run(opened), /No stage yet: what the page measures makes it (Beta|Stable) \(.+?\)\..*?Set its status in contract\.authored\.json \((beta|stable)\)\./);
+    // What to do first, then why: what the page measures (a list joined by · ).
+    assert.match(await run(opened), /Set its status in contract\.authored\.json \((beta|stable)\)\..*?No stage yet: what the page measures makes it (Beta|Stable) \(.+?\)\./);
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

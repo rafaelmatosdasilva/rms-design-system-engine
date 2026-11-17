@@ -71,8 +71,12 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     assert.equal(await run(`document.querySelectorAll('#history .sg-chip').length`), 0, 'one kind alone: no chips');
     // The button's own History: the change to its page.
     await run(`location.hash = '#c-button/history'`);
-    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-button .pg-inspect[data-hist="intent"]')`, { attempts: 200 }), true, 'the button\'s History has its row');
-    assert.match(await run(`document.querySelector('#c-button .pg-inspect[data-hist="intent"]').innerText.replace(/\\s+/g, ' ')`), /Intent layer c2d4e6f8 Its page and 1 more changed: button, Saving\. 2026-10-31/);
+    // The History page's own table, its heads and its row, filtered to the button: the change to its page alone.
+    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-button [data-area="log"] table.sg-log tr[data-chip="intent"]')`, { attempts: 200 }), true, 'the button\'s History has its row');
+    assert.deepEqual(await run(`[...document.querySelectorAll('#c-button [data-area="log"] table.sg-log thead th')].map((th) => th.textContent)`), ['Date', 'Source', 'What', 'Affects', 'Done by']);
+    const own = await run(`[...document.querySelectorAll('#c-button [data-area="log"] tr[data-chip="intent"]')].map((tr) => [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()))`);
+    assert.equal(own.length, 1, 'only the change that affects it');
+    assert.deepEqual(own[0].slice(1), rows[0].slice(1), 'the same row as History\'s');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

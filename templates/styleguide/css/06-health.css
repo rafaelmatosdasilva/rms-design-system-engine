@@ -12,7 +12,7 @@
 .sg-tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin: 0; padding: 0; border: var(--sg-line); border-radius: var(--sg-control-radius); background: transparent; transition: background-color var(--sg-fast), border-color var(--sg-fast); color: var(--sg-text-2); font: inherit; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); line-height: normal; cursor: help; }
 .sg-tip-btn:hover, .sg-tip-btn:focus-visible { color: var(--sg-text); }
 .sg-tip-btn:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }   /* the shared hover */
-.sg-tip-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-tip-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-tip-bubble { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 20; width: max-content; max-width: min(18rem, 70vw); padding: var(--sg-space-s) var(--sg-space-m); border-radius: calc(var(--sg-radius-s) - var(--sg-space-xs)); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-s); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); text-align: left; box-shadow: var(--sg-shadow-lift); visibility: hidden; }
 .sg-mx-why { display: inline-flex; align-items: center; gap: var(--sg-space-s); }   /* a word and the ? that says why */
 .sg-mx-why .sg-tip-btn { width: calc(var(--sg-space-l) + var(--sg-space-xxs)); height: calc(var(--sg-space-l) + var(--sg-space-xxs)); font-size: var(--sg-xs); }
@@ -31,7 +31,7 @@
 .sg-health-count > .sg-health-num:has(.sg-health-dot) { flex-wrap: nowrap; column-gap: 0; }   /* the dot, the number, and its word on the number's baseline, all on one line */
 .sg-health-num > .sg-health-dot { align-self: center; margin-right: calc(var(--sg-space-xs) + var(--sg-space-xxs)); }
 .sg-health-num > .sg-health-dot ~ .sg-health-out { margin-left: var(--sg-space-s); }
-.sg-health-dot { flex: none; width: calc(var(--sg-space-xs) * 2.25); height: calc(var(--sg-space-xs) * 2.25); border-radius: var(--sg-radius-pill); background: var(--sg-positive); }   /* green, as the done part of the bar: the big number is that part */
+.sg-health-dot { flex: none; width: calc(var(--sg-dot) * 1.5); height: calc(var(--sg-dot) * 1.5); border-radius: var(--sg-radius-pill); background: var(--sg-positive); }   /* green, as the done part of the bar: the big number is that part */
 .sg-health-out { font-size: calc(var(--sg-s) + var(--sg-space-s)); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }   /* of 133, 8px over the text size */
 .sg-health-desc { font-size: calc(var(--sg-s) + var(--sg-space-xxs) / 2); color: var(--sg-text-2); }   /* what the count counts, under it, 1px over the text size */
 .sg-health-num, .sg-health-num.sg-health-num { line-height: normal; }
@@ -67,12 +67,12 @@ th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-sort { color: va
 th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-tri { opacity: 1; }
 th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
 .sg-mx-cell, .sg-todo td > a.sg-mx-cell[href] { color: inherit; text-decoration: none; display: inline-flex; border-radius: var(--sg-radius-s); }   /* a status that opens its area, not underlined until pointed at */
-.sg-mx-cell:hover .pg-par-status { text-decoration: underline; text-underline-offset: 3px; }
+.sg-mx-cell:hover .pg-par-status { text-decoration: underline; text-underline-offset: var(--sg-underline-offset); }
 .sg-matrix tr[hidden] { display: none; }
-.sg-mx-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--sg-space-xl) + var(--sg-space-s)); height: calc(var(--sg-space-xl) + var(--sg-space-s)); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; transition: background-color var(--sg-fast), color var(--sg-fast); }   /* close: an X alone, rounded as the page's buttons are */
+.sg-mx-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--sg-icon-btn); height: var(--sg-icon-btn); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; transition: background-color var(--sg-fast), color var(--sg-fast); }   /* close: an X alone, rounded as the page's buttons are */
 .sg-mx-close:hover { background-color: var(--sg-hover-fill); color: var(--sg-text); }
-.sg-mx-close:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-mx-close > svg { width: calc(var(--sg-space-l) + var(--sg-space-xs)); height: calc(var(--sg-space-l) + var(--sg-space-xs)); }
+.sg-mx-close:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
+.sg-mx-close > svg { width: var(--sg-mark); height: var(--sg-mark); }
 .sg-mx-at { white-space: nowrap; color: var(--sg-text-2); }
 .sg-matrix { table-layout: fixed; width: 100%; }   /* the columns keep their width whatever is sorted or shown */
 .sg-matrix th:first-child { width: 22%; }
@@ -87,9 +87,9 @@ th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
 .sg-health-go { margin-top: auto; padding-top: var(--sg-cell-x); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
 .sg-health-anchor { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-m); cursor: pointer; }   /* a link down to the table: its words and an arrow pointing down */
 .sg-health-anchor > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
-.sg-health-anchor:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sg-health-anchor:hover { text-decoration: underline; text-underline-offset: var(--sg-underline-offset); }
 .sg-health-anchor:hover > svg { transform: translateY(var(--sg-space-xxs)); }
-.sg-health-anchor:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+.sg-health-anchor:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 .sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text-2); }   /* what is left, side by side on one line */
 .sg-health-legend .pg-par-status { gap: calc(var(--sg-space-xxs) * 2.5); white-space: nowrap; }   /* the dot, its words and the count of components 5px apart */
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */

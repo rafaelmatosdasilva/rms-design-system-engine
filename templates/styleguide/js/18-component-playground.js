@@ -224,10 +224,5 @@
       return k.href ? sysButton('a', k.name, ' href="' + esc(k.href) + '" target="_blank" rel="noopener"', 'pg-usage-name') : '<span class="pg-usage-name">' + esc(k.name) + '</span>';
     }).join('');
   }
-  // A date and time in the reader's own clock (two changes on one day read apart).
-  var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
-  // A date as a row says it, short: 16 Oct, 22:11 (the year only when it is not this one).
-  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  var whenShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ', ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
   function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + linkVars(r[1]) + '</td></tr>'; }).join(''); }
 

@@ -126,6 +126,11 @@ What every page shares:
 - **Filters in one order.** All first, then the filters (Who acts), then the statuses, all as far apart as each other.
 - **Column widths by what they hold.** Each column has its share of the table, so leaving one out never squeezes the rest. A column with nothing in any row is left out (Motion's What to do when nothing is to do).
 - **A row's panel reads as text.** Every line in one colour and weight, and never a table or a box drawn like one: what a table would say is said as labelled values.
+- **Every panel in one order.** What to do comes first, with See in Figma or See in code when it has one. Then what it changes or where (the components, the places), then its Status, then the rest: who acts, why, where it was read and when it was last checked. A panel says each date once.
+- **What to do is the action only.** It says what to do, each name or value in it a pill. What was found is in Why, or is the value inside the action.
+- **Every panel has its own link.** A rule's, a task's, a documentation row's, a change in Figma's and a token's: copy the address and it opens again.
+- **Changes in Figma say what to do.** A change waiting to be made, or made but not as said, opens on what to do in Figma, with See in Figma.
+- **A token's naming rule says the new name.** A token whose parts are out of the system's order (its state, its size, its kind's word) is listed with the whole name it takes, beside the name it has. The rule's title is one short sentence. Its panel says, under What to do, where most names put each part, with one of your own names that does.
 
 ### Status
 
@@ -149,7 +154,7 @@ Accessibility is tried while the page is built and kept in it, so the page opens
 
 ### Each component's page
 
-At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time. Parity, Accessibility and Documentation carry their Status dot on their tab (N/A none), from the same rules as the Status table, so a word or a rule changed once changes everywhere. Their chips and each row's status use the Status words too: Parity Differs, Unsure, Match; Accessibility Issues, Review, Pass; Documentation Missing, Partial, Ready. An area with nothing to show (N/A, nothing moves, no commit yet, not used anywhere) says why in an info box, N/A in the same words as the Status table's tip.
+At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time. Parity, Accessibility and Documentation carry their Status dot on their tab (N/A none), from the same rules as the Status table, so a word or a rule changed once changes everywhere. Their chips and each row's status use the Status words too: Parity Differs, Unsure, Match; Accessibility Issues, Review, Met; Documentation Missing, Review, Done. An area with nothing to show (N/A, nothing moves, no commit yet, not used anywhere) says why in an info box, N/A in the same words as the Status table's tip.
 
 | Area | What it shows |
 |---|---|
@@ -157,14 +162,14 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
-| Rules | Each of the system's rules the component breaks in Figma (from the Rules page), with its fix. Who fixes it and a link to its node in Figma are said once above the table. Shown only when it breaks one |
-| Accessibility | One table by WCAG 2.2 criterion: its task number, the criterion, who acts, its status and when it was last checked. What to do, what Figma states and what was found are in the row's panel |
-| Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
+| Rules | The Rules page's own table, filtered to the rules that change this component, in Figma or in the code, to fix or to decide. The same columns, filters and sorting, and each row opens the same panel as on the Rules page, with its own link. Shown only when a rule changes it |
+| Accessibility | The Accessibility page's own table, limited to this component's criteria at A and AA: its task number, the criterion, its level, who acts, its status and when it was last checked (the Component column left out, every row being this one). The same filters and sorting, and each row opens the same panel as on the Accessibility page, with its own link. Under it, in a table of its own, what the page leaves out: what is looked at beyond A and AA and the Figma notes no check reads. Drawn at once with every result already known, a row still being tried in this browser saying so until its try ends |
+| Documentation | The Documentation page's own table, filtered to the rows it has for this component: its page in the intent layer (a row for each decision it asks for), or the page still to write. The same columns, filters (Source, Area) and status words (Missing, Review, Done), and each row opens the same panel as on the Documentation page, with its own link. Its tab's dot counts those rows: Done when none is open, Missing when every one is still to write, else Review. What it is, when to use it, Do and Don't pictures, its role, an example and what is still to write are in that panel |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when. A change to its page in the intent layer (its contract) names who made it too |
+| History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it, its changes in Figma and code not committed yet |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 
@@ -242,10 +247,10 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 
 - **What it looks for.** A section headed with the component's exact name, what it is, when to use it, when not to, its role and an example. Its properties are not asked for: its contract carries them from Figma and the code.
 - **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out. A name with a `*` (`--card-*`) is a family, there when one of the system's names starts with it.
-- **Where you see it.** In each component's Documentation area, one row per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
+- **Where you see it.** In the panel of each component's row on the Documentation page (the same row its Documentation area shows), one item per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
 - **The whole document** gets a class too, from how many of its components are ready.
-- **What a screen meets first.** Each component's Documentation area also asks what its page leaves open at the edges: what it does when its content does not fit (it scrolls, wraps, is cut or grows), and, for a component with two actions, what it shows with one. Asked only where it applies, and no more once the page says it.
+- **What a screen meets first.** Each component's documentation also asks what its page leaves open at the edges: what it does when its content does not fit (it scrolls, wraps, is cut or grows), and, for a component with two actions, what it shows with one. Asked only where it applies, and no more once the page says it.
 
 ### Foundations
 

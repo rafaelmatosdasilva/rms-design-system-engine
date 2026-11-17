@@ -93,18 +93,29 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
     const { sessionId } = await openPage(send, 'file://' + file + '#c-button');
     assert.ok(await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 400 }));
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)).result.value;
+    // A component's Documentation area is the Documentation page's own row for it: what is written, by source, and
+    // what is still to write are in that row's panel, the page's own.
+    const read = (id) => run(`(async () => {
+      const tr = document.querySelector('#${id} .pg-knowledge tbody tr[data-il-row]'); if (!tr) return null;
+      tr.cells[0].click(); await new Promise((r) => setTimeout(r, 400));
+      const m = document.querySelector('#sg-il-panel'), card = (h) => [...m.querySelectorAll('.pg-inspect')].find((x) => x.querySelector('.pg-inspect-head').textContent === h);
+      const done = {}, reads = card('What the agents read');
+      let src = '';
+      if (reads) for (const n of reads.querySelector('.sg-row-detail-body').children) { if (n.matches('p.sg-il-line')) src = n.querySelector('strong').textContent; else if (n.matches('.sg-il-group')) done[n.querySelector('.sg-il-head').textContent] = src; }
+      const todo = card('What to do') ? card('What to do').textContent : '';
+      m.querySelector('[data-panel-close]').click();
+      return JSON.stringify({ done, todo });
+    })()`);
     assert.ok(await waitForTrue(send, sessionId, '!!document.querySelector("#c-button .pg-knowledge tbody tr")', { attempts: 400, tolerateErrors: true }));
-    const rows = await run(`JSON.stringify([...document.querySelectorAll('#c-button .pg-knowledge tbody tr')].map((tr) => [tr.cells[1].textContent.trim(), tr.dataset.status, tr.cells[2].textContent.trim()]))`);
-    const of = (kind) => JSON.parse(rows).find((x) => x[0] === kind);
-    assert.deepEqual(of('Do and don\'t').slice(1), ['done', 'Contract'], 'written in the contract: done, its source named');
-    assert.equal(of('Properties')[1], 'done', 'the engine\'s own contract is the one every agent reads');
+    const button = JSON.parse(await read('c-button'));
+    assert.equal(button.done['Do and don\'t'], 'Contract', 'written in the contract: done, its source named');
+    assert.ok('Properties' in button.done, 'the engine\'s own contract is the one every agent reads');
     // A component with nothing written: still to write.
     await run(`location.hash = '#c-badge'`);
     assert.ok(await waitForTrue(send, sessionId, '!!document.querySelector("#c-badge .pg-knowledge tbody tr")', { attempts: 400, tolerateErrors: true }));
-    const how = await run(`(() => { const tr = [...document.querySelectorAll('#c-badge .pg-knowledge tbody tr')].find((x) => /Do and don't/.test(x.cells[1].textContent)); return tr ? tr.dataset.status : 'none'; })()`);
-    assert.equal(how, 'todo', 'nothing written for badge: still to write');
-    const role = await run(`(() => { const tr = [...document.querySelectorAll('#c-badge .pg-knowledge tbody tr')].find((x) => x.cells[1].textContent.trim() === 'Role'); return tr ? tr.dataset.status + '|' + tr.cells[2].textContent.trim() : 'none'; })()`);
-    assert.equal(role, 'done|Code', 'its root a plain span: no role, read from the code');
+    const badge = JSON.parse(await read('c-badge'));
+    assert.ok(!('Do and don\'t' in badge.done) && /Do and don't/.test(badge.todo), 'nothing written for badge: still to write');
+    assert.equal(badge.done.Role, 'Code', 'its root a plain span: no role, read from the code');
   } finally { close(); c.kill(); }
   const tpl = templateText();
   assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma, the comment above its rule in the code, or contract\.authored\.json under guidance\.doDont\./);

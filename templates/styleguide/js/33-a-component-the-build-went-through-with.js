@@ -41,6 +41,12 @@
   // A component the sweep draws out of sight can take the focus on its own (a modal that opens, a field that focuses
   // itself): while a person is on a control of the page, any focus that lands out of sight goes straight back to them.
   var personFocus = null;
+  // Whether the focus a person left on the page is one a try must wait on: moving it would close their list or take
+  // their typing (a field, a list or a menu they opened), or they touched the page a moment ago (as personBusy). Where
+  // the focus only rests (a row a closed panel gave it back to, a page's title the route moved it to, a button already
+  // pressed) costs them nothing: the check moves it and the page hands it straight back (personFocus).
+  var HOLDS = 'input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]),select,textarea,[contenteditable=""],[contenteditable=true],[role=textbox],[role=searchbox],[role=combobox],[role=listbox],[role=menu],[aria-expanded="true"]';
+  function personHolds(el) { return !!(el && el.matches && (el.matches(HOLDS) || el.closest('[role=listbox],[role=menu],[aria-expanded="true"]'))) || Date.now() - lastTouch < 2000; }
   document.addEventListener('focusin', function (e) {
     var t = e.target, away = t && t.closest && t.closest('.pg-offstage');
     if (away) { if (personFocus && personFocus.isConnected && personFocus !== t && !personFocus.closest('.pg-offstage')) personFocus.focus({ preventScroll: true }); return; }
@@ -230,7 +236,7 @@
       // with what it left out. Once the component has changed, hearing it again is what to do.
       var heard = r.k.sc === '4.1.2' && WCAG && WCAG.heard ? WCAG.heard[c.name] : null;
       if (heard) {
-        var hDay = new Date(heard.at + 'T12:00:00Z'), hWho = heard.reader + (heard.version ? ' (' + heard.version + ')' : '') + ' on ' + (isNaN(hDay) ? heard.at : hDay.getUTCDate() + ' ' + MONTHS[hDay.getUTCMonth()]);
+        var hDay = new Date(heard.at + 'T12:00:00Z'), hWho = heard.reader + (heard.version ? ' (' + heard.version + ')' : '') + ' on ' + dayShort(hDay);
         if (heard.stale) todos.push(esc('Hear ' + c.name + ' again with ' + heard.reader + ', it changed after ' + hWho + ':') + ' <code>rms-design-system-engine --hear --component ' + esc(c.name) + '</code>');
         else found += '<div class="pg-a11y-item pg-a11y-heard">' + esc('Heard with ' + hWho + ': ' + (heard.apart.length ? heard.same + ' of ' + heard.heard + ' controls said as the browser says them.' : 'every control said as the browser says it.') + ' A measurement of one reader, it decides nothing.') +
           (heard.apart.length ? '<ul class="pg-a11y-listed-list">' + heard.apart.map(function (l) { return '<li>' + esc(l.desc + ': the browser says "' + l.want + '" and ' + heard.reader + ' said "' + (l.said || 'nothing') + '"' + (l.why ? ', ' + l.why : '')) + '</li>'; }).join('') + '</ul>' : '') + '</div>';
@@ -303,7 +309,7 @@
       off.forEach(function (b) { if (offs.indexOf(b.label) < 0) offs.push(b.label); });
       return off.length > 0;
     });
-    return every && offs.length ? 'With ' + offs.join(' or ') + ' off it shows no words, so nothing names it. Where a product uses it that way, give it a name there: an aria-label, or aria-labelledby on words beside it. Say so in its Usage.' : '';
+    return every && offs.length ? 'With ' + offs.map(namePill).join(' or ') + esc(' off it shows no words, so nothing names it. Where a product uses it that way, give it a name there: an aria-label, or aria-labelledby on words beside it. Say so in its Usage.') : '';
   }
   function showFirst(list, propOf) {
     var out = list.slice(), shows = showsText;
@@ -358,15 +364,22 @@
     // the description (else the note is what it is, above).
     var docRows = (figNotes.length ? '<div><dt>From Figma</dt><dd>' + figNotes.map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
       (c.slots ? '<div><dt>Slots</dt><dd>' + c.slots.map(function (sl) {
-        var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content, with ' + sl.preferred.join(', ') + ' suggested' : 'Takes any content the product puts in it');
         var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
-        return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
+        // HTML: the components it takes, a list of pills (namePills), the words around them escaped.
+        var what = sl.preferredOnly ? (sl.preferred.length ? esc('Takes only' + count + ': ') + namePills(sl.preferred) : esc((sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') + count + '.'))
+          : (sl.preferred.length ? esc('Takes any content' + count + ', with these suggested: ') + namePills(sl.preferred) : esc('Takes any content the product puts in it' + count + '.'));
+        return '<p><b>' + esc(sl.name) + '</b> ' + what + esc((sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
       (c.note && figDesc ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '') +
       // Its file and the props its code declares, for a component only the code has (no Figma props to show them by).
       (c.codeOnly ? '<div><dt>In the code</dt><dd><p><code>' + esc(c.codeOnly.file) + '</code></p>' + ((c.codeOnly.props || []).length ? '<ul class="pg-code-props">' + c.codeOnly.props.map(function (p) {
-        return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + esc(p.options.join(' | ')) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
+        return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + namePills(p.options) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
       }).join('') + '</ul>' : '<p>No props declared.</p>') + '</dd></div>' : '');
+    // The rules that change it, as the Rules page has them (none when the system has no rules).
+    var compRules = RULES_PAGE ? RULES_PAGE.of(c.name) : [];
+    // The Documentation page's rows for it, as the page has them (drawn first when it is not yet).
+    if (!DOC_PAGE && fillDocs) { fillDocs(); fillDocs = null; }
+    var compDocs = DOC_PAGE ? DOC_PAGE.of(c.name) : [];
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
@@ -386,12 +399,17 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || ruleRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
+        // Documentation counts what its table shows, the Documentation page's rows for it in their words, as Rules does
+        // from its rules: Done when none is open, Missing when every one is still to write (or to remove), else Review.
+        if (a[0] === 'docs' && compDocs.length) { var dSt = compDocs.map(DOC_PAGE.status), dFix = dSt.filter(function (k) { return k === 'write' || k === 'remove'; }).length, dDec = dSt.filter(function (k) { return k === 'review'; }).length;
+          return { v: a[0], label: a[1], state: !dFix && !dDec ? { cls: 'match', say: 'Done' } : dFix === dSt.length ? { cls: 'differs', say: 'Missing' } : { cls: 'figma', say: 'Review' } }; }
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
         // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
-        if (a[0] === 'rules') { var nr = ruleRows(c).length; return { v: a[0], label: a[1], state: { cls: 'differs', say: nr + ' to fix in Figma' } }; }
+        // Counted as its table counts them, in the Rules page's words: the rules to fix, else the rules to decide.
+        if (a[0] === 'rules') { var nf = compRules.filter(function (r) { return r.status === 'fix'; }).length; return { v: a[0], label: a[1], state: nf ? { cls: 'differs', say: nf + ' to fix' } : { cls: 'figma', say: compRules.length + ' to decide' } }; }
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
         return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
@@ -410,9 +428,11 @@
       '</div>' +
       // Variants: every option of each variant prop and both sides of each on/off prop, one per row, the other props as the Playground sets them.
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
-      // Documentation: Figma's and the code's own words, and when each side last changed.
+      // Documentation: the Documentation page's own table, filtered to the rows it has for this component (its page in the
+      // intent layer, each decision on it a row, or the page still to write), with the page's filters, each row opening
+      // the same panel (DOC_PAGE, 07-second-in-the-list.js, the owner's, 16 November 2026).
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' + naInfo(states.doc) +
-        knowledgeHTML(c) +
+        (compDocs.length ? '<div class="pg-doc pg-par pg-knowledge" id="' + esc(cid(c.name)) + '-documentation">' + DOC_PAGE.tableHTML(compDocs) + '</div>' : states.doc.say === 'N/A' ? '' : areaInfo('The Documentation page has no row for it.')) +
         '</div></div>' +
       // API: its props (each one the code says must be given marked), the events it sends and its slots, as the code has them.
       // with its Details (its slots and what each takes), how it is built rather than how it is used.
@@ -427,11 +447,16 @@
       ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
-      // Rules: the Figma review's findings for this component, each rule it breaks with its fix, waiting on whoever
-      // keeps the Figma file; each opens the component's node in Figma (ruleRows).
-      (ruleRows(c).length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(ruleRows(c)) + '</div>' + rulesLead(c) + issueTableHTML(byStatus(ruleRows(c)), '', '', 'Rules') + '</div></div></div>' : '') +
+      // Rules: the Rules page's own table, filtered to the rules that change this component, on either side, to fix or
+      // to decide (RULES_PAGE, 07-second-in-the-list.js), with the page's filters and sorting, each row opening the same
+      // panel (the owner's, 16 November 2026). No line above the table: each rule's own panel has See in Figma.
+      (compRules.length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par" id="' + esc(cid(c.name)) + '-rules">' + RULES_PAGE.tableHTML(compRules) + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
+    // Its Rules, Documentation and History areas: the pages' own tables, wired as the pages wire them.
+    if (compRules.length) RULES_PAGE.wire(sec.querySelector('.pg-area[data-area="rules"] .pg-doc'), compRules);
+    if (compDocs.length) DOC_PAGE.wire(sec.querySelector('.pg-area[data-area="docs"] .pg-doc'), compDocs);
+    fillHistoryArea(sec, c);
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // A component taller than the stage: the room above and below it shrinks first (to the stage's least), then the stage
     // grows to it, so it always shows whole and centred, never cut at the bottom with the room left at the top.
@@ -851,9 +876,9 @@
       var cmpBar = compareEl.querySelector('.pg-compare-bar');
       segItems(cmpBar).forEach(function (b) { segSelect(b, b.dataset.v === compareMode); b.addEventListener('click', function () { compareMode = b.dataset.v; segItems(cmpBar).forEach(function (x) { segSelect(x, x === b); }); drawCompare(); }); });
     }
-    // The Accessibility table, drawn from the items the data gives and those this page's run finds, with a count of each
-    // status above it and when the last audit ran.
-    var a11yEl = sec.querySelector('.pg-a11y-rows'), a11ySumEl = sec.querySelector('.pg-a11y-sum'), a11yNote = sec.querySelector('.pg-a11y-note');
+    // The Accessibility area: the Accessibility page's own table, drawn from the items the data gives and those this
+    // page's run finds (a11yArea, 30-its-accessibility.js), with when the last audit ran above it.
+    var a11yEl = sec.querySelector('.pg-a11y'), a11yNote = sec.querySelector('.pg-a11y-note');
     // What this browser tried before (kept on the Status page) shows at once, until this page tries it again.
     var staticItems = c.a11y ? a11yStaticItems(c) : [], liveItems = (c.__a11y && c.__a11y.liveItems) || [], liveNow = (c.__a11y && c.__a11y.live) || null;
     // The parts of what is drawn that hold words (its label, its description), by their own class, for the rows a person
@@ -874,28 +899,28 @@
       if (live !== undefined) liveNow = live;
       var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
-      a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(function (r) { return issueRowHTML(r, 'Accessibility'); }).join('');
-      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the Status page lists what it shows
+      var wasLive = c.__a11y && c.__a11y.live;   // what the lists already show for it
+      if (liveNow) c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) };
+      a11yArea(a11yEl, c);
+      if (liveNow && liveNow !== wasLive) { fillTodoSoon(); if (!checking) keepA11y(); }   // drawn again only when what it found changed   // the Status page and the Accessibility page list what it shows
       // Its tab carries its state, as its Status row says it, once the browser has tried it.
       var accNow = componentStates(c).acc;
       areaState(sec.querySelector('.pg-areas [data-v="a11y"]'), accNow); areaNA(sec.querySelector('.pg-area[data-area="a11y"]'), accNow);
-      labelCells(a11yEl.closest('.pg-a11y'));
-      var n = {};
-      Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
-      // What meeting the standard rests on: a criterion a person answered is their word, and a claim that does not say
-      // so reads as though the engine measured all of it.
+      labelCells(a11yEl);
+      // Nothing to fix or to check in its criteria at A and AA, the checks a person makes included, and none still being
+      // tried: it meets WCAG 2.2 at A and AA, said with how much of that rests on a person's word.
+      var a11yRows = a11yEl.querySelector('.sg-a11y-table tbody').rows, n = {};
+      Array.prototype.forEach.call(a11yRows, function (r) { n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
       function saidRest(rows) {
         var said = 0;
         Array.prototype.forEach.call(rows, function (r) { if (r.hasAttribute('data-said')) said++; });
         return said ? ' \u00b7 ' + said + (said === 1 ? ' criterion on a person\'s word' : ' criteria on a person\'s word') : '';
       }
-      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility', whoChipsHTML(a11yEl.rows)) +
-        // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
-        (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA' + saidRest(a11yEl.rows) + '</span>' : '');
+      var meets = !n.todo && !n.check && !n.pending && n.done ? esc('Meets WCAG 2.2 at level A and AA' + saidRest(a11yRows) + '.') : '';
       var ch = c.a11y && c.a11y.checked;
       // Only what a row cannot say: when each check ran is in its own row.
-      a11yNote.innerHTML = [!ch ? esc('The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.') : ch.notRead ? '<span class="sg-mx-why">' + esc('The last audit (' + when(ch.at) + ') could not try it: ' + plainWhy(ch.why) + '. Run the audit again once that is fixed.') + whyTip(ch.why) + '</span>' : '',
-        (c.a11y && c.a11y.excused || []).length ? esc('Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.') : ''].filter(Boolean).join(' ');
+      a11yNote.innerHTML = [meets, !ch ? esc('The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.') : ch.notRead ? '<span class="sg-mx-why">' + esc('The last audit (' + when(ch.at) + ') could not try it: ' + plainWhy(ch.why) + '. Run the audit again once that is fixed.') + whyTip(ch.why) + '</span>' : '',
+        (c.a11y && c.a11y.excused || []).length ? esc('Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join(' · ') + '.') : ''].filter(Boolean).join(' ');
       a11yNote.hidden = !a11yNote.textContent;
       stickHeight(sec);   // its chips, now filled, measured for the table's head under them
     }
@@ -972,8 +997,21 @@
         // One the person cannot see any more (a closed panel gave the focus back to a button on a page since hidden) is
         // left until the browser's next frame takes it away: no one is on it, so nothing waits for it.
         if (inPage && (!document.contains(busy) || !busy.getClientRects().length)) inPage = false;
+        // Nor one where the focus only rests (personHolds): a row a closed panel gave it back to, the page's title the
+        // route moved it to, a button pressed. Waiting on it held the try for as long as the person stayed: its rows read
+        // "Being tried in this browser…" for minutes, and every component after it too.
+        if (inPage && !personHolds(busy)) inPage = false;
         // The build's own run has no person on the page: nothing to wait for.
-        if (inPage && !BAKING) { busy.addEventListener('blur', function () { setTimeout(again, 50); }, { once: true }); return false; }
+        // It waits for them to leave it: its blur, or, as the sweep waits on a person (personBusy, every half second), the
+        // moment it is no longer theirs. A control drawn again or hidden under them (a row of the Accessibility page
+        // redrawn as a try ends, a page left, a panel closed onto a row since replaced) never blurs, and the variant
+        // waiting on it waited for good: its try stayed "Being tried in this browser…" and every component after it too.
+        if (inPage && !BAKING) {
+          var left = false, leave = function () { if (left) return; left = true; setTimeout(again, 50); };
+          busy.addEventListener('blur', leave, { once: true });
+          (function stillOn() { if (left) return; if (document.activeElement !== busy || !busy.isConnected || !busy.getClientRects().length || !personHolds(busy)) leave(); else setTimeout(stillOn, 500); })();
+          return false;
+        }
         var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
         // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
         // applies then.
@@ -1034,16 +1072,16 @@
       })(0);
       function finish() {
         var n = plan.combos.length, scope = function (where) {
-          if (where.length === n) return n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.';
-          return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
+          if (where.length === n) return esc(n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.');
+          return ' In ' + namePills(where);   // HTML: the variants a list of pills
         };
         // Each check's result as an item under its criterion, with the variants it holds in; the text contrast as one.
         // A control with no name only where an on/off prop hides its words (an icon-only button, a box with no text): it
         // fails as it is, and what to do is said: the product that uses it that way names it there.
-        liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: esc(say), html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
+        liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: say, html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + scope(g.where), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
         // What a screen reader says on its controls, in the variants tried: the words a person hears, name, role, state.
         if (spokenOrder.length) liveItems.push({ sc: '4.1.2', label: wcagLabelOf('4.1.2'), st: 'done', from: FROM_PAGE,
-          html: 'A screen reader says ' + spokenOrder.slice(0, 8).map(function (t) { return '“' + esc(t) + '”' + (spoken[t].length < n && n > 1 ? ' (' + esc(spoken[t].slice(0, 2).join('; ') + (spoken[t].length > 2 ? ' and ' + (spoken[t].length - 2) + ' more' : '')) + ')' : ''); }).join(', ') + (spokenOrder.length > 8 ? ', and ' + (spokenOrder.length - 8) + ' more' : '') + '.' });
+          html: 'A screen reader says ' + spokenOrder.slice(0, 8).map(function (t) { return '“' + esc(t) + '”' + (spoken[t].length < n && n > 1 ? ' (in ' + namePills(spoken[t]) + ')' : ''); }).join(', ') + (spokenOrder.length > 8 ? ', and ' + (spokenOrder.length - 8) + ' more' : '') + '.' });
         if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
@@ -1080,7 +1118,7 @@
         checking = false;
         order.forEach(function (key) {
           var f = found[key];
-          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ' + f.where.slice(0, 3).join('; ') + (f.where.length > 3 ? ' and ' + (f.where.length - 3) + ' more' : '') + '.')) + placesTag([placeOf(f.desc)]) });
+          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ')) + (f.where.length === combos.length ? '' : namePills(f.where)) + placesTag([placeOf(f.desc)]) });
         });
         a11yRender(live);
         if (bgRun) { var f = bgRun; bgRun = null; f(); }
@@ -1101,7 +1139,7 @@
         // Never while a person is on a control of the page outside it: tried once they leave it; one they take mid-way
         // stops the try, which runs again from this variant once they leave.
         // The build's own run has no person: the focus its component's script moves is never taken for one.
-        var personOn = function () { if (BAKING) return null; var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) ? a : null; };
+        var personOn = function () { if (BAKING) return null; var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) && personHolds(a) ? a : null; };
         // A variant stopped by a person is tried again once they leave, three times at most: then it is left untried and
         // the rest go on, so a component whose own script keeps moving the focus never holds the others up.
         retried[i] = (retried[i] || 0);

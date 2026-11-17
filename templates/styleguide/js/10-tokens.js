@@ -24,6 +24,7 @@
   // The Tokens page, as Figma's own panel: its collections (All first), the chosen one's groups as a tree, and a table
   // with that collection's own modes as columns; a search and the foundations' filter (Colors, Typography, Spacing,
   // Radii, Motion) narrow what it lists. All collections at once: one table, each collection opening on a row of its own modes.
+  var tkPanelOpen = null;   // set by the Tokens page: opens the token panel an address names (panel=tk:<name>)
   var tkFoundation = null;   // set by the Tokens page: a foundation page's own tables (null with no Figma tokens)
   var TK_FILTER = [['', 'All'], ['colour', 'Colors'], ['typography', 'Typography'], ['spacing', 'Spacing'], ['radius', 'Radii'], ['motion', 'Motion']];
   var TK_SCREEN = ['watch', 'phone', 'mobile', 'small', 'tablet', 'medium', 'laptop', 'large', 'desktop', 'wide', 'xl'];

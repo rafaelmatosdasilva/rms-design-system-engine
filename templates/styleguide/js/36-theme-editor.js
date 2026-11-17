@@ -67,7 +67,7 @@
     if (T.typeFamily) add(T.typeFamily.value || T.typeFamily.css || T.typeFamily.family);
     (T.typography || []).forEach(function (t) { if (t.family) add(t.family.value || t.family.css); });
     WEB_FONTS.forEach(add);
-    return out;
+    return out;   // the system's own first: what a new theme starts from (families[0])
   })();
   // A family drawn as chosen: one the page has no face for (and that is not one every computer has) is loaded from
   // Google Fonts, in the page and in the preview's frame, so what is chosen is what is seen and what a theme keeps.
@@ -605,7 +605,7 @@
       '<div class="pg-inspect sg-token-card sg-ts-pick" data-pane="scratch"' + (source === 'scratch' ? '' : ' hidden') + '></div>' +
       '<div class="pg-inspect sg-token-card" data-pane="scratch"' + (source === 'scratch' ? '' : ' hidden') + '><div class="pg-inspect-head sg-ts-pick-head"><span>Base customization</span></div><div class="pg-controls">' +
         row('Name', 'ts-name', '<input type="text" class="sg-input" id="ts-name" value="' + esc(brief.name || draft.name || '') + '" placeholder="Ocean">') +
-        row('Font family', 'ts-font', select('ts-font', families.map(function (f) { return [f, f]; }).concat([['other', 'Other…']]), famKnown ? brief.fontFamily : 'other', 'Font family') +
+        row('Font family', 'ts-font', select('ts-font', families.slice().sort(function (x, y) { return x.localeCompare(y, 'en', { sensitivity: 'base' }); }).map(function (f) { return [f, f]; })   /* A to Z (the owner's, 16 November 2026), Other… after them all */.concat([['other', 'Other…']]), famKnown ? brief.fontFamily : 'other', 'Font family') +
           '<input type="text" class="sg-input" id="ts-font-other" value="' + esc(famKnown ? '' : brief.fontFamily) + '" placeholder="Family name"' + (famKnown ? ' hidden' : '') + '>') +
         row('Primary colour', 'ts-primary', colour('ts-primary', brief.primary, (brief.dark || {}).primary)) +
         row('Secondary colour', 'ts-secondary', colour('ts-secondary', brief.secondary, (brief.dark || {}).secondary)) +

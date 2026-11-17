@@ -45,11 +45,11 @@ a.sg-card { transition: transform var(--sg-move), border-color var(--sg-move); }
 a.sg-card:hover { transform: translateY(-2px); }
 a.sg-card.sg-card--own:hover { border-color: var(--sg-border-hover); }   /* a step brighter than its line, never a heavy one */
 a.sg-card:active { transform: translateY(0) scale(0.985); transition-duration: 0.15s; }
-a.sg-card:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+a.sg-card:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); }
 @media (prefers-reduced-motion: reduce) { a.sg-card, a.sg-card:hover, a.sg-card:active { transform: none; transition: border-color var(--sg-fast); } }
 /* A card that opens a page says so: an arrow at its bottom right that moves on toward it under the pointer. */
 a.sg-card { position: relative; }
-a.sg-card::after { content: ''; position: absolute; right: var(--sg-space-l); bottom: calc(var(--sg-space-m) + var(--sg-space-s)); width: 16px; height: 16px; background: var(--sg-muted); opacity: 0.4; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform var(--sg-move), background-color var(--sg-fast), opacity var(--sg-fast); pointer-events: none; }
+a.sg-card::after { content: ''; position: absolute; right: var(--sg-space-l); bottom: calc(var(--sg-space-m) + var(--sg-space-s)); width: var(--sg-mark); height: var(--sg-mark); background: var(--sg-muted); opacity: 0.4; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform var(--sg-move), background-color var(--sg-fast), opacity var(--sg-fast); pointer-events: none; }
 a.sg-card:hover::after, a.sg-card:focus-visible::after { transform: translateX(4px); background: var(--sg-text); opacity: 1; }   /* quiet at rest, full under the pointer */
 a.sg-card > h3, a.sg-card > h3 + p { padding-right: calc(var(--sg-space-l) * 2 + var(--sg-space-s)); }   /* its words never under the arrow */
 @media (prefers-reduced-motion: reduce) { a.sg-card:hover::after { transform: none; } }
@@ -116,7 +116,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 /* The page's own accordion: a row that opens on a click (or Enter), a plus that turns into a minus. */
 .sg-acc > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-s) 0; cursor: pointer; list-style: none; }
 .sg-acc > summary::-webkit-details-marker { display: none; }
-.sg-acc > summary:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; border-radius: var(--sg-radius-s); }
+.sg-acc > summary:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: var(--sg-focus-offset); border-radius: var(--sg-radius-s); }
 .sg-acc > p { padding: 0 0 var(--sg-space-s); }
 .sg-acc-mark { position: relative; flex: none; width: 0.75em; height: 0.75em; }
 .sg-acc-mark::before, .sg-acc-mark::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; margin-top: -0.75px; background: var(--sg-muted); }
@@ -133,7 +133,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-showroom-review > p { margin: 0 0 var(--sg-space-s); }
 .sg-showroom-review .sg-acc > p + p { margin-top: var(--sg-space-xs); }
 .sg-notes-top { position: sticky; top: 0; z-index: 2; border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; margin: calc(-1 * var(--sg-space-m)) calc(-1 * var(--sg-space-m)) 0; padding: var(--sg-space-m) var(--sg-space-m) var(--sg-space-xs); background: var(--sg-bg-2); border-bottom: var(--sg-line); }   /* the filter and its key stay at the panel's top as its notes scroll */
-.sg-chip-dot { flex: none; width: calc(var(--sg-space-xs) * 1.5); height: calc(var(--sg-space-xs) * 1.5); border-radius: var(--sg-radius-pill); }   /* a chip's dot in its pins' colour, 8px from its words as every dot is */
+.sg-chip-dot { flex: none; width: var(--sg-dot); height: var(--sg-dot); border-radius: var(--sg-radius-pill); }   /* a chip's dot in its pins' colour, 8px from its words as every dot is */
 .sg-pins { position: absolute; inset: 0; pointer-events: none; }
 .sg-pin { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 var(--sg-space-xxs); border-radius: var(--sg-radius-pill); border: 2px solid var(--sg-bg); box-shadow: var(--sg-shadow); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-bg); transition: transform 0.15s var(--sg-ease, ease); }
 .sg-pin.is-on { transform: translate(-50%, -50%) scale(1.2); z-index: 2; }
@@ -154,7 +154,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-note > .sg-acc > summary { justify-content: flex-start; }
 .sg-note .sg-acc-title { flex: 1; }
 .sg-note-no { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-bg); }
-.sg-note.is-on > .sg-acc > summary .sg-acc-title > b { text-decoration: underline; text-underline-offset: 3px; }
+.sg-note.is-on > .sg-acc > summary .sg-acc-title > b { text-decoration: underline; text-underline-offset: var(--sg-underline-offset); }
 .sg-note--away .sg-note-no { background: transparent; color: var(--sg-muted); box-shadow: inset 0 0 0 1px var(--sg-line-colour); }   /* not on the screen: no pin for it */
 .sg-note[hidden] { display: none; }
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
@@ -164,7 +164,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-status--stable { background: color-mix(in srgb, var(--sg-positive) 20%, transparent); }
 .sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
 .sg-status--connected { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); gap: var(--sg-space-xxs); }
-.sg-status-mark { width: 14px; height: 14px; flex: none; }   /* the project's Code Connect pairs it with Figma */
+.sg-status-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; }   /* the project's Code Connect pairs it with Figma */
 .pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 /* What a component's page says first, and its overview card under its name: its version, when it last changed, how it
    stands with Figma and with accessibility, and where it is used. A fact that needs work is marked, never coloured alone. */

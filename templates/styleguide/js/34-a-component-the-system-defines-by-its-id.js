@@ -392,10 +392,12 @@
     var partOf = !built && BUILDERS[id] && BUILDERS[id]._c;
     if (partOf && needPart(partOf, function (ok) { if ((hashParts().id || homeId()) !== id) return; if (ok) route(); else partWaitPage(partOf, true); })) { partWaitPage(partOf, false); return; }
     if (!built && BUILDERS[id]) BUILDERS[id]();
-    if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);
     // An area named in the address (#c-chip/accessibility) opens on it; moving to another component opens its Playground.
+    // The area first, then what the address sets in it: a component already drawn writes its address from the area it
+    // shows, and the one it showed before would be written over the one asked for.
     var sec0 = document.getElementById(id);
     if (sec0 && sec0._area && (at.area || (id !== route.last && built))) sec0._area(at.area || 'play', true);
+    if (built && sec0 && sec0._link) sec0._link(at.q);
     // Opened on an area filtered (#c-chip/accessibility?st=todo): its chip chosen once that area has its rows.
     var stWant = at.q && at.q.get('st');
     if (sec0 && stWant) (function pick(n) { var chip = sec0.querySelector('.pg-area:not([hidden]) .sg-chip[data-st="' + stWant + '"]'); if (chip) { if (chip.getAttribute('aria-pressed') !== 'true') chip.click(); } else if (n < 40) setTimeout(function () { pick(n + 1); }, 250); })(0);
@@ -405,11 +407,13 @@
     // The filter and the panel the address names, once they are drawn: the page bar's chip (show), a Showroom screen's
     // kind of note (kind), the side panel (panel).
     var qWant = function (k) { return at.q && at.q.get(k); };
-    if (qWant('show')) whenThere(function () { return target.querySelector('.sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"], .pg-area:not([hidden]) .sg-chip[data-hist="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
+    if (qWant('show')) whenThere(function () { return target.querySelector('.pg-area:not([hidden]) .sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"], .sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     if (qWant('kind')) whenThere(function () { return target.querySelector('.sg-showroom-filter .sg-chip[data-v="' + qWant('kind') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     var panelWant = qWant('panel'), openPanel = document.querySelector('.sg-comp-panel:not([hidden])');
     if (panelWant && !(openPanel && openPanel._open && openPanel._key === panelWant)) whenThere(function () {
-      return /^doc:/.test(panelWant) ? (target._openKey && target._openKey(panelWant)) : /^row:/.test(panelWant) ? openRowKey(panelWant) : false;
+      // A rule's panel (cx:<id>) opens wherever its row is, the Rules page or a component's Rules area.
+      // A documentation row's (doc:<file>) wherever its row is too, the Documentation page or a component's area.
+      return /^doc:/.test(panelWant) ? ((target._openKey && target._openKey(panelWant)) || !!(DOC_PAGE && DOC_PAGE.open(panelWant))) : /^row:/.test(panelWant) ? openRowKey(panelWant) : /^cx:/.test(panelWant) ? !!(RULES_PAGE && RULES_PAGE.open(panelWant)) : /^tk:/.test(panelWant) ? !!(tkPanelOpen && tkPanelOpen(panelWant)) : false;
     }, function () {});
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     pageTop();

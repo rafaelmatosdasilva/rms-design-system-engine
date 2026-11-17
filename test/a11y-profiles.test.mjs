@@ -84,9 +84,10 @@ test('who acts has a card of its own in the panel, and what to do says only what
   assert.match(page, /if \(k === 'whoCell'\) return \(r\.k && r\.k\.sc \? card\('Level and principle', [^\n]*\+ card\(col\[0\], r\.who \?/);
   // What to do never repeats who acts (the owner's, 12 November 2026), and every panel opens with it.
   assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(r\.todo \?/);
-  assert.match(page, /order = order\.filter\(function \(col\) \{ return col\[1\] === 'todo'; \}\)\.concat/);
+  // One order in every panel (panelCard): what to do, what it affects and whose it is, its status, then the rest.
+  assert.match(page, /var body = colsAt\(\['todo'\]\)\s*\+ affects \+ colsAt\(\['where'\]\) \+ \(A11Y_TOP \? card\('Component'[^\n]*\n\s*\+ colsAt\(\['status'\]\)/);
   assert.doesNotMatch(page, /if \(taskOpen\) order =/, 'whether the task is open or done');
-  assert.match(page, /cards\.splice\(firstTodo, 0, '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects/, 'what it affects goes under it');
+  assert.match(page, /affects = card\('What it affects', kvList\(/, 'what it affects goes under it, a panel card as every other');
 });
 
 test('every issue table gives each column its share by what it holds, and the column it is read for the rest', () => {

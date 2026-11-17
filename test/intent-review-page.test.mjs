@@ -48,7 +48,7 @@ test('a decision to review again: its page says so, a withdrawal says its questi
   assert.doesNotMatch(html, /Declined/);
   assert.match(tpl, /p\.recheck && p\.action === 'review' \? 'Decision to review again'/);
   assert.match(tpl, /\(d\.review \? line\('<span class="pg-par-val">' \+ esc\(d\.review\)/, 'the History page shows the note');
-  assert.match(tpl, /\(d\.review \? '<br>' \+ esc\(d\.review\) : ''\)/, 'and so does the component\'s own History');
+  assert.match(tpl, /if \(!historyTable\(box, c\.name, box\.firstChild\)\)/, 'and so does the component\'s own History, the same table filtered to it');
 });
 
 // An Add answered with no page has no page row to show its recheck on: it gets a row of its own, for its component,

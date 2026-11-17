@@ -272,6 +272,7 @@
   function stickHeight(sec) {
     if (!sec) return;
     var headRow = sec.querySelector('.pg-header > .pg-head'); if (headRow && headRow.offsetParent) sec.style.setProperty('--pg-head-h', stuckH(headRow) + 'px');   // a component's title row, the areas sticking under it
+    var tabs = sec.querySelector('.pg-areas'); if (tabs && tabs.offsetParent) sec.style.setProperty('--pg-tabs-h', stuckH(tabs) + 'px');   // a component's areas: an area's filters stick under them
     var top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sg-sticky-top')) || 0, low = top;
     Array.prototype.forEach.call(sec.querySelectorAll(STICK_BARS), function (el) {
       if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
@@ -279,7 +280,7 @@
     });
     sec.style.setProperty('--pg-bars-h', (low - top) + 'px');   // the page's own bars: a component's chips stick under them
     Array.prototype.forEach.call(sec.querySelectorAll('.pg-card-section .pg-par-sum'), function (el) {
-      if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
+      if (!el.offsetParent || getComputedStyle(el).position !== 'sticky' || el.closest('.sg-todo-head')) return;   // counts in a filter bar stick with it
       low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + stuckH(el));
     });
     sec.style.setProperty('--pg-areas-h', (low - top) + 'px');   // with its chips: the cards' heads stick under all of them
@@ -312,6 +313,18 @@
     var crumbs = (o.crumbs || []).filter(Boolean);
     return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + (o.titleTip ? ' ' + o.titleTip : '') + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
       '<div class="sg-panel-body">' + o.body + '</div>';
+  }
+  // A card of a side panel, the one way every panel draws one: its head, then what it holds, nothing when it holds
+  // nothing. What to do is the panel's lead card. Every panel says its cards in one order: What to do (its See in Figma
+  // or See in code under it, opts.see), what it changes or where (the components, the places), its Status, then the
+  // rest (who, why, where it was read, when it was last checked).
+  // opts.see: the See button's markup, under what it holds. opts.bare: what it holds is a block of its own (a list of
+  // labelled values), set straight under the head.
+  function panelCard(head, html, opts) {
+    opts = opts || {};
+    if (!html) return '';
+    return '<div class="pg-inspect sg-token-card' + (head === 'What to do' || opts.lead ? ' sg-lead-card' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div>' +
+      (opts.bare ? html + (opts.see || '') : '<div class="sg-row-detail-body">' + html + (opts.see || '') + '</div>') + '</div>';
   }
   // The components a token is used by, as the Status table shows them: whether Figma has each (Found) and the code (Built), and an
   // arrow to its page (one only in Figma has none to open).
@@ -352,6 +365,29 @@
   // What a table would say, inside a panel that opens from a table's row: labelled values, never another table (the
   // owner's rule). kvOne: one item, each label over its value; kvList: several, each its own block. An empty value is left out.
   // A label is words, escaped; { html } when it is markup the page made itself (the components a change is for, linked).
+  // A list of names, the one way the guide sets one, on every page and in every panel (the owner's, 16 November 2026):
+  // each name a pill (.sg-name), the first five shown, the rest behind one chevron pill ("9 more") that opens them.
+  // A name in a sentence is namePill. One handler opens every list's rest.
+  // A date and time in the reader's own clock (two changes on one day read apart).
+  var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
+  // A date as a row says it, short: 16 Oct, 22:11 (the year only when it is not this one).
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var whenShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ', ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
+  // A day as a sentence says it: 15 Oct (the year only when it is not this one).
+  var dayShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
+  var PILLS_SHOWN = 5;
+  // A table's rows shown at once: the rest behind the same chevron, so a page of thousands opens at once (the owner's, 17 November 2026).
+  var ROWS_SHOWN = 100;
+  // A table's rows put in another order: its filter bar shows the first ones again.
+  function rowsMoved(el) { if (el) el.dispatchEvent(new CustomEvent('sg-sorted', { bubbles: true })); }
+  var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
+  function pillsMore(n, attr) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" ' + (attr || 'data-pills-more') + '>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; }
+  function namePill(n) { return '<code class="sg-name">' + esc(n) + '</code>'; }
+  function namePills(names) { names = names || []; return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-pills-more]'); if (!b || !b.parentNode) return;
+    Array.prototype.forEach.call(b.parentNode.querySelectorAll(':scope > [hidden]'), function (p) { p.hidden = false; }); b.remove();
+  });
   function kvOne(pairs, cls) { return '<dl class="sg-kv' + (cls ? ' ' + cls : '') + '">' + pairs.filter(function (p) { return p[1]; }).map(function (p) { return '<div><dt>' + (p[0] && typeof p[0] === 'object' ? p[0].html : esc(p[0])) + '</dt><dd>' + p[1] + '</dd></div>'; }).join('') + '</dl>'; }
   function kvList(items, cls) { return '<ul class="sg-kv-list' + (cls ? ' ' + cls : '') + '">' + items.map(function (pairs) { return '<li>' + kvOne(pairs) + '</li>'; }).join('') + '</ul>'; }
   // The components that use a token: each its name (its page when it has one) and where it is, in Figma and in the code.
@@ -431,7 +467,7 @@
       // What it is for, as Figma describes it; a semantic token with none says so (a primitive needs none).
       (t.description ? '<div><dt>What it is for</dt><dd><p>' + esc(t.description) + '</p></dd></div>' : t.figma && !t.primitive ? '<div><dt>What it is for</dt><dd><p class="pg-missing">Not written yet.</p></dd></div>' : '') +
       '<div><dt>' + (rows.length ? 'In each mode' : 'Its value') + '</dt><dd>' + values + '</dd></div>' +
-      '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#' + esc(cid(c.n)) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : (t.figma && NOT_USED_YET[String(t.figma).replace(/\/colou?r$/, '')] ? '<p>Not used yet: kept for a brand or a component to come. Its description says which.</p>' : '<p>No component uses it yet.</p>')) + '</dd></div></dl>' +
+      '<div><dt>Used by</dt><dd>' + (comps.length ? comps.map(function (c, i) { return '<p' + (i >= PILLS_SHOWN ? ' hidden' : '') + '><a class="sg-uses-link" href="#' + esc(cid(c.n)) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > PILLS_SHOWN ? pillsMore(comps.length - PILLS_SHOWN) : '') : (t.figma && NOT_USED_YET[String(t.figma).replace(/\/colou?r$/, '')] ? '<p>Not used yet: kept for a brand or a component to come. Its description says which.</p>' : '<p>No component uses it yet.</p>')) + '</dd></div></dl>' +
       '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';
     tokenPop.querySelector('[data-copy-token]').addEventListener('click', function (e) { copyText('var(' + v + ')', e.currentTarget); });
     Array.prototype.forEach.call(tokenPop.querySelectorAll('a'), function (a) { a.addEventListener('click', function () { closeToken(false); }); });

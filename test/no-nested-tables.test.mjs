@@ -56,7 +56,7 @@ test('in Chrome: a token\'s panel and an issue\'s panel hold labelled values and
     // Every issue table on a component's page: each row's panel holds no table.
     await run(`location.hash = '#c-button'`);
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#c-button tr.sg-row-open')`, { attempts: 200 }), true, 'the button has rows that open');
-    const issues = await run(`(() => { const out = []; for (const tr of [...document.querySelectorAll('#c-button tr.sg-row-open')].slice(0, 12)) { tr.cells[0].click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); out.push(d ? d.querySelectorAll('table').length : -1); } return out; })()`);
+    const issues = await run(`(() => { const out = []; for (const tr of [...document.querySelectorAll('#c-button tr.sg-row-open')].slice(0, 12)) { tr.cells[0].click(); const d = document.querySelector((tr.hasAttribute('data-il-row') ? '#sg-il-panel' : '#sg-row-panel') + ' .sg-row-detail'); out.push(d ? d.querySelectorAll('table').length : -1); } return out; })()`);
     assert.ok(issues.length > 0 && issues.every((n) => n === 0), `no table in any row's panel: ${issues.join(', ')}`);
     assert.deepEqual(errors, []);
     close();
@@ -65,18 +65,21 @@ test('in Chrome: a token\'s panel and an issue\'s panel hold labelled values and
 
 // A component's Figma review findings: a Rules area on its own page, from the Rules page's Figma rules to fix, with who
 // acts and the link to its node in Figma said once above the rows, never on each.
-test('a component\'s Rules area lists the Figma rules it breaks, and says what every row shares once', async () => {
+test('a component\'s Rules area lists the Figma rules it breaks, with no line above the table', async () => {
   const { readFileSync } = await import('node:fs');
   const read = (f) => readFileSync(new URL(`../templates/styleguide/js/${f}`, import.meta.url), 'utf8');
   const tasks = read('30-its-accessibility.js'), page = read('33-a-component-the-build-went-through-with.js'), table = read('22-one-table-for-every-issue.js'), areas = read('27-changelog.js');
   assert.match(areas, /\['parity', 'Parity'\], \['rules', 'Rules'\]/);
   // Only Figma's rules that are to fix; one still to decide stays the team's question on the Rules page.
   assert.match(tasks, /if \(\(r\.side \|\| 'figma'\) !== 'figma' \|\| r\.status !== 'fix'\) return;/);
-  // Shown only when the component breaks one, as Products is.
-  assert.match(page, /\(a\[0\] !== 'rules' \|\| ruleRows\(c\)\.length\)/);
+  // Shown only when a rule changes the component, as Products is: the Rules page's own table, filtered to it.
+  assert.match(page, /\(a\[0\] !== 'rules' \|\| compRules\.length\)/);
+  assert.match(page, /var compRules = RULES_PAGE \? RULES_PAGE\.of\(c\.name\) : \[\];/);
+  assert.match(page, /RULES_PAGE\.tableHTML\(compRules\)/);
   // Who acts, and the link to Figma, once above the table: never a column, and never on each row.
   assert.match(table, /Rules: \[\['Task nr', 'no'\], \['Rule', 'kind'\], \['What to do', 'todo'\], \['Status', 'status'\], \['Last checked', 'updated'\]\]/);
   assert.doesNotMatch(table.match(/todo: function \(r\) \{[^\n]*/)[0], /sg-todo-who/, 'What to do never says who acts');
-  assert.match(tasks, /function rulesLead\(c\)[\s\S]*?sg-cx-figma[\s\S]*?FIGMA_SVG/);
+  // No line above the table repeating who acts and where (the owner's, 16 November 2026): each rule's panel has See in Figma.
+  assert.doesNotMatch(tasks + page, /rulesLead|breaks in Figma, each fixed there/);
   assert.match(tasks, /area: 'Rules', kind: r\.says, ruleArea: RULE_AREA\[r\.area\] \|\| capital\(r\.area\), figma: '', code: ''/, 'each row says its kind of rule, for the Rules page\'s Area filter');
 });

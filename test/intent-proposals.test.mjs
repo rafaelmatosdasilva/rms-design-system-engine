@@ -174,7 +174,7 @@ test('a decision whose component changed after it was recorded is to review agai
   assert.ok(!done.noPage.includes('tileTwo'), 'still documented in Tile One until a person says otherwise');
   const tile = done.pages.find((p) => p.name === 'Tile One');
   assert.deepEqual([tile.action, tile.recheck], ['review', 1]);
-  assert.match(tile.todo[0], /^Review a decision again: tileTwo changed on 5 Mar 2026/);
+  assert.equal(tile.todo[0], 'Confirm the decision on `tileTwo` still holds, or withdraw it.', 'the action alone: what changed is its evidence');
   const ev = withEvidence('recheck:add:tileTwo', x, { decisions: readDecisions(root) });
   assert.ok(ev.candidates.find((c) => c.answer === 'yes').evidence.some((e) => e.from === 'Past decisions' && /QA answered yes on 2026-03-01/.test(e.says)));
   assert.ok(ev.candidates.find((c) => c.answer === 'no').evidence.some((e) => /New props `glow`: what the decision rested on may have changed/.test(e.says)));

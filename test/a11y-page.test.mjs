@@ -1,7 +1,8 @@
 // The Accessibility page: every criterion of every component in one table, as Rules and Documentation gather theirs.
 // Each row is the row the component's own Accessibility area shows, under the same task number, opening the same panel,
-// filtered by status, component, level, principle, who acts and what the criterion depends on. It waits for every
-// component to be tried in the browser, so it never draws half a table that changes under the reader.
+// filtered by status, component, level, principle, who acts and what the criterion depends on. It is drawn at once with
+// every result already known, a component still being tried saying so on its rows, each drawn again in place when its
+// try ends, never a row moved under the reader. A component's Accessibility area is this table, limited to it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,7 +17,9 @@ const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
 const tpl = templateText();
 
 test('the page is made of the rows a component\'s own area shows, and the try fills it as it fills the Status page', () => {
-  assert.match(tpl, /a11yIssueRows\(c, t \? t\.items : c\.a11y \? a11yStaticItems\(c\) : \[\], t \? t\.live : null\)\.forEach\(function \(r\) \{ if \(A11Y_ST\[r\.st\] && !r\.extra && r\.k && \(r\.k\.level === 'A' \|\| r\.k\.level === 'AA'\)\)/, 'the same rows, one way to work them out, those AA asks for');
+  assert.match(tpl, /a11yIssueRows\(c, t \? t\.items : c\.a11y \? a11yStaticItems\(c\) : \[\], t \? t\.live : null\)\.forEach\(function \(r\) \{\n\s+if \(!\(A11Y_ST\[r\.st\] && !r\.extra && r\.k && \(r\.k\.level === 'A' \|\| r\.k\.level === 'AA'\)\)\) return;/, 'the same rows, one way to work them out, those AA asks for');
+  assert.match(tpl, /pending: \['…', 'Being tried in this browser…', 'none'\]/, 'a row still being tried says so, with a neutral dot');
+  assert.match(tpl, /a11yTable\(box, c\.name\);/, 'a component\'s area is the page\'s own table, limited to it');
   assert.match(tpl, /ROW_DETAIL\.push\(\{ r: r, area: 'Accessibility' \}\)/, 'each opens the same panel as on the component');
   assert.match(tpl, /var SWEEP_PAGES = \{ status: 1, accessibility: 1 \};/, 'opening the page tries every component, as the Status page does');
   assert.match(tpl, /fillTodoNos\(document\);\n    fillA11yPage\(\);/, 'drawn with the task numbers it shares');
@@ -45,7 +48,12 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)).result.value;
     assert.equal(await run(`!!document.querySelector('nav a[href="#accessibility"]')`), true, 'in the menu');
-    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#accessibility .sg-a11y-table tbody tr')`, { attempts: 600 }), true, 'the table fills once every component is tried');
+    // Drawn at once, before every component is tried: the rows still being tried say so, and each ends in place.
+    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#accessibility .sg-a11y-table tbody tr')`, { attempts: 40 }), true, 'the table shows at once');
+    const order0 = await run(`[...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((tr) => tr.dataset.rowDetail ? tr.cells[1].textContent + tr.cells[2].textContent.split(' ')[0] : '').join('|')`);
+    assert.equal(await waitForTrue(send, sessionId, `(() => { const t = [...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')]; return t.length > 0 && !t.some((tr) => tr.dataset.status === 'pending'); })()`, { attempts: 600 }), true, 'every row ends with its result');
+    const order1 = await run(`[...document.querySelectorAll('#accessibility .sg-a11y-table tbody tr')].map((tr) => tr.cells[1].textContent + tr.cells[2].textContent.split(' ')[0]).join('|')`);
+    assert.ok(order0.split('|').filter((x) => order1.split('|').includes(x)).join('|') === order1.split('|').filter((x) => order0.split('|').includes(x)).join('|'), 'no row moved while the tries ended');
     const seen = await run(`(() => {
       const sec = document.getElementById('accessibility'), trs = [...sec.querySelectorAll('.sg-a11y-table tbody tr')];
       return { rows: trs.length, comps: [...new Set(trs.map((tr) => tr.cells[1].textContent.trim()))].length,
@@ -100,7 +108,8 @@ test('in Chrome: one table for every component, filtered as Rules is, each row o
     assert.ok(panel && panel.length, 'the panel opened');
     assert.ok(panel.includes('What to do'), panel.join());
     assert.ok(panel.includes('Level and principle'), 'the panel says the level and the principle, as the filters do');
-    assert.deepEqual(panel.slice(0, 3), ['What to do', 'Component', 'Where it was read'], 'whose it is and where it was read, right under what to do');
+    assert.deepEqual(panel.slice(0, 3), ['What to do', 'Component', 'Status'], 'whose it is right under what to do, then its status: where it was read is with the rest, after it');
+    assert.ok(panel.indexOf('Where it was read') > panel.indexOf('Status'), 'where it was read comes after its status');
     // A task for a designer links to the component in Figma in What to do, in a tab of its own with Figma's mark. A
     // task for a developer never links to Figma.
     const figma = await run(`(async () => {

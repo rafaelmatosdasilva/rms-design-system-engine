@@ -68,7 +68,7 @@ test('a check made by hand is shown as a person\'s word, and what meets the stan
   assert.match(page, /r\.said \? ' data-said="1"' : ''/, 'the table marks the row');
   assert.match(page, /function saidRest\(rows\)/, 'the badge counts them');
   assert.match(page, /' criterion on a person\\'s word' : ' criteria on a person\\'s word'/);
-  assert.match(page, /Meets WCAG 2\.2 at level A and AA' \+ saidRest\(a11yEl\.rows\)/, 'the claim says what it rests on');
+  assert.match(page, /Meets WCAG 2\.2 at level A and AA' \+ saidRest\(a11yRows\)/, 'the claim says what it rests on, counted on the Accessibility page\'s own table');
   // Where the row was read from is their word, never a measurement.
   assert.match(page, /A person\\'s word \(' \+ \(sb\.by \|\| 'someone'\)/);
 });

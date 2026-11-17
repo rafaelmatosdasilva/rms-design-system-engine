@@ -9,61 +9,24 @@
       return '<div class="pg-example"><div class="pg-ctl-label">' + (e.kind === 'do' ? 'Do' : 'Don\'t') + '</div><div class="pg-example-stage"><img loading="lazy" alt="' + esc((e.kind === 'do' ? 'Do: ' : 'Don\'t: ') + (e.caption || c.name)) + '" src="' + esc(e.src) + '" width="' + Math.round(e.w) + '" height="' + Math.round(e.h) + '"></div>' + (e.caption ? '<p class="pg-example-caption">' + esc(e.caption) + '</p>' : '') + '</div>';
     }).join('') + '</div>';
   }
+  // A component's History is the History page's own table, filtered to the changes that affect it (historyTable,
+  // 07-second-in-the-list.js), drawn once its page is (33). Under it, what that page does not list: when Figma was last
+  // read for it, the changes made to it in Figma through the engine (each opening its before and after on the Changes in
+  // Figma page) and code not committed yet. Labelled values, never a table of their own.
   function changelogHTML(c) {
-    var u = c.updated || {}, log = c.changelog || [], figma = c.figmaLog || [];
-    var card = function (head, rows, kind) { return '<div class="pg-inspect" data-hist="' + (kind || 'code') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
-    var link = function (r) { return r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>'; };
-    var what = function (list) { return (list || []).length ? '<span class="pg-par-val">' + esc(list.join('; ')) + '</span>' : ''; };
-    var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
-    // Figma: when it was last read, then every read that changed what Figma says of it, with what changed.
-    var fig = (u.figmaRead ? '<tr><td>Last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') +
-      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + ((r.editors || []).length ? ' <span class="pg-log-date">changed in Figma by ' + esc(r.editors.join(', ')) + '</span>' : '') + doneByHTML(r) + what(/first time/.test(r.changed[0]) ? [] : r.changed.length > 4 ? r.changed.slice(0, 4).concat('and ' + (r.changed.length - 4) + ' more') : r.changed) + '</td></tr>'; }).join('');
-    // What the team decided about it, gathered from wherever each decision was made (decisions.mjs). First, because
-    // a decision outlives every commit under it: an option somebody looked at and did not want is the one thing a
-    // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
-    var dec = (c.decisions || []).map(function (d) {
-      return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
-        (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') +
-        (d.became ? '<br>' + esc(d.became) : '') + (d.back ? '<br>' + esc(d.back) : '') + (d.review ? '<br>' + esc(d.review) : '') + (d.author ? '<br><span class="pg-dim">' + esc('made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by)) + '</span>' : '') + '</td></tr>';
-    }).join('');
-    // Each change made to it in Figma through the engine, with its status, opening its before and after on the Changes in
-    // Figma page.
+    var u = c.updated || {};
     var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said', 'taken back': 'Taken back' };
-    fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
-      return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + (x.signedOff ? '<br><span class="pg-dim">' + esc('signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '') + '</td></tr>';
-    }).join('');
-    // Each change to the intent layer on a page that documents it: what changed, the commit that made it, and who made it,
-    // as every other change on the page says who did it.
-    var lay = (DATA.intentChanges || []).filter(function (x) { return (x.components || []).indexOf(c.name) >= 0; }).map(function (x) {
-      var sha = !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>';
-      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc((x.pages.length === 1 ? 'Its page changed: ' : 'Its page and ' + (x.pages.length - 1) + ' more changed: ') + x.pages.join(', ') + '.') + ' ' + day(x.at || '') + (x.by ? ' <span class="pg-log-date">' + esc(x.by) + '</span>' : '') + '</td></tr>';
-    }).join('');
-    // The comments left on it in Figma (figma-comments.mjs), each thread with its replies, open or resolved.
-    var cm = (c.figmaComments || []).map(function (t) {
-      return '<tr><td>' + (t.resolved ? 'Resolved' : 'Open') + '</td><td>' + esc('\u201c' + t.text + '\u201d') + ' ' + day(t.at) + (t.by ? ' <span class="pg-log-date">' + esc(t.by) + '</span>' : '') +
-        (t.replies || []).map(function (r) { return '<br>' + esc('\u201c' + r.text + '\u201d') + (r.by ? ' <span class="pg-log-date">' + esc(r.by) + '</span>' : ''); }).join('') + '</td></tr>';
-    }).join('');
-    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (lay ? card('Intent layer', lay, 'intent') : '') + (fig ? card('Figma', fig, 'figma') : '') + (cm ? card('Comments in Figma', cm, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
-    // Its code, Figma, the intent layer and its decisions: chips, as the History page has, for each kind it has when it has two.
-    var has = [['code', 'Code', log.length || u.uncommitted], ['figma', 'Figma', fig], ['intent', 'Intent layer', lay], ['decisions', 'Decisions', dec]].filter(function (x) { return x[2]; });
-    var hist = has.length > 1 ? '<p class="pg-par-sum"><span class="sg-chips" role="group" aria-label="Show">' + [['all', 'All']].concat(has).map(function (x) { return '<button type="button" class="sg-chip" data-hist="' + x[0] + '" aria-pressed="' + (x[0] === 'all') + '">' + x[1] + '</button>'; }).join('') + '</span></p>' : '';
-    if (!log.length) return hist + '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
-
-    // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
-    // request and what it changed in the component's own rules.
-    var groups = [], by = {};
-    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = { k: k, rows: [], at: String(r.date), on: r.releasedAt || '' }; groups.push(by[k]); } by[k].rows.push(r); });
-    groups.sort(releaseOrder);
-    return hist + '<div class="pg-cards">' + out + groups.map(function (g) {
-      var k = g.k, rows = g.rows, first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
-      // One row per ticket, each of its commits a line (what it says, its commit, its day, what it changed); a commit for
-      // no ticket keeps its own row, its commit and pull request on the left.
-      return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), byTicket(rows, function (r) { return r; }).map(function (t) {
-        if (t.ticket) return '<tr><td>' + (t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener">' + esc(t.ticket) + '</a>' : esc(t.ticket)) + '</td><td>' + t.items.map(function (r) { return '<p class="sg-il-line">' + commitLine(r, ' ' + day(r.date) + what(r.changed)) + '</p>'; }).join('') + '</td></tr>';
-        var r = t.items[0], pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
-        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + doneByHTML(r) + what(r.changed) + '</td></tr>';
-      }).join(''));
-    }).join('') + '</div>';
+    var fc = (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
+      return [{ html: '<a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a>' }, esc(x.asked || x.steps[0] || '') + ' <span class="pg-log-date">' + esc(String(x.at || '').slice(0, 10)) + '</span>' + (x.signedOff ? '<span class="pg-par-val">' + esc('Signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '')];
+    });
+    var now = [['Figma last read', u.figmaRead ? esc(when(u.figmaRead)) : ''], ['Its code', u.uncommitted ? 'Has changes not committed yet' : '']];
+    return (fc.length ? panelCard('Changes in Figma', kvOne(fc)) : '') + (u.figmaRead || u.uncommitted ? panelCard('Now', kvOne(now)) : '');
+  }
+  // Its History area, once its page is drawn: the History page's table above what changelogHTML put there, or a line
+  // that nothing is known to have changed it.
+  function fillHistoryArea(sec, c) {
+    var box = sec.querySelector('.pg-area[data-area="log"] .pg-doc'); if (!box) return;
+    if (!historyTable(box, c.name, box.firstChild)) box.insertAdjacentHTML('afterbegin', areaInfo('No change to it is known yet. No commit, read of Figma, change of the intent layer or decision names it.'));
   }
   // Each card's preview, drawn once its area is on screen (a hidden card has no size to fit), never with ?all.
   function builtThumbs(sec) {
