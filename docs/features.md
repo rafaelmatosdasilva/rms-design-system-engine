@@ -10,8 +10,8 @@ What the engine does for design and product teams. Every part reads the same kno
 |---|---|---|
 | [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, with a score for how well you follow them. | Ready to use |
 | [Measure Figma-code parity](#measure-figma-code-parity) | A deep design-code comparison of colours, sizes, states and spacing in every mode, as a real browser draws them (25 gates). | Ready to use |
+| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Ready to use |
 | [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component, checked on the Figma designs and in a real browser. | Early development |
-| [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, with a score for how well you follow them. | Early development |
 
 ### Documentation
 
@@ -109,45 +109,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
 | `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
 
-## Test accessibility
-
-**Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
-
-*Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, and from VoiceOver or NVDA themselves only when you ask.*
-
-- Tries every component in a real browser, in every state and colour mode.
-- Measures contrast against what is really painted behind the text.
-- Follows the Tab key through each page to find traps, lost focus and controls a keyboard never reaches.
-- Measures touch targets, on the page and again on a small 320 pixel screen.
-- Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
-- Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
-- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
-- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again. It is shown as their word, not a measurement, and what meets the standard says how much of it rests on one.
-- Sorts the judgement calls for whoever checks them, when you ask: a model reads your headings, labels, link words and error messages and lists the ones worth looking at first, with why. It decides nothing — no criterion passes or fails on it.
-- Listens with a real screen reader when you ask: VoiceOver on a Mac or NVDA on Windows is moved through each control of each component, and what it said is held against the name, role and states the browser gives. A measurement of one reader, shown on the 4.1.2 row. It never turns a setting of your computer on.
-- Tries what a browser decides in Firefox and Safari as well as Chrome: what Tab reaches, whether the focus shows, reflow, zoom, text spacing and target size. Only what differs from Chrome is said, and each row says which browser answered it.
-- Tries what belongs to a page across your products' own pages: a title and a language, a page that works both ways up, a skip link, the same navigation and help in the same place, more than one way of finding a page, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
-- Walks a flow for real when you ask it to: each step filled in and sent, so a field asked twice is a finding and not a question. It never types a password or a card number, and stops before a step that pays, signs or deletes.
-- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
-- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
-- Tries again only what changed, so a second run takes seconds.
-- Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
-- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
-
-### What to ask
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
-| `/rms-design-system-engine check the accessibility of our pages and flows` | What belongs to a page, tried across your product's own pages |
-| `/rms-design-system-engine walk our checkout flow and check nothing is asked twice` | The flow filled in and sent step by step, with what it asks for again |
-| `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
-| `/rms-design-system-engine judge the wordings of our components` | The headings, labels, links and error messages a person should look at first |
-| `/rms-design-system-engine listen to our components with VoiceOver` | What VoiceOver said on each control, and each one said apart from what the browser gives |
-
 ## Lint your codebase rules
 
-**Early development** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
+**Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
 
 *Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
 
@@ -195,6 +159,42 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
 | `/rms-design-system-engine inspect our design system` | One rating for each of ten questions (coverage, accessibility, governance, adoption and more), with the evidence behind it and what only an interview answers |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
+
+## Test accessibility
+
+**Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
+
+*Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, and from VoiceOver or NVDA themselves only when you ask.*
+
+- Tries every component in a real browser, in every state and colour mode.
+- Measures contrast against what is really painted behind the text.
+- Follows the Tab key through each page to find traps, lost focus and controls a keyboard never reaches.
+- Measures touch targets, on the page and again on a small 320 pixel screen.
+- Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
+- Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
+- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
+- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again. It is shown as their word, not a measurement, and what meets the standard says how much of it rests on one.
+- Sorts the judgement calls for whoever checks them, when you ask: a model reads your headings, labels, link words and error messages and lists the ones worth looking at first, with why. It decides nothing — no criterion passes or fails on it.
+- Listens with a real screen reader when you ask: VoiceOver on a Mac or NVDA on Windows is moved through each control of each component, and what it said is held against the name, role and states the browser gives. A measurement of one reader, shown on the 4.1.2 row. It never turns a setting of your computer on.
+- Tries what a browser decides in Firefox and Safari as well as Chrome: what Tab reaches, whether the focus shows, reflow, zoom, text spacing and target size. Only what differs from Chrome is said, and each row says which browser answered it.
+- Tries what belongs to a page across your products' own pages: a title and a language, a page that works both ways up, a skip link, the same navigation and help in the same place, more than one way of finding a page, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
+- Walks a flow for real when you ask it to: each step filled in and sent, so a field asked twice is a finding and not a question. It never types a password or a card number, and stops before a step that pays, signs or deletes.
+- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
+- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
+- Tries again only what changed, so a second run takes seconds.
+- Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
+- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
+
+### What to ask
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine check the accessibility of the button` | WCAG 2.2 A and AA in a real browser, with axe-core |
+| `/rms-design-system-engine check the accessibility of our pages and flows` | What belongs to a page, tried across your product's own pages |
+| `/rms-design-system-engine walk our checkout flow and check nothing is asked twice` | The flow filled in and sent step by step, with what it asks for again |
+| `/rms-design-system-engine badge 1.3.3 is checked` | A criterion marked as checked by a person |
+| `/rms-design-system-engine judge the wordings of our components` | The headings, labels, links and error messages a person should look at first |
+| `/rms-design-system-engine listen to our components with VoiceOver` | What VoiceOver said on each control, and each one said apart from what the browser gives |
 
 ## Write component specs
 
