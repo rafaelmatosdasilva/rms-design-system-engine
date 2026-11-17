@@ -501,7 +501,7 @@
       var name = th.getAttribute('data-sort'), val = cols.filter(function (col) { return col[0] === name; })[0][1];
       table._sortDir = table._sortKey === name ? -table._sortDir : 1; table._sortKey = name;
       var dir = table._sortDir;
-      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(a._x), v = val(b._x); return (u < v ? -1 : u > v ? 1 : 0) * dir; }).forEach(function (tr) { tb.appendChild(tr); });
+      Array.prototype.slice.call(tb.rows).sort(function (a, b) { var u = val(a._x), v = val(b._x); return (u < v ? -1 : u > v ? 1 : 0) * dir; }).forEach(function (tr) { tb.appendChild(tr); }); rowsMoved(tb);
       Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (h) { h.setAttribute('aria-sort', h.getAttribute('data-sort') === name ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
     });
     e.bar = filterBar(scope, a11yBarOpts());

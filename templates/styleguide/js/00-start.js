@@ -376,8 +376,12 @@
   // A day as a sentence says it: 15 Oct (the year only when it is not this one).
   var dayShort = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.getDate() + ' ' + MONTHS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); };
   var PILLS_SHOWN = 5;
+  // A table's rows shown at once: the rest behind the same chevron, so a page of thousands opens at once (the owner's, 17 November 2026).
+  var ROWS_SHOWN = 100;
+  // A table's rows put in another order: its filter bar shows the first ones again.
+  function rowsMoved(el) { if (el) el.dispatchEvent(new CustomEvent('sg-sorted', { bubbles: true })); }
   var PILLS_CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>';
-  function pillsMore(n) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" data-pills-more>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; }
+  function pillsMore(n, attr) { return '<button type="button" class="sg-link-pill sg-link-pill--table sg-pills-more" ' + (attr || 'data-pills-more') + '>' + PILLS_CHEV + esc(n.toLocaleString('en') + ' more') + '</button>'; }
   function namePill(n) { return '<code class="sg-name">' + esc(n) + '</code>'; }
   function namePills(names) { names = names || []; return '<span class="sg-il-codes">' + names.map(function (n, i) { return '<code class="sg-name"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</code>'; }).join('') + (names.length > PILLS_SHOWN ? pillsMore(names.length - PILLS_SHOWN) : '') + '</span>'; }
   document.addEventListener('click', function (e) {

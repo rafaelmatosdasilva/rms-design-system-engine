@@ -44,6 +44,7 @@
       });
       runs.forEach(function (group) { group.forEach(function (tr) { tb.appendChild(tr); }); });
     });
+    rowsMoved(t);
     var head = sortHeadRow(t);
     if (head) Array.prototype.forEach.call(head.cells, function (th) { if (th.hasAttribute('data-sort-col')) th.setAttribute('aria-sort', sortColOf(th) === col ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
   }

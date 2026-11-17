@@ -254,7 +254,7 @@
       Array.prototype.slice.call(tb.children).sort(function (a, b) {
         var x = rows[+a.getAttribute('data-cx-row')], y = rows[+b.getAttribute('data-cx-row')], u = val(x), v = val(y);
         return (u < v ? -1 : u > v ? 1 : 0) * dir || ORDER[x.status] - ORDER[y.status];
-      }).forEach(function (tr) { tb.appendChild(tr); });
+      }).forEach(function (tr) { tb.appendChild(tr); }); rowsMoved(tb);
       Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
     // A head sorts, a row opens its panel on a click or Enter, and the filters above the table: scoped to where the
@@ -660,7 +660,7 @@
         cur = { x: ROWS[+tr.getAttribute('data-log-row')], trs: [tr] }; blocks.push(cur);
       });
       blocks.sort(function (a, b) { var u = val(a.x), v = val(b.x); return (u < v ? -1 : u > v ? 1 : 0) * logDir || stamp(b.x.at) - stamp(a.x.at); });
-      blocks.forEach(function (b) { b.trs.forEach(function (tr) { tb.appendChild(tr); }); });
+      blocks.forEach(function (b) { b.trs.forEach(function (tr) { tb.appendChild(tr); }); }); rowsMoved(tb);
       Array.prototype.forEach.call(logTable.querySelectorAll('th[data-sort]'), function (th) { th.setAttribute('aria-sort', th.getAttribute('data-sort') === key ? (logDir > 0 ? 'ascending' : 'descending') : 'none'); });
     };
     // The shared cells stick under the table's head: how tall the head is, again whenever it changes (shown, resized).
@@ -744,8 +744,12 @@
     };
     paint();
     if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
+    var shown = ROWS_SHOWN;
+    // The rows the filters leave, in the table's order now, the first ROWS_SHOWN of them drawn and the rest behind "N more".
     var draw = function () {
-      trs.forEach(function (tr) { tr.hidden = !passes(tr); });
+      var n = 0;
+      Array.prototype.forEach.call(sec.querySelectorAll('tbody > tr[data-f]'), function (tr) { var ok = passes(tr); if (ok) n++; tr.hidden = !ok || n > shown; });
+      rowsMore(n - shown);
       if (trs.length) tableNone(trs[0].closest('table'), o.said);
       var on = cols.filter(function (c) { return F[c.key]; }).length + (C ? 1 : 0);
       bar.querySelector('[data-f-all]').setAttribute('aria-pressed', on ? 'false' : 'true');
@@ -773,7 +777,18 @@
       });
       sec.dispatchEvent(new CustomEvent('sg-filter', { detail: F }));
     };
+    var rowsMore = function (rest) {
+      var t = trs.length ? trs[0].closest('table') : null; if (!t) return;
+      var foot = t.querySelector(':scope > tfoot.sg-rows-more');
+      if (rest <= 0) { if (foot) foot.hidden = true; return; }
+      if (!foot) { foot = document.createElement('tfoot'); foot.className = 'sg-rows-more'; t.appendChild(foot); }
+      foot.hidden = false;
+      foot.innerHTML = '<tr><td colspan="' + ((t.tHead && t.tHead.rows[0] && t.tHead.rows[0].cells.length) || 1) + '">' + pillsMore(rest, 'data-rows-more') + '</td></tr>';
+    };
+    sec.addEventListener('click', function (e) { if (e.target.closest('[data-rows-more]') && sec.contains(e.target)) { shown += ROWS_SHOWN; draw(); } });
+    sec.addEventListener('sg-sorted', function () { draw(); });
     bar.addEventListener('click', function (e) {
+      if (!e.target.closest('.sg-chip-menu')) shown = ROWS_SHOWN;   // a new filter starts from the first rows again
       var m = e.target.closest('.sg-chip-menu'); if (m) { mxMenu(m, m.getAttribute('aria-expanded') !== 'true'); return; }
       if (e.target.closest('[data-f-all], [data-f-clear]')) { F = {}; C = ''; draw(); return; }
       var ch = e.target.closest('.sg-chip[data-chip]'); if (ch) { C = C === ch.getAttribute('data-chip') ? '' : ch.getAttribute('data-chip'); draw(); return; }
