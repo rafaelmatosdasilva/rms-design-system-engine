@@ -374,7 +374,7 @@
     m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open');
     PANEL_PATH = null; todoLink();
     setTimeout(function () { if (!m._open) m.classList.add('is-parked'); }, 200);   // after it slides out: parked, its page kept for the next one
-    if (m._from && document.contains(m._from)) m._from.focus();
+    var from = m._from; if (from && document.contains(from)) requestAnimationFrame(function () { from.focus({ preventScroll: true }); });   // after the panel has started to go, the page not scrolled
   }
   // Opened from an address: sorted by the area it names, else by what is left in all of them; every component shown.
   function openTodoKind(slug, q) {

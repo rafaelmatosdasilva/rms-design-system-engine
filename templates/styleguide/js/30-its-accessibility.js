@@ -176,6 +176,10 @@
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
+  // The lists drawn again once the browser is free, never in the middle of what a person just did (a panel opening):
+  // several calls in a row are one.
+  var todoSoon = 0;
+  function fillTodoSoon() { if (todoSoon) return; todoSoon = (window.requestIdleCallback || setTimeout)(function () { todoSoon = 0; fillTodo(); }, { timeout: 1500 }); }
   function fillTodo() {
     var order = [];
     // The system's own items (a control the page needs and the system lacks, a component only Figma has): rows of the

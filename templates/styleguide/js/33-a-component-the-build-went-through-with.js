@@ -899,9 +899,10 @@
       if (live !== undefined) liveNow = live;
       var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
+      var wasLive = c.__a11y && c.__a11y.live;   // what the lists already show for it
       if (liveNow) c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) };
       a11yArea(a11yEl, c);
-      if (liveNow) { fillTodo(); if (!checking) keepA11y(); }   // the Status page and the Accessibility page list what it shows
+      if (liveNow && liveNow !== wasLive) { fillTodoSoon(); if (!checking) keepA11y(); }   // drawn again only when what it found changed   // the Status page and the Accessibility page list what it shows
       // Its tab carries its state, as its Status row says it, once the browser has tried it.
       var accNow = componentStates(c).acc;
       areaState(sec.querySelector('.pg-areas [data-v="a11y"]'), accNow); areaNA(sec.querySelector('.pg-area[data-area="a11y"]'), accNow);
