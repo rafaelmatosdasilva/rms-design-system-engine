@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { standin, fileState } from './standin.mjs';
 import { opsScript, modelOf, ground, opWords, partNamed, rankOf } from '../../lib/figma-ops.mjs';
-import { specOf, likeOf, nameOf, askedOf, EXT } from '../../lib/component-spec.mjs';
+import { specOf, likeOf, nameOf, askedOf, partOf } from '../../lib/component-spec.mjs';
 import { parseChange } from '../../lib/component-change.mjs';
 import { kindOf, examplesOf, kindRules, composeOps, foundationOps, kindSpec } from '../../lib/system-kinds.mjs';
 import { grammarOf } from '../../lib/construction-grammar.mjs';
@@ -140,8 +140,8 @@ function opsOf(req, system, captures, grammar) {
   if (kind === 'foundation') {
     const f = foundationOps({ description: req.ask, variables: Object.values(captures.varNames).map((v) => v.name) });
     const { spec } = kindSpec({ kind, description: req.ask, ops: [...f.ops, ...answers], questions: f.questions, captures, grammar });
-    const first = kindSpec({ kind, description: req.ask, ops: f.ops, questions: f.questions, captures, grammar }).spec[EXT].questions;
-    return { ops: spec[EXT].ops, asked: first.length, asks: first.map((q) => q.ask), left: spec[EXT].questions.length, like: f.ops[0]?.like ?? null };
+    const first = partOf(kindSpec({ kind, description: req.ask, ops: f.ops, questions: f.questions, captures, grammar }).spec).questions;
+    return { ops: partOf(spec).ops, asked: first.length, asks: first.map((q) => q.ask), left: partOf(spec).questions.length, like: f.ops[0]?.like ?? null };
   }
   if (kind !== 'component') {
     const comps = Object.keys(captures.props);
@@ -149,7 +149,7 @@ function opsOf(req, system, captures, grammar) {
     const c = composeOps({ kind, name: nameOf(req.ask) ?? req.ask.match(/called (\w+)/)?.[1], description: req.ask, examples, components: comps, rules: kindRules(kind, examples) });
     const first = kindSpec({ kind, description: req.ask, name: c.ops[0].name, ops: c.ops, questions: c.questions, captures, grammar }).spec;
     const { spec } = kindSpec({ kind, description: req.ask, name: c.ops[0].name, ops: [...c.ops, ...answers], captures, grammar });
-    return { ops: spec[EXT].ops, asked: first[EXT].questions.length, asks: first[EXT].questions.map((q) => q.ask), left: spec[EXT].questions.length, like: null };
+    return { ops: partOf(spec).ops, asked: partOf(first).questions.length, asks: partOf(first).questions.map((q) => q.ask), left: partOf(spec).questions.length, like: null };
   }
   const like = likeOf(req.ask, Object.keys(captures.props)).like;
   const name = nameOf(req.ask);
@@ -157,9 +157,9 @@ function opsOf(req, system, captures, grammar) {
   const first = specOf({ description: req.ask, like, name, ops: read.ops, unread: read.unread, captures, grammar }).spec;
   // A request drawn from a library answers what a person would: its description, and the shared variable each of the
   // like's own points at (--shared).
-  if (req.autoAnswer) answers.push(...(first[EXT].shared ?? []), { op: 'describe', text: `A copy of ${like}, for the benchmark.` });
+  if (req.autoAnswer) answers.push(...(partOf(first).shared ?? []), { op: 'describe', text: `A copy of ${like}, for the benchmark.` });
   const { spec } = specOf({ description: req.ask, like, name, ops: [...read.ops, ...answers], captures, grammar });
-  return { ops: spec[EXT].ops, asked: first[EXT].questions.length, asks: first[EXT].questions.map((q) => q.ask), left: spec[EXT].questions.length, like };
+  return { ops: partOf(spec).ops, asked: partOf(first).questions.length, asks: partOf(first).questions.map((q) => q.ask), left: partOf(spec).questions.length, like };
 }
 
 // A node as the capture reads one, for the layout check: its tree and, per layer, where it sits and the size of a box

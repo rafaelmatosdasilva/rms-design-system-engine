@@ -145,6 +145,11 @@ Why the engine can be trusted with a team's code, design files and credentials: 
 
 - **On every change:** the full test suite (more than 2,000 tests, including planted mistakes and property tests with fast-check), CodeQL code scanning, and the privacy check, all required before a merge.
 - **Every week:** OpenSSF Scorecard, on every change to main as well; and Dependabot, which opens one pull request for the pinned actions that moved.
+- **Every week, the advisories Dependabot cannot close:** one with no newer version to move to, or whose range is the
+  advisory's own mistake (a "3.x" range with no end matches 4.x too, long after the fix). Those are answered in that
+  folder's `osv-scanner.toml` with the reason and **a date to look again**, and the watch says when a date is close,
+  when one has passed, and when something is flagged that nothing is coming for. It decides nothing: each is fixed,
+  reported upstream, or answered again, which is a person's call.
 - **Self-certified:** the [OpenSSF Best Practices](https://www.bestpractices.dev/projects/16082) passing level.
 
 ### Known limits

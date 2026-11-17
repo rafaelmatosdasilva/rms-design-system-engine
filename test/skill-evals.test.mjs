@@ -579,10 +579,12 @@ test('graders that had no case: each passes a right answer and fails the wrong o
   assert.equal(passes('audit-then-accept', fakeCtx({ calls: [run('rms-design-system-engine --component chip')], final: 'The chip was failing, so I accepted it as known debt and the run is green again now.', files: { 'design-system-engine-baseline.json': JSON.stringify({ gates: ['Structure'] }) } })), false, 'a whole gate accepted, not the finding');
 
   // A component built like another: a clone with no value of its own, and Figma never said to be changed.
-  const pill = { name: 'pill', 'x-rms-design-system-engine': { like: 'chip', ops: [{ op: 'clone', from: 'chip' }] } };
+  const ext = 'io.github.rafaelmatosdasilva.rms-design-system-engine';
+  const asDoc = (entry) => ({ schemaVersion: '0.23.1', name: 'Acme', entries: [entry] });
+  const pill = asDoc({ name: 'pill', $extensions: { [ext]: { like: 'chip', ops: [{ op: 'clone', from: 'chip' }] } } });
   assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: ask, files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(pill) } })), true);
   assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: 'I have created the pill in Figma.', files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(pill) } })), false, 'claiming Figma was changed');
-  const invented = { name: 'pill', 'x-rms-design-system-engine': { like: 'chip', ops: [{ op: 'clone', from: 'chip', height: '24px' }] } };
+  const invented = asDoc({ name: 'pill', $extensions: { [ext]: { like: 'chip', ops: [{ op: 'clone', from: 'chip', height: '24px' }] } } });
   assert.equal(passes('figma-build-like', fakeCtx({ calls: [run('rms-design-system-engine --spec pill --like chip')], final: ask, files: { [`${OUT}/specs/pill.spec.json`]: JSON.stringify(invented) } })), false, 'a value of its own');
 
   // A step on a scale: the engine asks what XL changes, and nothing is built on a guess.
