@@ -39,7 +39,8 @@ should always run scoped. Omit the flag to audit the whole DS.
 **A name the system does not have.** A component asked for that is in neither the Figma data nor the code (no file
 named for it, no element with its class) is said: "nothing about it was checked", in the report and the summary
 (**Nothing checked**), and the NEXT line asks the person which component they mean, never a pass. The router knows the
-components only the code has (a file whose first element carries a class of its own) as well as Figma's, and before
+components only the code has (a file whose first element carries a class of its own, or, where no Figma capture
+names anything, one that declares the component its file is named for) as well as Figma's, and before
 any is known (no snapshot yet) it still scopes to a name written as one (`buttonPrimary`, "the card component").
 
 **No Figma data captured yet.** With a Figma file set up and no snapshot readable, nothing was compared with Figma:
@@ -646,7 +647,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the Status page with its file (`1 in the code and not in Figma, on the Status page`), and a page for one of them
   (`--component X --styleguide`) says so. Before Figma's data is captured, every component is the
   code's: shown with its file and the props its code declares, marked **Only in the code** and compared with nothing
-  in Figma, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
+  in Figma, and the run says so (`3 only in the code`) instead of counting them agreed. The class and the `components`
+  folder are how a file is paired with a Figma component, so with no capture neither narrows the list: the whole
+  library is read, and a file counts when it carries a class of its own **or** declares the component it is named for.
+  A React library that styles itself with CSS modules, styled components or `clsx` carries no class on any file, and
+  read the paired way its page listed one internal file and nothing else. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes
