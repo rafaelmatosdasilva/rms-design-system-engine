@@ -2,6 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A library with no Figma capture is read by its own code, not by the pairing's rules (continuous evaluation)
+
+What changed since the entry below (engine fef91a1): The README shows what each feature reads, runs and writes, with its own badges (#558); The README opens each feature on its stage, and shows only tools a real run has used (#559); The README's cells have even space, its live badges are two-toned, and its top says only where the engine runs (#560); Every tool the engine uses is free and open source, and an option, never a requirement (#561); Each feature's stage is a small badge above its name: Stable, Beta or Soon (#562); Tokens for a team's own pipeline, and GitHub read as GitLab is (#563); Rename Gather usage guidelines to Maintain usage guidelines, list Lint after Figma rules, show GitHub under its Writes (#564); The summary names the host the code was read from: GitHub, not GitLab, for a GitHub project (#565); The README's features: one kind of thing a line (Reads, Runs, Writes, Publishes, Follows), only what a real run proved (#566); A store written with git and no branch named goes to the default branch, never to a branch called HEAD (#567); Update README.md (#568); React components drawn with the project's own React, proven on a real system (#569); test-tools: bump @vitejs/plugin-react (#570); Each Storybook story is checked as the state it shows: parity and behaviours on it too, and a state Figma lacks named (#571); A library with no Figma capture is read by its own code, not by the pairing's rules. The guide changed in `reference/usage.md`.
+
+Guide set measured: `27a42dd20c45` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md c92fab2f` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md dd1fcdbe` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md fc59d6c1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 35e9ed3 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 77/79 | 76/79 |
+| Mean cost a run | 0.063 | 0.068 |
+| Input a run | 107k | 120k |
+| Turns a run | 3.9 | 4.2 |
+| Rule violations | 0 | 0 |
+| Runs stopped at a limit | 0 | 1 |
+
+**Reading.** Haiku: 3 of 79 runs failed, fewer passes than the entry below, and 1 of them never finished: audit-all #1: timed out — read those as the ceiling, not the guide. Failed: audit-all #1: the run was given room to finish (timed out); figma-add-option #0: puts the question to the person; figma-add-option #1: the engine asked what XL changes ([{"at":0,"ask":"Which of chip's Size options is the new XL like (M, L)? Its variants start as copies of that one's."}]). no task changed state; 3 runs moved inside tasks that pass sometimes, which is noise, not a difference. Input moved but input a turn held (28k to 29k): the turns moved, 3.9 to 4.2, and nothing a run reads grew - most in `two-turns-pt` 6.0 to 10.3, `figma-add-option` 2.3 to 6.0, `forbidden-green` 2.7 to 4.3. Each of the 3 was re-run on this same commit on an idle machine and passed: `figma-add-option` 3/3 on Haiku and 3/3 on Sonnet, `audit-all` 3/3 on Haiku. `audit-all #1` timed out while the full suite was finishing on the same machine. Both `figma-add-option` failures are one slip: the agent passed a `--like` the Size axis does not hold, so the engine asked which option XL copies rather than what XL changes - it refused to guess either way, but the check is pinned to the second wording. That question is `figma-ops.mjs` as of #121 (28 October) and this change touches `component-source.mjs`, `reference/usage.md` and one test, nothing on the Figma path. Records: `records/2026-11-18-a-library-with-no-figma`.
+
 ## 2026-11: Tokens for a team's own pipeline, and GitHub read as GitLab is (continuous evaluation)
 
 What changed since the entry below (engine 9cb6583): Style Dictionary and Tokens Studio exports, and a GitHub link read through its API. The guide changed in `reference/config.md`.

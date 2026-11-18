@@ -294,5 +294,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `findings-and-pins` | The 24 guide tasks on Haiku (engine 112d31c) | "Findings in the review surface, the result in chat, and every pin watched" |
 | `specs-as-dsds` | The 24 guide tasks on Haiku (engine 9cb6583) | "A spec DSDS's own tools read, and the advisories Dependabot cannot close" |
 | `tokens-and-github` | The 24 guide tasks on Haiku (engine fef91a1) | "Tokens for a team's own pipeline, and GitHub read as GitLab is" |
+| `2026-11-18-a-library-with-no-figma` | The 24 guide tasks on Haiku (engine 35e9ed3) | "A library with no Figma capture is read by its own code, not by the pairing's rules" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
