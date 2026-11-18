@@ -8,6 +8,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 - [Prototype with your real components](#prototype-with-your-real-components)
 - [Turn Figma into code](#turn-figma-into-code)
 - [Turn code into Figma](#turn-code-into-figma)
+- [Build from your documentation](#build-from-your-documentation)
 - [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt)
 - [Generate in code from a prompt](#generate-in-code-from-a-prompt)
 
@@ -755,6 +756,10 @@ Give it a file instead of a component name, and it draws that page as a Figma fr
 - **A frame, not a component.** It takes no variants. A component the page uses that Figma doesn't have is a question.
 
 The full options are in [the reference](../reference/usage.md) (`--spec-from-code`).
+
+## Build from your documentation
+
+Your whole library built from your written docs alone, in Figma and in code, the same every time. It is not available yet: what it will do is on the [features page](features.md#build-from-your-documentation).
 
 ## Generate in Figma from a prompt
 
