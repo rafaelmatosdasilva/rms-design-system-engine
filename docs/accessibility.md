@@ -22,7 +22,17 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **Your own stories, when you keep them.** If the project has Storybook and no target is named, the check runs on
   the stories themselves — every component in every state your team decided mattered, with the content it really
   carries, on the page that runs its own script. A finding is said as the component and the state you named it
-  (`Button · Disabled`), not as a story URL.
+  (`Button · Disabled`), not as a story URL. A Storybook you build to files (`storybook build`, into
+  `storybook-static` or the folder `storybook.static` names) is found and served for the run with nothing set up,
+  and the run says the date it was built, since a build older than your code checks the code as it was then.
+- **Each story as the variant it shows.** A story's args, read from the page Storybook drew, are matched to the
+  component's Figma properties however the code spells them (`tone: 'danger'` is `Tone=Danger`, `disabled: true`
+  is `State=Disabled`). A story that shows what Figma has no variant for is named: an option Figma does not list
+  (`size: 'xl'`), or a state Figma never draws (`loading: true`). Either nobody designed what it draws, or Figma is
+  behind the code.
+- **Behaviours, on the page that runs them.** A behaviour (a disclosure opening on a click, a switch flipping) needs the
+  component's own script, which a story runs. Every behaviour tried is recorded with the page it was tried on and
+  whether it worked, the ones that passed too, so a behaviour never tried never reads as one that worked.
 - **Across your system, not its first corner.** When there are more stories than the check will open in one run, it
   takes one state of each component before a second of any, so a cap covers the system rather than whichever
   components the index lists first. The run says how many components it reached.

@@ -2,7 +2,10 @@
 // which is the same shape whether it came from a static build or a running server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { componentOf, storiesByComponent, storyUrl, pagesFor, storyLines, spread, targetsFor } from '../lib/storybook-stories.mjs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { componentOf, storiesByComponent, storyUrl, pagesFor, storyLines, spread, targetsFor, variantOf, figmaPropertiesOf, storyStateLines, staticBuild, serveStatic, STORY_READY } from '../lib/storybook-stories.mjs';
+import { tempDir } from './helpers.mjs';
 
 // What Storybook 7 and later publishes as index.json. Each entry is one story: one component in one state.
 const INDEX_JSON = { v: 5, entries: {
@@ -78,7 +81,7 @@ test('the pages a run opens: a story named by its component and state, a page fo
     { url: 'http://localhost:6006/iframe.html?id=b--off', component: 'Button', state: 'Disabled' },
   ];
   const t = targetsFor(stories, 'http://localhost:6006', { stories: true, cap: 2 });
-  assert.deepEqual(t.targets, [
+  assert.deepEqual(t.targets.map(({ label, url, page }) => ({ label, url, page })), [
     { label: 'Button · Primary', url: 'http://localhost:6006/iframe.html?id=b--primary', page: false },
     { label: 'Chip · On', url: 'http://localhost:6006/iframe.html?id=c--on', page: false },
   ], 'named as the team names them, and a story is one component rather than a whole page');
@@ -113,4 +116,72 @@ test('the script that serves is chosen by what it runs, never by what it is call
 
   assert.equal(servesPages('storybook build'), false, 'building is not serving');
   assert.equal(servesPages('storybook dev -p 6006'), true);
+});
+
+// Figma's properties as the props snapshot keeps them: a variant property lists its options, a boolean one carries
+// Figma's own suffix on its name.
+const BUTTON = {
+  Size: { type: 'VARIANT', defaultValue: 'Medium', variantOptions: ['Small', 'Medium'] },
+  State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Hover', 'Disabled'] },
+  'Icon#3:1': { type: 'BOOLEAN', defaultValue: false },
+  'Label#3:0': { type: 'TEXT', defaultValue: 'Save' },
+};
+
+test("a story's args are the Figma variant they name, whichever way the code spells it", () => {
+  assert.deepEqual(variantOf({ size: 'small', label: 'Save' }, BUTTON).variant, { Size: 'Small' }, 'small is Small; a label is content, not a state');
+  assert.deepEqual(variantOf({ icon: true }, BUTTON).variant, { Icon: true }, "Figma's suffix is no part of the name");
+  assert.deepEqual(variantOf({ isIcon: false }, BUTTON).variant, { Icon: false }, 'isIcon is the Icon property');
+  assert.deepEqual(variantOf({ disabled: true }, BUTTON).variant, { State: 'Disabled' }, 'a flag that names an option is that option');
+  assert.equal(variantOf({ size: 'Small', disabled: true }, BUTTON).label, 'Size=Small, State=Disabled');
+  assert.deepEqual(variantOf({ disabled: false, onClick: null, count: 3 }, BUTTON), { variant: {}, label: '', missing: [] }, 'a flag set off, and an arg Figma has no property for, say nothing');
+});
+
+test("a state is matched to the option that is that state, as the project's states say or its name does", () => {
+  const props = { Status: { type: 'VARIANT', variantOptions: ['Idle', 'Busy'] } };
+  assert.deepEqual(variantOf({ loading: true }, props).variant, { Status: 'Busy' }, 'busy is loading by its name');
+  const cfg = { states: { error: { prop: 'Tone', value: 'Critical' } } };
+  assert.deepEqual(variantOf({ invalid: true }, { Tone: { type: 'VARIANT', variantOptions: ['Neutral', 'Critical'] } }, cfg).variant, { Tone: 'Critical' }, 'ds-config.json says Critical is the error');
+});
+
+test('what a story shows that Figma has no variant for is said, with what Figma does have', () => {
+  const { missing } = variantOf({ size: 'xl', loading: true, label: 'Saving' }, BUTTON);
+  assert.deepEqual(missing, [{ arg: 'size', value: 'xl', prop: 'Size', options: ['Small', 'Medium'] }, { arg: 'loading', value: true, concept: 'loading' }]);
+  const lines = storyStateLines([{ component: 'Button', state: 'Saving', missing }, { component: 'Button', state: 'Primary', missing: [] }]);
+  assert.equal(lines.length, 1, 'a story Figma covers says nothing');
+  assert.match(lines[0], /Button · Saving shows Size=xl, which Figma's Size does not list \(it has Small, Medium\); and loading, a state Figma never draws for it/);
+});
+
+test("the component's Figma properties are found under its name however the snapshot writes it", () => {
+  const snap = { _updated: 'x', iconButton: { properties: { Size: {} } }, 'Field size': { properties: { Tone: {} } } };
+  assert.deepEqual(Object.keys(figmaPropertiesOf('IconButton', snap)), ['Size']);
+  assert.deepEqual(Object.keys(figmaPropertiesOf('FieldSize', snap)), ['Tone']);
+  assert.equal(figmaPropertiesOf('Card', snap), null);
+});
+
+test('a story page is checked once Storybook has drawn it, and carries its component and state', () => {
+  const { targets } = targetsFor([{ url: 'http://x/iframe.html?id=b--p', component: 'Button', state: 'Primary', id: 'b--p' }], 'http://x', { stories: true });
+  assert.equal(targets[0].ready, STORY_READY);
+  assert.deepEqual(targets[0].story, { component: 'Button', state: 'Primary', id: 'b--p' });
+  assert.equal(targetsFor([{ url: 'http://x/about' }], 'http://x').targets[0].ready, undefined, 'a page found another way waits for nothing more');
+});
+
+test('a static build is a folder with its page and its index, served without anything outside it', async () => {
+  const root = tempDir('storybook-static-');
+  assert.equal(staticBuild(root), null, 'no build');
+  mkdirSync(join(root, 'storybook-static'));
+  writeFileSync(join(root, 'storybook-static', 'iframe.html'), '<!doctype html><p>story');
+  assert.equal(staticBuild(root), null, 'a page with no index is not a build');
+  writeFileSync(join(root, 'storybook-static', 'index.json'), '{"v":5,"entries":{}}');
+  writeFileSync(join(root, 'secret.txt'), 'not served');
+  assert.equal(staticBuild(root), join(root, 'storybook-static'));
+  assert.equal(staticBuild(root, { storybook: { static: 'elsewhere' } }), null, 'the folder the config names');
+  const s = await serveStatic(staticBuild(root));
+  try {
+    const page = await fetch(s.url + '/iframe.html');
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('content-type'), /text\/html/);
+    assert.equal((await fetch(s.url + '/index.json')).headers.get('content-type'), 'application/json');
+    for (const out of ['/../secret.txt', '/%2e%2e/secret.txt']) assert.notEqual((await fetch(s.url + out)).status, 200, out);
+    assert.equal((await fetch(s.url + '/missing.js')).status, 404);
+  } finally { await s.close(); }
 });

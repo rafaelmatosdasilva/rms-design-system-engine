@@ -376,6 +376,7 @@
   "stdio-sync.test.mjs": 0.1,
   "steering-check.test.mjs": 20.7,
   "stores.test.mjs": 7.2,
+  "storybook-real.test.mjs": 30,
   "storybook-stories.test.mjs": 0,
   "structure-capture.test.mjs": 3.6,
   "structure-reading.test.mjs": 2.4,
