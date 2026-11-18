@@ -35,6 +35,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | [Design themes over your system](#design-themes-over-your-system) | A new theme over your system's tokens, its colours, type, corners and spacing, set live in light and dark and kept readable. | Coming soon |
 | [Turn Figma into code](#turn-figma-into-code) | A Figma-only system turned into code, piece by piece, from Figma's exact names and values, with each piece checked once built. | Coming soon |
 | [Turn code into Figma](#turn-code-into-figma) | Anything that exists only in your code, drawn in Figma with its props as properties and its tokens as variables, for review. | Coming soon |
+| [Build from your documentation](#build-from-your-documentation) | Your variables, text styles and components with their variants, built in Figma and in code from your docs, the same every time. | Coming soon |
 | [Generate in Figma from a prompt](#generate-in-figma-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and drawn in Figma from its rules. | Coming soon |
 | [Generate in code from a prompt](#generate-in-code-from-a-prompt) | Anything your system holds, a component, pattern, template or foundation, described by you and written in code from its rules. | Coming soon |
 | [Prototype with your real components](#prototype-with-your-real-components) | Prototypes built by AI from your real components, each edit checked as it is made, so nothing invented gets past the checks. | Coming soon |
@@ -365,6 +366,18 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Draws a template or a pattern too, as a frame made of the system's own components.
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.
+
+## Build from your documentation
+
+**Coming soon** · **Why it matters:** The system lives on as long as it is written down: Figma today, another tool tomorrow, built from the same files.
+
+- Builds your whole library in Figma from your written docs: collections, modes and variables, text styles, and every component with its variants, properties and bound variables.
+- Gives each component its own page, with its documentation drawn beside it.
+- Writes the same docs as code too: the tokens' CSS and each component's file, the way your components are written.
+- Follows the same description every time, so it gives the same library every time. No AI is used in the build, and no AI credit is spent.
+- A second run changes only what your docs changed, and nothing when nothing did.
+- Lists what your docs do not say exactly, instead of guessing it.
+- Checks the library and the code against your docs once built.
 
 ## Generate in Figma from a prompt
 
