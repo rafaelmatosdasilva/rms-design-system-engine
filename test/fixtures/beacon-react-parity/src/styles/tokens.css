@@ -1,0 +1,21 @@
+/* Beacon's tokens, with its dark theme: a class on the root. Each component's own stylesheet is imported here too. */
+@import '../components/disclosure.css';
+@import '../components/field.css';
+@import '../components/menu.css';
+@import '../components/card.css';
+
+:root {
+  --bc-space-s: 8px;
+  --bc-space-m: 16px;
+  --bc-radius-m: 6px;
+  --bc-radius-l: 8px;
+  --bc-stroke: 1px;
+  --bc-field-height: 36px;
+  --bc-field-height-small: 28px;
+  --bc-ink: #11181c;
+  --bc-surface: #ffffff;
+}
+:root.theme-dark {
+  --bc-ink: #ecf0f3;
+  --bc-surface: #10161b;
+}

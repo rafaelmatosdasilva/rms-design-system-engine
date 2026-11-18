@@ -1,0 +1,5 @@
+.bc-menu__button { box-sizing: border-box; height: var(--bc-field-height); padding: 0 var(--bc-space-m); border-radius: var(--bc-radius-m); border: var(--bc-stroke) solid var(--bc-ink); background: var(--bc-surface); color: var(--bc-ink); }
+.bc-menu__sheet { position: absolute; margin: 0; padding: var(--bc-space-s); list-style: none; border-radius: var(--bc-radius-m); background: var(--bc-surface); border: var(--bc-stroke) solid var(--bc-ink); }
+.bc-menu__item { padding: var(--bc-space-s) var(--bc-space-m); }
+/* In the dark theme the button takes the ink as its fill: Figma keeps it on the surface. Only a reading in that mode sees it. */
+:root.theme-dark .bc-menu__button { background: var(--bc-ink); color: var(--bc-surface); }

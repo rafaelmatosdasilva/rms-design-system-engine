@@ -1,0 +1,41 @@
+{
+  "_note": "Beacon with a dark mode and Figma's variables and structure, for test/react-parity.test.mjs. Every name is invented.",
+  "figma": {
+    "modes": [
+      {
+        "name": "Light",
+        "snapshotKey": "light",
+        "cssSelector": "root"
+      },
+      {
+        "name": "Dark",
+        "snapshotKey": "dark",
+        "cssSelector": "class:theme-dark"
+      }
+    ],
+    "namingConvention": {
+      "prefix": "--bc-",
+      "dropSegments": [
+        "color"
+      ]
+    }
+  },
+  "paths": {
+    "themeCSS": "src/styles/tokens.css",
+    "snapshotVars": "figma/vars.snapshot.json",
+    "snapshotStructure": "figma/structure.snapshot.json",
+    "compPropsSnapshot": "figma/props.snapshot.json"
+  },
+  "componentFiles": {
+    "disclosure": "src/components/Disclosure.jsx",
+    "fieldSize": "src/components/FieldSize.jsx",
+    "menuSheet": "src/components/MenuSheet.jsx",
+    "cardTile": "src/components/CardTile.jsx"
+  },
+  "componentSelectors": {
+    "disclosure": ".bc-disclosure__summary",
+    "fieldSize": ".bc-field__input",
+    "menuSheet": ".bc-menu__button",
+    "cardTile": ".bc-card"
+  }
+}

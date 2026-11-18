@@ -1,0 +1,26 @@
+{
+  "_updated": "2026-11-18T00:00:00.000Z",
+  "_note": "Invented Figma component structure for Beacon.",
+  "components": {
+    "disclosure": {
+      "h": 36, "paddingVar": { "lr": "space/m" }, "innerRadiusVar": "radius/m", "strokeOnDefault": true,
+      "colors": { "fill": { "token": "surface/color" }, "text": { "token": "ink/color" }, "stroke": { "token": "ink/color" } },
+      "defaultVariant": "", "variants": {}
+    },
+    "menuSheet": {
+      "h": 36, "paddingVar": { "lr": "space/m" }, "innerRadiusVar": "radius/m", "strokeOnDefault": true,
+      "colors": { "fill": { "token": "surface/color" }, "text": { "token": "ink/color" }, "stroke": { "token": "ink/color" } },
+      "defaultVariant": "", "variants": {}
+    },
+    "fieldSize": {
+      "h": 36, "paddingVar": { "lr": "space/s" }, "innerRadiusVar": "radius/m", "strokeOnDefault": true,
+      "colors": { "stroke": { "token": "ink/color" } },
+      "defaultVariant": "", "variants": {}
+    },
+    "cardTile": {
+      "paddingVar": { "tb": "space/m", "lr": "space/m" }, "innerRadiusVar": "radius/l", "strokeOnDefault": true,
+      "colors": { "stroke": { "token": "ink/color" } },
+      "defaultVariant": "", "variants": {}
+    }
+  }
+}
