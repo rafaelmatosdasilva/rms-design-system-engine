@@ -200,6 +200,26 @@ test('colours: every mode against the token value, paint opacity included; a var
   assert.equal(compareComponents(code, structure, vars, cfg, maps()).differ.filter((d) => d.field === 'background [dark]').length, 0);
 });
 
+// The rule names Figma's variable, and a rule of the dark theme's own paints over it: the variable is not what is drawn
+// there, so the colour drawn is held to Figma's. Found on a React system whose dark theme gives a menu button the ink as
+// its fill: the check credited the base rule's variable in every mode and said it matched.
+test('colours: the variable is a match only in a mode where it is what draws the colour', () => {
+  const fact = (value, v) => ({ value, var: v, rule: '.menu', at: 'menu.css:1', confidence: 'verified' });
+  const code = { tokens: { '--surface': { modes: { light: { value: '#ffffff' }, dark: { value: '#10161b' } } } },
+    components: { menu: { confidence: 'high', instance: { hasText: true }, fill: 'direct', props: { backgroundColor: fact('rgb(255, 255, 255)', '--surface') },
+      colors: { light: { backgroundColor: 'rgb(255, 255, 255)' }, dark: { backgroundColor: 'rgb(236, 240, 243)' } } } } };
+  const structure = { menu: { fillStructure: 'direct', colors: { fill: { token: 'surface/color' } } } };
+  const vars = { color: { light: { 'surface/color': '#ffffff' }, dark: { 'surface/color': '#10161b' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps({ EXPLICIT: { 'surface/color': '--surface' } }));
+  assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figmaValue} vs ${d.code}`), ['background [dark]: #10161b vs rgb(236, 240, 243)'], JSON.stringify(r.differ));
+  const line = measuredLine(r.differ[0]);
+  assert.match(line, /\.menu sets --surface \(menu\.css:1\), but a rule for dark draws another colour over it: give that rule var\(--surface\), or take it out/);
+  assert.doesNotMatch(line, /via --surface/, 'the variable did not draw it there');
+  // The variable resolves to the colour drawn, which is not Figma's: the token's value is what differs, Gate 3's job.
+  code.tokens['--surface'].modes.dark.value = 'rgb(236, 240, 243)';
+  assert.equal(compareComponents(code, structure, vars, cfg, maps({ EXPLICIT: { 'surface/color': '--surface' } })).differ.length, 0);
+});
+
 test('variants: each Figma axis value is the default, a produced state or a declared one; the rest is listed', async () => {
   const { compareVariants } = await import('../lib/capture-compare.mjs');
   const code = { components: { chip: { states: { 'State=Hover': {} }, statesNotProduced: [{ state: 'State=Focus' }] } } };

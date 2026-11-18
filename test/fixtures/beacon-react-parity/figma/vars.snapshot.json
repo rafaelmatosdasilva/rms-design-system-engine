@@ -1,0 +1,30 @@
+{
+  "_updated": "2026-11-18T00:00:00.000Z",
+  "_note": "Invented Figma variables for Beacon.",
+  "color": {
+    "light": {
+      "ink/color": "#11181c",
+      "surface/color": "#ffffff"
+    },
+    "dark": {
+      "ink/color": "#ecf0f3",
+      "surface/color": "#10161b"
+    }
+  },
+  "sizing": {
+    "space/s": "8px",
+    "space/m": "16px",
+    "radius/m": "6px",
+    "radius/l": "8px",
+    "field/height": "36px",
+    "field/height-small": "28px",
+    "stroke": "1px"
+  },
+  "typography": {},
+  "aliases": {},
+  "breakpoints": {},
+  "strings": {},
+  "booleans": {},
+  "animation": {},
+  "primitives": {}
+}

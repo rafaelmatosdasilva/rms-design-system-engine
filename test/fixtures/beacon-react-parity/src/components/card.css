@@ -1,0 +1,2 @@
+.bc-card { padding: var(--bc-space-m); border-radius: var(--bc-radius-m); border: var(--bc-stroke) solid var(--bc-ink); }
+.bc-card__title { margin: 0; }

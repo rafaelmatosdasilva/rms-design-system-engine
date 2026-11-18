@@ -1,0 +1,8 @@
+{
+  "_updated": "2026-11-18T00:00:00.000Z",
+  "_note": "Invented Figma component properties for Beacon.",
+  "disclosure": { "nodeId": "1:1", "properties": { "label#1:0": { "type": "TEXT", "defaultValue": "Details" } } },
+  "fieldSize": { "nodeId": "1:2", "properties": { "label#1:0": { "type": "TEXT", "defaultValue": "Name" } } },
+  "menuSheet": { "nodeId": "1:3", "properties": { "label#1:0": { "type": "TEXT", "defaultValue": "More" } } },
+  "cardTile": { "nodeId": "1:4", "properties": { "title#1:0": { "type": "TEXT", "defaultValue": "A tile" } } }
+}

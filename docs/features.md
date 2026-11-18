@@ -321,6 +321,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: each prop is a control read from Figma and the code. The controls are still being tuned, so some props are missing or not shown well.*
 
 - Draws each component from your own markup and CSS, with Figma's props as its controls.
+- A Vue or React component is drawn by your project's own build, every variant as it renders: its hooks, context and portals run (`styleguide.renderVue` or `styleguide.renderReact: false` reads the source instead).
 - Every state, every theme and every breakpoint your Figma file gives.
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.

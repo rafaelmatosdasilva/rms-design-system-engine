@@ -1,0 +1,2 @@
+.bc-disclosure__summary { box-sizing: border-box; height: var(--bc-field-height); padding: 0 var(--bc-space-m); border-radius: var(--bc-radius-m); background: var(--bc-surface); color: var(--bc-ink); border: var(--bc-stroke) solid var(--bc-ink); }
+.bc-disclosure__panel { padding: var(--bc-space-m); }

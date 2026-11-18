@@ -437,5 +437,6 @@
   "workspace.test.mjs": 0,
   "writes.test.mjs": 0,
   "writing-formats.test.mjs": 0,
-  "wrong.test.mjs": 1.2
+  "wrong.test.mjs": 1.2,
+  "react-parity.test.mjs": 45
 }
