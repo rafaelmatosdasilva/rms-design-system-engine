@@ -1,0 +1,1 @@
+{ "private": true, "description": "The Storybook a Vue project builds its stories with, for test/storybook-real.test.mjs.", "dependencies": { "storybook": "10", "@storybook/vue3-vite": "10", "vue": "3", "vite": "8", "@vitejs/plugin-vue": "6" } }

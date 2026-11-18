@@ -51,13 +51,14 @@ test/skill-evals/results/prototype-figma/*.jsonl
 test/skill-evals/results/prototype-figma/transcripts/
 test/skill-evals/results/route/
 # The tools CI installs from their lockfiles (npm ci --prefix test/.ci-tools, test/.vue-tools, test/.vue-cli-tools,
-# test/.nuxt-tools, test/.react-tools and test/.lint-tools): each folder's package.json and package-lock.json are
+# test/.nuxt-tools, test/.react-tools, test/.storybook-tools and test/.lint-tools): each folder's package.json and package-lock.json are
 # kept, what they install is not.
 test/.ci-tools/*
 test/.vue-tools/*
 test/.vue-cli-tools/*
 test/.nuxt-tools/*
 test/.react-tools/*
+test/.storybook-tools/*
 !test/.*-tools/package.json
 !test/.*-tools/package-lock.json
 !test/.*-tools/osv-scanner.toml

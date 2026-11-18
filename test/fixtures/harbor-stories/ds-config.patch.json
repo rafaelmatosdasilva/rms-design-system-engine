@@ -1,0 +1,8 @@
+{
+  "componentFiles": {
+    "button": "components/HbButton.vue",
+    "badge": "components/HbBadge.vue",
+    "iconButton": "components/HbIconButton.vue",
+    "disclosure": "components/HbDisclosure.vue"
+  }
+}
