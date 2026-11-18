@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## A check pinned to one wording failed the engine for asking a better question
+
+**Found** 18 November 2026, the evaluation of the change that reads a library with no Figma capture by its own code. **Fixed in** nothing yet; recorded against `figmaStepScore` in `test/skill-evals/tasks.mjs`.
+
+**Evidence.** `figma-add-option` failed 2 of 3 runs. The check `the engine asked what XL changes` matches the question text with `/what does XL change/i`. What the engine actually asked was "Which of chip's Size options is the new XL like (M, L)? Its variants start as copies of that one's." - `figma-ops.mjs`, the branch taken when the `--like` it was given is not an option the axis holds. So the engine refused to guess, which is the behaviour the task guards, and the check failed it for refusing in the other of its two wordings. The agent's slip is upstream of that: the request says "like the L one" and L is on the axis, so `--like L` was there to pass and something else went.
+
+**Guesses ruled out.** That the change under measurement caused it: the question dates to #121, 28 October, and the change touches `component-source.mjs`, `reference/usage.md` and one test, nothing on the Figma path. That it was the machine: re-run on the same commit, idle, the task passed 3/3 on Haiku and 3/3 on Sonnet. `audit-all #1`, the third failure of the same run, **was** the machine - it timed out while the full suite was finishing beside it, and passed 3/3 re-run.
+
+**What changed.** Nothing in the engine. Left open: the check reads one of the two questions the engine can ask here, so a run that takes the other branch fails whatever the engine does. It should accept either, and a separate check should catch the agent dropping a `--like` the request named.
+
+---
+
 ## Asked what XL changes, the agent proposed a height of its own
 
 **Found** 14 November 2026, the evaluation of the batch that reads the states a component must have. **Fixed in** `test/skill-evals/rules.mjs` (a false positive, twice); **left open**: an agent that offers a value of its own when the engine asks what a size changes.

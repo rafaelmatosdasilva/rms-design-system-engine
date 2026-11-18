@@ -5,7 +5,7 @@
 // as compared with nothing in Figma, and drawn from its own source (a Vue template, as a React return is).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +41,33 @@ test('the code\'s components: each file whose first element carries a class of i
   assert.equal(rootClassOf('A.tsx', 'export function A() { return <div className="chip">x</div>; }'), 'chip');
   assert.equal(rootClassOf('A.vue', '<template><div><b/></div></template>'), null);
   assert.deepEqual(codeComponents(HARBOR, {}).map((c) => [c.name, c.file, c.cls]), [['HbBadge', 'components/HbBadge.vue', 'hb-badge'], ['HbButton', 'components/HbButton.vue', 'hb-button'], ['HbIconButton', 'components/HbIconButton.vue', 'hb-icon-button']]);
+});
+
+test('with no Figma capture the code\'s own list is read: the whole library, and a component that carries no class of its own', () => {
+  // A React library that styles itself with CSS modules, styled components or clsx puts no literal class on any file,
+  // and keeps an inner corner of its own under a components folder. Read as a captured system would be, it has one
+  // component - the one internal file that happens to carry a class - and its page says a design system has nothing.
+  const root = tempDir('no-capture-');
+  const write = (f, text) => { mkdirSync(join(root, dirname(f)), { recursive: true }); writeFileSync(join(root, f), text); };
+  write('src/Button/Button.tsx', "import classes from './Button.module.css';\nexport function Button(props) { return <button className={classes.Button} {...props} />; }\n");
+  write('src/Banner/Banner.tsx', "import {clsx} from 'clsx';\nexport const Banner = forwardRef((p, ref) => <div ref={ref} className={clsx(p.tone)} />);\n");
+  write('src/internal/components/Caret.tsx', 'export function Caret() { return <span className="Caret" />; }\n');
+  write('src/internal/components/Spacer.tsx', 'export function Spacer() { return <span />; }\n');
+  write('src/Button/Button.test.tsx', 'export function Nope() { return <i className="nope" />; }\n');
+
+  const named = (cfg) => codeComponents(root, cfg).map((c) => c.name);
+  assert.deepEqual(named({}), ['Banner', 'Button', 'Caret', 'Spacer'], 'the whole library, class or no class');
+
+  // A capture names the components, and then the class and the components folder are how a file is paired with one:
+  // read exactly as before, so a system with a capture sees no change at all.
+  writeFileSync(join(root, 'figma.snapshot.json'), JSON.stringify({ Button: { properties: {} } }));
+  const paired = { paths: { compPropsSnapshot: 'figma.snapshot.json' } };
+  assert.deepEqual(named(paired), ['Caret'], 'the components folder, and only a file with a class of its own');
+  assert.deepEqual(codeComponents(root, paired).map((c) => c.cls), ['Caret']);
+
+  // A capture of its own components only: one that names nothing is no capture.
+  writeFileSync(join(root, 'figma.snapshot.json'), JSON.stringify({ _at: '2026-11-18' }));
+  assert.deepEqual(named(paired), ['Banner', 'Button', 'Caret', 'Spacer']);
 });
 
 test('with Figma\'s components a component only the code has is shown, marked so (off the page with showCodeOnly: false); with no Figma data every one is shown, said so', () => {
