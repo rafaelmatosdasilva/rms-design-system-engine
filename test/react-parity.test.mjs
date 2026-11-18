@@ -61,7 +61,10 @@ test('parity measures each React component as the project\'s own React draws it,
 test('the parity check names exactly the deliberate differences: one in every mode, two only in dark', { skip: READY, timeout: budget(900000) }, () => {
   const said = audit.stdout;
   const measured = said.split('\n').filter((l) => /^\s+⚠️ {2}\w+ .*: Figma .*, rendered /.test(l)).map((l) => l.trim());
-  assert.equal(measured.length, 3, measured.join('\n') || said.slice(-3000));
+  // What gate 13 said, whole, when it is not what is asked: its measured part is read from the capture, so a failure
+  // here is most often the capture, and the section says which.
+  const gate13 = said.slice(said.indexOf('[13] Structure'), said.indexOf('[14] All states')).slice(0, 4000);
+  assert.equal(measured.length, 3, `${measured.join('\n')}\n--- gate 13 ---\n${gate13}\n--- capture ---\n${captured.stdout.slice(0, 1500)}`);
   assert.match(measured.find((l) => l.includes('cardTile radius')) ?? '', /Figma radius\/l \(8px\), rendered 6px via --bc-radius-m .*→ set var\(--bc-radius-l\)/);
   assert.match(measured.find((l) => l.includes('menuSheet background [dark]')) ?? '', /Figma surface\/color \(#10161b\), rendered rgb\(236, 240, 243\) .*a rule for dark draws another colour over it: give that rule var\(--bc-surface\)/);
   assert.match(measured.find((l) => l.includes('menuSheet text colour [dark]')) ?? '', /Figma ink\/color \(#ecf0f3\), rendered rgb\(16, 22, 27\)/);
