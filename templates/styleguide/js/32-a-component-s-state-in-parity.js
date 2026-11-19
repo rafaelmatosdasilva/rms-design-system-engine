@@ -211,8 +211,12 @@
     // The criteria that belong to a page are not counted on the card: each one left is a row of the table below.
     dT.how = 'How much of each component\'s documentation is written. The line under it counts what is written in full.';
     // In the menu's order: Documentation before Accessibility, as their pages are (the owner's, 15 November 2026).
-    var tiles = [pT, iT, dT, aT].map(tile).join('');
-    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
+    // A card with nothing counted (built from the code alone: no Figma to compare, no documentation to count) is left
+    // out, never a dash over 0 of everything: the page shows what it knows. Accessibility stays while a browser has
+    // components to try.
+    var shown = [pT, iT, dT, aT].filter(function (o) { return o.pct != null || o.untested; });
+    var tiles = shown.map(tile).join('');
+    var html = '<div class="sg-health"><div class="sg-health-tiles" style="--sg-tiles:' + shown.length + '">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
     if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
@@ -244,6 +248,12 @@
     ['Documentation', 'doc', function (o) { return o.doc.say; }]
   ];
   var MX_COL_OF = { figma: 'Figma', code: 'Code', par: 'Parity', acc: 'Accessibility', doc: 'Documentation' };
+  // The columns with nothing to say in any row, left out of the table with their filter (built from the code alone:
+  // no Figma, so nothing found there, compared with it or documented from it). Set when the table is drawn
+  // (30-its-accessibility.js); its cells stay, hidden, so every column keeps its place in MX_COLS.
+  var MX_HIDE = {};
+  // The area the table is sorted by when none is named: the first whose column shows.
+  function mxFirstArea() { return MX_AREAS.filter(function (a) { return !MX_HIDE[a]; })[0] || null; }
   var MX_AREAS = ['Parity', 'Accessibility', 'Documentation'];
   // The Status page's address says what it shows, so a link opens it as it is: the area it is sorted by
   // (#status/parity), each filter (?code=Missing&doc=Missing), a sort another than the area's (sort=Component&dir=up),
@@ -380,7 +390,7 @@
   function openTodoKind(slug, q) {
     var box = td.querySelector('.sg-todo');
     // With none named, by Parity (the first card), the most left first, its arrow showing.
-    todoArea = MX_AREAS.filter(function (a) { return a.toLowerCase() === String(slug || '').toLowerCase(); })[0] || 'Parity';
+    todoArea = MX_AREAS.filter(function (a) { return a.toLowerCase() === String(slug || '').toLowerCase() && !MX_HIDE[a]; })[0] || mxFirstArea();
     todoKey = todoArea; todoDir = -1;
     // What the address asks for: its filters, its sort, the component open in the panel.
     MX_FILTERS = {};

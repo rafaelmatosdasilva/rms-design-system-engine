@@ -22,11 +22,16 @@
     var now = [['Figma last read', u.figmaRead ? esc(when(u.figmaRead)) : ''], ['Its code', u.uncommitted ? 'Has changes not committed yet' : '']];
     return (fc.length ? panelCard('Changes in Figma', kvOne(fc)) : '') + (u.figmaRead || u.uncommitted ? panelCard('Now', kvOne(now)) : '');
   }
-  // Its History area, once its page is drawn: the History page's table above what changelogHTML put there, or a line
-  // that nothing is known to have changed it.
+  // Its History area, once its page is drawn: the History page's table above what changelogHTML put there. With nothing
+  // known to have changed it, the area and its tab are left out: the page shows what it knows.
   function fillHistoryArea(sec, c) {
-    var box = sec.querySelector('.pg-area[data-area="log"] .pg-doc'); if (!box) return;
-    if (!historyTable(box, c.name, box.firstChild)) box.insertAdjacentHTML('afterbegin', areaInfo('No change to it is known yet. No commit, read of Figma, change of the intent layer or decision names it.'));
+    var area = sec.querySelector('.pg-area[data-area="log"]'), box = area && area.querySelector('.pg-doc'); if (!box) return;
+    if (!historyTable(box, c.name, box.firstChild)) {
+      if (box.firstChild) return;   // when Figma was last read for it, its changes in Figma: known, so shown
+      var tab = sec.querySelector('.pg-areas [data-v="log"]');
+      if (tab) tab.parentNode.removeChild(tab);
+      area.parentNode.removeChild(area);
+    }
   }
   // Each card's preview, drawn once its area is on screen (a hidden card has no size to fit), never with ?all.
   function builtThumbs(sec) {

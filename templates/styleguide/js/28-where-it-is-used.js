@@ -6,6 +6,9 @@
     if (!screens.length) return '';
     return '<h3 class="pg-usedin-title">In the Showroom</h3><div class="sg-card-grid sg-showroom-grid pg-usedin-screens" data-screens="' + esc(screens.map(function (s) { return s.key; }).join(' ')) + '"></div>';
   }
+  // Where a component is used is known once the products' pages are read (DATA.productsRead), or once one component is
+  // found in one, or on a Showroom screen. Before that, no component's Used in is shown, rather than "not found" for each.
+  var USAGE_READ = !!DATA.productsRead || COMPONENTS.some(function (c) { return (c.usage || []).length; }) || (DATA.showroom || []).some(function (s) { return (s.uses || []).length; });
   function usedInHTML(c) {
     var u = (c.usage || []).map(function (k) { return typeof k === 'string' ? { key: k, name: k } : k; });
     var screens = usedScreensHTML(c);

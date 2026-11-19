@@ -380,6 +380,10 @@
     // The Documentation page's rows for it, as the page has them (drawn first when it is not yet).
     if (!DOC_PAGE && fillDocs) { fillDocs(); fillDocs = null; }
     var compDocs = DOC_PAGE ? DOC_PAGE.of(c.name) : [];
+    // An area is shown only with something to show: Parity once something is compared (built from the code alone,
+    // nothing is), Documentation once it has a row or a state, Used in once products' pages are read (USAGE_READ). The
+    // History area leaves itself out when nothing names the component (fillHistoryArea).
+    var areaShown = function (k) { return k === 'parity' ? states.par.say !== 'N/A' : k === 'docs' ? !!compDocs.length || states.doc.say !== 'N/A' : k === 'used' ? USAGE_READ : true; };
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
@@ -399,7 +403,7 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return areaShown(a[0]) && (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         // Documentation counts what its table shows, the Documentation page's rows for it in their words, as Rules does
@@ -431,9 +435,9 @@
       // Documentation: the Documentation page's own table, filtered to the rows it has for this component (its page in the
       // intent layer, each decision on it a row, or the page still to write), with the page's filters, each row opening
       // the same panel (DOC_PAGE, 07-second-in-the-list.js, the owner's, 16 November 2026).
-      '<div class="pg-area" data-area="docs"><div class="pg-footer">' + naInfo(states.doc) +
+      (areaShown('docs') ? '<div class="pg-area" data-area="docs"><div class="pg-footer">' + naInfo(states.doc) +
         (compDocs.length ? '<div class="pg-doc pg-par pg-knowledge" id="' + esc(cid(c.name)) + '-documentation">' + DOC_PAGE.tableHTML(compDocs) + '</div>' : states.doc.say === 'N/A' ? '' : areaInfo('The Documentation page has no row for it.')) +
-        '</div></div>' +
+        '</div></div>' : '') +
       // API: its props (each one the code says must be given marked), the events it sends and its slots, as the code has them.
       // with its Details (its slots and what each takes), how it is built rather than how it is used.
       // Code: how a product brings it in (its import, its file), then its API and its Details.
@@ -442,10 +446,10 @@
       // Motion: how it moves, as a spec, the code's beside Figma's.
       '<div class="pg-area" data-area="motion"><div class="pg-footer">' + motionHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + naInfo(states.acc) + a11yHTML(c) + '</div></div>' +
-      '<div class="pg-area" data-area="parity"><div class="pg-footer">' + (states.par.say === 'N/A' ? naInfo(states.par) : parityHTML(c)) + '</div></div>' +
+      (areaShown('parity') ? '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' : '') +
       (builtUses(c).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +
       ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
-      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
+      (areaShown('used') ? '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' : '') +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
       // Rules: the Rules page's own table, filtered to the rules that change this component, on either side, to fix or
       // to decide (RULES_PAGE, 07-second-in-the-list.js), with the page's filters and sorting, each row opening the same
@@ -1617,7 +1621,7 @@
       .sort(function (a, b) { return a.at - b.at; }).map(function (x) { return x.k; });
     showFirst(ordered, function (k) { return k._prop; }).forEach(function (k) { controlsEl.appendChild(k); });
     dependents();
-    if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = c.codeOnly ? 'Only in the code: its props are under Documentation, compared with nothing in Figma.' : 'No agreed props yet.'; controlsEl.appendChild(none); }
+    if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = c.codeOnly ? ((c.codeOnly.props || []).length ? 'Its props are under Code, as its code declares them.' : 'Its code declares no props.') : 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
 
