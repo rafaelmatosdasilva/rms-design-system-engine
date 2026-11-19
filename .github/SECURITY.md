@@ -1,4 +1,16 @@
-# Security policy
+# Security and enterprise
+
+## For IT and security teams
+
+What a security or procurement review asks, in one place. Each line links to its detail.
+
+- **Runs on your machines.** No server, no account and no telemetry. It runs as plain Node scripts on your computers or CI ([what runs where](../docs/security.md#what-runs-where)).
+- **A fixed list of hosts.** It talks only to the services you already use, listed host by host for your firewall ([allow it through a firewall](../docs/security.md#allow-it-through-a-firewall)).
+- **Your data stays yours.** Tokens stay in each person's own `.env` and go only to their own host. Code people wrote is never changed: findings come back as patches ([tokens](../docs/security.md#tokens), [what it may change](../docs/security.md#what-it-may-change)).
+- **Nothing extra to trust.** No npm dependencies. Every release is signed and comes with a software bill of materials ([verify a release](#verify-a-release)).
+- **Compliance.** No personal data is collected or processed. SOC 2 and ISO 27001 are not held, because there is no service to certify. HIPAA does not apply. The AI model's work is covered by your own agreement with Anthropic ([compliance](../docs/security.md#compliance)).
+- **Open and checked.** MIT licence, public code and tests, CodeQL on every change, [OpenSSF Best Practices Silver](https://www.bestpractices.dev/projects/16082) and [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine) ([how the engine is kept safe](#how-the-engine-is-kept-safe)).
+- **Known limits.** One maintainer, and only the latest version is supported ([supported versions](#supported-versions), [known limits](../docs/security.md#known-limits)).
 
 ## Report a vulnerability
 
@@ -32,7 +44,7 @@ Only the latest `main` is supported. The engine updates itself once a day, so a 
 
 ## Verify a release
 
-Each release carries its code as an archive with signed provenance: a Sigstore attestation that this repository's release workflow built it from that tag. Check it before you use it:
+Each release carries its code as an archive, with its software bill of materials (`.cdx.json`, CycloneDX) and signed provenance for both: a Sigstore attestation that this repository's release workflow built them from that tag. Check it before you use it:
 
 ```bash
 gh attestation verify rms-design-system-engine-v1.0.0.tar.gz --repo rafaelmatosdasilva/rms-design-system-engine
