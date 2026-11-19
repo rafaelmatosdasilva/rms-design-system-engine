@@ -13,7 +13,11 @@
   --sg-bg: #ffffff; --sg-bg-2: #f7f7f8; --sg-surface: #ffffff; --sg-stage: var(--sg-bg);
   --sg-text: #1c1c1e; --sg-text-2: #3a3a3c; --sg-muted: #5f5f64; --sg-border: #8e8e93; --sg-accent: #0a5fb4;
   --sg-danger: #c62828; --sg-on-danger: #ffffff;   /* the page's own red for what cannot be undone (a delete): never the system's nor a theme's */
-  --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
+  /* The status colours: green done, yellow to check, red to fix, the page's own when the system has no token for one
+     (its success, warning and error tokens win where it has them). Never the accent or the text colour: a bar or a dot
+     must read as its status in any brand. Each passes 3:1 as a mark on the page, the green and red 4.5:1 as words. */
+  --sg-positive: #1a7f37; --sg-warning: #b07800; --sg-negative: var(--sg-danger);
+  --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
   /* The page's lines: the system's border in light; in dark the text's colour, faint and see-through, so a line keeps
      its edge and blends with whatever background a brand gives the page. */
   --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);
@@ -32,8 +36,9 @@
   --sg-nav-hover: var(--sg-a2);   /* a menu item under the pointer: lighter than the chosen one's */
   --sg-line-soft: color-mix(in srgb, var(--sg-line-colour) 60%, transparent);   /* a quieter line: under the menu's stuck head or group name */
   /* The warning colour where it is read (a label, an icon, a sign): in light, the system's yellow darkened with the text's
-     colour so it keeps its contrast on a light page; in dark, the yellow itself. */
-  --sg-warning-ink: color-mix(in srgb, var(--sg-warning) 45%, var(--sg-text));
+     colour so it keeps its contrast on a light page (styleguide-data.mjs writes it when the system has one); the page's
+     own yellow is dark enough already. In dark, the yellow itself. */
+  --sg-warning-ink: var(--sg-warning-ink-system, var(--sg-warning));
   --sg-seg-on: var(--sg-a3);
   /* One hover for every control (a button, a field, a select, a switch's option, a card): its line a step brighter and
      one step of fill, the text's colour a little, see-through. */
@@ -83,6 +88,7 @@
   --sg-bg: #161618; --sg-bg-2: #1e1e21; --sg-surface: #161618;
   --sg-text: #e6e6e8; --sg-text-2: #d4d4d8; --sg-muted: #a1a1aa; --sg-border: #52525b; --sg-accent: #6cb4ff;
   --sg-danger: #f47174; --sg-on-danger: #1b0a0a;
+  --sg-positive: #3fb950; --sg-warning: #d29922;   /* the page's own status colours in dark (red is its danger's) */
   --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, transparent);
   --sg-line-solid: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg));   /* the same line, solid: where pieces of it meet, nothing doubles or shows through */
   --sg-warning-ink: var(--sg-warning);

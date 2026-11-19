@@ -276,6 +276,7 @@ The template is only the layout. Every colour, weight and space on the page is o
 
 - The page's controls are its own, drawn with your tokens: a segmented control, buttons (solid, so nothing behind shows through), fields, a card, and one tooltip used everywhere (the Status page's i and a WCAG criterion's name alike). A chosen filter, an open dropdown and a field you type in share one look: the page's background, outlined.
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.
+- The status colours are green for done, yellow for to check and red for to fix. Your success, warning and error tokens are used when you have them. Without them the page uses its own green, yellow and red, never your accent, so a bar always reads as its status.
 - Page titles use your own heading style. `"title-scale"` in `styleguide.chrome` changes their size.
 - A colour you set in `styleguide.chrome` carries to the ones that follow it. A new `bg` is also the stage behind each component, unless you set `stage` too.
 

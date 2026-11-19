@@ -286,3 +286,32 @@ test('a panel colour set by hand (styleguide.chrome bg-2, surface) wins over the
   assert.match(tpl, /decl\[k\] = 'var\(' \+ k \+ '-own, color-mix/, 'and a brand\'s, resolved with the brand\'s own tokens');
   assert.match(tpl, /var LOOK = \/\^--sg-\(bg\|bg-2\|surface\|bg-2-own\|surface-own\|/, 'declared again under each brand');
 });
+
+// The status colours are the page's own (green done, yellow to check, red to fix) where the system has no token for
+// one, never its accent or text colour: a system with no status tokens drew every bar blue and black. Its own
+// success, warning and error tokens still win.
+test('the status colours: the template\'s own green, yellow and red, the system\'s where it has them', () => {
+  const page = templateText();
+  const block = (re) => (re.exec(page) ?? [])[1] ?? '';
+  const light = block(/:root \{([\s\S]*?)\n\}/), dark = block(/:where\(:root\)\[data-sg-scheme="dark"\] \{([\s\S]*?)\n\}/);
+  const value = (b, name) => (new RegExp(`--sg-${name}:\\s*([^;]+);`).exec(b) ?? [])[1]?.trim();
+  for (const name of ['positive', 'warning', 'negative']) assert.doesNotMatch(value(light, name) ?? '', /--sg-(accent|text)\b/, `${name} is never the accent or the text`);
+  const colour = { light: { positive: value(light, 'positive'), warning: value(light, 'warning'), negative: value(light, 'danger') }, dark: { positive: value(dark, 'positive'), warning: value(dark, 'warning'), negative: value(dark, 'danger') } };
+  assert.equal(value(light, 'negative'), 'var(--sg-danger)', 'red: the page\'s own danger red');
+  assert.equal(value(light, 'warning-ink'), 'var(--sg-warning-ink-system, var(--sg-warning))', 'its own yellow is read as it is');
+  // Each a mark that reads on the page's background in its mode (3:1), the green and the red as words too (4.5:1).
+  const lum = (h) => h.match(/\w\w/g).map((x) => parseInt(x, 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const bg = { light: value(light, 'bg'), dark: value(dark, 'bg') };
+  for (const mode of ['light', 'dark']) for (const [name, hex] of Object.entries(colour[mode])) {
+    assert.match(hex ?? '', /^#[0-9a-f]{6}$/i, `${mode} ${name}`);
+    assert.ok(ratio(hex, bg[mode]) >= (name === 'warning' ? 3 : 4.5), `${mode} ${name} ${hex} on ${bg[mode]}: ${ratio(hex, bg[mode]).toFixed(2)}`);
+  }
+  // No status token: nothing is written, so the template's own colours stand.
+  const plain = chromeRoles({ tokens: { colors: [{ items: [{ var: '--brand', figma: 'color/brand', values: {} }, { var: '--text', figma: 'text/primary', values: {} }] }] } }).roles;
+  assert.deepEqual([plain.positive, plain.warning, plain.negative, plain['warning-ink-system']], [undefined, undefined, undefined, undefined]);
+  // The system's own status tokens win, its yellow darkened with its text where it is read on a light page.
+  const own = chromeRoles({ tokens: { colors: [{ items: ['success', 'warning', 'error'].map((s) => ({ var: `--status-${s}`, figma: `status/${s}`, values: {} })) }] } }).roles;
+  assert.deepEqual([own.positive, own.warning, own.negative], ['var(--status-success)', 'var(--status-warning)', 'var(--status-error)']);
+  assert.equal(own['warning-ink-system'], 'color-mix(in srgb, var(--sg-warning) 45%, var(--sg-text))');
+});
