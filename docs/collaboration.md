@@ -136,7 +136,7 @@ What every page shares:
 
 One page for how the system stands and what is left. It is second in the list, under the index.
 
-- **Four cards at the top.** Parity, Code, Documentation and Accessibility: how many components are done in each, and what is left.
+- **Four cards at the top.** Parity, Code, Documentation and Accessibility: how many components are done in each, and what is left. A card with nothing to count is left out, and so is a column of the table that is empty in every row, with its filter. Built from the code alone, with no Figma yet, that leaves Code and Accessibility.
 - **One table of the components.** A row for each component, with its state in Figma, Code, Parity, Accessibility and Documentation, and when it was last checked. A row opens the component's page in a side panel. Filters narrow the table by state, and a link keeps what you chose. How the table works is in [The Status table](#the-status-table).
 - **Not tied to one component.** Under the table, the system's own tasks: token descriptions, components whose file is still to confirm, controls the page stands in for.
 
@@ -154,7 +154,7 @@ Accessibility is tried while the page is built and kept in it, so the page opens
 
 ### Each component's page
 
-At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time. Parity, Accessibility and Documentation carry their Status dot on their tab (N/A none), from the same rules as the Status table, so a word or a rule changed once changes everywhere. Their chips and each row's status use the Status words too: Parity Differs, Unsure, Match; Accessibility Issues, Review, Met; Documentation Missing, Review, Done. An area with nothing to show (N/A, nothing moves, no commit yet, not used anywhere) says why in an info box, N/A in the same words as the Status table's tip.
+At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time. Parity, Accessibility and Documentation carry their Status dot on their tab (N/A none), from the same rules as the Status table, so a word or a rule changed once changes everywhere. Their chips and each row's status use the Status words too: Parity Differs, Unsure, Match; Accessibility Issues, Review, Met; Documentation Missing, Review, Done. An area with nothing to show is left out: Parity and Documentation when nothing is compared or written for it (always the case when the page is built from the code alone), History when no change names it, Used in until your products' pages are read. Motion says so when nothing moves, and Used in when no product uses it.
 
 | Area | What it shows |
 |---|---|
@@ -181,7 +181,7 @@ Also on each component.
 - **Code.** Its head stays in view as you scroll, with Copy code as a plain underlined button. Exactly what the Playground shows, as a product writes it (`<Chip size="l" />`), or the HTML with only the classes your CSS styles.
 - **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
-- **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
+- **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A, so its page has no Parity area. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Coverage.** How much of its file your tests cover, beside its Code Connect.
 - **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Status page asks for it:
   - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Met and Documentation Written (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.

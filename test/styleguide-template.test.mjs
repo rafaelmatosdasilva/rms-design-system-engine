@@ -430,8 +430,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
     assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
-    // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Rules,Accessibility,Documentation,Motion,Code,Used in,History', 'Specs is part of the Playground, not an area of its own, and Rules there since a rule to fix or to decide changes the chip');
+    // Built with only where the component is made of others (the chip is not); Used in only once products' pages are
+    // read (this system names none).
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Rules,Accessibility,Documentation,Motion,Code,History', 'Specs is part of the Playground, not an area of its own, and Rules there since a rule to fix or to decide changes the chip');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');

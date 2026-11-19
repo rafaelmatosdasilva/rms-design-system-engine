@@ -342,12 +342,20 @@
       // It opens its own page, else (a family with no component of its name) its first part's.
       if (!h.href) h.href = (h.parts.filter(function (x) { return x.href; })[0] || {}).href || null;
     });
+    // A column no row has anything for is left out, its filter with it: Figma when no component is in Figma, Parity and
+    // Documentation when every row says N/A (built from the code alone). Its cells stay, hidden, so the sort's columns
+    // keep their places; the table is then sorted by the first area that shows.
+    var na = function (x) { return !x || x.say === 'N/A' || x.say === '–'; };
+    MX_HIDE = { Figma: !rows.some(function (o) { return o.figma; }), Parity: rows.every(function (o) { return na(o.par); }), Documentation: rows.every(function (o) { return na(o.doc); }) };
+    if (todoArea && MX_HIDE[todoArea]) { if (todoKey === todoArea) todoKey = mxFirstArea(); todoArea = mxFirstArea(); }
+    if (MX_HIDE[todoKey]) todoKey = todoArea;
     fillHealth(rows);   // the cards count what the table shows
     var rowsHTML = rows.sort(function (a, b) { return a.name.localeCompare(b.name); }).map(rowHTML).join('');
     // The filters: one chip a column, its name inside, All until a state is chosen, so nothing looks applied. Each
     // opens a list (the Brand selector's) of All and the column's states, with how many rows each would show beside
     // the other chips' choices (filled in by showTodoArea). The chips combine; Clear filters drops them all.
     var chipsRow = '<span class="sg-chips" role="group" aria-label="Filter">' + MX_CHIP_COLS.map(function (g) {
+      if (MX_HIDE[g[0]]) return '';
       var words = [];
       rows.forEach(function (o) { var w = g[2](o); if (w && w !== '–' && w !== 'N/A' && words.indexOf(w) < 0) words.push(w); });
       words.sort(function (a, b) { return MX_ORDER.indexOf(a) - MX_ORDER.indexOf(b); });
@@ -358,7 +366,8 @@
         '<span class="sg-select-list" id="' + id + '" role="listbox" aria-label="' + esc(g[0]) + '" tabindex="-1" hidden>' + [''].concat(words).map(function (w, i) { return '<span class="sg-dd-option" role="option" id="' + id + '-' + i + '" data-mx="' + esc(g[1] + ':' + w) + '" aria-selected="false"><span>' + esc(w || 'All') + '</span><span class="sg-count"></span></span>'; }).join('') + '</span></span>';
     }).join('') + '<button type="button" class="sg-mx-clear" data-mx-clear-all hidden>Clear filters</button></span>';
     var head = MX_COLS.map(function (a) { return '<th data-sort="' + a + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(a) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-mx-open-cell"><span class="sg-hidden-text">Open</span></th>';
-    var table = '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-matrix"><thead><tr>' + head + '</tr></thead><tbody>' + rowsHTML + '</tbody></table></div></div>';
+    var hideCls = Object.keys(MX_HIDE).filter(function (k) { return MX_HIDE[k]; }).map(function (k) { return ' sg-mx--no-' + k.toLowerCase(); }).join('');
+    var table = '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-matrix' + hideCls + '"><thead><tr>' + head + '</tr></thead><tbody>' + rowsHTML + '</tbody></table></div></div>';
     // What belongs to no one component (the system's tokens, a control the page stands in for): each kind's own table
     // under the components', its rows numbered as before. A component only one side has is a row of the table above.
     var inTable = function (r) { return r.from && (r.from.figmaOnly || r.from.codeOnly || r.from.pairing); };

@@ -45,7 +45,7 @@
   // Its Motion area: that table under the area's own title, a count of each status above it; what does not move said so.
   function motionHTML(c) {
     var rows = byStatus(motionIssueRows(c));
-    if (!rows.length) return '<div class="pg-doc">' + areaInfo('It does not move: no transition or animation in its code, and none in Figma.') + '</div>';
+    if (!rows.length) return '<div class="pg-doc">' + areaInfo('It does not move: no transition or animation in its code' + (c.codeOnly ? '.' : ', and none in Figma.')) + '</div>';
     return '<div class="pg-doc pg-par pg-motion"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + issueTableHTML(rows, '', '', 'Motion') + '</div>';
   }
   var MOTION = DATA.motion || null;

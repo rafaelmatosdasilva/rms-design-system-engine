@@ -166,3 +166,61 @@ test('in the browser: with Figma\'s data a component only the code has has its p
     close();
   } finally { c.kill(); }
 });
+
+// Built from the code alone, the page shows what it knows: no card, column, filter or area with nothing in it. Parity
+// and Documentation have nothing to count without Figma, Used in nothing before a product's pages are read, History
+// nothing before a commit names the component (the owner's, 19 November 2026).
+test('in the browser: built from the code alone, nothing is shown empty', { timeout: budget(300000) }, async (t) => {
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
+  const chromePath = findChrome({ playwright: true });
+  if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const dir = tempDir('sg-code-alone-');
+  cpSync(HARBOR, dir, { recursive: true });
+  rmSync(join(dir, 'figma'), { recursive: true });
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')); delete cfg.componentFiles;
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify(cfg, null, 2));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const c = await launchChrome(chromePath);
+  try {
+    const { send, on, close } = await connectCDP(c.wsUrl);
+    const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
+    const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#status`);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    await waitForTrue(send, sessionId, `!!document.querySelector('#status .sg-matrix') && !!document.querySelector('#status .sg-health-tile')`);
+    // The cards: Code and Accessibility, never a dash over 0 of everything for Parity or Documentation.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#status .sg-health-label')].map((p) => p.textContent)`), ['Code', 'Accessibility']);
+    // The table: no Figma, Parity or Documentation column, and no filter for them; sorted by a column that shows.
+    const shown = await run(`[...document.querySelectorAll('#status .sg-matrix thead th[data-sort]')].filter((th) => getComputedStyle(th).display !== 'none').map((th) => th.textContent.trim()).filter(Boolean)`);
+    assert.deepEqual(shown, ['Component', 'Code', 'Accessibility', 'Last checked']);
+    assert.deepEqual(await run(`[...document.querySelectorAll('#status .sg-chip-label')].map((s) => s.textContent)`), ['Code', 'Accessibility']);
+    assert.equal(await run(`!!document.querySelector('#status .sg-matrix th[aria-sort="descending"][data-sort="Accessibility"]')`), true, 'sorted by Accessibility');
+    // A component's page: no Parity, Documentation, Used in or History area, and the Playground points to its props.
+    const first = await run(`document.querySelector('.sg-nav a[href^="#c-"]').getAttribute('href')`);
+    await run(`location.hash = ${JSON.stringify(first)}`);
+    await waitForTrue(send, sessionId, `!!document.querySelector('${first} .pg-areas [data-v]')`);
+    const tabs = await run(`[...document.querySelectorAll('${first} .pg-areas [data-v]')].map((b) => b.dataset.v)`);
+    for (const gone of ['parity', 'docs', 'used', 'log']) {
+      assert.equal(tabs.includes(gone), false, `no ${gone} tab: ${tabs}`);
+      assert.equal(await run(`!!document.querySelector('${first} .pg-area[data-area="${gone}"]')`), false, `no ${gone} area`);
+    }
+    assert.ok(tabs.includes('play') && tabs.includes('api'), tabs.join(' '));
+    assert.match(await run(`document.querySelector('${first} .pg-controls').textContent`), /Its props are under Code|Its code declares no props/);
+    assert.doesNotMatch(await run(`document.querySelector('${first}').textContent`), /none in Figma/);
+    assert.deepEqual(errors, []);
+    close();
+  } finally { c.kill(); }
+});
+
+test('with no Figma data and no component in the code, the style guide says there is nothing to compare, never that they agree', { timeout: budget(300000) }, () => {
+  const dir = tempDir('sg-nothing-');
+  cpSync(HARBOR, dir, { recursive: true });
+  rmSync(join(dir, 'figma'), { recursive: true });
+  rmSync(join(dir, 'components'), { recursive: true });
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')); delete cfg.componentFiles;
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify(cfg, null, 2));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /No Figma data yet, and no component found in the code: nothing to compare\./, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout, /Figma and the code agree on everything/);
+});
