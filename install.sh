@@ -69,6 +69,7 @@ chmod +x "$BIN_DIR/rms-design-system-engine"
 # 4. The accessibility scanner (axe-core, pinned and checked), fetched now so the first check runs every rule even
 #    offline. A failure here is not an install failure: the check fetches it on its first run.
 node "$CLONE_DIR/lib/a11y-check.mjs" --fetch-axe || true
+node "$CLONE_DIR/lib/web-features-data.mjs" --fetch || true
 
 # 4b. The two optional ones. Chrome: without it nothing is measured as a browser draws it, so rendered parity, the
 #     accessibility check and every picture are skipped. TypeScript: without one the components' JSX and Props are not

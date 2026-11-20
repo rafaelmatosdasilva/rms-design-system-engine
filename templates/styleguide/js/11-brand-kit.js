@@ -651,9 +651,17 @@
       var shadowsOn = !shOn || /^true$/i.test(bkNow(shOn));
       bkOut.style.setProperty('--bk-shadow', '0 0 #0000');   // set from the brand's card shadow below, when it has one on
       // Its two hues (named so in Figma, else its most used hues) colour the hero and every sample.
-      var hues = prim.filter(function (t) { return bkChroma(bkHex(t)) > 0.15; }).sort(function (a, b) { return (used[b.figma] || 0) - (used[a.figma] || 0); });
-      var hero = bkCols.find(function (t) { return /primary-?hue/i.test(t.figma); }) || bkCols.find(function (t) { return /(^|\/)(brand|primary)/i.test(t.figma); }) || hues[0];
-      var second = bkCols.find(function (t) { return t !== hero && /secondary-?hue/i.test(t.figma); }) || bkCols.find(function (t) { return t !== hero && /secondary/i.test(t.figma); }) || hues.filter(function (t) { return t !== hero; })[0];
+      // Its identity is the system's own colours: never one inside a component (cardTile/iconMuted/color, as a
+      // published guide once showed in its two large cards, both the same grey), never a status colour (the swatches below show those),
+      // and never one value twice. A token is a component's when its first part is a component's name or begins with one.
+      var compNames = COMPONENTS.map(function (c) { return String(c.name).toLowerCase(); }).filter(function (n) { return n.length > 2; });
+      var ofComponent = function (t) { var f = String(t.figma).split('/')[0].toLowerCase(); return compNames.some(function (n) { return f === n || f.indexOf(n) === 0; }); };
+      var STATUS_HUE = /(^|\/)(positive|success|accept|negative|error|danger|warning|alert|caution|pending|info|information|notice)(\/|$)/i;
+      var own = bkCols.filter(function (t) { return !ofComponent(t); });
+      var hues = prim.filter(function (t) { return bkChroma(bkHex(t)) > 0.15 && !ofComponent(t) && !STATUS_HUE.test(t.figma); }).sort(function (a, b) { return (used[b.figma] || 0) - (used[a.figma] || 0); });
+      var differs = function (t, from) { return from.every(function (f) { return !f || (t !== f && String(bkHex(t)).toLowerCase() !== String(bkHex(f)).toLowerCase()); }); };
+      var hero = own.find(function (t) { return /primary-?hue/i.test(t.figma); }) || own.find(function (t) { return /(^|\/)(brand|primary)/i.test(t.figma); }) || hues[0];
+      var second = own.find(function (t) { return differs(t, [hero]) && /secondary-?hue/i.test(t.figma); }) || own.find(function (t) { return differs(t, [hero]) && /(^|\/)secondary/i.test(t.figma); }) || hues.filter(function (t) { return differs(t, [hero]); })[0];
       if (hero) { var h1 = bkHex(hero), h2 = second ? bkHex(second) : h1; bkOut.style.setProperty('--bk-1', bkCss(hero)); bkOut.style.setProperty('--bk-1-on', onOf(h1, 3)); bkOut.style.setProperty('--bk-2', second ? bkCss(second) : bkCss(hero)); bkOut.style.setProperty('--bk-2-on', second ? onOf(h2) : onOf(h1)); }
       // The family: the system's text style family (the brand's own), else a family token.
       var famT = BK_ALL.find(function (t) { return /font-?family/i.test(t.figma); }), TF = TOKENS.typeFamily;
@@ -664,6 +672,9 @@
       // 1. The hero: the brand's name, its type, its two hues and its third colour (the app's background, as Figma names it).
       var third = bkCols.find(function (t) { return t !== hero && t !== second && /app-?background/i.test(t.figma); }) || bkCols.find(function (t) { return t !== hero && t !== second && /tertiary/i.test(t.figma); }) ||
         prim.slice().sort(function (a, b) { return (bkLum(bkHex(a)) || 0) - (bkLum(bkHex(b)) || 0); })[0];
+      // The third card holds to the same: the system's own, a tertiary named as a role, never a value shown already.
+      if (third && (ofComponent(third) || !differs(third, [hero, second]) || (/tertiary/i.test(third.figma) && !/(^|\/)tertiary/i.test(third.figma)))) third = own.find(function (t) { return differs(t, [hero, second]) && /(^|\/)tertiary/i.test(t.figma); }) ||
+        prim.filter(function (t) { return !ofComponent(t) && differs(t, [hero, second]); }).sort(function (a, b) { return (bkLum(bkHex(a)) || 0) - (bkLum(bkHex(b)) || 0); })[0];
       if (hero) {
         var tile = function (t) { return '<div class="sg-bk-tile sg-bk-tile--small" ' + paint(t) + '><span>' + esc(t.figma) + '</span><b>' + esc(bkHex(t).toUpperCase()) + '</b></div>'; };
         html += '<div class="sg-bk-hero"><div class="sg-bk-tile sg-bk-tile--hero" ' + paint(hero) + '><span class="sg-bk-hero-ghost" aria-hidden="true"' + (famCss ? ' style="font-family:' + esc(famCss) + '"' : '') + '>Aa</span><div class="sg-bk-tile-head"><b class="sg-bk-brand">' + esc(bkBrand()) + '</b><span>' +
@@ -1528,7 +1539,7 @@
           Corporate: 'means business', Friendly: 'holds the door open', Fast: 'never keeps you waiting', Calm: 'takes its time', Premium: 'cares about the finish', Safe: 'plays it safe', Warm: 'makes you feel at home', Cool: 'keeps a cool head' };
         var said = top3.slice().sort(function (x, y) { return y.k - x.k; }).map(function (x) { return esc(DOES[x.pole] || lc(x.pole)); });   // one weight: a sentence, not a ranking
         var words = said.length ? 'It ' + (said.length > 1 ? said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1] : said[0]) + '.' : '';
-        PMAP = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-pers" ' + bg2 + ' role="group" aria-label="' + esc('Personality: ' + (head || 'balanced')) + '" data-axes="' + esc(JSON.stringify(AX.map(function (ax) { return [ax[0], ax[1], Math.round(ax[2] * 100), ax[3]]; }))) + '">' +
+        PMAP = '<div class="sg-bk-bento sg-bk-bento--fit"><div class="sg-bk-t w6 sg-bk-pers" ' + bg2 + ' role="group" aria-label="' + esc('Personality: ' + (head || 'balanced')) + '" data-axes="' + esc(JSON.stringify(AX.map(function (ax) { return [ax[0], ax[1], Math.round(ax[2] * 100), ax[3]]; }))) + '">' +
           '<div class="sg-bk-pers-top"><span class="sg-bk-pers-h">Personality · read from ' + BK_ALL.length + ' tokens' + (two ? ', in light and dark' : '') + '</span></div>' +
           '<div class="sg-bk-pers-body"><div class="sg-bk-pers-words">' +
           '<p class="sg-bk-pers-t" style="' + fam + strong + 'color:' + esc(ac1) + '">' + esc(claim) + '</p>' +

@@ -502,6 +502,11 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-t { container-type: inline-size; position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: var(--sg-space-s); min-width: 0; padding: var(--sg-space-l); border-radius: var(--bk-rad, var(--sg-radius)); background: var(--t-bg); color: var(--t-fg); font-size: var(--sg-s); overflow: clip; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour), var(--bk-shadow, 0 0 #0000); text-decoration: none; }
 .sg-bk-t.w1 { grid-column: span 1; } .sg-bk-t.w2 { grid-column: span 2; } .sg-bk-t.w3 { grid-column: span 3; } .sg-bk-t.w4 { grid-column: span 4; } .sg-bk-t.w6 { grid-column: 1 / -1; }
 .sg-bk-bento--geo { grid-auto-rows: calc(var(--sg-space-xxl) * 4 + var(--sg-space-s)); }   /* the shapes' rows: 7.5rem taller in all (three rows) */
+/* The personality: as tall as its words and its chart, never a fixed number of rows. Held to five rows, the claim was
+   centred in a card shorter than itself and drawn over its own heading, and the chart's labels ran into each other. */
+.sg-bk-bento--fit { grid-auto-rows: auto; }
+.sg-bk-bento--fit .sg-bk-pers-body { grid-template-rows: auto; }
+.sg-bk-bento--fit .sg-bk-pers-chart { height: auto; width: min(100%, 28rem); }
 /* An Identity block: each section of the kit one size, the type block's (the full width, five rows of the bento), so
    the blocks line up as the kit grows. Every new section block takes this class. */
 .sg-bk-t.sg-bk-block { grid-column: 1 / -1; grid-row: span 5; }

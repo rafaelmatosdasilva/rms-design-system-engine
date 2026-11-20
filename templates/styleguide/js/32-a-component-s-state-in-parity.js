@@ -121,6 +121,34 @@
   // The four cards above the table, read from its rows: the same components (one a family, a part with its parent)
   // and the same states, in the same words (Match, Differs; Built, Unsure, Missing; Met, Issues, Review,
   // Untested; Done, Review, Missing). The big number is what is done; the bar and its legend split the rest.
+  // The score cards on one row while each one's number, its word and its links fit in it, else two a row, else one.
+  // Their size is the system's own (its heading font), so it is measured, never a width written here: held to the
+  // window's width, four cards beside the menu on a 1280px laptop spilled Match, Built, Done and Met past their edge,
+  // and See Partial broke onto two lines. Measured again once the system's font is in, and on every resize.
+  function fitTiles(tiles) {
+    if (!tiles || tiles._fit) return;
+    tiles._fit = true;
+    var n = Number(tiles.style.getPropertyValue('--sg-tiles')) || tiles.children.length;
+    var spills = function () {
+      return [].some.call(tiles.children, function (c) {
+        var edge = c.getBoundingClientRect().right;
+        var num = c.querySelector('.sg-health-num');
+        if (num && [].some.call(num.children, function (k) { return k.getBoundingClientRect().right > edge + 0.5; })) return true;
+        return [].some.call(c.querySelectorAll('[data-go-area]'), function (b) { var lh = parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.4; return b.getClientRects().length > 0 && b.getBoundingClientRect().height > lh * 1.5; });
+      });
+    };
+    var set = function () {
+      if (!tiles.isConnected || !tiles.getClientRects().length) return;
+      var cols = n;
+      tiles.style.setProperty('--sg-tiles', String(cols));
+      while (cols > 1 && spills()) { cols = cols > 2 ? 2 : 1; tiles.style.setProperty('--sg-tiles', String(cols)); }
+    };
+    set();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
+    addEventListener('resize', set);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(set).observe(tiles.parentElement || tiles);
+  }
+
   function fillHealth(mx) {
     if (!hl || !mx) return;
     var figmaRows = mx.filter(function (o) { return o.figma; }), built = figmaRows.filter(function (o) { return o.code === 'found' || o.code === 'css'; });
@@ -219,7 +247,7 @@
     var html = '<div class="sg-health"><div class="sg-health-tiles" style="--sg-tiles:' + shown.length + '">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
-    if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
+    if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; fitTiles(box.querySelector('.sg-health-tiles')); }
     // Each link filters the table to the rows its card counted: Documentation counts every Figma component, built in the
     // code or not, so its links never add Code: Built (the components not built yet are documented too, or missing).
     if (!box._go) { box._go = true; box.addEventListener('click', function (e) { var b = e.target.closest('[data-go-area]'); if (b) goTask.apply(null, ({ Implementation: [null, { code: 'Missing' }, 'Code'], Unsure: [null, { code: 'Unsure' }, 'Code'], Parity: ['Parity', { figma: 'Found', code: 'Built', par: 'Differs' }], Accessibility: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Issues' }], Documentation: ['Documentation', { figma: 'Found', doc: 'Missing' }], ParityPartial: ['Parity', { figma: 'Found', code: 'Built', par: 'Partial' }], ParityUnsure: ['Parity', { figma: 'Found', code: 'Built', par: 'Unsure' }], AccessibilityReview: ['Accessibility', { figma: 'Found', code: 'Built', acc: 'Review' }], DocumentationPartial: ['Documentation', { figma: 'Found', doc: 'Review' }] })[b.getAttribute('data-go-area')] || [b.getAttribute('data-go-area')]); }); }
