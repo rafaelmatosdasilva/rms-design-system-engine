@@ -18,6 +18,13 @@
     if (!Object.keys(map).length) return;
     [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).forEach(function (el) {
       ID_REFS.forEach(function (a) { var v = el.getAttribute(a); if (v) el.setAttribute(a, v.split(/\s+/).map(function (x) { return map[x] || x; }).join(' ')); });
+      // What an icon draws with (a clip path, a mask, a gradient: url(#id)) and what it reuses (<use href="#id">): kept
+      // pointing inside this copy, never at the one it was copied from, which may be on a hidden page and not drawn.
+      Array.prototype.forEach.call(el.attributes, function (x) {
+        var v = x.value;
+        if (/url\(\s*['"]?#/.test(v)) { var w = v.replace(/url\(\s*(['"]?)#([^'")\s]+)\1\s*\)/g, function (m, q, id) { return map[id] ? 'url(' + q + '#' + map[id] + q + ')' : m; }); if (w !== v) el.setAttribute(x.name, w); }
+        else if ((x.name === 'href' || x.name === 'xlink:href') && v.charAt(0) === '#' && map[v.slice(1)]) el.setAttribute(x.name, '#' + map[v.slice(1)]);
+      });
     });
   }
   // A component its own build rendered in each variant (a Vue component): the rendering made with the props set now,

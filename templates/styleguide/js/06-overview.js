@@ -111,7 +111,9 @@
   // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
     var at = THUMBS[cid(c.name)]; if (!at || !src || ALL) return;
-    at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
+    // Its ids made its own: a copy sharing the preview's ids takes the preview's labels (a checkbox's label ticks the
+    // thumbnail's box, the one that comes first on the page).
+    at.innerHTML = ''; var k = src.cloneNode(true); uniqueIds(k); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
     if (!ov.hidden) fitThumb(at);   // the index hidden: fitted when it opens (route), nothing to measure before
   }
   // Scaled to fit its card once the overview is on screen (a hidden card has no size to fit). What it draws is measured,
