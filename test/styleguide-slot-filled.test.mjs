@@ -77,11 +77,12 @@ test('a slot its markup already fills shows that content, marked as the slot in 
     assert.deepEqual(v.thumbMark, ['none'], 'unmarked');
     // Beside Inspect, a button named for the slot says it is there, and marks its area in the preview while pressed.
     const shownMark = `(() => { const b = [...document.querySelectorAll('#c-choiceGroup .pg-stage-tools button')].find((x) => x.textContent.trim() === 'Slot Options'); if (!b) return null;
-      b.click(); const g = document.querySelector('#c-choiceGroup .pg-preview .tp-choice-group'), mark = g.querySelector(':scope > .pg-slot-over'), box = (n) => n.getBoundingClientRect();
-      const r = { pressed: b.getAttribute('aria-pressed'), display: getComputedStyle(mark).display, covers: [...g.querySelectorAll('.tp-radio')].every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }) };
+      const struck = () => b.querySelectorAll('.sg-link-mark path').length;
+      const eyeBefore = struck(); b.click(); const g = document.querySelector('#c-choiceGroup .pg-preview .tp-choice-group'), mark = g.querySelector(':scope > .pg-slot-over'), box = (n) => n.getBoundingClientRect();
+      const r = { eye: [eyeBefore, struck()], pressed: b.getAttribute('aria-pressed'), display: getComputedStyle(mark).display, covers: [...g.querySelectorAll('.tp-radio')].every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }) };
       b.click(); r.after = [b.getAttribute('aria-pressed'), getComputedStyle(mark).display]; return JSON.stringify(r); })()`;
     const sm = JSON.parse((await send('Runtime.evaluate', { expression: shownMark, returnByValue: true }, sessionId)).result.value);
-    assert.deepEqual(sm, { pressed: 'true', display: 'block', covers: true, after: ['false', 'none'] }, 'pressed, the area shows over the radios, and goes again');
+    assert.deepEqual(sm, { eye: [2, 1], pressed: 'true', display: 'block', covers: true, after: ['false', 'none'] }, 'its eye struck through, then open while the area shows over the radios, and the area goes again');
     // Inspect: the slot is marked over its content, named, and clicked it says what it is.
     await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('#c-choiceGroup button')].find((b) => b.textContent.trim() === 'Inspect').click()` }, sessionId);
     const inspect = `(() => {

@@ -1449,19 +1449,20 @@
       fill.style.width = (Math.max.apply(null, on.map(function (q) { return q.right; })) - x0) + 'px';
       fill.style.height = (Math.max.apply(null, on.map(function (q) { return q.bottom; })) - y0) + 'px';
     }
-    // A slot whose content shows is said beside Inspect: a button named for it, which marks its area in the preview
-    // while it is pressed, so the slot is never found only by inspecting. One button for every such slot.
+    // A slot whose content shows is said beside Inspect: a button named for it, its eye struck through while the area
+    // is unmarked and open while it is marked, so the slot is never found only by inspecting. One for every such slot.
     var slotBtn = null, slotsShown = false;
     function slotButton() {
       var tools = sec.querySelector('.pg-stage-tools');
       if (ALL || !tools) return;
       var names = SLOTS.map(slotName).filter(function (n, i, a) { return a.indexOf(n) === i; }), said = names.length === 1 ? names[0] : 'Slots';
       if (!slotBtn) {
-        tools.insertAdjacentHTML('afterbegin', sysButton('button', said, ' aria-pressed="false"'));
+        tools.insertAdjacentHTML('afterbegin', sysButton('button', said, ' aria-pressed="false"', null, null, EYE_OFF_SVG));
         slotBtn = tools.firstElementChild;
         slotBtn.addEventListener('click', function () {
           slotsShown = !slotsShown;
           slotBtn.setAttribute('aria-pressed', slotsShown ? 'true' : 'false');
+          var eye = slotBtn.querySelector('.sg-link-mark'); if (eye) eye.outerHTML = slotsShown ? EYE_SVG : EYE_OFF_SVG;
           preview.classList.toggle('pg-slots-shown', slotsShown);
         });
       }
