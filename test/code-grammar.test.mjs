@@ -312,6 +312,52 @@ test('the code\'s words: their case, and words written into the markup instead o
   assert.deepEqual(wp.toFix.map((t) => [t.component, t.value]), [['acme-pay', '"Read more" (src/acme-pay.vue:1)']]);
 });
 
+test('the team\'s own linters run with its own config, presets included, and one that cannot run says why', async () => {
+  const { lintConfigs, teamLint } = await import('../lib/lint-config.mjs');
+  const { teamLintLines } = await import('../lib/code-grammar.mjs');
+  const dir = tempDir('team-lint');
+  // A config that only extends a preset: no setting the engine reads as decided, and still the team's rules.
+  writeFileSync(join(dir, 'eslint.config.mjs'), "import next from 'eslint-config-next/core-web-vitals';\nexport default [...next];\n");
+  writeFileSync(join(dir, '.stylelintrc.json'), JSON.stringify({ extends: 'stylelint-config-standard' }));
+  writeFileSync(join(dir, 'acme-card.tsx'), 'export function AcmeCard() { return <div />; }\n');
+  writeFileSync(join(dir, 'acme-card.css'), '.acme-card { color: red; }\n');
+  const configs = lintConfigs(dir);
+  assert.deepEqual(configs.map((c) => [c.tool, Object.keys(c.settings).length]), [['stylelint', 0], ['eslint', 0]], 'no setting of its own');
+  const files = ['acme-card.tsx', 'acme-card.css'];
+  // Not installed: said, never fetched and never run.
+  let ran = 0;
+  const none = teamLint(dir, configs, files, { run: () => { ran++; return '[]'; }, keepIt: false });
+  assert.equal(ran, 0);
+  assert.deepEqual(none.map((l) => [l.tool, l.ran]), [['stylelint', false], ['eslint', false]]);
+  assert.match(none[1].why, /not installed in the project's node_modules/);
+  mkdirSync(join(dir, 'node_modules', '.bin'), { recursive: true });
+  for (const t of ['eslint', 'stylelint']) writeFileSync(join(dir, 'node_modules', '.bin', t), '');
+  // Installed: everything each reports, by rule and by place. ESLint answers on stdout, naming a file in filePath (its
+  // source is the file's text); Stylelint 16 answers on stderr, naming a file in source.
+  const run = (bin, args) => {
+    const e = new Error('exit 2');
+    if (/eslint$/.test(bin)) e.stdout = JSON.stringify([{ filePath: join(dir, 'acme-card.tsx'), source: 'export function AcmeCard…', messages: [{ ruleId: 'react-hooks/purity', line: 3, message: 'Error: Cannot call impure function during render' }, { ruleId: 'react-hooks/purity', line: 9, message: 'Error: again' }] }]);
+    else e.stderr = JSON.stringify([{ source: join(dir, 'acme-card.css'), warnings: [{ rule: 'color-named', line: 1, text: 'Unexpected named color "red" (color-named)' }] }]);
+    assert.ok(args.some((a) => a.endsWith(/eslint$/.test(bin) ? '.tsx' : '.css')), 'each linter is given its own kind of file');
+    throw e;
+  };
+  const got = teamLint(dir, configs, files, { run, keepIt: false });
+  assert.deepEqual(got.map((l) => [l.tool, l.ran, l.counts]), [['stylelint', true, { 'color-named': 1 }], ['eslint', true, { 'react-hooks/purity': 2 }]]);
+  assert.deepEqual(got[0].findings, [{ rule: 'color-named', file: 'acme-card.css', line: 1, message: 'Unexpected named color "red"' }]);
+  assert.equal(got[1].findings[0].file, 'acme-card.tsx');
+  assert.deepEqual(teamLintLines(got), [
+    "- The team's Stylelint (.stylelintrc.json) reports 1 finding on the component files: color-named (1).",
+    "- The team's ESLint (eslint.config.mjs) reports 2 findings on the component files: react-hooks/purity (2).",
+  ]);
+  // A setup that cannot run (a config its version cannot load) says so in the linter's own words, past its banner,
+  // and nothing is run in its place.
+  const broken = () => { const e = new Error('exit 2'); e.stdout = ''; e.stderr = '\nOops! Something went wrong! :(\n\nESLint: 8.57.1\n\nTypeError: Converting circular structure to JSON\n    --> starting at object\n'; throw e; };
+  const b = teamLint(dir, [configs[1]], files, { run: broken, keepIt: false })[0];
+  assert.deepEqual(b, { tool: 'eslint', file: 'eslint.config.mjs', ran: false, version: '8.57.1', why: 'TypeError: Converting circular structure to JSON' });
+  assert.deepEqual(teamLintLines([b]), ["- The team's ESLint 8.57.1 (eslint.config.mjs) could not run: TypeError: Converting circular structure to JSON"]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('a rule the team already wrote into its linter is the team\'s, said with where it was written', async () => {
   const { decidedByLint, lintConfigs, lintReports } = await import('../lib/lint-config.mjs');
   const dir = tempDir('lint-config');
