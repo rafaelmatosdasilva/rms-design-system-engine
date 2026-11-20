@@ -33,6 +33,10 @@
   // Play's mark: a triangle pointing forward.
   var PLAY_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v9l7.5-4.5z"/></svg>';
   // Full screen's mark: four corners pointing out.
+  // An area shown or not (a slot's, in the Playground): the eye open while it shows, struck through while it does not.
+  var EYE_PATH = '<path d="M1.5 8C3.2 5 5.4 3.5 8 3.5S12.8 5 14.5 8C12.8 11 10.6 12.5 8 12.5S3.2 11 1.5 8Z"/><circle cx="8" cy="8" r="2"/>';
+  var EYE_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + EYE_PATH + '</svg>';
+  var EYE_OFF_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + EYE_PATH + '<path d="M2.5 2.5l11 11"/></svg>';
   var FULL_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>';
   var FIGMA_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1H5.67a2.33 2.33 0 0 0 0 4.67H8ZM8 1h2.33a2.33 2.33 0 0 1 0 4.67H8ZM8 5.67H5.67a2.33 2.33 0 0 0 0 4.66H8ZM8 10.33H5.67a2.33 2.33 0 1 0 2.33 2.34Z"/><circle cx="10.33" cy="8" r="2.33"/></svg>';   // Figma's mark in lines, as every mark of the page
   // A link that leaves the guide for another site (the intent layer where it lives, a team's page): a box and an arrow out.
