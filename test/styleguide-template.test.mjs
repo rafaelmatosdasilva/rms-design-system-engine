@@ -257,7 +257,10 @@ test('in the browser: no script error, a control changes the real component, the
         if (String(v) !== String(last)) { last = v; moved = Date.now(); }
         await new Promise((r) => setTimeout(r, 100));
       }
-      assert.fail(`${what} stopped changing ${Math.round((Date.now() - moved) / 1000)}s ago (${Math.round((Date.now() - began) / 1000)}s in all) without becoming ready; last read: ${String(v).slice(0, 300)}`);
+      // A page stuck mid-test is most often one a script error stopped (the router, before it shows the page asked for),
+      // and the errors are otherwise only said at the test's end, which a hang never reaches: said here, with the address.
+      const at = await run('location.hash').catch(() => '?');
+      assert.fail(`${what} stopped changing ${Math.round((Date.now() - moved) / 1000)}s ago (${Math.round((Date.now() - began) / 1000)}s in all) without becoming ready; last read: ${String(v).slice(0, 300)}; the address: ${at}; script errors: ${errors.length ? errors.map((e) => String(e).split('\n').slice(0, 3).join(' ')).join(' | ').slice(0, 1500) : 'none'}`);
     };
     const shownIs = (id) => until(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`, (v) => v === id);
     // One view at a time: the page opens on Status (the index stays built, off the menu, each component's thumbnail in
