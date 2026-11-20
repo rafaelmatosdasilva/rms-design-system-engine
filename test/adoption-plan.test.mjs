@@ -64,7 +64,7 @@ test('with nothing read about a product, it says what it did not see rather than
 
 test('adoption requests reach --adoption-plan, with the product named', () => {
   assert.deepEqual(route('make an adoption plan for shop').run, ['rms-design-system-engine --adoption-plan shop']);
-  assert.deepEqual(route('what would it take to move shop onto the design system?').run, ['rms-design-system-engine --adoption-plan shop']);
+  assert.deepEqual(route('how do we get shop onto the design system?').run, ['rms-design-system-engine --adoption-plan shop']);
   assert.deepEqual(route('plano de adoção para o shop').run, ['rms-design-system-engine --adoption-plan shop']);
   assert.deepEqual(route('what should we fix first?').run, ['rms-design-system-engine']);
 });

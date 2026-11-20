@@ -43,7 +43,7 @@ test('a part the check found wrong is drawn where it is with a numbered mark, an
   assert.deepEqual(wf.used, [['Button', 1]]);
   const text = wireframeText('settings', wf);
   assert.match(text, /Components: Button\n/);
-  assert.match(text, /Arranged by the engine, since the system has no component for it: a Row layout component/);
+  assert.match(text, /Arranged by the engine, which no component of the system does: a Row layout component/);
   assert.match(text, /Marked in the drawing:\n\[1\]/);
 });
 

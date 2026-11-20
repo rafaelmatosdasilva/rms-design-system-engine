@@ -113,6 +113,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Opens one issue per difference in your tracker, and closes it once it is fixed. *(Coming soon)*
 - Reviews the screens a product builds with the system as pages, and scores each out of 10. *(Coming soon)*
 - Reads products kept in their own repositories. *(Coming soon)*
+- Plans a product's move onto the system: each value typed by hand, copied style and own version of a component, and the version it runs, answered as use the system's, ask the system, keep with a reason, or move up a version, with who acts, a size, and steps that each end on the check that says done. *(Coming soon)*
 - Hands a renamed prop or value back with its way across: the old name kept as a deprecated alias, a patch for each product and the version that removes it.
 - Finds the same job built differently across products, such as a create flow, and asks whether each difference is earned.
 - Drafts a proposal when two or more products work around the same thing, such as overriding a component's padding or detaching it in Figma, and keeps each rejected one with its reason.
@@ -125,6 +126,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
 | `/rms-design-system-engine how healthy is our design system?` | An answer to each of thirteen questions (is the data current, do Figma and the code agree, is each component explained, do agents build with it well and more), with its evidence, the command for any it could not answer, and what changed since the last report |
+| `/rms-design-system-engine make an adoption plan for shop` | What it takes to bring that product onto the system, in steps, each item with who acts, its size and its places, and the check that says each step is done |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
 ## Measure Figma-code parity
@@ -411,6 +413,8 @@ What it makes:
 - Each state (empty, error, loading) at each screen size.
 - Pages linked, so you can click through a flow.
 - A hand-over page, and review comments kept with the prototype.
+- A page made outside the system (an AI tool's page, a file or a link) rebuilt from your components: what each part is for read from its markup, the counts of hand-typed values and styles of its own before and after, and every part the system lacks on the gaps list. The page itself is never changed.
+- Any prototype drawn as plain text to paste into code review, a ticket or a thread, every box one of your components with its options, and a numbered mark on anything the check found wrong or the system lacks.
 
 How it checks the agent's work, in a loop, before you see it:
 
@@ -478,6 +482,8 @@ Two things it will not do. It never shows a zero where it means *not yet*: a ste
 | `/rms-design-system-engine remember this lesson: the clock button was put inside the tile, because a tile holds one action` | Your correction kept with your reason, and the strongest guard that can hold it (a check, a step agents read, or a rule for your guidelines), written once you say yes |
 | `/rms-design-system-engine show the lessons` | Every lesson and what it became, the rules proposed from findings that repeat, and the lines an AI wrote that a person changed since |
 | `/rms-design-system-engine are our prototypes getting better?` | The whole loop on one screen: the patterns a new page is held to, what agents got wrong and whose fault each was, what was written, what is left for a person, and whether the number is falling |
+| `/rms-design-system-engine rebuild landing.html from our design system` | The page rebuilt from your components as a prototype, with each part's match and why, the counts before and after, and what the system lacks |
+| `/rms-design-system-engine draw prototypes/settings.json as a text wireframe` | The prototype as plain text to paste anywhere, every box a real component, with a note for each part the check marked |
 | `/rms-design-system-engine judge the Showroom screens with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |
 
 ## Works with your tools

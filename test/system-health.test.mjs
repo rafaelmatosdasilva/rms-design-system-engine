@@ -52,7 +52,7 @@ test('each question is answered from its own evidence', () => {
   assert.deepEqual(at(rows, 'access').unseen, ['firefox, not installed here']);
   assert.equal(at(rows, 'proof').rating, 'poor');
   assert.equal(at(rows, 'whole').rating, 'mixed');
-  assert.match(at(rows, 'whole').evidence.join(' '), /1 of 2 parts most products need .*left out on purpose/);
+  assert.match(at(rows, 'whole').evidence.join(' '), /1 of 2 parts nearly every product builds with .*left out on purpose/);
   assert.equal(at(rows, 'explained').rating, 'poor');
   assert.equal(at(rows, 'releases').rating, 'mixed');
   assert.equal(at(rows, 'products').rating, 'mixed');
