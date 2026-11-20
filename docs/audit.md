@@ -421,6 +421,15 @@ A screen that lays its own control over a component (a clear button over a text 
 - A class with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`) steps outside the theme. When your `@theme` has the same value, it names the utility to write. Otherwise it says the value is not in the design system.
 - `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }`. Figma's token names are then matched to the theme's own (`surface/base/color` to `--color-surface-base`), and a theme variable used through its utility counts as used.
 
+#### shadcn/ui
+
+A shadcn/ui system is read as its own kind of React, from its `components.json`:
+
+- **Its components are its ui folder.** The folder `components.json` names (through your `@/` alias in `tsconfig.json`) holds the components, each file named in kebab case and read by the name it exports: `dropdown-menu.tsx` is `DropdownMenu`.
+- **Its variants are its props.** A component that takes `VariantProps<typeof buttonVariants>` has a prop for each axis of that `cva` call, with its options and the default `cva` gives it. `tailwind-variants`' `tv` is read the same way. Figma's variants are then compared with these props like any other.
+- **`asChild` is composition.** A component that hands its element to its child (Radix's `Slot`) takes `asChild`, said as a yes/no prop and never drawn on its own, since it needs a child to draw.
+- **Drawn as it ships.** With React and Vite installed, the components are drawn by your own Vite config, so its alias and its Tailwind plugin compile the classes and Radix runs: a switch switches, and its `data-[state=checked]` classes follow.
+
 #### Values written by hand
 
 The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.

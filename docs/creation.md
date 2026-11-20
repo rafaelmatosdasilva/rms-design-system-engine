@@ -721,6 +721,8 @@ A system that exists only in Figma, built in code piece by piece, each piece che
 - **Every rule of its build sheet.** Its sizes, spacing and colours as your variables, a class for each option that changes its look, and its own height where an option changes it.
 - **What is still yours.** What Figma does not say exactly, such as what a state is wired to or a focus ring the design does not draw, is listed at the top of the file, never made up.
 
+- **The shadcn/ui way, in a shadcn/ui project.** Each component is a `.tsx` in the ui folder `components.json` names, its options a `cva` call, joined with `cn()` from your utils alias, its root named by `data-slot`, and `asChild` through Radix's `Slot` when your project has it. A state Figma draws on the element (Disabled) is Tailwind's prefix for it (`disabled:`), and each value is written as the utility that reads its variable (`px-(--space-m)`), never as a value in brackets.
+
 ### What it never does
 
 - **Write into your code.** The files come back as a patch, and a file you already have is left out.

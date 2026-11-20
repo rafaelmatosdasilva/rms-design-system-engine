@@ -1,0 +1,1 @@
+{ "name": "acme-ui", "private": true, "type": "module", "dependencies": { "react": "19", "react-dom": "19", "@radix-ui/react-slot": "1", "@radix-ui/react-switch": "1", "class-variance-authority": "0.7", "clsx": "2", "tailwind-merge": "3" }, "devDependencies": { "vite": "8", "@vitejs/plugin-react": "6", "tailwindcss": "4", "@tailwindcss/vite": "4" } }

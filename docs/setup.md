@@ -77,6 +77,11 @@ Setup ends with a first result, so you see what the engine is for before learnin
 - **What to ask next.** Three requests to try, such as showing that component in the style guide.
 - With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
 
+### A shadcn/ui project
+
+- **Found from its `components.json`.** Setup says it is a shadcn/ui project and where its components are.
+- **Its tokens are the stylesheet it names.** The CSS `components.json` names (`tailwind.css`, such as `src/index.css`), with its `--primary` kind of variables, is taken as your tokens, with nothing asked.
+
 ### Tokens your product loads at runtime
 
 Some systems do not declare their token values in a file in the repository: the product fetches a stylesheet per mode as it starts (`light_desktop.css`, `dark_phone.css`). Setup downloads every one it can reach and merges them into one local file, `src/styles/tokens.hosted.css`, each mode in its own block, and `paths.themeCSS` in `ds-config.json` names it.
