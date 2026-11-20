@@ -2,6 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The accessibility page renamed, so GitHub shows no Accessibility tab (continuous evaluation)
+
+What changed since the entry below (engine 35e9ed3): The accessibility page is docs/test-accessibility.md, so GitHub shows no Accessibility tab beside the README. The guide changed in `cookbook/ci-and-hooks.md`.
+
+Guide set measured: `9e7b4140eb06` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md dd1fcdbe` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md fc59d6c1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 22f5c45 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 76/79 | 78/79 |
+| Mean cost a run | 0.068 | 0.059 |
+| Input a run | 120k | 99k |
+| Turns a run | 4.2 | 3.5 |
+| Rule violations | 0 | 0 |
+| Runs stopped at a limit | 1 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed. Failed: figma-add-option #0: puts the question to the person. no task changed state; 2 runs moved inside tasks that pass sometimes, which is noise, not a difference. Input moved but input a turn held (29k to 28k): the turns moved, 4.2 to 3.5, and nothing a run reads grew - most in `two-turns-pt` 10.3 to 6.0, `figma-add-option` 6.0 to 2.0, `fix-chip-height` 7.0 to 5.0. Records: `records/2026-11-20-the-accessibility-page-is-docs`.
+
 ## 2026-11: A library with no Figma capture is read by its own code, not by the pairing's rules (continuous evaluation)
 
 What changed since the entry below (engine fef91a1): The README shows what each feature reads, runs and writes, with its own badges (#558); The README opens each feature on its stage, and shows only tools a real run has used (#559); The README's cells have even space, its live badges are two-toned, and its top says only where the engine runs (#560); Every tool the engine uses is free and open source, and an option, never a requirement (#561); Each feature's stage is a small badge above its name: Stable, Beta or Soon (#562); Tokens for a team's own pipeline, and GitHub read as GitLab is (#563); Rename Gather usage guidelines to Maintain usage guidelines, list Lint after Figma rules, show GitHub under its Writes (#564); The summary names the host the code was read from: GitHub, not GitLab, for a GitHub project (#565); The README's features: one kind of thing a line (Reads, Runs, Writes, Publishes, Follows), only what a real run proved (#566); A store written with git and no branch named goes to the default branch, never to a branch called HEAD (#567); Update README.md (#568); React components drawn with the project's own React, proven on a real system (#569); test-tools: bump @vitejs/plugin-react (#570); Each Storybook story is checked as the state it shows: parity and behaviours on it too, and a state Figma lacks named (#571); A library with no Figma capture is read by its own code, not by the pairing's rules. The guide changed in `reference/usage.md`.
