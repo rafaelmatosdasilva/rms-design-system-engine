@@ -1218,7 +1218,7 @@
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim(), why: unescapeHTML(plainText(r.why || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && r.kind !== 'Its Storybook' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: docSrcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim(), why: unescapeHTML(plainText(r.why || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -1254,6 +1254,16 @@
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
     // keep it instead, and whether to remove it (once the For agents page).
     var notesOff = function (p) { var c = !p.tokens && docComp(p); return (c && c.notesLeft) || []; };
+    // Where its Storybook and its code or Figma disagree (its Documentation's Its Storybook row): each a change to make in
+    // the story file or the component, under What to do with the notes to change, never a draft to write.
+    var sbFixes = function (p) {
+      var c = !p.tokens && docComp(p), sb = c && c.storybookDocs;
+      return ((sb && sb.differs) || []).map(function (d) {
+        var other = [d.code != null ? 'the code says ' + d.code : '', d.figma != null ? 'Figma says ' + d.figma : ''].filter(Boolean).join(' and ');
+        return { what: d.prop + ', ' + d.what + '. Storybook says ' + d.storybook + (other ? ', and ' + other : ''), from: 'its Storybook',
+          fix: (d.figma != null ? 'Decide which side is right, then change the story in ' : 'Change the story in ') + (sb.from || 'its story file') + ', or the component, so the two say the same.' };
+      });
+    };
     var needsRemove = function (p) { return notesOff(p).length > 0; };
     var removeTopic = function (p) { var n = notesOff(p).length; return n + (n === 1 ? ' note no agent reads' : ' notes no agent reads'); };
     var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
@@ -1327,14 +1337,14 @@
           write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span>' + namePills(asked) : '') }],
           todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits.</strong></p>',
           why: '<p class="sg-il-line">' + esc((held ? 'Agents won\'t use the drafts until you decide. ' : 'Today an agent asked for a component the system does not have builds one of its own. ') + ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
-      if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+      if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p).concat(sbFixes(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: docAt(p), reads: '', todo: '<p class="sg-il-line"><strong>' + esc('Write its page in the intent layer, titled as ' + (IL.namesFrom || 'Figma') + ' names it.') + '</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>' + ilReachOf(p.missingFor), gets: '<p class="pg-missing">Nothing.</p>' };
       if (p.recheckFor) { var rx = (IL.noPageRechecks || {})[p.recheckFor] || {};
         return { decision: decisionCell('review', p), write: [], notes: [], file: '<span class="pg-missing">—</span>', forWhat: compLink(p.recheckFor), updated: docAt(p), reads: '', gets: '',
           todo: '<p class="sg-il-line"><strong>' + esc('Confirm the decision still holds, or withdraw it.') + '</strong></p>',
           why: ((rx.stale || {}).truth ? '<p class="sg-il-line">' + esc(rx.stale.truth) + '</p>' : '') + '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
-      if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
-      return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+      if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p).concat(sbFixes(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
+      return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p).concat(sbFixes(p)), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {

@@ -80,3 +80,32 @@ test('the reading is kept on the build, so a run with no browser reads it again'
   const again = await storybookDocs(dir, {}, { offline: true });
   assert.equal(again.titles['Components/Badge'].tags[0], 'beta');
 });
+
+test("where the stories disagree, a change to make in the component's Documentation, never a draft to write", { skip: READY, timeout: budget(600000) }, async () => {
+  const a = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], {
+    cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(280000) });
+  assert.ok(a.status === 0 || a.status === 1, `${a.stdout}\n${a.stderr}`.slice(-2000));
+  const out = join(dir, '.design-system-engine-out', 'styleguide');
+  const { serveStatic } = await import('../lib/storybook-stories.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue } = await import('../lib/cdp.mjs');
+  const server = await serveStatic(out), c = await launchChrome(CHROME);
+  try {
+    const { send, close } = await connectCDP(c.wsUrl);
+    const { sessionId } = await openPage(send, `${server.url}/index.html#c-button`);
+    const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    const tab = `[...document.querySelectorAll('[role="tab"], .sg-tab')].find((b) => b.offsetParent && /^Documentation/.test(b.textContent.trim()))`;
+    assert.ok(await waitForTrue(send, sessionId, `!!${tab}`, { attempts: 200, intervalMs: 50 }), 'the Documentation area');
+    await ev(`${tab}.click()`);
+    // Its row in the Documentation table opens what to do: each disagreement a change to make, never a draft to write.
+    const row = `[...document.querySelectorAll('tbody tr')].find((x) => x.offsetParent && /button/.test(x.textContent))`;
+    assert.ok(await waitForTrue(send, sessionId, `!!${row}`, { attempts: 200, intervalMs: 50 }), 'its row');
+    await ev(`${row}.click()`);
+    const panel = `([...document.querySelectorAll('aside, [class*="panel"]')].filter((x) => x.offsetParent && /What to do/.test(x.innerText)).pop() || { innerText: '' }).innerText`;
+    assert.ok(await waitForTrue(send, sessionId, `/Change · Its Storybook/.test(${panel})`, { attempts: 200, intervalMs: 50 }), (await ev(panel)).slice(0, 3000));
+    const said = await ev(panel);
+    assert.match(said, /Label, a different default\. Storybook says Go, and the code says Continue/);
+    assert.match(said, /Decide which side is right, then change the story in stories\/Button\.stories\.js, or the component, so the two say the same\./, 'with Figma in it, a person decides');
+    assert.doesNotMatch(said, /To draft · Its Storybook/, 'a disagreement is never a draft');
+    close();
+  } finally { c.kill(); await server.close(); }
+});

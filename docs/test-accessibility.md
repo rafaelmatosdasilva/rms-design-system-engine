@@ -34,6 +34,10 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **Behaviours, on the page that runs them.** A behaviour (a disclosure opening on a click, a switch flipping) needs the
   component's own script, which a story runs. Every behaviour tried is recorded with the page it was tried on and
   whether it worked, the ones that passed too, so a behaviour never tried never reads as one that worked.
+- **Your play functions, as written.** A story's `play` function is your own script of a person using the component
+  (typing, clicking, waiting for a result). Each one is run in Chrome and recorded as a behaviour tried. One that fails
+  is a behaviour that breaks, said with its own words: *the Closes On Escape story's play function fails: Escape did
+  not close the disclosure.*
 - **Across your system, not its first corner.** When there are more stories than the check will open in one run, it
   takes one state of each component before a second of any, so a cap covers the system rather than whichever
   components the index lists first. The run says how many components it reached.
