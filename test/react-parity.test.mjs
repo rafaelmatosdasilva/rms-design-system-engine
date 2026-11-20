@@ -13,7 +13,7 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../lib/cdp.mjs';
@@ -69,6 +69,20 @@ test('the parity check names exactly the deliberate differences: one in every mo
   assert.match(measured.find((l) => l.includes('menuSheet background [dark]')) ?? '', /Figma surface\/color \(#10161b\), rendered rgb\(236, 240, 243\) .*a rule for dark draws another colour over it: give that rule var\(--bc-surface\)/);
   assert.match(measured.find((l) => l.includes('menuSheet text colour [dark]')) ?? '', /Figma ink\/color \(#ecf0f3\), rendered rgb\(16, 22, 27\)/);
   assert.doesNotMatch(said, /⚠️ {2}(disclosure|fieldSize) /, 'the components that match Figma in both modes are not named');
+});
+
+// A system read straight from Figma and its code has no hand-written structure contract, and the browser's
+// measurements were never compared for it: found proving this very parity, which needed a contract first.
+test('with no structure contract, what the browser measured is still compared with Figma', { skip: READY, timeout: budget(900000) }, () => {
+  const bare = beacon('react-nocontract-');
+  rmSync(join(bare, 'structure-contract.mjs'));
+  const cap = run(bare, 'code-capture.mjs', ['--force']);
+  assert.equal(cap.status, 0, `${cap.stdout}\n${cap.stderr}`.slice(0, 1500));
+  const r = run(bare, 'structure-check.mjs');
+  const measured = r.stdout.split('\n').filter((l) => /^\s+⚠️ {2}\w+ .*: Figma .*, rendered /.test(l)).map((l) => l.trim());
+  assert.equal(measured.length, 3, r.stdout.slice(0, 3000));
+  assert.ok(measured.some((l) => l.includes('cardTile radius')), 'the same differences the contract run names');
+  assert.match(r.stdout, /census: \d+ facts compared on 4 components/, 'and says how much it compared');
 });
 
 // The Playground draws each variant as React drew it, read back from the page the project's own React drew, and a
