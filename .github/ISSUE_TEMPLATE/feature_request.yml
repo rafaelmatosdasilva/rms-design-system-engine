@@ -19,7 +19,6 @@ body:
         - Test accessibility
         - Write component specs
         - Maintain usage guidelines
-        - Annotate Figma from the code
         - Publish a living style guide
         - Try components in a playground
         - Design themes over your system

@@ -19,7 +19,6 @@ What the engine does for design and product teams. Every part reads the same kno
 |---|---|---|
 | [Write component specs](#write-component-specs) | One contract per component, its props, states, tokens and decisions, that developers and AI agents build from without guessing. | Ready to use |
 | [Maintain usage guidelines](#maintain-usage-guidelines) | The intent layer, why each component exists and when to use it, kept current where your docs live, with drafts for the gaps. | Ready to use |
-| [Annotate Figma from the code](#annotate-figma-from-the-code) | Accessibility specs in Figma, problems pinned on your screens and each component linked to its code, all after you approve. | Coming soon |
 
 ### Collaboration
 
@@ -75,6 +74,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
 | `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
+| `/rms-design-system-engine take back the last change in Figma` | What the way back puts back, and once you say yes, the file as it was before |
 
 ## Lint your codebase rules
 
@@ -184,7 +184,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
-- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
+- Checks your designed screens in Figma for contrast and target size, each problem listed in the style guide with a link that opens its layer in Figma.
 
 ### What to ask
 
@@ -212,6 +212,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
 - Drafts a Figma Code Connect file for each component that has none, from what its contract pairs. A person checks it and publishes it.
+- Gives each Figma variable its name in the code, so Dev Mode shows the token a developer writes, once you say yes.
 
 ### What to ask
 
@@ -246,6 +247,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Rates how ready your guidance is for AI agents, component by component.
 - Gives agents the mistakes that look right, each with why it fails and what to use instead, and suggests the ones your pages leave out, such as a status shown by colour alone.
 - Reads how much damage each destructive action does, and checks your screens against it: undo for what can be undone, how long when it is only for a while, and a confirmation with the safe option selected for what is permanent.
+- Writes what the intent layer says each component and token is for into its Figma description, once you say yes, so an agent reading Figma knows where it belongs. Only what the team approved, never over one a designer wrote.
 - Never overwrites a sentence a person wrote.
 - A change to the layer reaches the published style guide on its own, checked on the pages it was about.
 
@@ -258,31 +260,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine which mistakes should our docs warn agents about?` | For each component, the mistakes its kind is known for that its page does not say, and each one it says without why it fails or what to use instead |
 | `/rms-design-system-engine rate our guidelines for agents` | How much an agent can take from your guidance: ready, partial or thin, for each component, with what to add |
 | `/rms-design-system-engine rate our guidelines and test extraction with a model` | The same, plus a test where a model answers questions from your guidance alone (uses your model tokens) |
-
-## Annotate Figma from the code
-
-**Coming soon** · **Why it matters:** Designers see in Figma what developers already know.
-
-- Writes each component's accessibility spec into Figma.
-- Pins accessibility problems on the layers of your designed screens.
-- Links each component to its code file in Dev Mode.
-- Writes into each token's and component's Figma description what it is for and where to use it, so an agent reading Figma knows where it belongs; never over one a designer wrote.
-- Writes a token your code changed first back into Figma's variables, only where it can tell the code moved first.
-- Draws each component's spec beside it in Figma, from its contract: anatomy, properties, states, tokens, sizes and accessibility.
-- Comes as a Figma plugin too, so a designer reviews the change and applies it inside Figma, with an Undo.
-- Shows you every change first, and asks about each kind of change on its own. Nothing changes until you say yes.
-- Keeps a way back for every change, so you can take it back.
-
-### What to ask
-
-| Ask in Claude Code | What you get |
-|---|---|
-| `/rms-design-system-engine bring Figma in line with the code` | Every change the code says Figma is missing, by kind, each kind asked on its own before anything is written |
-| `/rms-design-system-engine write the spec pages into Figma` | Each component's spec drawn beside it, shown first and drawn once you say yes |
 | `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, never over one a designer wrote |
-| `/rms-design-system-engine write the token values the code changed into Figma` | Each value the code changed first, written into its variable once you say yes |
-| `/rms-design-system-engine pin the accessibility problems on the screens in Figma` | Each problem pinned on its layer, with a summary on each screen |
-| `/rms-design-system-engine take back the last change in Figma` | What the way back puts back, and once you say yes, the file as it was before |
 
 ## Publish a living style guide
 
@@ -523,7 +501,7 @@ Your tools stay as they are, and the engine fits around them.
 **Why it matters:** You can trust what it reports.
 
 - It never changes code people wrote. It flags what it finds and hands back a patch.
-- It only reads Figma, unless you say yes to a change.
+- It only reads Figma, unless you say yes to a change, and every change it makes there can be taken back.
 - A check that could not run says Not run, never Pass.
 - Every check is tested with a mistake planted on purpose.
 - A difference your team decides to keep is kept, with its reason, and stops failing.

@@ -512,6 +512,12 @@ Each gap reaches the design team:
 - **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
 - **On the style guide.** Each one is on its component's Accessibility list and on the Status page, for you in Figma.
 
+The same contrast and target-size checks reach the screens your team designs too, not only the components, once they are read (`--figma-a11y`).
+
+- **A task each.** Each problem on a screen is a task on the style guide, for whoever keeps the Figma file, under its WCAG criterion and its screen.
+- **What was measured.** The panel says what the check found, such as the two colours and their ratio.
+- **Its layer, one click away.** See in Figma opens the layer it is on, in a tab of its own, so it is fixed there like any other Figma task.
+
 Meanwhile Claude writes a visible focus ring and leaves the words of an error message or a name to you. `"designA11y": false` in `ds-config.json` turns this off.
 
 ### What it cannot tell you

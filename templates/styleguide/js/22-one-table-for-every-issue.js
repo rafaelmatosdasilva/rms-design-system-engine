@@ -155,6 +155,8 @@
         : r.who && r.who.indexOf(WHO.developer) === 0 && codeUrl ? ['sg-cx-code', codeUrl, CODE_SVG, 'See in code', 'Open ' + comp + '\'s file in the code'] : null;
       if (seeOf) see = '<p class="sg-see">' + sysButton('a', seeOf[3], ' href="' + esc(seeOf[1]) + '" target="_blank" rel="noopener" title="' + esc(seeOf[4]) + '" data-see="' + seeOf[0] + '"', null, null, seeOf[2]) + '</p>';
     }
+    // A Figma task on no component, such as a problem on a designed screen: its own layer in the Figma file.
+    else if (r.figmaUrl && r.who && r.who.indexOf(WHO.figma) === 0) see = '<p class="sg-see">' + sysButton('a', 'See in Figma', ' href="' + esc(r.figmaUrl) + '" target="_blank" rel="noopener" title="Open the layer in Figma" data-see="sg-cx-figma"', null, null, FIGMA_SVG) + '</p>';
     // Every panel's one order (panelCard, 00-start.js): what to do (and, for something still to write, where), what it
     // affects and the component it is on, its status, then the rest in its table's order, why, where it was read and when
     // it was last checked (the owner's, 12 and 16 November 2026). Who acts is a card of its own where the table has its column.
