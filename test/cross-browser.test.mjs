@@ -10,7 +10,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { measureExpr, crossBrowsers, differences, untried, schemeNeeds, crossPass } from '../lib/cross-browser.mjs';
-import { fromRemote, userJs } from '../lib/bidi.mjs';
+import { fromRemote, userJs, launchFirefox } from '../lib/bidi.mjs';
 import { launchSafari, webdriverSession, webdriverPage, whySafariRefused, automationSafaris } from '../lib/webdriver.mjs';
 import { openBrowser } from '../lib/page-driver.mjs';
 import { findFirefox } from '../lib/browsers.mjs';
@@ -230,4 +230,24 @@ test('the Safari a session started is quit when it closes, and a person\'s own S
     await session.close();
     assert.equal(await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), 3000))]), true, 'the session\'s Safari is quit');
   } finally { try { stand.kill(); } catch {} await fake.close(); }
+});
+
+// Found on the suite's own runners: two runs that began in the same minute each waited 30s for Firefox and failed,
+// while the runs before and after passed on the same code. A slow start is tried once more after a pause, as Chrome's
+// is; a Firefox that cannot be started at all is not, since trying again only gives the same answer later.
+test('a Firefox slow to start is given a second try, and one that cannot start is not', { skip: process.platform === 'win32' ? 'the stand-in is a shell script' : false, timeout: 60000 }, async () => {
+  const dir = tempDir('ff-slow-'), ff = join(dir, 'firefox'), tries = join(dir, 'tries');
+  writeFileSync(tries, '');
+  // The first start says nothing; the second says where it listens.
+  writeFileSync(ff, `#!/bin/sh\necho x >> "${tries}"\nif [ "$(wc -l < "${tries}")" -ge 2 ]; then echo "WebDriver BiDi listening on ws://127.0.0.1:9" >&2; fi\nexec sleep 30\n`, { mode: 0o755 });
+  const b = await launchFirefox(ff, { timeoutMs: 1500, retryAfterMs: 50 });
+  try {
+    assert.equal(b.wsUrl, 'ws://127.0.0.1:9');
+    assert.equal(readFileSync(tries, 'utf8').trim().split('\n').length, 2, 'tried twice');
+  } finally { b.kill(); }
+  writeFileSync(tries, '');
+  writeFileSync(ff, `#!/bin/sh\necho x >> "${tries}"\nexec sleep 30\n`, { mode: 0o755 });
+  await assert.rejects(launchFirefox(ff, { timeoutMs: 800, retryAfterMs: 50 }), /did not open WebDriver BiDi within/);
+  assert.equal(readFileSync(tries, 'utf8').trim().split('\n').length, 2, 'two tries, then the answer');
+  await assert.rejects(launchFirefox(join(dir, 'no-such-firefox'), { timeoutMs: 800, retryAfterMs: 50 }), /could not be started/);
 });
