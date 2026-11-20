@@ -3,12 +3,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sbom, axeVersion } from '../lib/release-sbom.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -32,7 +32,7 @@ test('axe-core is listed at the version the accessibility check pins, and the pa
 });
 
 test('from the command line: the archive\'s SHA-256, as the release workflow runs it', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'sbom-'));
+  const dir = tempDir('sbom-');
   const archive = join(dir, 'rms-design-system-engine-v4.3.0.tar.gz');
   writeFileSync(archive, 'an archive');
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'release-sbom.mjs'), 'v4.3.0', archive], { encoding: 'utf8' });
