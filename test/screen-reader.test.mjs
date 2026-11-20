@@ -164,3 +164,8 @@ test('in a real browser: a reader that presses Tab itself reaches each control f
     assert.deepEqual(lines.map((l) => [l.want, l.said, l.ok, !!l.skipped]), [['button, One', 'One button', true, false], ['button, Two', 'Two button', true, false]]);
   } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a field\'s name and value count when the reader says them apart, as NVDA does', () => {
+  assert.ok(compareSaid('edit text, Name, Ada', 'Name, edit, selected Ada', 'nvda').ok);
+  assert.equal(compareSaid('edit text, Name, Ada', 'Name, edit', 'nvda').ok, false, 'the value left out is still a finding');
+});
