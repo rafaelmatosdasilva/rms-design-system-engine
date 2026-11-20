@@ -222,7 +222,7 @@ checks each piece once it exists, and hands back the starting files when asked (
 - **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
 - **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
-- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react] [--folder <folder>]` writes each
+- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react|shadcn] [--folder <folder>]` writes each
   component still to build (all of them in build order, or the ones named) from what is exact in Figma, as one patch
   that adds the files: `.design-system-engine-out/handback/scaffold.patch`, for a person to apply with `git apply`.
   Each is the component file and a stylesheet of its own beside it (`Button.vue` or `Button.jsx` with `button.css`):
@@ -232,8 +232,12 @@ checks each piece once it exists, and hands back the starting files when asked (
   sheet as CSS, in `box-sizing: border-box` as Figma sizes a frame, a variant's own height included. What the sheet
   says and Figma does not give exactly (what a state is wired to, `aria-pressed`, a focus ring the design does not
   draw, a border whose width the capture does not hold) is never filled in: the file lists it as still yours to
-  write. What the files are written in and where they go come from the flags, `ds-config.json` (`framework`,
-  `componentFiles`) or `package.json`, and are asked otherwise, never chosen. A file the code already has is left out,
+  write. In a shadcn/ui project (its `components.json`) each is one `.tsx` in the ui folder it names: its options a
+  `cva` call, joined with `cn()` from its utils alias, its root named by `data-slot`, `asChild` through Radix's `Slot`
+  when the project has it, a state of the element as Tailwind's prefix (`disabled:`) and each value as the utility
+  that reads its variable (`px-(--space-m)`), never in brackets. What the files are written in and where they go come
+  from the flags, `ds-config.json` (`framework`, `componentFiles`), `components.json` or `package.json`, and are asked
+  otherwise, never chosen. A file the code already has is left out,
   and a project not in build mode has nothing to scaffold. Once applied, `--component <name>` checks each one.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
   before its tokens is still checked against them. Unused tokens are expected and do not fail.
