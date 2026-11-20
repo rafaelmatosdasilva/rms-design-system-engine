@@ -80,6 +80,7 @@ Setup ends with a first result, so you see what the engine is for before learnin
 ### A shadcn/ui project
 
 - **Found from its `components.json`.** Setup says it is a shadcn/ui project and where its components are.
+- **A registry too.** When the project publishes a registry, its components are the folder its `registry.json` lists.
 - **Its tokens are the stylesheet it names.** The CSS `components.json` names (`tailwind.css`, such as `src/index.css`), with its `--primary` kind of variables, is taken as your tokens, with nothing asked.
 
 ### Tokens your product loads at runtime

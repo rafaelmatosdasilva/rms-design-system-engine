@@ -6,12 +6,13 @@
 //   npm ci --prefix test/.react-tools
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, symlinkSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { shadcnConfig, cvaCalls, cvaProps, componentName, resolveAlias, utilityOf, shadcnScaffold, slotOf, radixStateProps } from '../lib/shadcn.mjs';
 import { codeComponents, textComponentApi, componentSourceFiles, resolveComponentFile, textReader, extractDefaults } from '../lib/component-source.mjs';
 import { startReactHarness } from '../lib/react-harness.mjs';
+import { codeGrammarFor } from '../lib/code-grammar.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -76,6 +77,57 @@ test('its kebab-case files are its components, by the name each exports', () => 
   assert.deepEqual(codeComponents(FIXTURE, {}).map((k) => k.name), ['Badge', 'Button', 'Card', 'Switch']);
   const files = componentSourceFiles(FIXTURE, {});
   assert.match(resolveComponentFile('Button', { ROOT: FIXTURE, cfg: {}, files, read: textReader(), classFor: () => null }).file ?? '', /ui\/button\.tsx$/, 'Figma\'s Button is button.tsx');
+});
+
+// A registry: the library in its own folder, listed in registry.json, and components.json's ui folder holding the one
+// component its own site installed. Each file written as a public registry writes them: Tailwind's utilities, its
+// slots, a family per file, a useRender component with no element of its own, a type after a generic.
+function acmeRegistry() {
+  const dir = tempDir('acme-registry-');
+  const put = (f, t) => { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), t); };
+  put('components.json', JSON.stringify({ style: 'new-york', tsx: true, tailwind: { css: 'src/index.css' }, aliases: { components: '@/components', ui: '@/components/ui', utils: '@/lib/utils' } }));
+  put('src/index.css', '@import "tailwindcss";\n');
+  put('src/components/ui/button.tsx', 'export function Button(props) {\n  return <button data-slot="button" className="inline-flex h-9" {...props} />;\n}\n');
+  const ui = 'src/registry/ui';
+  put('registry.json', JSON.stringify({ name: 'acme', items: ['button', 'badge', 'menu', 'toggle-group'].map((n) => ({ name: n, type: 'registry:ui', files: [{ path: `${ui}/${n}.tsx`, type: 'registry:ui' }] })) }));
+  put(`${ui}/button.tsx`, [
+    'import { cva, type VariantProps } from "class-variance-authority";',
+    'const buttonVariants = cva("inline-flex items-center", { variants: { size: { sm: "h-8", lg: "h-10" } }, defaultVariants: { size: "sm" } });',
+    'function Button({ className, size, ...props }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {',
+    '  return <ButtonPrimitive data-slot="button" className={cn(buttonVariants({ size, className }))} {...props} />;',
+    '}', 'export { Button, buttonVariants };', ''].join('\n'));
+  put(`${ui}/badge.tsx`, [
+    'function Badge({ className, render = <span />, ...props }: React.ComponentProps<"span">) {',
+    '  return useRender({ render, props: { "data-slot": "badge", className: cn("rounded-md px-2", className), ...props } });',
+    '}', 'export { Badge };', ''].join('\n'));
+  put(`${ui}/menu.tsx`, [
+    'function MenuTrigger(props) {', '  return <MenuPrimitive.Trigger data-slot="menu-trigger" className="flex-1" {...props} />;', '}',
+    'function Menu(props) {', '  return (', '    <div data-slot="menu" className="relative flex">', '      <div data-slot="menu-content" className="flex-1 bg-popover">{props.children}</div>', '    </div>', '  );', '}',
+    'export { Menu, MenuTrigger };', ''].join('\n'));
+  put(`${ui}/toggle-group.tsx`, [
+    'function ToggleGroup({ children, ...props }: React.ComponentProps<typeof Group> & VariantProps<typeof toggleVariants>) {',
+    '  return <div data-slot="toggle-group" className="flex w-fit">{children}</div>;', '}', 'export { ToggleGroup };', ''].join('\n'));
+  return dir;
+}
+
+test('a registry is read from registry.json: its library, not the one component its own site installed', () => {
+  const dir = acmeRegistry();
+  assert.equal(shadcnConfig(dir).uiDir, 'src/registry/ui');
+  assert.equal(shadcnConfig(dir).registry, 'registry.json');
+  assert.deepEqual(codeComponents(dir, {}).map((k) => `${k.name} ${k.file}`), ['Badge src/registry/ui/badge.tsx', 'Button src/registry/ui/button.tsx', 'Menu src/registry/ui/menu.tsx', 'ToggleGroup src/registry/ui/toggle-group.tsx']);
+});
+
+test('a slotted component is read by its slots: a useRender one too, its parts its slots, never its utilities or its types', async () => {
+  assert.equal(slotOf('useRender({ props: { "data-slot": "badge" } })'), 'badge', 'a slot passed in props, as useRender does');
+  const g = await codeGrammarFor(acmeRegistry(), {}, { reports: false });
+  assert.deepEqual(g.code.notRead ?? [], [], 'every component read: a cva one drawn by its primitive, and a useRender one');
+  const parts = (g.code.anatomy.Menu?.parts ?? []).map((p) => p.class);
+  assert.deepEqual(parts, ['menu-content'], 'its slot is its part, never a utility (flex-1, bg-popover)');
+  assert.equal(g.code.anatomy.Menu.root, '.menu', 'the family\'s name is its root, not its first slot (menu-trigger)');
+  const partRule = g.code.rules.find((r) => r.id === 'code-part-class');
+  assert.ok(!partRule || !partRule.toFix.length, `the family's slots follow the family's name (menu-content under menu): ${JSON.stringify(partRule?.toFix)}`);
+  const words = g.code.rules.find((r) => r.id === 'code-words-through-props');
+  assert.ok(!words || !words.toFix.some((x) => /VariantProps|&/.test(x.value)), `a type after a generic is no words shown: ${JSON.stringify(words?.toFix)}`);
 });
 
 test('drawn with its own React, Tailwind and Radix: each variant as it ships, a Radix switch that switches', { skip: READY, timeout: budget(300000) }, async () => {
