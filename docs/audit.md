@@ -296,16 +296,21 @@ What two or more products work around is the system asking for a change (`rms-de
 - Decisions are kept in `design-system-engine-proposals.json`. A rejected proposal is said in one line with its reason, never drafted again as new.
 - The full check says in one line, under the drift check, how many are open. The proposals are written to `handback/proposals.md`.
 
-#### One inspection report
+#### System health report
 
-Ask for an inspection and the engine reads what it already found as one report (`rms-design-system-engine --inspection`). Run the full check first: the report reads its results.
+Ask how healthy your design system is and the engine answers from what it already found (`rms-design-system-engine --health`). Run the full check first: the report reads its results.
 
-- Ten questions: coverage, best practices, accessibility, shared language, testing, orchestration across design, code and docs, governance, adoption, machine-readable docs and agent access.
-- Each gets a rating (green, yellow or red) and the evidence behind it, such as "9 of 12 checks pass".
-- Each says what the engine could not see, such as a browser that was not here.
-- A question with no evidence gets no rating. It says why, and never guesses.
-- Each names what only an interview answers, such as who decides what goes into the system.
-- The report is written to `.design-system-engine-out/inspection.md`.
+- Thirteen questions, grouped by the engine's four layers:
+  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens.
+  - **Contracts**, does the code hold: the team's own rules, accessibility in every theme, tests and stories.
+  - **Intent**, is it whole and explained: the parts most products need, each component's purpose and when to use it, releases against the team's own documents.
+  - **Evaluation**, is it used: products on the system and keeping up, whether an agent can learn it, and whether what agents build with it passes.
+- Each answer is good, mixed or poor, with the evidence behind it, such as "9 of 12 checks pass".
+- Each says what the engine did not see, such as a browser that is not installed.
+- A question with no evidence is left unanswered. It says why and names the command that would answer it, and never guesses.
+- Each names what only the team can tell, such as who decides what goes into the system.
+- Each report is kept, so the next one says which answers got better or worse.
+- The report is written to `.design-system-engine-out/system-health.md`. `--inspection` is the command's earlier name and still works.
 
 #### Browser support
 

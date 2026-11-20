@@ -116,7 +116,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Hands a renamed prop or value back with its way across: the old name kept as a deprecated alias, a patch for each product and the version that removes it.
 - Finds the same job built differently across products, such as a create flow, and asks whether each difference is earned.
 - Drafts a proposal when two or more products work around the same thing, such as overriding a component's padding or detaching it in Figma, and keeps each rejected one with its reason.
-- Reads your results as one inspection report: ten questions, each with a rating, its evidence and what only an interview answers.
+- Says how healthy your system is in thirteen questions, from Facts to Evaluation, each answered from its evidence with what changed since last time.
 
 ### What to ask
 
@@ -124,7 +124,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
-| `/rms-design-system-engine inspect our design system` | One rating for each of ten questions (coverage, accessibility, governance, adoption and more), with the evidence behind it and what only an interview answers |
+| `/rms-design-system-engine how healthy is our design system?` | An answer to each of thirteen questions (is the data current, do Figma and the code agree, is each component explained, do agents build with it well and more), with its evidence, the command for any it could not answer, and what changed since the last report |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
 ## Measure Figma-code parity

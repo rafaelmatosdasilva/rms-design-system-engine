@@ -181,8 +181,8 @@
          Not verified: rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
   ✅  [25]  What this audit actually checked                    Pass
 
-  [verified] the 25 gates above are mechanically checked against Figma; checked 3 of 3 DS components (see gate 25).
-  [advisory] the notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail; a gate marked ⏭ was not checked.
+  Checked by the engine: the 25 gates above, each compared with Figma by code; checked 3 of 3 DS components (see gate 25).
+  Signals, not pass or fail: the notes below (exemption debt, code drift, accessibility, layering). A gate marked ⏭ was not checked.
 
 ────────────────────────────────────────────────────────────
 
