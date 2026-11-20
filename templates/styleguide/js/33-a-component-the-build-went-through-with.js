@@ -1447,7 +1447,7 @@
         els.forEach(function (el) {
           if (el !== cur) { el.classList.add('pg-slot-area'); el.setAttribute('data-slot', slotName(r)); return; }
           if (el.querySelector(':scope > .pg-slot-fill')) return;
-          var kids = Array.prototype.filter.call(el.children, function (k) { return !partSel.some(function (sel) { try { return k.matches(sel) || k.querySelector(sel); } catch (e) { return false; } }); });
+          var kids = Array.prototype.filter.call(el.children, function (k) { return !partSel.some(function (sel) { try { return k.matches(sel) || partsOf(el, sel).some(function (p) { return k.contains(p); }); } catch (e) { return false; } }); });
           var rs = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
           var w = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.right; })) - Math.min.apply(null, rs.map(function (q) { return q.left; })) : 0;
           var h = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.bottom; })) - Math.min.apply(null, rs.map(function (q) { return q.top; })) : 0;

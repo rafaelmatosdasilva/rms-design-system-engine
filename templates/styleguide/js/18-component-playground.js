@@ -174,7 +174,17 @@
       return (a === 'checked' || a === 'disabled' || a === 'indeterminate') ? !!t[a] : t.getAttribute(a) === String(effect.attrs[a]);
     });
   }
-  function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
+  // A part found inside another of the system's components drawn in this one (a group's radios, each a radioButton) is
+  // that component's, never this one's, unless its selector names that component: a label guessed for a group's own
+  // label once took every radio's label and mark with it.
+  var COMP_CLASSES = {}; COMPONENTS.forEach(function (c) { if (c.cls && !/^#/.test(c.cls)) String(c.cls).trim().split(/\s+/).forEach(function (k) { COMP_CLASSES[k] = true; }); });
+  function inOther(e, k, sel) {
+    for (var a = k.parentElement; a && a !== e; a = a.parentElement) {
+      for (var i = 0; i < a.classList.length; i++) { var x = a.classList[i]; if (COMP_CLASSES[x] && !e.classList.contains(x) && sel.indexOf('.' + x) < 0) return true; }
+    }
+    return false;
+  }
+  function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)).filter(function (k) { return !inOther(e, k, sel); }) : []; } catch (x) { return []; } }
   // A selector list searched one selector at a time, in its own order (the first is the best match), not in page order.
   function partsInOrder(e, sel) { return String(sel || '').split(',').reduce(function (acc, one) { return acc.concat(partsOf(e, one.trim()).filter(function (k) { return acc.indexOf(k) < 0; })); }, []); }
   function textLeaf(e, sel, used) {

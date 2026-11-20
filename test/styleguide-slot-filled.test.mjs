@@ -15,16 +15,19 @@ import { templateText } from '../lib/styleguide-template.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
 
-// The demo system with one more component, invented: choiceGroup, whose only Figma prop is a slot its markup fills.
+// The demo system with two more components, invented: choiceGroup, a slot its markup fills with radios and a switch for
+// its own label, and radio, each of those radios a component of the system's own.
 function choiceGroupProject() {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'sg-slot-');
   const edit = (p, fn) => writeFileSync(join(dir, p), fn(readFileSync(join(dir, p), 'utf8')));
-  edit('src/figma-component-props.snapshot.json', (s) => JSON.stringify({ ...JSON.parse(s), choiceGroup: { nodeId: '40:1', properties: { 'Options#1:0': { type: 'SLOT' } }, annotations: [] } }));
-  edit('ds-config.json', (s) => { const c = JSON.parse(s); c.componentFiles.choiceGroup = 'src/components/ChoiceGroup.jsx'; return JSON.stringify(c); });
-  edit('structure-contract.mjs', (s) => s.replace("  field: { main: '.tp-field' },\n", "  field: { main: '.tp-field' },\n  choiceGroup: { main: '.tp-choice-group' },\n"));
-  writeFileSync(join(dir, 'src', 'components', 'ChoiceGroup.jsx'), 'export function ChoiceGroup({ children }) {\n  return <div className="tp-choice-group" role="radiogroup" aria-label="Plan">{children}</div>;\n}\n');
-  edit('apps/gallery/ui.html', (s) => s.replace('</main>', '  <div class="tp-choice-group" role="radiogroup" aria-label="Plan"><label class="tp-radio"><input type="radio" name="plan" checked> Basic</label><label class="tp-radio"><input type="radio" name="plan"> Pro</label></div>\n</main>'));
-  appendFileSync(join(dir, 'src', 'theme.css'), '\n.tp-choice-group { display: flex; flex-direction: column; gap: 8px; }\n.tp-radio { display: flex; gap: 8px; align-items: center; }\n');
+  edit('src/figma-component-props.snapshot.json', (s) => JSON.stringify({ ...JSON.parse(s), choiceGroup: { nodeId: '40:1', properties: { 'showLabel#2:0': { type: 'BOOLEAN', defaultValue: false }, 'Options#1:0': { type: 'SLOT' } }, annotations: [] }, radio: { nodeId: '41:1', properties: { 'label#3:0': { type: 'TEXT', defaultValue: 'Basic' } }, annotations: [] } }));
+  edit('ds-config.json', (s) => { const c = JSON.parse(s); c.componentFiles.choiceGroup = 'src/components/ChoiceGroup.jsx'; c.componentFiles.radio = 'src/components/Radio.jsx'; return JSON.stringify(c); });
+  edit('structure-contract.mjs', (s) => s.replace("  field: { main: '.tp-field' },\n", "  field: { main: '.tp-field' },\n  choiceGroup: { main: '.tp-choice-group' },\n  radio: { main: '.tp-radio' },\n"));
+  writeFileSync(join(dir, 'src', 'components', 'ChoiceGroup.jsx'), 'export function ChoiceGroup({ showLabel = false, children }) {\n  return <div className="tp-choice-group" role="radiogroup" aria-label="Plan">{showLabel && <span className="tp-choice-group__label">Plan</span>}{children}</div>;\n}\n');
+  writeFileSync(join(dir, 'src', 'components', 'Radio.jsx'), 'export function Radio({ label = \'Basic\' }) {\n  return <label className="tp-radio"><input type="radio" name="plan" /><span className="tp-radio__mark" /><span className="tp-radio__label">{label}</span></label>;\n}\n');
+  const radio = (word, on) => `<label class="tp-radio"><input type="radio" name="plan"${on ? ' checked' : ''}><span class="tp-radio__mark"></span><span class="tp-radio__label">${word}</span></label>`;
+  edit('apps/gallery/ui.html', (s) => s.replace('</main>', `  <div class="tp-choice-group" role="radiogroup" aria-label="Plan">${radio('Basic', true)}${radio('Pro', false)}</div>\n</main>`));
+  appendFileSync(join(dir, 'src', 'theme.css'), '\n.tp-choice-group { display: flex; flex-direction: column; gap: 8px; }\n.tp-radio { display: flex; gap: 8px; align-items: center; }\n.tp-radio__mark { width: 12px; height: 12px; border: 1px solid; border-radius: 50%; }\n');
   return dir;
 }
 
@@ -48,6 +51,7 @@ test('a slot its markup already fills shows that content, marked as the slot, an
       return JSON.stringify({
         shown: radios.map((k) => getComputedStyle(k).display !== 'none' && getComputedStyle(k).visibility !== 'hidden' && box(k).height > 0),
         gone: g.querySelectorAll('.pg-slot-gone').length,
+        marks: g.querySelectorAll('.tp-radio__mark').length, words: radios.map((k) => k.textContent.trim()),
         mark: mark && { slot: mark.getAttribute('data-slot'), hidden: mark.getAttribute('aria-hidden'), outline: getComputedStyle(mark).outlineStyle, events: getComputedStyle(mark).pointerEvents,
           covers: radios.every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }),
           label: getComputedStyle(mark, '::after').content },
@@ -59,6 +63,10 @@ test('a slot its markup already fills shows that content, marked as the slot, an
     const v = JSON.parse((await send('Runtime.evaluate', { expression: read, returnByValue: true }, sessionId)).result.value);
     assert.deepEqual(v.shown, [true, true], 'both radios show in the preview');
     assert.equal(v.gone, 0, 'nothing of the content is hidden');
+    // The group's label switch is off and its part a guess (a label, a text, a span): it hides the group's own label,
+    // never each radio's, which are another component's parts.
+    assert.equal(v.marks, 2, 'each radio keeps its mark');
+    assert.deepEqual(v.words, ['Basic', 'Pro'], 'and its words');
     assert.ok(v.mark, 'the slot is marked');
     assert.equal(v.mark.slot, 'Slot Options', 'named for the slot');
     assert.equal(v.mark.label, '"Slot Options"', 'its name drawn on the page');
