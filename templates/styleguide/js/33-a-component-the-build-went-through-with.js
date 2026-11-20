@@ -36,6 +36,13 @@
   // Every component not tried yet in this browser, one after another, while the Status page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
   var sweepAt = 0, sweeping = false, sweepMissed = [], partFailed = {};
+  // How many tries are running on the page (data-sg-trying): a component's page being tried, and the sweep of every
+  // component the Status and Accessibility pages wait on. The build's pictures of the guide wait for none, so neither a
+  // hover a try leaves showing nor a count the sweep has not finished is taken for a change in the layout.
+  function pageTrying(on) {
+    var root = document.documentElement, n = Math.max(0, (Number(root.getAttribute('data-sg-trying')) || 0) + (on ? 1 : -1));
+    if (n) root.setAttribute('data-sg-trying', String(n)); else root.removeAttribute('data-sg-trying');
+  }
   // The components the sweep tried and could not measure in the browser (nothing drawn to try), for the build to name.
   window.__sgSweepMissed = function () { return sweepMissed.slice(); };
   // A component the sweep draws out of sight can take the focus on its own (a modal that opens, a field that focuses
@@ -70,9 +77,9 @@
     var list = COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     var share = /(?:^|[?&])bake=(\d+)\/(\d+)/.exec(location.hash);
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
-    sweeping = true;
+    sweeping = true; pageTrying(true);
     (function next() {
-      if (sweepAt >= list.length || !SWEEP_PAGES[hashParts().id]) { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || !SWEEP_PAGES[hashParts().id]) { sweeping = false; pageTrying(false); if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       if (personBusy() && !(list[sweepAt].__a11y && (list[sweepAt].__a11y.live || list[sweepAt].__a11y.baked))) return setTimeout(next, 500);
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
@@ -1056,6 +1063,8 @@
     a11yRender(liveNow);
     // Every variant tried in the browser (checkLive, below), its rows in the Accessibility table.
     var liveSig = null, checking = false, areaNow = null;
+    // Whether this component's page is being tried, counted on the page (pageTrying).
+    var setChecking = function (on) { if (checking === on) return; checking = on; pageTrying(on); };
     // Every variant, as Parity lists everything the component has: each one tried on the live component whenever the
     // Accessibility area shows (the Playground laid out out of sight for it, one task, nothing painted), the text
     // contrast measured in each colour mode too, and what each check found said once, with the variants it holds in.
@@ -1094,7 +1103,7 @@
       if (checking) return;
       var sig = Array.prototype.map.call(document.documentElement.attributes, function (x) { return x.name + x.value; }).join();
       if (sig === liveSig) return;
-      checking = true; liveSig = sig;
+      setChecking(true); liveSig = sig;
       var play = sec.querySelector('[data-area="play"]'), keep = {}, wasPreview = preview.hidden, wasPlay = play.hidden;
       Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
       var colours = AXES.filter(function (a) { return a.scoped && a.attr !== 'data-size' && !a.classes; });
@@ -1114,7 +1123,7 @@
         Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
         Object.keys(syncs).forEach(function (k) { syncs[k](); });
         refresh();
-        checking = false;
+        setChecking(false);
       };
       // again: how it is tried once the person leaves; it answers false then, and the variants wait for it.
       var measure = function (cb, again) {
@@ -1227,7 +1236,7 @@
     var wcagStop = null;
     function wcagUse(plan, live) {
       if (!window.__wcag21 || !a11yEl) return;
-      checking = true;
+      setChecking(true);
       var stopped = false;
       var play = sec.querySelector('[data-area="play"]'), keep = {}, wasPreview = preview.hidden;
       Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
@@ -1244,7 +1253,7 @@
         Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
         Object.keys(syncs).forEach(function (k) { syncs[k](); });
         refresh();
-        checking = false;
+        setChecking(false);
         order.forEach(function (key) {
           var f = found[key];
           liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ')) + (f.where.length === combos.length ? '' : namePills(f.where)) + placesTag([placeOf(f.desc)]) });
