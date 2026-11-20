@@ -254,6 +254,11 @@ rms-design-system-engine --hear
   with what to turn on (on a Mac: "Allow VoiceOver to be controlled with AppleScript" in VoiceOver Utility), and the
   engine never turns it on itself.
 - **Kept in one file.** `.design-system-engine-out/heard-by-reader.json`, which the style guide reads.
+- **Heard for real in the engine's own CI.** Every week, and on each change to the screen reader code, GitHub runs
+  VoiceOver on a macOS machine and NVDA on a Windows machine over the two fictional demo systems
+  (`.github/workflows/screen-readers.yml`). Guidepup's own setup step lets each reader be driven there. The run fails
+  when a reader cannot start or a component is not heard, and keeps what each reader said as its record.
+- **Windows finds its own Chrome.** Chrome under Program Files or the person's AppData is found without the PATH.
 
 ### Which browser answered it
 

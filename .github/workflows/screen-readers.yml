@@ -56,12 +56,18 @@ jobs:
       - uses: guidepup/setup-action@acf1a64cc26292ebe0db6a28d1341bd1bae93c65 # 0.21.0
         with:
           record: ${{ matrix.reader == 'voiceover' }}
-      # Guidepup from its committed lockfile, found as a machine-wide one is: never put in a project.
+      # Guidepup and its setup from their committed lockfile, found as a machine-wide one is: never put in a project.
       - name: Install Guidepup
         shell: bash
         run: |
           npm ci --prefix test/.reader-tools --no-audit --no-fund
           echo "NODE_PATH=$PWD/test/.reader-tools/node_modules" >> "$GITHUB_ENV"
+      # The reader's own files Guidepup drives it with (NVDA itself, VoiceOver's preferences), each checked against the
+      # sha256 Guidepup's manifest pins, into Guidepup's cache.
+      - name: Fetch the reader's files
+        shell: bash
+        working-directory: test/.reader-tools
+        run: ./node_modules/.bin/guidepup install ${{ matrix.reader }}
       - name: Build the style guides
         shell: bash
         run: |

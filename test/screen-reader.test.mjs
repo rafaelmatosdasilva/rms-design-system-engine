@@ -126,3 +126,10 @@ test('in a real browser: each control focused in turn, the browser\'s line held 
     assert.deepEqual(got.failed, ['absent: its preview is not on the page']);
   } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a reader that will not start says why, with the cause Guidepup gives under its own words', async () => {
+  const { startFailure } = await import('../lib/screen-reader.mjs');
+  assert.equal(startFailure(new Error('VoiceOver cannot be started', { cause: new Error('Timed out waiting for VoiceOver\nat x') })), 'VoiceOver cannot be started: Timed out waiting for VoiceOver');
+  assert.equal(startFailure(new Error('NVDA is not installed\n\nPlease ensure you have run:')), 'NVDA is not installed', 'the first line only');
+  assert.equal(startFailure(new Error('same', { cause: new Error('same') })), 'same', 'never said twice');
+});
