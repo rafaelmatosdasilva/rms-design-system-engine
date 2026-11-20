@@ -19,6 +19,25 @@ What decides a change:
 | Contributor | Anyone who opens an issue or takes part in a discussion | Following [CONTRIBUTING.md](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md) |
 | Reviewer | None yet | Approving changes before they merge, once the project has a second maintainer |
 
+## How issues are handled
+
+Every issue gets a first answer within a week. Each form asks which part of the [features page](features.md) it is about, and that part becomes a label (`part: Lint your codebase`). Two more kinds of label say where it stands and how soon it is worked on ([issue-triage.mjs](../lib/issue-triage.mjs) keeps them).
+
+| Label | What it means |
+|---|---|
+| `needs triage` | New: not read yet. Every new issue starts here. |
+| `needs info` | Waiting on the person who opened it: the comment says what is missing. With no reply in 14 days it is closed, and a reply reopens it. |
+| `confirmed` | Reproduced, or agreed it should change. Not planned yet. |
+| `planned` | On the way. The change that fixes it closes it, so whoever opened it is told when it lands. |
+| `wontfix` | Declined. The comment always says why. |
+| `duplicate` | Already asked. The comment links the issue that carries it on. |
+
+| Label | When |
+|---|---|
+| `priority: high` | A problem found in use, or one that stops a part doing what the features page promises. An accessibility barrier in what the engine makes is always high. |
+| `priority: medium` | It moves a part forward, or delivers what the features page already promises. |
+| `priority: low` | Later. |
+
 ## Continuity
 
 The project is built so that it does not depend on any one secret:

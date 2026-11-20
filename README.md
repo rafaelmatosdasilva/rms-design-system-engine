@@ -73,12 +73,25 @@ Then ask in plain words, such as `/rms-design-system-engine check the button`. [
 
 ---
 
+# Security and enterprise
+
+- **Runs on your machines.** No server, no account and no telemetry. It talks only to the services you already use, listed host by host for your firewall.
+- **Your data stays yours.** Tokens stay in each person's own `.env`, and code people wrote is never changed: findings come back as patches.
+- **Nothing extra to trust.** No npm dependencies. Every release is signed and comes with a software bill of materials.
+- **Compliance answered.** GDPR, SOC 2, ISO 27001, HIPAA and the AI model's terms, each in one line.
+
+[For IT and security teams](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/.github/SECURITY.md#for-it-and-security-teams) · [Security and data](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/security.md#security-and-data) · [Assurance case](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/security.md#assurance-case) · [Report a vulnerability](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/.github/SECURITY.md#report-a-vulnerability)
+
+---
+
 # Explore
 
 - [Features](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md)
 - [Docs](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/README.md)
-- [Security](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/security.md)
 - [Studies](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/studies/README.md)
 - [Governance](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/governance.md)
+- [Security and enterprise](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/.github/SECURITY.md)
+- [Contributing](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/.github/CONTRIBUTING.md)
+- [Code of conduct](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/.github/CODE_OF_CONDUCT.md)
 
 Built by [Rafael Matos da Silva](https://rafaelmatosdasilva.com). Released under the MIT License.

@@ -69,7 +69,7 @@ const PAGE_OF_GROUP = { Audit: 'audit', Documentation: 'documentation', Collabor
 const groupOf = new Map(groups.flatMap((g) => [...OVERVIEW.split(/^### /m).find((x) => x.startsWith(g.name)).matchAll(/^\| \[(.+?)\]\(#/gm)].map((m) => [m[1], g.name])));
 test('the technical documentation covers every usable part, on its group\'s page', () => {
   for (const name of usable) {
-    const page = name === 'Test accessibility' ? 'accessibility' : PAGE_OF_GROUP[groupOf.get(name)];
+    const page = name === 'Test accessibility' ? 'test-accessibility' : PAGE_OF_GROUP[groupOf.get(name)];
     assert.ok(page, `${name}: its group has a page`);
     const sections = [...read(`docs/${page}.md`).matchAll(/^## (.+)$/gm)].map((m) => m[1]);
     assert.ok(sections.includes(name), `${name} on docs/${page}.md`);

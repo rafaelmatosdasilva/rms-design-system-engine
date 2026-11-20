@@ -17,7 +17,7 @@ For whoever approves tools for a team: each line links to its detail below.
 
 - **No telemetry.** The engine sends nothing about you, your project or how you use it to its author or anyone else. There is no analytics, no crash report and no usage ping.
 - **No server and no account.** It runs on your computer or your CI runner, as plain Node scripts ([what runs where](#what-runs-where)).
-- **No npm dependencies.** No third-party package to trust.
+- **No npm dependencies.** No third-party package to trust. Each release comes with a software bill of materials (CycloneDX) and signed provenance.
 - **A fixed list of hosts.** It talks only to the services you use (Figma, your code host, Notion) and the few downloads listed in [what goes over the network](#what-goes-over-the-network). [Allow it through a firewall](#allow-it-through-a-firewall) lists them by name.
 - **Your tokens stay with you.** Each lives in your own git-ignored `.env`, goes only to its own host, and is never printed ([tokens](#tokens)).
 - **It never changes code people wrote.** Findings come back as patches for a person to apply ([what it may change](#what-it-may-change)).
@@ -139,18 +139,18 @@ Why the engine can be trusted with a team's code, design files and credentials: 
 | Cross-site scripting in the style guide (CWE-79) | Project data is embedded as JSON with `<` escaped, the page escapes text through one helper when it shows it, and icons are stripped of scripts and event attributes |
 | Prototype pollution (CWE-1321) | Name lookups use own keys only; found and covered by the property tests |
 | Supply-chain compromise (CWE-1357) | No runtime dependencies; workflow actions pinned by commit and watched for updates, so a pin never outlives its own security fixes; test tools installed from committed lockfiles; advisories tracked by OpenSSF Scorecard |
-| Tampered releases (CWE-494) | Each release carries a Sigstore provenance attestation (`gh attestation verify`), and npm versions carry npm provenance |
+| Tampered releases (CWE-494) | Each release carries a Sigstore provenance attestation (`gh attestation verify`) for its archive and its software bill of materials, and npm versions carry npm provenance |
 
 ### How this is checked
 
-- **On every change:** the full test suite (more than 2,000 tests, including planted mistakes and property tests with fast-check), CodeQL code scanning, and the privacy check, all required before a merge.
+- **On every change:** the full test suite (more than 3,000 tests, including planted mistakes and property tests with fast-check), CodeQL code scanning, and the privacy check, all required before a merge.
 - **Every week:** OpenSSF Scorecard, on every change to main as well; and Dependabot, which opens one pull request for the pinned actions that moved.
 - **Every week, the advisories Dependabot cannot close:** one with no newer version to move to, or whose range is the
   advisory's own mistake (a "3.x" range with no end matches 4.x too, long after the fix). Those are answered in that
   folder's `osv-scanner.toml` with the reason and **a date to look again**, and the watch says when a date is close,
   when one has passed, and when something is flagged that nothing is coming for. It decides nothing: each is fixed,
   reported upstream, or answered again, which is a person's call.
-- **Self-certified:** the [OpenSSF Best Practices](https://www.bestpractices.dev/projects/16082) passing level.
+- **Self-certified:** the [OpenSSF Best Practices](https://www.bestpractices.dev/projects/16082) Silver level, past the passing level.
 
 ### Known limits
 

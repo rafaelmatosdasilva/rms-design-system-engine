@@ -1,8 +1,6 @@
 # Contributing
 
-The way to take part is to **open an issue**. Tell us what broke, what you need, or where the documentation is wrong. Every issue is read and answered.
-
-The engine is built by one maintainer, so pull requests are not accepted.
+The way to take part is to **open an issue**: what broke, what you need, or where the documentation is wrong. Every issue is read and answered.
 
 ## Open an issue
 
@@ -15,55 +13,20 @@ The engine is built by one maintainer, so pull requests are not accepted.
 | **The documentation is wrong** | A page says something the engine doesn't do, or has a typo or a broken link. |
 | **An accessibility barrier** | Something the engine makes can't be used with a screen reader, the keyboard, zoom, high contrast or reduced motion. |
 
-A few things that help:
-
-- **One thing per issue.**
-- **Look first.** It may already be asked, or among the Coming soon parts of the [features page](../docs/features.md).
-- **Say what you were trying to do,** not only the feature you have in mind.
-- **Keep it anonymous.** Replace any client, product, person or host name with an invented one.
-
-Not an issue:
-
-- **A question** about using it goes to [Discussions](https://github.com/rafaelmatosdasilva/rms-design-system-engine/discussions).
-- **A security problem** goes through the Security tab, privately. [SECURITY.md](SECURITY.md) says how.
+- **One thing per issue,** and say what you were trying to do.
+- **Look first:** it may already be asked, or among the Coming soon parts of the [features page](../docs/features.md).
+- **Keep it anonymous:** replace any client, product, person or host name with an invented one.
+- **A question** goes to [Discussions](https://github.com/rafaelmatosdasilva/rms-design-system-engine/discussions). **A security problem** goes privately through the [Security tab](SECURITY.md#report-a-vulnerability).
 
 ## What happens to your issue
 
-**You get a first answer within a week.** Every issue gets a reply, a no included.
+- **A first answer within a week,** a no included.
+- **A label says where it stands.** `needs info` waits on you: with no reply in 14 days it is closed, and your reply reopens it. [Every label](../docs/governance.md#how-issues-are-handled) is on the governance page.
+- **A fix reaches you the day after it is merged,** since every install updates itself once a day.
+- **You can be thanked.** Tick the box at the end of the form, and the release that fixes your issue thanks you by your GitHub handle.
 
-Each form asks **which part** of the [features page](../docs/features.md) it is about. That part becomes a label (`part: Lint your codebase`).
+## Pull requests and forks
 
-Where an issue stands:
+The engine has one maintainer, so pull requests are not accepted, a typo fix included: open an issue instead.
 
-| Label | What it means |
-|---|---|
-| `needs triage` | New: not read yet. Every new issue starts here. |
-| `needs info` | Waiting on you: the comment says what is missing. With no reply in 14 days it is closed, and your reply reopens it. |
-| `confirmed` | Reproduced, or agreed it should change. Not planned yet. |
-| `planned` | On the way. The change that fixes it closes it, so you are told when it lands. |
-| `wontfix` | Declined. The comment always says why. |
-| `duplicate` | Already asked. The comment links the issue that carries it on. |
-
-How soon it is worked on:
-
-| Label | When |
-|---|---|
-| `priority: high` | A problem found in use, or one that stops a part doing what the features page promises. An accessibility barrier in what the engine makes is always high. |
-| `priority: medium` | It moves a part forward, or delivers what the features page already promises. |
-| `priority: low` | Later. |
-
-A fix reaches you the day after it is merged: every install updates itself once a day.
-
-**You can be thanked for it.** Each form ends with a box: tick it, and the notes of the release that fixes your issue thank you by your GitHub handle. Leave it unticked and the release says nothing of you.
-
-## Pull requests
-
-Pull requests are not accepted, a typo fix included: open an issue instead, and it is fixed here. A pull request is closed with a link to this page. Nothing about it is personal.
-
-## Forking
-
-You are free to fork the engine under its [MIT license](../LICENSE): change it, run your own version, build something else from it. Your fork is yours, and its changes stay there. [docs/development.md](../docs/development.md) explains how the repository is laid out and tested.
-
-## Code of conduct
-
-Everyone in issues and discussions follows the [code of conduct](CODE_OF_CONDUCT.md): be respectful, and criticise ideas, not people.
+You are free to fork it under its [MIT license](../LICENSE). [docs/development.md](../docs/development.md) explains how the repository is laid out and tested.

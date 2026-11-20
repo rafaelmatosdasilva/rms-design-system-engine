@@ -103,26 +103,31 @@ jobs:
             ${last:+-f previous_tag_name="$last"} --jq .body >> "$RUNNER_TEMP/notes.md"
           gh release create "$next" --title "$next" --notes-file "$RUNNER_TEMP/notes.md"
           echo "next=$next" >> "$GITHUB_OUTPUT"
-      # The release's code as one archive, with signed provenance: a Sigstore attestation that this workflow built it
-      # from that tag, which anyone can check with `gh attestation verify <archive> --repo <this repository>`.
+      # The release's code as one archive, with its software bill of materials (CycloneDX, release-sbom.mjs: the
+      # engine, the archive's hash, no dependency) and signed provenance for both: a Sigstore attestation that this
+      # workflow built them from that tag, which anyone can check with `gh attestation verify <file> --repo <this repository>`.
       - name: Archive the release
         if: steps.tag.outputs.next != ''
         run: |
           name="rms-design-system-engine-${{ steps.tag.outputs.next }}"
           git archive --format=tar.gz --prefix="$name/" -o "$name.tar.gz" "${{ steps.tag.outputs.next }}"
+          node lib/release-sbom.mjs "${{ steps.tag.outputs.next }}" "$name.tar.gz" > "$name.cdx.json"
           echo "ARCHIVE=$name.tar.gz" >> "$GITHUB_ENV"
+          echo "SBOM=$name.cdx.json" >> "$GITHUB_ENV"
       - id: attest
         if: steps.tag.outputs.next != ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ env.ARCHIVE }}
-      - name: Attach the archive and its provenance
+          subject-path: |
+            ${{ env.ARCHIVE }}
+            ${{ env.SBOM }}
+      - name: Attach the archive, its SBOM and their provenance
         if: steps.tag.outputs.next != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp "${{ steps.attest.outputs.bundle-path }}" "$ARCHIVE.intoto.jsonl"
-          gh release upload "${{ steps.tag.outputs.next }}" "$ARCHIVE" "$ARCHIVE.intoto.jsonl"
+          gh release upload "${{ steps.tag.outputs.next }}" "$ARCHIVE" "$SBOM" "$ARCHIVE.intoto.jsonl"
       # The same version as an npm package, on npmjs.org (rms-design-system-engine) and on GitHub Packages
       # (@rafaelmatosdasilva/rms-design-system-engine), for teams that install from a registry. Its name, version and
       # registry are set here only: the committed package.json stays the private one the repository runs from.

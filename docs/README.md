@@ -8,7 +8,7 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 
 - [Setup](setup.md): how to install the engine, keep it up to date and run it, what it adds to Claude Code, and the files and settings it uses.
 - [Audit](audit.md): how the engine checks your Figma library, lints your code and compares Figma with the code.
-- [Accessibility](accessibility.md): how the engine tests the accessibility of every component, and of your products' pages, in a real browser.
+- [Accessibility](test-accessibility.md): how the engine tests the accessibility of every component, and of your products' pages, in a real browser.
 - [Documentation](documentation.md): how the engine writes each component's contract and gathers the intent layer.
 - [Collaboration](collaboration.md): how the engine publishes the living style guide and the playground.
 - [Creation](creation.md): how the engine builds prototypes with your real components.

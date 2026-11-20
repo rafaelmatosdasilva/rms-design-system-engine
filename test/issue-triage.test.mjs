@@ -59,8 +59,12 @@ test('the workflow runs the module on each event, never the issue\'s text in a s
   for (const u of wf.match(/uses: \S+/g)) assert.match(u, /@[0-9a-f]{40}$/, `${u} pinned to a commit`);
 });
 
-test('CONTRIBUTING says what happens to an issue, with every state and priority label the workflow keeps', () => {
+// CONTRIBUTING stays short: what happens to an issue, and a link to the governance page, which names every label.
+test('CONTRIBUTING says what happens to an issue; the governance page names every state and priority label the workflow keeps', () => {
   const c = readFileSync(new URL('../.github/CONTRIBUTING.md', import.meta.url), 'utf8');
   assert.match(c, /^## What happens to your issue$/m);
-  for (const [n] of [...triageLabels().filter(([n]) => !n.startsWith('part: '))]) assert.ok(c.includes(`\`${n}\``), `CONTRIBUTING names ${n}`);
+  assert.match(c, /\]\(\.\.\/docs\/governance\.md#how-issues-are-handled\)/);
+  const g = readFileSync(new URL('../docs/governance.md', import.meta.url), 'utf8');
+  assert.match(g, /^## How issues are handled$/m);
+  for (const [n] of [...triageLabels().filter(([n]) => !n.startsWith('part: '))]) assert.ok(g.includes(`\`${n}\``), `the governance page names ${n}`);
 });
