@@ -149,6 +149,6 @@ test('the data is the pinned file or nothing: a download that is not it is never
   const fake = gzipSync(tar('package/data.json', JSON.stringify(DATA)));
   let asked = null;
   assert.equal(await fetchWebFeatures({ home, get: async (url) => { asked = url; return fake; } }), null);
-  assert.match(asked, new RegExp(`web-features-${WF_VERSION.replace(/\./g, '\\.')}\\.tgz$`), 'the pinned version, from the registry');
+  assert.ok(asked.endsWith(`/web-features-${WF_VERSION}.tgz`), `the pinned version, from the registry: ${asked}`);
   assert.equal(cachedWebFeatures(home), null, 'and nothing kept');
 });
