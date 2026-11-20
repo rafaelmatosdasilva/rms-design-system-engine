@@ -338,7 +338,7 @@ Setup writes only what it can read. Before Figma is captured it cannot know whic
 
 It also looks beside the project for products that use the system. When the folder above holds more than 2,000 entries (a temporary or home folder), it skips that look and says so, and you name any products in `ds-config.json` → `pluginDirs`.
 
-The CSS naming is found by trying each way on your tokens, Figma's `iconText` kept or not, camelCase split or not, and `/color` or `/default` kept (`--button-background-default-color`) or dropped.
+The CSS naming is found by trying each way on your tokens, a group word Figma's names carry kept or not, camelCase split or not, and `/color` or `/default` kept (`--button-background-default-color`) or dropped.
 
 ### How Figma's values are kept
 
@@ -374,6 +374,11 @@ Nobody copies a value by hand. The engine writes a read-only script for one chun
 - On a refresh only the checksums are asked, and only the components that changed are read again.
 - No script switches Figma's page: switching it is saved with the file, so a capture that only reads would still change it.
 - With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.
+- With [Figma Console MCP](https://www.npmjs.com/package/figma-console-mcp) configured in the project, the engine runs the same scripts through it too, so there is no chunk to copy by hand:
+  - It starts the server your `.mcp.json` (or `.cursor/mcp.json`, `.vscode/mcp.json`) names, for that read only, and stops it after.
+  - Its Desktop Bridge plugin, open in Figma Desktop, finds the server on its own within a few seconds, beside the one your Claude session runs.
+  - Every script runs in the file `figmaFileKey` names, so another file open in Figma is never read.
+  - No Figma token and no figma-cli are needed, and the snapshots are the ones every other route writes.
 
 ### Every output says what it was built from
 
@@ -402,7 +407,7 @@ A project that says never gets the list of Figma changes and no script to run. A
 ## Good to know
 
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
-- **Reading Figma, the best way available.** [Refreshing the Figma data](features.md#set-up) picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own.
+- **Reading Figma, the best way available.** [Refreshing the Figma data](features.md#set-up) picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then Figma Console MCP when the project configures it and its Desktop Bridge plugin answers, then the Figma API with a token, then the Figma tool of your Claude session. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own.
 - **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). The global folder is found even when `npm` is not on the PATH, as in an agent's shell that skips the profile setting up nvm or Volta. Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser, even where Chrome is installed.
 
 ## Environment variables
@@ -417,6 +422,7 @@ A project that says never gets the list of Figma changes and no script to run. A
 | `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` | Uses only the project's own TypeScript |
 | `DESIGN_SYSTEM_ENGINE_CHROME=none` | Reads the code with no browser, even where Chrome is installed |
 | `DESIGN_SYSTEM_ENGINE_FIGMA_CLI=none` | Never asks figma-cli, even where it is installed and Figma answers |
+| `DESIGN_SYSTEM_ENGINE_FIGMA_CONSOLE=none` | Never starts Figma Console MCP, even where the project configures it |
 | `DESIGN_SYSTEM_ENGINE_MIRRORS=<folder>` | Keeps every project mirror in one folder on this computer (for example `~/.cache/rms-engine/mirrors`), per host and project, instead of beside the work |
 | `DESIGN_SYSTEM_ENGINE_WORKSPACE=<folder>` | Keeps the engine's own files of a GitLab project (setup, snapshots, contracts, history, hand-back, output) in that folder, per host and project, apart from the mirror of its code |
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
