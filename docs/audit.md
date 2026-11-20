@@ -188,6 +188,12 @@ A rule your team already wrote into its linter counts as decided:
 - **Only when it agrees.** A setting decides a rule only when it says what the rule says. One that is turned off decides nothing.
 - **Your linter, run locally.** It runs from your project's own `node_modules` only, and is never installed for you.
 
+Your linters also run for everything they report, not only the settings that decide a rule:
+
+- **Your config as it is.** A config that only extends a preset (`next/core-web-vitals`, `plugin:vue/recommended`) is still your team's choice of rules. Each linter with a config runs on the component files and reports its findings by rule, such as `react-hooks/purity (1)`.
+- **Said when it cannot run.** When your setup cannot start (a config your installed version cannot load, a plugin missing, the linter not installed), the engine says so in the linter's own words, such as `ESLint 8.57.1 could not run: TypeError: …`. It never runs another version in its place.
+- **Where you see it.** Under the code's rules when you ask about them, and in `--construction-check`, as information that never fails the check. Its `--json` holds every finding with its file and line.
+
 Beside the rules, each component's anatomy, read as deeply as Figma's:
 
 - **Each state** and how it is written, with its file and line.
