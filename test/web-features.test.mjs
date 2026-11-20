@@ -4,7 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { readTargets, parseQueries, scanFile, scanFiles, supportLines, targetsSay, cmp, FEATURES } from '../lib/web-features.mjs';
+import { readTargets, parseQueries, scanFile, scanFiles, supportLines, targetsSay, cmp, FEATURES, featuresFrom, DATA_KEYS } from '../lib/web-features.mjs';
+import { fetchWebFeatures, cachedWebFeatures, WF_VERSION } from '../lib/web-features-data.mjs';
+import { gzipSync } from 'node:zlib';
+import { tempDir } from './helpers.mjs';
 
 const reader = (files) => ({ read: (p) => { const k = Object.keys(files).find((f) => p.endsWith(join('/', f)) || p === f); return k ? files[k] : null; } });
 const B = { chrome: '100', firefox: '113', safari: '15' };
@@ -99,4 +102,53 @@ test('the lines: one per feature and file with how many more, each with the brow
   ]);
   for (const f of FEATURES) assert.doesNotMatch(f.hint, /;/);
   for (const l of lines) assert.doesNotMatch(l, /;/);
+});
+
+// The web platform's own data (web-features), in the shape its data.json has: each feature's support as a whole, and
+// each of its compat keys' own.
+const DATA = { features: {
+  has: { kind: 'feature', name: ':has()', compat_features: ['css.selectors.has'], status: { support: { chrome: '105', edge: '105', firefox: '121', safari: '15.4' } } },
+  'anchor-positioning': { kind: 'feature', name: 'Anchor positioning', compat_features: ['css.properties.anchor-name', 'css.properties.position-try'],
+    status: { support: { chrome: '157', edge: '157', safari: '27' }, by_compat_key: { 'css.properties.anchor-name': { support: { chrome: '125', edge: '125', firefox: '147', safari: '26' } } } } },
+  'text-box': { kind: 'feature', name: 'text-box', compat_features: ['css.properties.text-box-trim'], status: { support: { chrome: '133', edge: '133', safari: '18.2' } } },
+  'target-text': { kind: 'feature', name: '::target-text', compat_features: ['css.selectors.target-text'], status: { support: { chrome: '89', edge: '89', firefox: '131', safari: '18.2' } } },
+  'starting-style': { kind: 'feature', name: '@starting-style', compat_features: ['css.at-rules.starting-style'], status: { support: { chrome: '117', edge: '117', firefox: '129', safari: '17.5' } } },
+  search: { kind: 'feature', name: '<search>', compat_features: ['html.elements.search'], status: { support: { chrome: '118', edge: '118', firefox: '118', safari: '17' } } },
+  content: { kind: 'feature', name: 'content', compat_features: ['css.properties.content'], status: { support: { chrome: '200', edge: '200', firefox: '200', safari: '200' } } },
+  moved: { kind: 'moved', redirect_target: 'has' },
+} };
+const TARGETS = { chrome: '120', edge: '120', firefox: '120', safari: '17' };
+
+test('with the web platform\'s data: the table\'s versions are its, per key where an entry finds one thing', () => {
+  const list = featuresFrom(DATA);
+  assert.deepEqual(list.find((f) => f.id === 'anchor-positioning').need, { chrome: '125', edge: '125', firefox: '147', safari: '26' }, 'anchor-name\'s own key, not the whole feature\'s 157');
+  assert.equal(list.find((f) => f.id === 'has').from, 'data');
+  assert.equal(list.find((f) => f.id === 'dialog').from, undefined, 'a feature the data lacks keeps the table\'s versions');
+  assert.ok(Object.keys(DATA_KEYS).every((id) => FEATURES.some((f) => f.id === id)), 'every key names a table entry');
+  assert.equal(featuresFrom(null), FEATURES, 'with no data, the table');
+});
+
+test('with the data, a feature the table never listed is found: a property, a selector, an at-rule, an element', () => {
+  const list = featuresFrom(DATA);
+  const css = scanFile({ file: 'a.css', text: '.content:hover { color: red }\n.title { text-box-trim: trim-both }\n::target-text { color: red }\n@starting-style { .x { opacity: 0 } }' }, TARGETS, list);
+  assert.deepEqual(css.features.map((f) => f.id).sort(), ['starting-style:starting-style', 'target-text:target-text', 'text-box:text-box-trim']);
+  assert.deepEqual(css.features.find((f) => f.id === 'text-box:text-box-trim').missing.map((m) => m.browser), ['chrome', 'edge', 'firefox', 'safari'], 'Firefox runs it in no version');
+  assert.ok(!css.features.some((f) => /content/.test(f.id)), 'a class in a selector is not a property');
+  assert.deepEqual(scanFile({ file: 'a.vue', text: '<template><search><input></search></template>' }, { ...TARGETS, safari: '16' }, list).features.map((f) => f.id), ['search:search']);
+  // A guard holds for them as for the table's.
+  assert.deepEqual(scanFile({ file: 'b.css', text: '@supports (text-box-trim: trim-both) { .t { text-box-trim: trim-both } }' }, TARGETS, list).features, []);
+  // The table alone finds none of them.
+  assert.deepEqual(scanFile({ file: 'a.css', text: '.title { text-box-trim: trim-both }' }, TARGETS).features, []);
+});
+
+test('the data is the pinned file or nothing: a download that is not it is never read', async () => {
+  const home = tempDir('wf-home-');
+  assert.equal(cachedWebFeatures(home), null, 'nothing cached yet');
+  // A package whose data.json is not the pinned one.
+  const tar = (name, body) => { const h = Buffer.alloc(512); h.write(name); h.write((body.length).toString(8).padStart(11, '0'), 124); return Buffer.concat([h, Buffer.from(body), Buffer.alloc((512 - (body.length % 512)) % 512), Buffer.alloc(1024)]); };
+  const fake = gzipSync(tar('package/data.json', JSON.stringify(DATA)));
+  let asked = null;
+  assert.equal(await fetchWebFeatures({ home, get: async (url) => { asked = url; return fake; } }), null);
+  assert.ok(asked.endsWith(`/web-features-${WF_VERSION}.tgz`), `the pinned version, from the registry: ${asked}`);
+  assert.equal(cachedWebFeatures(home), null, 'and nothing kept');
 });

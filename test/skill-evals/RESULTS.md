@@ -2,6 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer (continuous evaluation)
+
+What changed since the entry below (engine 7f55035f): A guide's own redraw is not a component's popup, and a browser that never answers is closed (#584); React: why a component did not draw, a part drawn inside its parent, parity without a contract, the team's accessibility lint (#581); shadcn/ui systems read as their own kind of React, and a component that needs content drawn with its stories' props (#582); No browser a stopped run left keeps running, and the guide is pictured once its tries are done (#585); shadcn/ui: Radix's states drawn and compared, the prop that sets each read from the classes that style it (#586); README: each tool and standard badge links to its own website (#587); Accessibility: an id a label or reference points at, used twice (#589); Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented (#590); Playground: a slot's own content shows, its area marked by an eye button and in Inspect (#591); A Tailwind system's style guide page draws its components with its compiled Tailwind, its reset kept to the drawings (#588); A Firefox slow to start is given a second try, as Chrome is (#592); A style guide test stuck mid-way says the page's script errors and its address (#593); Playground: what the person chose in a component stays when it is drawn again (#594); The Identity and Status pages at laptop widths, and browser support read from the web platform's own data; Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer. The guide changed in `cookbook/build-from-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `1cf0591bb1d7` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d07c296a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 6b45849f` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine a08807eb | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 74/79 | 79/79 |
+| Mean cost a run | 0.067 | 0.057 |
+| Input a run | 123k | 100k |
+| Turns a run | 4.2 | 3.6 |
+| Rule violations | 1 | 0 |
+| Runs stopped at a limit | 3 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 123k, in 3.6 turns against 4.2. no task changed state; 5 runs moved inside tasks that pass sometimes, which is noise, not a difference. Input moved but input a turn held (29k to 28k): the turns moved, 4.2 to 3.6, and nothing a run reads grew - most in `disabled-hover` 7.0 to 2.0, `fix-chip-height` 8.7 to 5.0, `audit-all` 4.7 to 2.0. Records: `records/2026-11-20-identity-a-token-is-a`.
+
 ## 2026-11: Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented (continuous evaluation)
 
 What changed since the entry below (engine 22f5c45): Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented. The guide changed in `reference/config.md`.

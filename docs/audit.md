@@ -306,7 +306,10 @@ Advice on the web features your code uses, against the browsers your team suppor
 - Each CSS, HTML or JavaScript feature a supported browser does not run is listed with its line, the first version that runs it, and how to keep it working.
 - A feature you already guard is left out: inside `@supports`, after a fallback value in the same rule, or behind a check in a script.
 - Old patterns the platform now replaces (`-webkit-box`, `-ms-` prefixes, `keyCode`, `document.write()`) are named with their replacement.
-- The system's own code and each product's code are listed apart. The browser versions come from a table kept in the engine, from the web platform's own compatibility data, so nothing is fetched when it runs.
+- The system's own code and each product's code are listed apart.
+- Which browser version runs what comes from [web-features](https://github.com/web-platform-dx/web-features), the data the browser vendors keep behind Baseline. The engine keeps one pinned copy in its own cache, downloaded once and checked against its pinned hash, never put in your project.
+- With the data, a feature no list of the engine's names is checked too: each CSS property, selector and at-rule, and each HTML element, the data knows. A version that changed is right the day the data says so.
+- With no copy (offline before the first download) or with the data turned off (`"webFeatures": { "data": false }`), the engine's own table checks the features it lists. The line says which one it used.
 
 #### A token in the right layer
 

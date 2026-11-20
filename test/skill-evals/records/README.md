@@ -298,5 +298,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-20-the-accessibility-page-is-docs` | The 24 guide tasks on Haiku (engine 22f5c45) | "The accessibility page renamed, so GitHub shows no Accessibility tab" |
 | `2026-11-20-storybook-follow-ups-disagreements-as` | The 24 guide tasks on Haiku (engine 7f55035f) | "Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented" |
 | `2026-11-20-the-guide-names-the-shadcn` | The 24 guide tasks on Haiku (engine ec880234) | "shadcn/ui scaffold in the guide" |
+| `2026-11-20-identity-a-token-is-a` | The 24 guide tasks on Haiku (engine a08807eb) | "Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
