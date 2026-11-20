@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Guidepup, which drives VoiceOver and NVDA, for the real screen reader runs (.github/workflows/screen-readers.yml): found as a machine-wide one is (NODE_PATH), never put in a project.",
+  "dependencies": {
+    "@guidepup/guidepup": "0.40.0"
+  }
+}
