@@ -129,7 +129,15 @@ test('in a real browser: each control focused in turn, the browser\'s line held 
 
 test('a reader that will not start says why, with the cause Guidepup gives under its own words', async () => {
   const { startFailure } = await import('../lib/screen-reader.mjs');
-  assert.equal(startFailure(new Error('VoiceOver cannot be started', { cause: new Error('Timed out waiting for VoiceOver\nat x') })), 'VoiceOver cannot be started: Timed out waiting for VoiceOver');
+  assert.equal(startFailure(new Error('VoiceOver cannot be started', { cause: new Error('Failed to mount\nat x', { cause: new Error('hdiutil: attach failed') }) })), 'VoiceOver cannot be started: Failed to mount: hdiutil: attach failed');
   assert.equal(startFailure(new Error('NVDA is not installed\n\nPlease ensure you have run:')), 'NVDA is not installed', 'the first line only');
   assert.equal(startFailure(new Error('same', { cause: new Error('same') })), 'same', 'never said twice');
+});
+
+test('the CI check fails a run whose reader said nothing on every control, and passes one that spoke', async () => {
+  const { heardProblems } = await import('./heard-check.mjs');
+  const run = (said) => ({ reader: { name: 'NVDA', which: 'nvda' }, failed: [], components: { button: { lines: [{ desc: 'button', want: 'button, Save', said, ok: !!said }] } } });
+  assert.match(heardProblems(run(''), 'nvda').join(' '), /said nothing on any control/);
+  assert.deepEqual(heardProblems(run('Save button'), 'nvda'), []);
+  assert.match(heardProblems({ reader: null, why: 'NVDA is not installed' }).join(' '), /no screen reader ran: NVDA is not installed/);
 });

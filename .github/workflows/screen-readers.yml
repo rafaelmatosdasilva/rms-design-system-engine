@@ -78,6 +78,9 @@ jobs:
           done
       - name: Hear every component with ${{ matrix.label }}
         shell: bash
+        # Guidepup's own log of each step it takes, so a reader that will not start says where it stopped.
+        env:
+          DEBUG: guidepup*
         run: |
           for ds in demo-ds harbor-ds; do
             (cd "$RUNNER_TEMP/$ds" && node "$GITHUB_WORKSPACE/audit.mjs" --hear --reader ${{ matrix.reader }})

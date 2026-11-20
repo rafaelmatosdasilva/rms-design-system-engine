@@ -1,6 +1,6 @@
 // heard-check.mjs - whether a real screen reader run heard every component, for the screen reader workflow
 // (.github/workflows/screen-readers.yml). Given the projects it ran in, it reads each one's heard-by-reader.json
-// (screen-reader.mjs) and fails when no reader ran, a component could not be heard, or nothing at all was heard. What a
+// (screen-reader.mjs) and fails when no reader ran, a component could not be heard, nothing at all was heard, or the reader said nothing on every control. What a
 // reader said apart from the browser does not fail it: that is the measurement, advisory, and the record keeps it.
 //
 //   node test/heard-check.mjs <reader> <project> [<project>...]
@@ -16,6 +16,8 @@ export function heardProblems(run, which) {
   const comps = Object.keys(run.components ?? {});
   if (!comps.length) out.push('no component was heard');
   else if (!comps.some((n) => run.components[n].lines?.length)) out.push('every component was opened, and no control on any of them was heard');
+  // A reader that said nothing on every control did not hear them: it ran beside the page, not on it.
+  else if (comps.flatMap((n) => run.components[n].lines ?? []).every((l) => !String(l.said ?? '').trim())) out.push('the reader said nothing on any control, so it was not reading the page');
   return out;
 }
 
