@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { componentOf, storiesByComponent, storyUrl, pagesFor, storyLines, spread, targetsFor, variantOf, figmaPropertiesOf, storyStateLines, staticBuild, serveStatic, STORY_READY } from '../lib/storybook-stories.mjs';
+import { componentOf, storiesByComponent, storyUrl, pagesFor, storyLines, spread, targetsFor, variantOf, figmaPropertiesOf, storyStateLines, staticBuild, serveStatic, STORY_READY, isDefaultVariant, sameComponent } from '../lib/storybook-stories.mjs';
 import { tempDir } from './helpers.mjs';
 
 // What Storybook 7 and later publishes as index.json. Each entry is one story: one component in one state.
@@ -184,4 +184,37 @@ test('a static build is a folder with its page and its index, served without any
     for (const out of ['/../secret.txt', '/%2e%2e/secret.txt']) assert.notEqual((await fetch(s.url + out)).status, 200, out);
     assert.equal((await fetch(s.url + '/missing.js')).status, 404);
   } finally { await s.close(); }
+});
+
+// Parity holds a component's base values to Figma's default variant, so they are measured on a story that shows it.
+test("a story shows Figma's default variant when every property it names is at Figma's default", () => {
+  const props = { Size: { type: 'VARIANT', defaultValue: 'Medium' }, 'Icon#3:1': { type: 'BOOLEAN', defaultValue: false } };
+  assert.equal(isDefaultVariant({}, props), true, 'a story that names nothing shows the default');
+  assert.equal(isDefaultVariant({ Size: 'Medium', Icon: false }, props), true);
+  assert.equal(isDefaultVariant({ Size: 'medium' }, props), true, 'spelled either way');
+  assert.equal(isDefaultVariant({ Size: 'Small' }, props), false);
+  assert.equal(isDefaultVariant({ Icon: true }, props), false);
+  assert.equal(isDefaultVariant({ Tone: 'Danger' }, props), false, 'a property Figma has no default for is not the default');
+});
+
+test('a component and the component a story is about, however each spells its name', () => {
+  assert.equal(sameComponent('iconButton', 'IconButton'), true);
+  assert.equal(sameComponent('field-size', 'FieldSize'), true);
+  assert.equal(sameComponent('button', 'IconButton'), false);
+  assert.equal(sameComponent('', 'Button'), false);
+});
+
+// Found on the Storybook fixture's own run: the codebase lint read storybook-static/assets/*.js as the team's code and
+// failed Storybook's own outline colours. A Storybook build is Storybook's bundle, passed over as dist is.
+test("a Storybook build is never read as the team's code, wherever ds-config.json says it is", async () => {
+  const { sourceFiles, storybookBuildDirs } = await import('../lib/code-roots.mjs');
+  assert.deepEqual(storybookBuildDirs(), ['storybook-static']);
+  assert.deepEqual(storybookBuildDirs({ storybook: { static: 'docs/sb' } }), ['storybook-static', 'sb']);
+  const root = tempDir('storybook-not-code-');
+  for (const d of ['src', 'storybook-static/assets', 'sb']) mkdirSync(join(root, d), { recursive: true });
+  writeFileSync(join(root, 'src', 'button.css'), '.b { color: red; }');
+  writeFileSync(join(root, 'storybook-static', 'assets', 'iframe.js'), 'a{outline:1px solid #2980b9}');
+  writeFileSync(join(root, 'sb', 'iframe.js'), 'a{outline:1px solid #2980b9}');
+  assert.deepEqual(sourceFiles(root).map((f) => f.file).sort(), ['sb/iframe.js', 'src/button.css']);
+  assert.deepEqual(sourceFiles(root, { storybook: { static: 'sb' } }).map((f) => f.file), ['src/button.css']);
 });

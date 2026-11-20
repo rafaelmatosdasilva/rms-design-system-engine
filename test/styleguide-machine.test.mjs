@@ -176,7 +176,7 @@ test('the build writes the twin for the page it built, and never for the code ca
   // As the other pages of the guide are tested (construction-page.test.mjs): the generator needs a whole project, so
   // what is checked here is that it calls this, and where.
   const gen = read(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
-  assert.match(gen, /import \{ writeStyleguide, writeMachine \} from '\.\/styleguide-files\.mjs';/);
+  assert.match(gen, /import \{ writeStyleguide, writeMachine(, STORYBOOK_DIR)? \} from '\.\/styleguide-files\.mjs';/);
   assert.match(gen, /const machine = opts\.out \? \{ files: \[\] \} : writeMachine\(outPath, html\);/);
   // It is written after the page, from the same text the page was written from.
   assert.ok(gen.indexOf('writeStyleguide(outPath, html') < gen.indexOf('writeMachine(outPath, html)'));

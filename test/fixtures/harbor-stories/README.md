@@ -3,3 +3,7 @@ Harbor's stories: what a team with Storybook keeps beside its components, laid o
 
 Three of Button's stories are variants Figma has. Two are not, on purpose: Loading, a state Figma never draws, and
 Huge, a size Figma does not list. The run names both.
+
+Button's story file also says what the team wrote by hand (its description, each prop's description, options and
+default) and Badge's is tagged beta, read into the contracts by `test/storybook-docs-real.test.mjs`. Three of those lines
+disagree with the code on purpose: `tone`, a prop the button no longer has, `size`'s option Huge, and `label`'s default.

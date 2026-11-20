@@ -35,6 +35,17 @@ Each prop says what it is for the same way. A Figma property paired with a code 
 
 A prop only the code has (`codeOnly`) carries the code's description too.
 
+### What your Storybook already says
+
+A team with Storybook has already written much of a spec there. With a Storybook built to files (`storybook build`), the engine reads each story file as you wrote it, never Storybook's generated props table, which only repeats the code.
+
+- **Prop descriptions.** A prop the code leaves undescribed takes its description from the story's `argTypes`, marked as Storybook's. The code's props, types and defaults still come first.
+- **The component's description.** `parameters.docs.description.component`, when the code has no comment of its own.
+- **Its status.** A `deprecated` tag marks it deprecated, and `beta`, `alpha` or `experimental` marks it experimental, when nothing else sets one.
+- **Its stories.** Each one is kept in the contract with the args it is drawn with, as a worked example.
+- **Where they disagree.** A prop Storybook describes that the code no longer has, an option one side lists and the other does not, or a default that differs. Each is said with both sides: *`label`, a different default (Storybook says `Go`, the code has `Continue`)*.
+- **Read once a build.** The reading is kept in the engine's output folder until the Storybook is built again. `storybook.docs: false` in `ds-config.json` turns it off.
+
 ### Props that say nothing, and drafts to approve
 
 A prop none of those sources describes is listed, with where its description goes.
@@ -326,6 +337,7 @@ Rules tell an agent what to do; an example shows it. A page with none gets one, 
 - **Only what the contract has.** Each prop, event and slot in it is one the contract names. A class, a directive or a prop the component does not take is left out.
 - **None of a product's own data.** A value the prop takes stays. A product's words become `…`, and an expression is named after its prop.
 - **Where it came from.** The line above it says how many of the uses take this form, and the file, line and product it was taken from.
+- **Your own story, when no product uses it.** A component with a Storybook story and no use in a product takes its first story as the example, with the story's args, said as the team's own story.
 - **A draft.** It goes under Examples, in the page's own format: a code block in a Markdown page, a block of text titled Examples in a DSDS page. Dropped, it goes whole, code and all. A component no product uses keeps the example written from its own code.
 
 ### Deciding a page's changes

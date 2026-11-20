@@ -403,7 +403,7 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return areaShown(a[0]) && (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return areaShown(a[0]) && (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c) || !!storybookHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         // Documentation counts what its table shows, the Documentation page's rows for it in their words, as Rules does
@@ -441,7 +441,7 @@
       // API: its props (each one the code says must be given marked), the events it sends and its slots, as the code has them.
       // with its Details (its slots and what each takes), how it is built rather than how it is used.
       // Code: how a product brings it in (its import, its file), then its API and its Details.
-      (apiHTML(c) || docRows || importHTML(c) ? '<div class="pg-area" data-area="api"><div class="pg-footer">' + codeImportHTML(c) + apiHTML(c) +
+      (apiHTML(c) || docRows || importHTML(c) || storybookHTML(c) ? '<div class="pg-area" data-area="api"><div class="pg-footer">' + codeImportHTML(c) + apiHTML(c) + storybookHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Details</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') + '</div></div>' : '') +
       // Motion: how it moves, as a spec, the code's beside Figma's.
       '<div class="pg-area" data-area="motion"><div class="pg-footer">' + motionHTML(c) + '</div></div>' +
@@ -462,12 +462,119 @@
     if (compDocs.length) DOC_PAGE.wire(sec.querySelector('.pg-area[data-area="docs"] .pg-doc'), compDocs);
     fillHistoryArea(sec, c);
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
+    // The team's own story, when the project has a Storybook (DATA.storybook, published beside the page): the Playground
+    // draws the component live, as the story does, with its own script running (a disclosure opens, a menu drops down).
+    // A copy of its markup runs nothing, so a component that needs its script never answered a click. One frame, loaded
+    // once: each control sets the story's args through Storybook's own channel, so nothing reloads and nothing flickers.
+    // The copy stays underneath, unseen, for what reads markup (its tokens, its code, the variants, the checks).
+    var STORY = !ALL && DATA.storybook && (c.stories || []).length ? { base: DATA.storybook.base, id: c.stories[0].id } : null;
+    var storyBox = null, storyIfr = null, storySent = null, storyH = 0, storyGrew = 0, storyReady = false;
+    if (STORY) {
+      storyBox = document.createElement('div'); storyBox.className = 'pg-story';
+      // Loaded once its Playground is in view, not with the page: a system of a hundred components is a hundred stories.
+      storyBox.innerHTML = '<iframe class="pg-story-frame" loading="lazy" title="' + esc(c.name + ', as its story draws it') + '" src="' + esc(STORY.base + 'iframe.html?id=' + encodeURIComponent(STORY.id) + '&viewMode=story') + '"></iframe>';
+      preview.parentNode.insertBefore(storyBox, preview.nextSibling);
+      preview.classList.add('pg-preview--model');
+      storyIfr = storyBox.firstElementChild;
+      storyIfr.addEventListener('load', function () { storyWhenDrawn(0); });
+      // Sized again when its stage is shown or resized: a frame on a page not shown has nothing laid out to measure.
+      if (window.ResizeObserver) new ResizeObserver(function () { storySize(); }).observe(storyBox);
+    }
+    // Storybook's preview, once it has drawn the story, else null (its page not there yet, or another origin).
+    function storyPreview() { try { var w = storyIfr && storyIfr.contentWindow, P = w && w.__STORYBOOK_PREVIEW__; return P && P.currentRender && P.currentRender.story && P.channel ? P : null; } catch (e) { return null; } }
+    // What the story drew of the component itself, inside whatever its decorators wrap it in (a theme provider, a
+    // padded box): the element most like the Playground's own copy of it, by its tag, its attributes, its classes and a
+    // class that names it (a CSS module's hashed name still carries it), the outermost of equals. With nothing alike,
+    // the first element that is more than a wrapper round one other.
+    function storyRoot() {
+      var r; try { var d = storyIfr.contentDocument; r = d && (d.querySelector('#storybook-root') || d.querySelector('#root')); } catch (e) { return null; }
+      if (!r || !r.firstElementChild) return null;
+      var model = preview.firstElementChild, best = null, bestScore = 0, word = squashKey(c.name);
+      if (model) Array.prototype.forEach.call(r.querySelectorAll('*'), function (el) {
+        if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') return;
+        var sc = el.tagName === model.tagName ? 3 : 0;
+        Array.prototype.forEach.call(model.attributes, function (a) { if (!/^(class|style|id)$/.test(a.name) && el.getAttribute(a.name) === a.value) sc += 2; });
+        Array.prototype.forEach.call(model.classList, function (k) { if (el.classList.contains(k)) sc += 2; });
+        if (word && Array.prototype.some.call(el.classList, function (k) { return squashKey(k).indexOf(word) >= 0; })) sc += 2;
+        if (sc > bestScore) { best = el; bestScore = sc; }
+      });
+      if (best && bestScore > 3) return best;
+      var el = r.firstElementChild;
+      while (el.children.length === 1 && !Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) el = el.firstElementChild;
+      return el;
+    }
+    function storyWhenDrawn(n) {
+      var P = storyPreview();
+      if (!P) { if (n < 600) setTimeout(function () { storyWhenDrawn(n + 1); }, 50); return; }
+      var d = storyIfr.contentDocument;
+      // As tall as what it draws, laid out as Storybook lays the story out (padded, centred or full width), but never a
+      // screen high: a centred story fills its window, which a frame sized to its page would follow up for ever.
+      if (!d.getElementById('sg-story-fit')) {
+        var st = d.createElement('style'); st.id = 'sg-story-fit';
+        st.textContent = 'html,body{height:auto!important;min-height:0!important;overflow:hidden!important;background:transparent!important}.sb-main-centered,.sb-main-centered #storybook-root,#storybook-root,#root{min-height:0!important;height:auto!important}';
+        d.head.appendChild(st);
+      }
+      // Seen only once its story is drawn and sized: Storybook's own loading screen never shows in the stage, and the
+      // stage takes its height once, never the loading screen's and then the story's.
+      storyReady = true;
+      P.channel.on('storyRendered', function () { storySize(); if (inspecting) requestAnimationFrame(drawAnatomy); });
+      try { new storyIfr.contentWindow.ResizeObserver(function () { storySize(); }).observe(d.body); } catch (e) { /* sized on each render */ }
+      storySent = null; storySync(); storySize();
+      var shown = function (n) { storySize(); if (n) { requestAnimationFrame(function () { shown(n - 1); }); return; } storyIfr.classList.add('is-drawn'); };
+      setTimeout(function () { shown(2); }, 60);
+    }
+    // Sized to its page, never by a pixel back and forth, and never growing for ever: a component as tall as its window
+    // (100vh) grows its page with its frame, so it stops at six steps up in a row.
+    function storySize() {
+      var d; try { d = storyIfr.contentDocument; } catch (e) { return; }
+      if (!storyReady || !d || !d.body) return;   // the loading screen is never measured
+      // Its body's own height: the page's scroll height is never less than the frame, so it could grow but never shrink.
+      var h = Math.ceil(d.body.getBoundingClientRect().height);
+      // A frame on a page not shown (another component's, or an area not open) has nothing laid out: sized once it shows.
+      if (!h || !storyIfr.offsetParent || Math.abs(h - storyH) <= 1) return;
+      storyGrew = h > storyH ? storyGrew + 1 : 0;
+      if (storyGrew > 6) return;
+      storyH = h; storyIfr.style.height = h + 'px';
+    }
+    // The story's args for the props as the Playground sets them: each prop under the arg of its name (isDisabled is
+    // Disabled), an option spelled as the story's own options spell it (danger for Danger), a variant option that is an
+    // arg of its own set on or off (State=Disabled is disabled), and the Playground's modes on its page.
+    function storyArgs(story) {
+      var types = story.argTypes || {}, given = story.initialArgs || {}, names = Object.keys(types).concat(Object.keys(given).filter(function (n) { return !(n in types); }));
+      var named = function (label) { return names.filter(function (n) { return squashKey(n) === squashKey(label) || squashKey(n.replace(/^is(?=[A-Z])/, '')) === squashKey(label); })[0]; };
+      var isFlag = function (n) { var t = types[n] || {}; return typeof given[n] === 'boolean' || (t.type && (t.type.name || t.type) === 'boolean') || (t.control && (t.control.type || t.control) === 'boolean'); };
+      var out = {};
+      props.forEach(function (p) {
+        var v = state[p.label], arg = named(p.label);
+        if (!arg) {
+          if (p.type === 'VARIANT') (p.options || []).forEach(function (o) { var a = named(o.label); if (a && isFlag(a)) out[a] = o.label === v; });
+          return;
+        }
+        if (p.type === 'BOOLEAN' || isFlag(arg)) out[arg] = p.type === 'BOOLEAN' ? !!v : /^(true|yes|on)$/i.test(String(v));
+        else if (p.type === 'VARIANT') { var t = types[arg] || {}, opts = t.options || (t.control && t.control.options) || []; var hit = opts.filter(function (o) { return squashKey(o) === squashKey(v); })[0]; out[arg] = hit !== undefined ? hit : v; }
+        else if (p.type === 'TEXT') out[arg] = v == null ? '' : String(v);
+      });
+      return out;
+    }
+    function storySync() {
+      var P = storyPreview(); if (!P) return;
+      var w = storyIfr.contentWindow, de = w.document.documentElement;
+      AXES.forEach(function (a) {
+        if (a.classes) a.values.forEach(function (v) { if (v.value) de.classList.toggle(v.value, preview.classList.contains(v.value)); });
+        else if (preview.hasAttribute(a.attr)) de.setAttribute(a.attr, preview.getAttribute(a.attr)); else de.removeAttribute(a.attr);
+      });
+      var args = storyArgs(P.currentRender.story), key = JSON.stringify(args);
+      if (key === storySent) { storySize(); return; }
+      storySent = key;
+      P.channel.emit('updateStoryArgs', { storyId: P.currentRender.id, updatedArgs: args });
+    }
     // A component taller than the stage: the room above and below it shrinks first (to the stage's least), then the stage
     // grows to it, so it always shows whole and centred, never cut at the bottom with the room left at the top.
     (function () {
       var box = preview && preview.closest('.pg-preview-card'), col = preview && preview.closest('.pg-preview-col'); if (!box || !col) return;
       var watched = null, ro = window.ResizeObserver ? new ResizeObserver(function () { fit(); }) : null;
       var fit = function () {
+        if (STORY) return;   // its story's frame is sized to what it draws
         var kids = Array.prototype.filter.call(preview.children, function (k) { return k.offsetHeight; }); if (!kids.length) return;
         box.style.removeProperty('--pg-stage-room'); box.classList.remove('pg-preview-card--fit');
         var top = Infinity, bottom = -Infinity; kids.forEach(function (k) { var r = k.getBoundingClientRect(); top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom); });
@@ -498,6 +605,8 @@
       if (!frame || probing) return;
       // Inspecting: the anatomy stands in for both, drawn at the Width chosen.
       if (inspecting) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = true; requestAnimationFrame(drawAnatomy); return; }
+      // A story at the Width chosen: its own frame that wide, its media queries applying, never written again.
+      if (STORY) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; var sw = WIDTH !== 'fit' && WIDTHS.find(function (x) { return x[0] === WIDTH; }); storyIfr.style.width = sw ? sw[2] + 'px' : '100%'; storySize(); return; }
       if (WIDTH === 'fit' || ALL) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; return; }
       var w = WIDTHS.find(function (x) { return x[0] === WIDTH; });
       preview.hidden = true; frame.hidden = false;
@@ -676,6 +785,23 @@
     function drawAnatomy() {
       if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
       anatBox.innerHTML = '';
+      var live = STORY ? storyRoot() : null, stage, wrap = null, marks, root, k = 1, box;
+      if (STORY && !live) return;   // drawn once its story has drawn (storyRendered)
+      if (live) {
+        // A story is inspected where it is drawn: its marks laid over its own frame, measured on the elements its own
+        // script made with its own styles. A copy of it in this page would lose the styles its page alone has.
+        anatBox.classList.add('pg-anatomy--live');
+        var ir = storyIfr.getBoundingClientRect(), cr = anatBox.parentNode.getBoundingClientRect();
+        anatBox.style.left = ir.left - cr.left + 'px'; anatBox.style.top = ir.top - cr.top + 'px';
+        anatBox.style.width = ir.width + 'px'; anatBox.style.height = ir.height + 'px';
+        stage = document.createElement('div'); stage.className = 'pg-anat-stage';
+        stage.style.width = ir.width + 'px'; stage.style.height = ir.height + 'px';
+        marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
+        stage.appendChild(marks); anatBox.appendChild(stage);
+        root = live; if (c.only) { try { root = live.querySelector(c.only) || live; } catch (err) { /* not a selector: the whole */ } }
+        // The frame's own coordinates are the marks': it is laid exactly over them, and its page never scrolls.
+        box = function (el) { var r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+      } else {
       // In the modes the Playground is set to (colour, sizing): the copy is drawn with the same tokens.
       AXES.forEach(function (a) {
         if (a.classes) a.values.forEach(function (v) { if (v.value) anatBox.classList.toggle(v.value, preview.classList.contains(v.value)); });
@@ -685,7 +811,6 @@
       var src = preview.firstElementChild;
       if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector(clsSel(clsName(c))); if (own) src = own; }
       var copy = src.cloneNode(true);
-      // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
       // At the Width chosen (Phone, Tablet, Desktop): laid out as that width's frame lays it out, whole; at Fit, at the
       // width the Playground last drew it (it is hidden while inspecting), so the copy lays out the same.
       var wv = WIDTH !== 'fit' && WIDTHS.find(function (x) { return x[0] === WIDTH; });
@@ -693,19 +818,19 @@
       if (!wv && pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
       uniqueIds(copy);
-      var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
-      var wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
-      var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
+      stage = document.createElement('div'); stage.className = 'pg-anat-stage';
+      wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
+      marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
-      var root = copy; if (c.only) { try { root = copy.querySelector(c.only) || copy; } catch (err) { /* not a selector: the whole */ } }
+      root = copy; if (c.only) { try { root = copy.querySelector(c.only) || copy; } catch (err) { /* not a selector: the whole */ } }
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
-      var whole = (wv ? wrap : copy).getBoundingClientRect(), rr = root.getBoundingClientRect();
+      var whole = (wv ? wrap : copy).getBoundingClientRect();
       // At the size the Playground draws it, always: one wider than the area scrolls sideways, as the Playground does.
-      var k = 1;
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
       // Measured from where the copy sits now (the stage moves once it is sized), before it is scaled.
-      function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
+      box = function (el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; };
+      }
       var m = marker(marks, k), b0 = box(root);
       m.mark('pg-anat-root', [b0.x, b0.y, b0.w, b0.h], { key: 'part 0 ' + c.name, name: c.name, el: root });   // under the rest: a click on the component itself
       var r = annotate(root, box, m.mark, m.num);
@@ -727,7 +852,7 @@
         });
       }
       anatPicked = anatPath[anatPath.length - 1] || null;
-      wrap.style.transform = 'scale(' + k + ')';
+      if (wrap) wrap.style.transform = 'scale(' + k + ')';
       // What is picked: the tokens it is drawn with; nothing picked, how to pick.
       var hit = anatPicked && hitOf(anatPicked), info = hit && hit._info;
       if (hit) hit.classList.add('is-picked'); else anatPicked = null;
@@ -1251,6 +1376,7 @@
       drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
       if (AREA === 'variants' && !drawingVariants) requestAnimationFrame(drawVariants);
       dependents();
+      if (STORY && !drawingVariants && !probing && !checking) storySync();   // never in the middle of a check that draws every variant in turn
     }
     // A control whose prop the code uses only while another is on (labelContent with showLabel on, alignment with
     // fullWidth on) is disabled while that one is not: nothing it sets would show. Its tooltip says what it waits for.
@@ -1473,7 +1599,7 @@
         // One of the two at a time, whatever the Width: the anatomy in the stage, or the Playground (live, or in its
         // Width's frame).
         anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
-        if (!inspecting) { anatPicked = null; anatPath = []; anatBox.innerHTML = ''; }
+        if (!inspecting) { anatPicked = null; anatPath = []; anatBox.innerHTML = ''; anatBox.classList.remove('pg-anatomy--live'); ['left', 'top', 'width', 'height'].forEach(function (k) { anatBox.style.removeProperty(k); }); }
         bottomBar();
         renderFrame();
         if (!inspecting) nudge();
