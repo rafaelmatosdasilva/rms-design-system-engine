@@ -4,10 +4,11 @@
 //   npm ci --prefix test/.react-tools
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, symlinkSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startReactHarness, reactBuild, harnessModule, styleSpecifier, componentsInCode } from '../lib/react-harness.mjs';
+import { startReactHarness, reactBuild, harnessModule, styleSpecifier, partOf } from '../lib/react-harness.mjs';
+import { codeComponents, rendersNothingOfItsOwn } from '../lib/component-source.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -116,13 +117,60 @@ test('the build is given what a real React system needs: its dependencies conver
 // contract, no selectors. Run against one, every browser check said "no render targets" about a system with hundreds
 // of components. Its own code names them, and that is the layout React systems use.
 test('a system that names its components nowhere else still names them in its code', () => {
-  const files = [
-    'src/Button/Button.tsx', 'src/Button/Button.stories.tsx', 'src/Button/Button.test.tsx',
-    'src/Button/Button.figma.tsx', 'src/Button/ButtonBase.tsx', 'src/Banner/Banner.tsx',
-    'src/Avatar/Avatar.jsx', 'src/utils/helpers.tsx', 'src/Banner/Banner.module.css',
-  ];
-  assert.deepEqual(componentsInCode(files), ['Avatar', 'Banner', 'Button'],
-    'a file named for its folder is that folder\'s component; a story, a test, a Figma mapping and a helper are not');
-  assert.equal(componentsInCode(files.concat(['src/Chip/Chip.tsx']), { most: 2 }).length, 2, 'and a cap is a cap');
-  assert.deepEqual(componentsInCode([]), []);
+  const dir = tempDir('react-list-');
+  const put = (f, t) => { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), t); };
+  put('src/components/Button/Button.tsx', 'export function Button() { return <button className="ac-button" />; }');
+  put('src/components/Button/Button.stories.tsx', 'export default { title: "Button" };');
+  put('src/components/Banner/Banner.tsx', 'export const Banner = () => <div role="status" />;');
+  put('src/components/Avatar/Avatar.jsx', 'export function Avatar() { return <img alt="" />; }');
+  // Things that render nothing of their own: a context, a provider, a flag holder. Not components.
+  put('src/components/Theme/ThemeProvider.tsx', 'const C = createContext(null);\nexport function ThemeProvider({ children }) { return <C.Provider value={1}>{children}</C.Provider>; }');
+  put('src/components/Flags/FeatureFlags.tsx', 'export function FeatureFlags({ children }) { const f = useFlags(); return <>{children}</>; }');
+  const names = codeComponents(dir, {}).map((k) => k.name);
+  assert.deepEqual(names.sort(), ['Avatar', 'Banner', 'Button'],
+    'its own components, never a story, a provider or a flag holder; one list for the pages and the browser checks alike, with no cap');
+});
+
+test('a file that draws nothing of its own is not a component, and one that draws anything is', () => {
+  assert.equal(rendersNothingOfItsOwn('export const Ctx = createContext(null);'), true);
+  assert.equal(rendersNothingOfItsOwn('export function P({ children }) { return <Ctx.Provider value={v}>{children}</Ctx.Provider>; }'), true);
+  assert.equal(rendersNothingOfItsOwn('export function M({ children }) { return useMedia("(min-width: 1px)") ? children : null; }'), true);
+  assert.equal(rendersNothingOfItsOwn('export function B() { return <button />; }'), false);
+  assert.equal(rendersNothingOfItsOwn('export function Card() { return <Box><Heading /></Box>; }'), false, 'one made of other components is one');
+  assert.equal(rendersNothingOfItsOwn('export const Link = styled.a`color: red`;'), false);
+});
+
+test('a part is drawn inside the component it belongs to, by the way compound parts are named', () => {
+  assert.equal(partOf('ActionListItem', ['ActionList', 'Action', 'Item']), 'ActionList', 'the longest name it begins with');
+  assert.equal(partOf('AutocompleteOption', ['Autocomplete']), 'Autocomplete');
+  assert.equal(partOf('Buttonish', ['Button']), null, 'only at a word\'s start');
+  assert.equal(partOf('Button', ['Button']), null);
+});
+
+// Found on a public system: a component that throws as React draws it, after render() has returned, left an empty
+// box and no reason, and a part written for its parent's context threw outside it.
+test('what React threw while drawing is said, a part is drawn inside its parent, and one that drew nothing says so', { skip: READY, timeout: budget(300000) }, async () => {
+  const dir = beacon('react-why-');
+  const put = (n, t) => writeFileSync(join(dir, 'src', 'components', `${n}.jsx`), t);
+  put('ChoiceList', `import { createContext } from 'react';\nexport const ChoiceCtx = createContext(null);\nexport function ChoiceList({ children }) { return <ul className="bc-choices"><ChoiceCtx.Provider value="x">{children}</ChoiceCtx.Provider></ul>; }`);
+  put('ChoiceListItem', `import { useContext } from 'react';\nimport { ChoiceCtx } from './ChoiceList.jsx';\nexport function ChoiceListItem() { if (!useContext(ChoiceCtx)) throw new Error('ChoiceListItem must be inside a ChoiceList'); return <li className="bc-choice">One</li>; }`);
+  put('Broken', `export function Broken() { throw new Error('needs a value it was not given'); }`);
+  put('Closed', `export function Closed({ open = false }) { return open ? <div role="dialog" /> : null; }`);
+  const names = ['ChoiceList', 'ChoiceListItem', 'Broken', 'Closed'];
+  const h = await startReactHarness(dir, { name: 'Beacon', paths: { themeCSS: 'src/styles/tokens.css' } }, names, { locate: locate(dir) });
+  assert.ok(h.url, h.why);
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-react-' });
+  try {
+    const { send } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, h.url);
+    await waitForTrue(send, sessionId, 'window.__dseHarnessReady === true', { attempts: 1200, intervalMs: 50, tolerateErrors: true });
+    const inPage = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result?.value;
+    const failed = JSON.parse(await inPage('JSON.stringify(window.__dseHarnessFailed)'));
+    const of = (n) => failed.filter((f) => f.component === n);
+    assert.equal(of('ChoiceListItem').length, 0, 'the part drew, inside its parent: ' + JSON.stringify(failed));
+    assert.equal(await inPage(`document.querySelector('[data-dse-component="ChoiceListItem"] [data-dse-case]').getAttribute('data-dse-inside') + ':' + Boolean(document.querySelector('[data-dse-component="ChoiceListItem"] .bc-choices .bc-choice'))`), 'ChoiceList:true');
+    assert.match(of('Broken')[0]?.why ?? '', /needs a value it was not given/, 'what it threw while React drew it is said');
+    assert.match(of('Closed')[0]?.why ?? '', /drew nothing/, 'and one that drew nothing says so, not a blank box');
+    assert.equal(of('Closed')[0]?.nothing, true);
+  } finally { browser.kill(); await h.close?.(); }
 });

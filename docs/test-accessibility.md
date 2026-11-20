@@ -5,6 +5,7 @@ How the engine tests the accessibility of every component, and of your products'
 **On this page**
 
 - [Test accessibility](#test-accessibility)
+  - [Your team's own accessibility lint](#your-teams-own-accessibility-lint)
   - [The Accessibility page](#the-accessibility-page)
   - [Pages and flows](#pages-and-flows)
   - [Beyond A and AA](#beyond-a-and-aa)
@@ -38,11 +39,16 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
   components the index lists first. The run says how many components it reached.
 - **Components it can find even when nothing lists them.** The engine learns your components from your Figma
   capture, your structure contract or your config. A published library often has none of those, and its own code is
-  then the list: a file named for the folder it sits in is that folder's component. The run says how many it read
-  that way.
+  then the list, the same one your style guide's pages are built from. A file that draws nothing of its own (a
+  context, a provider, a feature-flag holder) is not a component. The run says how many it read that way.
 - **Your React, not an imitation of it.** React components are drawn with the React and the Vite your project has
   installed, so a component that keeps state, reads a context or renders through a portal behaves here as it does in
   your product. Without React installed, a smaller stand-in draws what it can and the run says what it left out.
+- **A part inside its parent.** A part written for its parent's context (an autocomplete's option, a list's item)
+  throws or draws nothing on its own. When it does, it is drawn again inside the component its name says it belongs
+  to (`ActionListItem` inside `ActionList`).
+- **Why a React component did not draw.** What it threw while React drew it is said, and so is a case that drew
+  nothing with the props it was given (a closed dialog, tabs with no tabs), each with how many of its cases it hits.
 - **Your components.** On a page you name, your style guide or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
 - **First as a person meets them.** Each starts at rest, then each state is drawn on its own. A set whose first option is `disabled` is still tried enabled, so Tab, focus and the keys are tested where people use it.
 - **What your app gives them.** A Vue component that reads a Pinia store or links with Vue Router gets your project's own, when your `package.json` lists it and it is installed.
@@ -53,6 +59,16 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **The route it reads.** A component that reads the current route is drawn at a path its code expects, such as a name of the table it looks the path up in. The params, query and route name it reads are given too, and a router of the project's own that it imports is moved to the same place. When none can be read, its reason says so.
 - **An icon of its own folder.** An icon that loads from a folder its code lists gets the name of a file in that folder.
 - **One that cannot draw says why.** Its reason is given once, with how many of its cases it hits, such as a method called on an element it does not draw in that case, the input that was missing when it read a field of nothing, a list method called on what is not a list, or a date that is not one. The raw error follows it. It is reported as not checked, and the rest of the page is still kept for the next run.
+
+### Your team's own accessibility lint
+
+- **Counted beside the engine's checks.** When your ESLint uses eslint-plugin-jsx-a11y (React) or
+  eslint-plugin-vuejs-accessibility (Vue), the check runs your own ESLint on the design system's component files and
+  lists what those rules report, with the file and line.
+- **Your ESLint, as installed.** It runs from your project's `node_modules`, never fetched. A plugin your config names
+  but nobody installed is said to be, and nothing runs.
+- **Proposed, never installed.** A team with neither is told the one that fits its framework. Nothing is added to
+  your project or your config.
 
 ### What it tries
 
