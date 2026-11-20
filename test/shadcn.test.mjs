@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { shadcnConfig, cvaCalls, cvaProps, componentName, resolveAlias, utilityOf, shadcnScaffold, slotOf } from '../lib/shadcn.mjs';
-import { codeComponents, textComponentApi, componentSourceFiles, resolveComponentFile, textReader } from '../lib/component-source.mjs';
+import { shadcnConfig, cvaCalls, cvaProps, componentName, resolveAlias, utilityOf, shadcnScaffold, slotOf, radixStateProps } from '../lib/shadcn.mjs';
+import { codeComponents, textComponentApi, componentSourceFiles, resolveComponentFile, textReader, extractDefaults } from '../lib/component-source.mjs';
 import { startReactHarness } from '../lib/react-harness.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
@@ -57,6 +57,20 @@ test("a component's props are its cva axes and asChild, with cva's defaults", ()
   assert.equal(slotOf(read('src/components/ui/button.tsx')), 'button', 'its root named by data-slot');
 });
 
+test('a state Radix sets from a prop the component passes on, and its classes style, is that prop', () => {
+  const root = (imp, tag, cls) => `import * as P from "${imp}"\nfunction X({ className, ...props }) { return <P.${tag} className={cn("${cls}", className)} {...props} /> }`;
+  assert.deepEqual(Object.keys(radixStateProps(root('@radix-ui/react-switch', 'Root', 'data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'))), ['checked']);
+  assert.deepEqual(Object.keys(radixStateProps(root('@radix-ui/react-toggle', 'Root', 'data-[state=on]:bg-accent data-[disabled]:opacity-50'))).sort(), ['disabled', 'pressed']);
+  assert.deepEqual(Object.keys(radixStateProps(root('radix-ui', 'Root', 'data-[state=open]:rotate-180'))), ['open']);
+  assert.equal(radixStateProps(root('@radix-ui/react-switch', 'Root', 'data-[state=checked]:bg-primary')).checked.default, 'false');
+  // A part (not a Root) whose state its Root keeps, a file that passes nothing on, and one with no Radix are left.
+  assert.deepEqual(radixStateProps(root('@radix-ui/react-dialog', 'Content', 'data-[state=open]:animate-in')), {});
+  assert.deepEqual(radixStateProps(root('@radix-ui/react-switch', 'Root', 'data-[state=checked]:bg-primary').replace('{...props}', '')), {});
+  assert.deepEqual(radixStateProps('function X() { return <div className="data-[state=open]:block" {...props} /> }'), {});
+  // A class list on a part it renders is never a prop's default (className="…" on its thumb read as className's).
+  assert.deepEqual([...extractDefaults('function S({ size = "m", ...props }) { return <P.Root size="l"><P.Thumb className="block size-4" /></P.Root> }')], [['size', 'm']]);
+});
+
 test('its kebab-case files are its components, by the name each exports', () => {
   assert.equal(componentName('src/components/ui/dropdown-menu.tsx'), 'DropdownMenu');
   assert.deepEqual(codeComponents(FIXTURE, {}).map((k) => k.name), ['Badge', 'Button', 'Card', 'Switch']);
@@ -86,6 +100,13 @@ test('drawn with its own React, Tailwind and Radix: each variant as it ships, a 
     // Tailwind compiled by the project's own Vite plugin, its theme's variables resolved: the default button is primary.
     assert.equal(await inPage(`getComputedStyle(document.querySelector('[data-dse-component="Button"] [data-slot="button"]')).height`), '36px', 'h-9, compiled');
     assert.match(await inPage(`getComputedStyle(document.querySelector('[data-dse-component="Button"] [data-slot="button"]')).backgroundColor`), /oklch\(0\.205 0 0\)|rgb\(23, 23, 23\)/, 'bg-primary, from the theme');
+    // Its checked state is a case of its own: the prop Radix sets data-state="checked" from, read from the classes that
+    // style it, though the component passes it on in {...props} and names none. Drawn by Radix, in its checked colour.
+    const sw = JSON.parse(await inPage(`JSON.stringify([...document.querySelectorAll('[data-dse-component="Switch"] [data-dse-case]')].map((b) => { const s = b.querySelector('[data-slot="switch"]'); return [b.getAttribute('data-dse-case'), s && s.getAttribute('data-state'), s && getComputedStyle(s).backgroundColor]; }))`));
+    const checked = sw.find(([c]) => /checked=true/.test(c));
+    assert.ok(checked, `the switch is drawn checked: ${JSON.stringify(sw)}`);
+    assert.equal(checked[1], 'checked', 'Radix drew it checked');
+    assert.notEqual(checked[2], sw.find(([c]) => c === 'default')?.[2], 'its data-[state=checked] colour, not the unchecked one');
     // Radix runs: the switch flips its state, and its data-[state=checked] classes follow.
     assert.equal(await inPage(`(async () => { const s = document.querySelector('[data-dse-component="Switch"] [data-slot="switch"]'); const before = s.getAttribute('data-state'); s.click(); await new Promise((r) => setTimeout(r, 200)); return before + '>' + s.getAttribute('data-state') + ':' + s.getAttribute('role'); })()`),
       'unchecked>checked:switch');
