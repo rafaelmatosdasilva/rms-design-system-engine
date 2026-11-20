@@ -166,3 +166,39 @@ test('setup reads a shadcn/ui project from its components.json: its tokens are t
   assert.match(r.stdout, /A shadcn\/ui project \(components\.json\): its components in src\/components\/ui, its tokens in src\/index\.css/, r.stdout.slice(0, 2000));
   assert.equal(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).paths.themeCSS, 'src/index.css');
 });
+
+// Found building a shadcn/ui system's style guide: the page carried its theme file as written (@import "tailwindcss",
+// @theme), so none of its utilities applied and its switch was drawn 16px by 6px and grey, and a component Figma has
+// was not drawn at all, its markup carrying no class of its name. The compiled Tailwind comes from the build, its reset
+// kept to the drawings, and data-slot says which component a drawing is.
+test('its style guide page draws it with its compiled Tailwind, checked and not, the guide around it untouched', { skip: READY, timeout: budget(600000) }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { writeFileSync } = await import('node:fs');
+  const dir = tempDir('shadcn-page-');
+  cpSync(FIXTURE, dir, { recursive: true });
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(dir, 'src', 'figma-component-props.snapshot.json'), JSON.stringify({ Switch: { nodeId: '2:1', properties: { Checked: { type: 'VARIANT', defaultValue: 'False', variantOptions: ['False', 'True'] } } } }));
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  cfg.paths.compPropsSnapshot = 'src/figma-component-props.snapshot.json';
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify(cfg));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--here', '--no-publish', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', CHROME_PATH: CHROME } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
+  assert.match(readFileSync(page, 'utf8'), /@layer base \{\n@scope \(\.pg-preview, /, 'Tailwind\'s reset kept to the drawings');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-shadcn-page-' });
+  try {
+    const { send } = await connectCDP(browser.wsUrl);
+    const look = async (hash) => {
+      const { sessionId } = await openPage(send, `file://${page}${hash}`);
+      await waitForTrue(send, sessionId, `!!document.querySelector('#c-Switch .pg-preview [data-slot="switch"]')`, { attempts: 400, intervalMs: 50, tolerateErrors: true });
+      const v = await send('Runtime.evaluate', { expression: `JSON.stringify((() => { const s = document.querySelector('#c-Switch .pg-preview [data-slot="switch"]'), r = s.getBoundingClientRect(); return { state: s.getAttribute('data-state'), size: [r.width, r.height], bg: getComputedStyle(s).backgroundColor, nav: getComputedStyle(document.querySelector('.sg-nav')).padding }; })())`, returnByValue: true }, sessionId);
+      return JSON.parse(v.result.value);
+    };
+    const off = await look('#c-Switch'), on = await look('#c-Switch?Checked=true');
+    assert.deepEqual(off.size, [32, 20], `h-5 w-8, compiled: ${JSON.stringify(off)}`);
+    assert.equal(off.state, 'unchecked');
+    assert.equal(on.state, 'checked', 'Figma\'s Checked is Radix\'s checked');
+    assert.notEqual(on.bg, off.bg, 'its data-[state=checked] colour');
+    assert.notEqual(off.nav, '0px', 'the guide\'s own menu keeps its padding: the reset stays inside the drawings');
+  } finally { browser.kill(); }
+});
