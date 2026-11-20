@@ -1,0 +1,109 @@
+name: Screen readers
+
+# A real screen reader over the components, not the browser's word for what one would say: VoiceOver on a macOS runner
+# and NVDA on a Windows runner, each driven through Guidepup (lib/screen-reader.mjs, --hear) over the two fictional
+# systems in test/fixtures. Guidepup's own setup (guidepup setup --ci) lets each reader be driven on a runner nobody sits
+# at; the engine never changes a setting itself. What each reader said is kept as the run's record (heard-by-reader.json), which a
+# style guide shows on each component's 4.1.2 row. It fails only when a reader could not run or a component was not
+# heard: what a reader said apart from the browser is the measurement, advisory, and is kept, never a failure.
+on:
+  pull_request:
+    paths:
+      - lib/screen-reader.mjs
+      - lib/a11y-check.mjs
+      - lib/cdp.mjs
+      - test/heard-check.mjs
+      - test/.reader-tools/**
+      - .github/workflows/screen-readers.yml
+  push:
+    branches: [main]
+    paths:
+      - lib/screen-reader.mjs
+      - lib/a11y-check.mjs
+      - lib/cdp.mjs
+      - test/heard-check.mjs
+      - test/.reader-tools/**
+      - .github/workflows/screen-readers.yml
+  # Readers and runner images move on their own: once a week, whatever changed here.
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hear:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            reader: voiceover
+            label: VoiceOver
+          - os: windows-2025
+            reader: nvda
+            label: NVDA
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Guidepup and its setup from their committed lockfile, found as a machine-wide one is: never put in a project.
+      - name: Install Guidepup
+        shell: bash
+        run: |
+          npm ci --prefix test/.reader-tools --no-audit --no-fund
+          echo "NODE_PATH=$PWD/test/.reader-tools/node_modules" >> "$GITHUB_ENV"
+      # The computer made ready to be driven, by the same Guidepup setup the lockfile pins: VoiceOver allowed to be
+      # controlled and its local preferences written (macOS), NVDA's settings (Windows). Guidepup's own GitHub action
+      # carried an older setup, which left out the preferences Guidepup 0.40 starts VoiceOver from.
+      - name: Set the runner up for a screen reader
+        shell: bash
+        working-directory: test/.reader-tools
+        run: ./node_modules/.bin/guidepup setup --ci
+      # The reader's own files Guidepup drives it with (NVDA itself, VoiceOver's preferences), each checked against the
+      # sha256 Guidepup's manifest pins, into Guidepup's cache.
+      - name: Fetch the reader's files
+        shell: bash
+        working-directory: test/.reader-tools
+        run: ./node_modules/.bin/guidepup install ${{ matrix.reader }}
+      - name: Build the style guides
+        shell: bash
+        run: |
+          for ds in demo-ds harbor-ds; do
+            dir="$RUNNER_TEMP/$ds"
+            cp -R "test/fixtures/$ds" "$dir"
+            (cd "$dir" && node "$GITHUB_WORKSPACE/audit.mjs" --styleguide --no-a11y-bake > /dev/null)
+          done
+      - name: Hear every component with ${{ matrix.label }}
+        shell: bash
+        # Guidepup's own log of each step it takes, so a reader that will not start says where it stopped.
+        env:
+          DEBUG: guidepup*
+        run: |
+          for ds in demo-ds harbor-ds; do
+            (cd "$RUNNER_TEMP/$ds" && node "$GITHUB_WORKSPACE/audit.mjs" --hear --reader ${{ matrix.reader }})
+          done
+      - name: Check every component was heard
+        shell: bash
+        run: node test/heard-check.mjs ${{ matrix.reader }} "$RUNNER_TEMP/demo-ds" "$RUNNER_TEMP/harbor-ds"
+      # The record: what the reader said on each control, beside what the browser says it should.
+      - name: Keep what was heard
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p heard
+          for ds in demo-ds harbor-ds; do
+            cp "$RUNNER_TEMP/$ds/.design-system-engine-out/heard-by-reader.json" "heard/$ds.json" 2>/dev/null || true
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: heard-${{ matrix.reader }}
+          path: heard/
+          if-no-files-found: ignore
+          retention-days: 90

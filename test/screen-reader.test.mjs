@@ -126,3 +126,46 @@ test('in a real browser: each control focused in turn, the browser\'s line held 
     assert.deepEqual(got.failed, ['absent: its preview is not on the page']);
   } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a reader that will not start says why, with the cause Guidepup gives under its own words', async () => {
+  const { startFailure } = await import('../lib/screen-reader.mjs');
+  assert.equal(startFailure(new Error('VoiceOver cannot be started', { cause: new Error('Failed to mount\nat x', { cause: new Error('hdiutil: attach failed') }) })), 'VoiceOver cannot be started: Failed to mount: hdiutil: attach failed');
+  assert.equal(startFailure(new Error('NVDA is not installed\n\nPlease ensure you have run:')), 'NVDA is not installed', 'the first line only');
+  assert.equal(startFailure(new Error('same', { cause: new Error('same') })), 'same', 'never said twice');
+});
+
+test('the CI check fails a run whose reader said nothing on every control, and passes one that spoke', async () => {
+  const { heardProblems } = await import('./heard-check.mjs');
+  const run = (said) => ({ reader: { name: 'NVDA', which: 'nvda' }, failed: [], components: { button: { lines: [{ desc: 'button', want: 'button, Save', said, ok: !!said }] } } });
+  assert.match(heardProblems(run(''), 'nvda').join(' '), /said nothing on any control/);
+  assert.deepEqual(heardProblems(run('Save button'), 'nvda'), []);
+  assert.match(heardProblems({ reader: null, why: 'NVDA is not installed' }).join(' '), /no screen reader ran: NVDA is not installed/);
+});
+
+test('in a real browser: a reader that presses Tab itself reaches each control from the one before it', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  const dir = makeFixture({});
+  const page = join(dir, 'page.html');
+  writeFileSync(page, `<!doctype html><html><body><button>Before</button><section id="c-pair"><div class="pg-preview">
+    <button>One</button>
+    <button>Two</button>
+  </div></section></body></html>`);
+  const chrome = await launchChrome(CHROME);
+  const { send, close } = await connectCDP(chrome.wsUrl);
+  try {
+    const { sessionId } = await openPage(send, 'about:blank');
+    const key = (type) => send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }, sessionId);
+    const focused = async () => (await send('Runtime.evaluate', { expression: 'document.activeElement.textContent.trim()', returnByValue: true }, sessionId)).result.value;
+    let tabs = 0;
+    // A reader whose speech is what has the focus after its own Tab, as Guidepup records it.
+    const reader = { which: 'nvda', tab: async () => { tabs++; await key('keyDown'); await key('keyUp'); }, said: async () => `${await focused()} button` };
+    const got = await hearComponents({ url: () => pathToFileURL(page).href, names: ['pair'], reader, send, sessionId, settleMs: 0, rootOf: (n) => `#c-${n} .pg-preview` });
+    const lines = got.components.pair.lines;
+    assert.equal(tabs, 2, 'one Tab a control');
+    assert.deepEqual(lines.map((l) => [l.want, l.said, l.ok, !!l.skipped]), [['button, One', 'One button', true, false], ['button, Two', 'Two button', true, false]]);
+  } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a field\'s name and value count when the reader says them apart, as NVDA does', () => {
+  assert.ok(compareSaid('edit text, Name, Ada', 'Name, edit, selected Ada', 'nvda').ok);
+  assert.equal(compareSaid('edit text, Name, Ada', 'Name, edit', 'nvda').ok, false, 'the value left out is still a finding');
+});

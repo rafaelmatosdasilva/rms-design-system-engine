@@ -26,6 +26,14 @@ test('findChrome: DESIGN_SYSTEM_ENGINE_CHROME=none finds none, even a Mac\'s Chr
   assert.equal(findChrome({ env: { DESIGN_SYSTEM_ENGINE_CHROME: 'none' }, exists: mac, which: () => '/usr/bin/chromium', playwright: true }), null);
 });
 
+test('findChrome: a Windows Chrome under Program Files or AppData is found without the PATH', () => {
+  const at = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  assert.equal(findChrome({ env: { PROGRAMFILES: 'C:\\Program Files' }, exists: (p) => p === at, which: none }), at);
+  const own = 'D:\\Profiles\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe';
+  assert.equal(findChrome({ env: { PROGRAMFILES: 'C:\\Program Files', LOCALAPPDATA: 'D:\\Profiles\\AppData\\Local' }, exists: (p) => p === own, which: none }), own);
+  assert.equal(findChrome({ env: {}, exists: () => false, which: none }), null, 'no Windows folders named, none looked for');
+});
+
 test('playwrightChromium: picks the newest chromium-N build that has a binary', () => {
   const list = () => ['chromium-1100', 'chromium_headless_shell-1200', 'chromium-1200', 'ffmpeg-1'];
   const exists = (p) => p.endsWith('chrome-linux/chrome');
