@@ -184,7 +184,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
-- Checks your designed screens in Figma for contrast and target size, each problem listed in the style guide with a link that opens its layer in Figma.
+- Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
 
 ### What to ask
 
@@ -212,7 +212,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
 - Drafts a Figma Code Connect file for each component that has none, from what its contract pairs. A person checks it and publishes it.
-- Gives each Figma variable its name in the code, so Dev Mode shows the token a developer writes, once you say yes.
 
 ### What to ask
 
@@ -247,7 +246,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Rates how ready your guidance is for AI agents, component by component.
 - Gives agents the mistakes that look right, each with why it fails and what to use instead, and suggests the ones your pages leave out, such as a status shown by colour alone.
 - Reads how much damage each destructive action does, and checks your screens against it: undo for what can be undone, how long when it is only for a while, and a confirmation with the safe option selected for what is permanent.
-- Writes what the intent layer says each component and token is for into its Figma description, once you say yes, so an agent reading Figma knows where it belongs. Only what the team approved, never over one a designer wrote.
 - Never overwrites a sentence a person wrote.
 - A change to the layer reaches the published style guide on its own, checked on the pages it was about.
 
@@ -260,7 +258,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine which mistakes should our docs warn agents about?` | For each component, the mistakes its kind is known for that its page does not say, and each one it says without why it fails or what to use instead |
 | `/rms-design-system-engine rate our guidelines for agents` | How much an agent can take from your guidance: ready, partial or thin, for each component, with what to add |
 | `/rms-design-system-engine rate our guidelines and test extraction with a model` | The same, plus a test where a model answers questions from your guidance alone (uses your model tokens) |
-| `/rms-design-system-engine put the intent layer descriptions in Figma` | Each component's and token's purpose as its description in Figma, never over one a designer wrote |
 
 ## Publish a living style guide
 
