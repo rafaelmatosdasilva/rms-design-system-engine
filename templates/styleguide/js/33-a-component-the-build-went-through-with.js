@@ -1275,7 +1275,7 @@
         var later = function () { if (++retried[i] > 3) { setTimeout(function () { if (!stopped) next(i + 1); }, 0); return; } setTimeout(function () { if (stopped) return; if (personOn()) later(); else next(i); }, 400); };
         if (personOn()) { combos.pop(); later(); return; }
         // Its keys (arrows, Home and End, Escape, Tab in a modal) only where the system's own script is on the page.
-        window.__wcag21.interact(root, { wait: 200, triggers: 6, keys: !!document.querySelector('script[data-system-script]'), person: !BAKING }).then(function (r) {
+        window.__wcag21.interact(root, { wait: 200, triggers: 6, keys: !!document.querySelector('script[data-system-script]'), person: !BAKING, host: document.querySelector('.sg-layout'), stage: preview }).then(function (r) {
           r.ran.forEach(function (k) { live.ran[k] = 1; });
           r.findings.forEach(function (f) {
             var key = f.kind + '|' + f.desc;

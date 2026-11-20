@@ -108,6 +108,33 @@ test('page: a tip that fades out slowly once Escape is pressed is closed, not on
   });
 });
 
+// Found on a style guide built of a real system: while a control was hovered, the guide drew its own health card again
+// as results came in, and the card was taken for the component's popup that Escape does not close (1.4.13).
+test('page: what the host page redraws of its own while a control is hovered is not the component\'s popup', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  await inPage(async (ev) => {
+    const found = await ev(`(async () => {
+      const host = document.createElement('div');
+      host.innerHTML = '<div class="card-slot"></div><div class="stage"><button type="button">Save</button></div>';
+      document.body.appendChild(host);
+      const slot = host.querySelector('.card-slot'), stage = host.querySelector('.stage'), b = stage.querySelector('button');
+      // The host's card, drawn again over the stage the moment the control is hovered, as a page refreshing itself does.
+      b.addEventListener('mouseover', () => { slot.innerHTML = '<div class="health" style="position:fixed;top:0;left:0;width:400px;height:200px;background:#fff">12 of 14</div>'; });
+      const run = async (opts) => { slot.innerHTML = ''; return (await window.__wcag21.interact(stage, { wait: 100, triggers: 1, ...opts })).findings.map((f) => f.desc); };
+      const without = await run({});
+      const withHost = await run({ host, stage });
+      // A popup the component puts at the end of the body (a portal) is still its own.
+      b.addEventListener('mouseover', () => { if (!document.getElementById('portal')) { const p = document.createElement('div'); p.id = 'portal'; p.textContent = 'Saved'; p.style.cssText = 'position:fixed;top:0;left:0;width:120px;height:40px;background:#000;color:#fff'; document.body.appendChild(p); } });
+      const portal = await run({ host, stage });
+      host.remove(); document.getElementById('portal')?.remove();
+      return { without, withHost, portal };
+    })()`);
+    const esc = (l) => l.filter((d) => /does not close with Escape/.test(d));
+    assert.ok(esc(found.without).length, 'with no host named, the redraw is read as a popup: ' + JSON.stringify(found.without));
+    assert.deepEqual(esc(found.withHost), [], 'the host\'s own redraw is left alone');
+    assert.ok(esc(found.portal).some((d) => /portal/.test(d)), 'a portal at the end of the body is still the component\'s: ' + JSON.stringify(found.portal));
+  });
+});
+
 // a tip or a menu that closes when anything is pressed is not the control acting on the press (a tip must close so,
 // WCAG 1.4.13); only what the press itself does counts. A control that acts on the press is still found.
 test('page: a tip or a menu that closes on any press is not the pressed control acting; one that acts on the press is found', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {

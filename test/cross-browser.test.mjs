@@ -77,6 +77,34 @@ test('the pass opens one browser a scheme, measures each group and closes everyt
   assert.match(bad.refused[0], /^WebKit: Safari's remote automation is off/);
 });
 
+// Found on a test run: Firefox opened its WebDriver BiDi port and never answered session.new. The error was thrown,
+// but Firefox and its socket were left open, and the run waited on them for five hours. Here a stand-in Firefox does
+// the same: it says where it listens, takes the connection and answers nothing.
+test('a Firefox that never answers is given up on and closed, leaving nothing running', { skip: process.platform === 'win32' ? 'the stand-in is a shell script' : false, timeout: 120000 }, async () => {
+  const { createHash } = await import('node:crypto');
+  const server = createServer();
+  const sockets = [], closing = [];
+  server.on('upgrade', (req, sock) => {
+    sockets.push(sock);
+    const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+    sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    // A frame whose opcode is 8 is the client closing the connection.
+    sock.on('data', (d) => { if ((d[0] & 0x0f) === 8) closing.push(sock); });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const dir = tempDir('ff-silent-'), pidFile = join(dir, 'pid'), ff = join(dir, 'firefox');
+  writeFileSync(ff, `#!/bin/sh\necho $$ > "${pidFile}"\necho "WebDriver BiDi listening on ws://127.0.0.1:${server.address().port}" >&2\nexec sleep 600\n`, { mode: 0o755 });
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  try {
+    await assert.rejects(openBrowser('firefox', ff), /session\.new: no answer/);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    for (let i = 0; i < 40 && alive(pid); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(alive(pid), false, 'the stand-in Firefox was stopped');
+    for (let i = 0; i < 40 && closing.length < sockets.length; i++) await new Promise((r) => setTimeout(r, 50));
+    assert.ok(sockets.length && closing.length === sockets.length, 'its socket was closed');
+  } finally { for (const s of sockets) s.destroy(); server.close(); }
+});
+
 test('one measuring script for every browser: plain JavaScript, no protocol of its own', () => {
   const expr = measureExpr([{ selector: '.x', prop: 'height', probe: '<i class="x"></i>' }]);
   assert.doesNotMatch(expr, /Runtime\.|Emulation\.|browsingContext|send\(/);
