@@ -44,6 +44,7 @@ A team with Storybook has already written much of a spec there. With a Storybook
 - **Its status.** A `deprecated` tag marks it deprecated, and `beta`, `alpha` or `experimental` marks it experimental, when nothing else sets one.
 - **Its stories.** Each one is kept in the contract with the args it is drawn with, as a worked example.
 - **Where they disagree.** A prop Storybook describes that the code no longer has, an option one side lists and the other does not, or a default that differs. Each is said with both sides: *`label`, a different default (Storybook says `Go`, the code has `Continue`)*.
+- **Each disagreement, a change to make.** On the component's Documentation, each one is a change in the story file or the component, open until the two say the same, and counted with the rest of what its documentation needs. One with Figma in it asks you which side is right first.
 - **Read once a build.** The reading is kept in the engine's output folder until the Storybook is built again. `storybook.docs: false` in `ds-config.json` turns it off.
 
 ### Props that say nothing, and drafts to approve

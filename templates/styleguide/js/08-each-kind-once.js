@@ -254,6 +254,15 @@
       todo: esc(l.length === 1 ? 'Change it or remove it, as it says.' : 'Change or remove each, as it says.'), who: whoOf(l[0]), st: 'check', rel: '', at: DATA.builtAt || null,
       src: l.map(function (n) { return capital(n.from); }).filter(function (x, i, a) { return a.indexOf(x) === i; }) };
   };
+  // Where the team's Storybook says something else than the code or Figma (storybook-docs.mjs): a task for whoever keeps
+  // the stories, open until the two say the same again. With Figma in it, which side is right is a person's call.
+  var storybookRow = function (c) {
+    var sb = c.storybookDocs, d = (sb && sb.differs) || []; if (!d.length) return null;
+    var figma = d.some(function (x) { return x.figma != null; });
+    return { key: c.name + '\u0000doc:storybook', area: 'Documentation', kind: 'Its Storybook', written: '<ul class="pg-storybook-differs">' + storybookDiffers(sb) + '</ul>' + (sb.from ? '<p class="pg-selector">In <code>' + esc(sb.from) + '</code></p>' : ''),
+      todo: esc((figma ? 'Decide which side is right, then change ' : 'Change ') + (d.length === 1 ? 'the story or the component, so the two say the same.' : 'the stories or the component, so each says the same.')),
+      who: figma ? WHO.both : WHO.code, st: 'todo', rel: '', at: DATA.builtAt || null, src: ['Code'] };
+  };
   // Written, but too thin to say anything: under four words, or a line that only names its section ("Overview
   // section."). Such a row is never Ready: it is to check, with why.
   var WEAK = function (html) { var t = plainText(html || '').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
@@ -276,9 +285,9 @@
     // A part is documented in its root's page, under Parts: that section is all it asks for.
     if (c.partOf && c.partOf.root) return [partDocRow(c)].map(writeTo);
     var asked = partQuestionRow(c);
-    if (asked) return [asked].concat(docRowsOf(c, tokenDocRow(c), agentRows(c), intentRow(c), leftRow(c))).map(writeTo);
-    var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
-    return docRowsOf(c, tok, ag, ir, lr).map(writeTo);
+    if (asked) return [asked].concat(docRowsOf(c, tokenDocRow(c), agentRows(c), intentRow(c), leftRow(c)), storybookRow(c) || []).map(writeTo);
+    var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c), sr = storybookRow(c);
+    return docRowsOf(c, tok, ag, ir, lr).concat(sr ? [sr] : []).map(writeTo);
   }
   // What to write, for this component: the points the system already knows that belong under that kind, each from what was
   // read (its controls, its code API, its Figma description, its own guidance), so the person writes from facts, not from

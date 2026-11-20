@@ -2,6 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented (continuous evaluation)
+
+What changed since the entry below (engine 22f5c45): Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented. The guide changed in `reference/config.md`.
+
+Guide set measured: `97ea394687e1` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 53d55f59` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 6488379b` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md fc59d6c1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 7f55035f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 78/79 | 74/79 |
+| Mean cost a run | 0.059 | 0.067 |
+| Input a run | 99k | 123k |
+| Turns a run | 3.5 | 4.2 |
+| Rule violations | 0 | 1 |
+| Runs stopped at a limit | 0 | 3 |
+
+**Reading.** Haiku: 5 of 79 runs failed, fewer passes than the entry below, 1 rule violation, and 3 of them never finished: visual-howto #2: timed out; fix-first #0: timed out; fix-first #2: timed out — read those as the ceiling, not the guide. Failed: audit-all #2: names a measured difference; fix-chip-height #2: the combination is 32px, the field still 36px; visual-howto #2: the run was given room to finish (timed out); fix-first #0: the run was given room to finish (timed out); fix-first #0: reports in the chat, not in a file (no reply); fix-first #2: the run was given room to finish (timed out). no task changed state; 6 runs moved inside tasks that pass sometimes, which is noise, not a difference. Input moved but input a turn held (28k to 29k): the turns moved, 3.5 to 4.2, and nothing a run reads grew - most in `disabled-hover` 2.0 to 7.0, `fix-chip-height` 5.0 to 8.7, `audit-all` 2.0 to 4.7. Records: `records/2026-11-20-storybook-follow-ups-disagreements-as`.
+
 ## 2026-11: shadcn/ui scaffold in the guide (continuous evaluation)
 
 What changed since the entry for engine 35e9ed3, two below (measured beside the one under it, on its own branch): reference/usage.md and cookbook/build-from-figma.md name --framework shadcn and components.json. The guide changed in `cookbook/build-from-figma.md`, `reference/usage.md`.

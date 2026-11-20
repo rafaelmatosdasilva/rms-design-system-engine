@@ -476,6 +476,12 @@
     // The copy stays underneath, unseen, for what reads markup (its tokens, its code, the variants, the checks).
     var STORY = !ALL && DATA.storybook && (c.stories || []).length ? { base: DATA.storybook.base, id: c.stories[0].id } : null;
     var storyBox = null, storyIfr = null, storySent = null, storyH = 0, storyGrew = 0, storyReady = false;
+    // A Storybook the team hosts at another address (storybook.url): its page cannot be read from here, so the story is
+    // reached through Storybook's own channel, the messages its manager and its preview send each other, which a built
+    // Storybook takes from any address. Its args and argTypes come back once it is prepared (storyPrepared), and each
+    // render is said (storyRendered). FAR: { origin, id, story } once prepared.
+    var FAR = null;
+    if (STORY) try { var so = new URL(STORY.base, location.href).origin; if (so !== location.origin) FAR = { origin: so, id: null, story: null }; } catch (e) { /* a base the page cannot read: as its own */ }
     if (STORY) {
       storyBox = document.createElement('div'); storyBox.className = 'pg-story';
       // Loaded once its Playground is in view, not with the page: a system of a hundred components is a hundred stories.
@@ -483,7 +489,15 @@
       preview.parentNode.insertBefore(storyBox, preview.nextSibling);
       preview.classList.add('pg-preview--model');
       storyIfr = storyBox.firstElementChild;
-      storyIfr.addEventListener('load', function () { storyWhenDrawn(0); });
+      storyIfr.addEventListener('load', function () { if (!FAR) storyWhenDrawn(0); });
+      if (FAR) window.addEventListener('message', function (e) {
+        if (!storyIfr || e.source !== storyIfr.contentWindow) return;
+        var m; try { m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+        var ev = m && m.key === 'storybook-channel' && m.event, a = ev && (ev.args || [])[0];
+        if (!ev) return;
+        if (ev.type === 'storyPrepared' && a) { FAR.id = a.id; FAR.story = { argTypes: a.argTypes || {}, initialArgs: a.initialArgs || {} }; storyReady = true; storySent = null; storySync(); }
+        else if (ev.type === 'storyRendered') { storySize(); if (!storyIfr.classList.contains('is-drawn')) setTimeout(function () { storySize(); storyIfr.classList.add('is-drawn'); }, 60); }
+      });
       // Sized again when its stage is shown or resized: a frame on a page not shown has nothing laid out to measure.
       if (window.ResizeObserver) new ResizeObserver(function () { storySize(); }).observe(storyBox);
     }
@@ -533,6 +547,13 @@
     // Sized to its page, never by a pixel back and forth, and never growing for ever: a component as tall as its window
     // (100vh) grows its page with its frame, so it stops at six steps up in a row.
     function storySize() {
+      // Another address: its page cannot be measured, so the frame takes the height of the copy underneath, drawn with the
+      // same props, and Storybook's own padding round it.
+      if (FAR) {
+        var m = preview.firstElementChild, fh = m ? Math.ceil(m.getBoundingClientRect().height) + 32 : 0;
+        if (!storyReady || !fh || !storyIfr.offsetParent || Math.abs(fh - storyH) <= 1) return;
+        storyH = fh; storyIfr.style.height = fh + 'px'; return;
+      }
       var d; try { d = storyIfr.contentDocument; } catch (e) { return; }
       if (!storyReady || !d || !d.body) return;   // the loading screen is never measured
       // Its body's own height: the page's scroll height is never less than the frame, so it could grow but never shrink.
@@ -564,6 +585,15 @@
       return out;
     }
     function storySync() {
+      if (FAR) {
+        // Its modes are its own page's to set: only its args are sent.
+        if (!FAR.story) return;
+        var fa = storyArgs(FAR.story), fk = JSON.stringify(fa);
+        if (fk === storySent) { storySize(); return; }
+        storySent = fk;
+        storyIfr.contentWindow.postMessage(JSON.stringify({ key: 'storybook-channel', event: { type: 'updateStoryArgs', args: [{ storyId: FAR.id, updatedArgs: fa }] } }), FAR.origin);
+        return;
+      }
       var P = storyPreview(); if (!P) return;
       var w = storyIfr.contentWindow, de = w.document.documentElement;
       AXES.forEach(function (a) {
@@ -611,6 +641,8 @@
     function renderFrame() {
       if (!frame || probing) return;
       // Inspecting: the anatomy stands in for both, drawn at the Width chosen.
+      // A story at another address cannot be read: Inspect reads the copy, drawn with the same props, in its place.
+      if (storyBox) storyBox.hidden = !!(FAR && inspecting);
       if (inspecting) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = true; requestAnimationFrame(drawAnatomy); return; }
       // A story at the Width chosen: its own frame that wide, its media queries applying, never written again.
       if (STORY) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; var sw = WIDTH !== 'fit' && WIDTHS.find(function (x) { return x[0] === WIDTH; }); storyIfr.style.width = sw ? sw[2] + 'px' : '100%'; storySize(); return; }
@@ -793,7 +825,7 @@
       if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
       anatBox.innerHTML = '';
       var live = STORY ? storyRoot() : null, stage, wrap = null, marks, root, k = 1, box;
-      if (STORY && !live) return;   // drawn once its story has drawn (storyRendered)
+      if (STORY && !live && !FAR) return;   // drawn once its story has drawn (storyRendered)
       if (live) {
         // A story is inspected where it is drawn: its marks laid over its own frame, measured on the elements its own
         // script made with its own styles. A copy of it in this page would lose the styles its page alone has.
@@ -865,7 +897,7 @@
       if (hit) hit.classList.add('is-picked'); else anatPicked = null;
       marks.classList.toggle('has-pick', !!hit);
       // One line: what is picked and its values; nothing picked, how to pick.
-      if (anatLine) anatLine.innerHTML = !info ? 'Click a part, a padding or a gap to see what it is and its value.'
+      if (anatLine) anatLine.innerHTML = !info ? 'Click a part, a padding or a gap to see what it is and its value.' + (FAR ? ' Your Storybook is at another address, which this page cannot read, so Inspect reads the page\'s own copy of it, drawn with the same props.' : '')
         : info.el && isSlot(info.el) ? '<b>' + esc(anatPath.map(function (key) { var h = hitOf(key); return h && h._info ? h._info.name : ''; }).filter(Boolean).join(' › ') || info.name) + '</b>  ·  ' + esc(['a placeholder for content, which brings its own look'].concat(pickedValues(info.el).filter(function (v) { return /^(padding|gap)\b/.test(v); })).join('  ·  '))
         : info.el ? '<b>' + esc(anatPath.map(function (key) { var h = hitOf(key); return h && h._info ? h._info.name : ''; }).filter(Boolean).join(' › ') || info.name) + '</b>  ·  ' + esc(pickedValues(info.el).join('  ·  ') || 'nothing of its own')
         : '<b>' + esc(info.what) + '</b>  ·  ' + esc(info.value);

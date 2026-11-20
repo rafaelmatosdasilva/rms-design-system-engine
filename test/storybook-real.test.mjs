@@ -7,7 +7,7 @@
 // Nothing here is a stand-in for Storybook: the index, the pages and the args are what `storybook build` wrote.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,7 @@ before(async () => {
 
 test('a Storybook built to files is found with nothing set up, and its stories are the pages checked', { skip: READY, timeout: budget(600000) }, () => {
   assert.match(said, /reading the Storybook built in storybook-static on \d{4}-\d{2}-\d{2}/, said.slice(0, 800));
-  assert.match(said, /9 page\(s\) found — checking 9, covering 4 of 4 components/);
+  assert.match(said, /11 page\(s\) found — checking 11, covering 4 of 4 components/);
   for (const page of ['Button · Primary', 'Badge · Danger', 'IconButton · Default', 'Disclosure · Closed']) assert.ok(a11y.target.includes(page), page);
 });
 
@@ -76,6 +76,18 @@ test('behaviours run on a story: the disclosure opens there, as only its own scr
   assert.ok(tried, JSON.stringify(a11y.behaviours));
   assert.equal(tried.behaviour, 'click-expand');
   assert.equal(tried.ok, true);
+});
+
+// A story's play function is the team's own script of a person using it: run as the page draws it, each one tried is
+// recorded, and one that fails is a behaviour that breaks, with what Storybook said.
+test("a story's play function is a behaviour tried: Opens passes, Closes On Escape fails with its own words", { skip: READY, timeout: budget(600000) }, () => {
+  const play = (state) => (a11y.behaviours ?? []).find((b) => b.page === `Disclosure · ${state}` && b.behaviour === 'play');
+  assert.equal(play('Opens')?.ok, true, JSON.stringify(a11y.behaviours));
+  assert.equal(play('Closes On Escape')?.ok, false, 'Storybook names it from its export, word by word');
+  assert.equal(play('Closed'), undefined, 'a story with no play function has none to try');
+  const found = JSON.stringify(a11y).match(/Disclosure: the Closes On Escape story's play function \(the team's own script of a person using it\) fails: [^"]*/)?.[0] ?? '';
+  assert.match(found, /Escape did not close the disclosure\./, JSON.stringify(a11y).slice(0, 2000));
+  assert.doesNotMatch(JSON.stringify(a11y), /the Opens story's play function[^"]*fails/);
 });
 
 // Parity reads the code capture. Harbor has no built page and no style guide, so before its stories every component was
@@ -148,4 +160,54 @@ test('the Playground draws the live story: its controls set the args, and Inspec
     assert.ok(await waitForTrue(send, sessionId, `${hits}.includes('part 0 button')`, { attempts: 200, intervalMs: 50 }), JSON.stringify(await ev(hits)));
     close();
   } finally { c.kill(); await server.close(); }
+});
+
+test('a Storybook the team hosts at another address: its controls set the story through its own channel, Inspect reads the copy', { skip: READY, timeout: budget(600000) }, async () => {
+  const { serveStatic } = await import('../lib/storybook-stories.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue } = await import('../lib/cdp.mjs');
+  const hosted = await serveStatic(join(dir, 'storybook-static'));
+  const cfgFile = join(dir, 'ds-config.json'), was = readFileSync(cfgFile, 'utf8');
+  // No build beside the code (storybook.static names none): the address is all the page has.
+  writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(was), storybook: { url: hosted.url, static: 'no-build-here' } }, null, 2));
+  let server = null, c = null;
+  try {
+    // Run beside this process, never blocking it: the address it reads is served from here.
+    const r = await new Promise((ok) => {
+      const p = spawn(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+      let said = ''; p.stdout.on('data', (d) => { said += d; }); p.stderr.on('data', (d) => { said += d; });
+      p.on('close', (status) => ok({ status, said }));
+    });
+    assert.equal(r.status === 0 || r.status === 1, true, r.said.slice(-2000));
+    const out = join(dir, '.design-system-engine-out', 'styleguide');
+    const { readPage } = await import('../lib/styleguide-files.mjs');
+    const data = JSON.parse(readPage(join(out, 'index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+    assert.deepEqual(data.storybook, { base: `${hosted.url}/`, hosted: true }, r.said.slice(-1500));
+    assert.ok(!existsSync(join(out, 'storybook')), 'nothing copied: the stories load from where the team hosts them');
+    assert.deepEqual(data.components.find((x) => x.name === 'button').stories.map((s) => s.state), ['Primary', 'Secondary', 'Large', 'Loading', 'Huge']);
+    server = await serveStatic(out); c = await launchChrome(CHROME);
+    assert.notEqual(new URL(server.url).origin, new URL(hosted.url).origin);
+    const { send, close } = await connectCDP(c.wsUrl);
+    const { sessionId } = await openPage(send, `${server.url}/index.html#c-button?variant=Secondary`);
+    const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    const shown = `(() => { const f = [...document.querySelectorAll('.pg-story-frame')].find((x) => x.offsetParent); return !!f && f.classList.contains('is-drawn') && parseFloat(f.style.height) > 0; })()`;
+    assert.ok(await waitForTrue(send, sessionId, shown, { attempts: 600, intervalMs: 50 }), 'the story drawn, and sized from the copy');
+    assert.equal(await ev(`(() => { try { return [...document.querySelectorAll('.pg-story-frame')].find((x) => x.offsetParent).contentDocument; } catch (e) { return 'refused'; } })()`), null, 'the page cannot read it');
+    // What the story drew, read where it is, in its own frame: the control's Secondary, sent through Storybook's channel.
+    const inStory = async () => {
+      const { frameTree } = await send('Page.getFrameTree', {}, sessionId);
+      const f = (frameTree.childFrames ?? []).map((x) => x.frame).find((x) => x.url.startsWith(hosted.url));
+      if (!f) return '';
+      const { executionContextId } = await send('Page.createIsolatedWorld', { frameId: f.id }, sessionId);
+      return (await send('Runtime.evaluate', { expression: `(document.querySelector('#storybook-root .hb-button') || {}).className || ''`, contextId: executionContextId, returnByValue: true }, sessionId)).result?.value ?? '';
+    };
+    let cls = '';
+    for (let i = 0; i < 200 && !/hb-button--secondary/.test(cls); i++) { cls = await inStory(); if (!/hb-button--secondary/.test(cls)) await new Promise((ok) => setTimeout(ok, 50)); }
+    assert.match(cls, /hb-button--secondary/, 'the story drawn as the control says');
+    await ev(`[...document.querySelectorAll('.pg-stage-tools button')].find((b) => b.offsetParent && /Inspect/.test(b.textContent)).click()`);
+    const line = `([...document.querySelectorAll('.pg-anat-line')].find((x) => x.offsetParent) || {}).textContent || ''`;
+    assert.ok(await waitForTrue(send, sessionId, `/at another address/.test(${line})`, { attempts: 200, intervalMs: 50 }), await ev(line));
+    const hits = `(() => { const a = [...document.querySelectorAll('.pg-anatomy')].find((x) => x.offsetParent); return a ? a.querySelectorAll('[data-hit]').length : 0; })()`;
+    assert.ok(await waitForTrue(send, sessionId, `${hits} > 0`, { attempts: 200, intervalMs: 50 }), 'Inspect marks the copy');
+    close();
+  } finally { writeFileSync(cfgFile, was); c?.kill(); await server?.close(); await hosted.close(); }
 });

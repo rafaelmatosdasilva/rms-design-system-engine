@@ -18,6 +18,15 @@
   // ── What the team wrote in its Storybook: the component's description, each story as a worked example with the args it
   // is drawn with, and each place Storybook and the code or Figma disagree, each side's value named. Read from the
   // story file, as the team wrote it (its contract's Storybook part).
+  // Each place a component's Storybook and its code or Figma disagree, one list item each, each side's value named. On its
+  // Code area and in its Documentation, where the disagreement is a task.
+  function storybookDiffers(sb) {
+    var val = function (v) { return '<code class="sg-name">' + esc(String(v)) + '</code>'; };
+    return ((sb && sb.differs) || []).map(function (d) {
+      var other = [d.code != null ? 'the code says ' + val(d.code) : '', d.figma != null ? 'Figma says ' + val(d.figma) : ''].filter(Boolean).join(' and ');
+      return '<li>' + val(d.prop) + ', ' + esc(d.what) + '. Storybook says ' + val(d.storybook) + (other ? ', and ' + other : '') + '.</li>';
+    }).join('');
+  }
   function storybookHTML(c) {
     var sb = c.storybookDocs; if (!sb) return '';
     var val = function (v) { return '<code class="sg-name">' + esc(String(v)) + '</code>'; };
@@ -25,10 +34,7 @@
       var args = Object.keys(e.args || {}).map(function (k) { return esc(k) + ' ' + val(e.args[k]); }).join(esc('  ·  '));
       return '<tr><td>' + esc(e.name) + '</td><td>' + (args || esc('its defaults')) + '</td></tr>';
     }).join('');
-    var differs = (sb.differs || []).map(function (d) {
-      var other = [d.code != null ? 'the code says ' + val(d.code) : '', d.figma != null ? 'Figma says ' + val(d.figma) : ''].filter(Boolean).join(' and ');
-      return '<li>' + val(d.prop) + ', ' + esc(d.what) + '. Storybook says ' + val(d.storybook) + (other ? ', and ' + other : '') + '.</li>';
-    }).join('');
+    var differs = storybookDiffers(sb);
     return '<div class="pg-doc pg-storybook"><h3>Storybook</h3>' + (sb.description ? '<p>' + esc(sb.description) + '</p>' : '') +
       (rows ? '<div class="pg-inspect"><div class="pg-inspect-head">Its stories</div><table>' + rows + '</table></div>' : '') +
       (differs ? '<p>Where Storybook and the code or Figma disagree:</p><ul class="pg-storybook-differs">' + differs + '</ul>' : '') +
