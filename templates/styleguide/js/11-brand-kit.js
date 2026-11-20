@@ -653,9 +653,16 @@
       // Its two hues (named so in Figma, else its most used hues) colour the hero and every sample.
       // Its identity is the system's own colours: never one inside a component (cardTile/iconMuted/color, as a
       // published guide once showed in its two large cards, both the same grey), never a status colour (the swatches below show those),
-      // and never one value twice. A token is a component's when its first part is a component's name or begins with one.
-      var compNames = COMPONENTS.map(function (c) { return String(c.name).toLowerCase(); }).filter(function (n) { return n.length > 2; });
-      var ofComponent = function (t) { var f = String(t.figma).split('/')[0].toLowerCase(); return compNames.some(function (n) { return f === n || f.indexOf(n) === 0; }); };
+      // and never one value twice. A token is a component's when, past its layer (its collection's own name, or a word for
+      // a layer), one of its groups is a component's name (component/cardTile/accent/color), or begins with one and goes on
+      // in a capital (cardTileIcon/color). The layer is never the component, even where one shares its name: a system
+      // whose first layer and one of its components had the same name lost its brand hue to that component.
+      var compNames = COMPONENTS.map(function (c) { return String(c.name); }).filter(function (n) { return n.length > 2; });
+      var LAYER = /^(base|primitives?|semantic|advanced|core|global|system|sys|brand|theme|tokens?|alias(es)?|ref(erence)?|foundations?)$/i;
+      var ofComponent = function (t) {
+        var parts = String(t.figma).split('/'); if (parts.length > 1 && (LAYER.test(parts[0]) || parts[0].toLowerCase() === String(t.collection || '').toLowerCase())) parts = parts.slice(1);
+        return parts.slice(0, -1).some(function (g) { return compNames.some(function (n) { return g.toLowerCase() === n.toLowerCase() || (g.indexOf(n) === 0 && /^[A-Z]/.test(g.charAt(n.length))); }); });
+      };
       var STATUS_HUE = /(^|\/)(positive|success|accept|negative|error|danger|warning|alert|caution|pending|info|information|notice)(\/|$)/i;
       var own = bkCols.filter(function (t) { return !ofComponent(t); });
       var hues = prim.filter(function (t) { return bkChroma(bkHex(t)) > 0.15 && !ofComponent(t) && !STATUS_HUE.test(t.figma); }).sort(function (a, b) { return (used[b.figma] || 0) - (used[a.figma] || 0); });
