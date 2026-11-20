@@ -15,3 +15,22 @@
       ((api.slots || []).length ? box('Slots', list(api.slots)) : '') +
       '</div><p class="pg-selector">Read from <code>' + esc(api.file) + '</code></p></div>';
   }
+  // ── What the team wrote in its Storybook: the component's description, each story as a worked example with the args it
+  // is drawn with, and each place Storybook and the code or Figma disagree, each side's value named. Read from the
+  // story file, as the team wrote it (its contract's Storybook part).
+  function storybookHTML(c) {
+    var sb = c.storybookDocs; if (!sb) return '';
+    var val = function (v) { return '<code class="sg-name">' + esc(String(v)) + '</code>'; };
+    var rows = (sb.examples || []).map(function (e) {
+      var args = Object.keys(e.args || {}).map(function (k) { return esc(k) + ' ' + val(e.args[k]); }).join(esc('  ·  '));
+      return '<tr><td>' + esc(e.name) + '</td><td>' + (args || esc('its defaults')) + '</td></tr>';
+    }).join('');
+    var differs = (sb.differs || []).map(function (d) {
+      var other = [d.code != null ? 'the code says ' + val(d.code) : '', d.figma != null ? 'Figma says ' + val(d.figma) : ''].filter(Boolean).join(' and ');
+      return '<li>' + val(d.prop) + ', ' + esc(d.what) + '. Storybook says ' + val(d.storybook) + (other ? ', and ' + other : '') + '.</li>';
+    }).join('');
+    return '<div class="pg-doc pg-storybook"><h3>Storybook</h3>' + (sb.description ? '<p>' + esc(sb.description) + '</p>' : '') +
+      (rows ? '<div class="pg-inspect"><div class="pg-inspect-head">Its stories</div><table>' + rows + '</table></div>' : '') +
+      (differs ? '<p>Where Storybook and the code or Figma disagree:</p><ul class="pg-storybook-differs">' + differs + '</ul>' : '') +
+      (sb.from ? '<p class="pg-selector">Read from <code>' + esc(sb.from) + '</code></p>' : '') + '</div>';
+  }

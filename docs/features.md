@@ -510,6 +510,7 @@ Two things it will not do. It never shows a zero where it means *not yet*: a ste
 Your tools stay as they are, and the engine fits around them.
 
 - Checks in a real browser: Chrome for every check, and Firefox and Safari for the match with Figma and six accessibility checks. Firefox runs whenever it is installed, Safari when you ask, and only what differs from Chrome is said.
+- Reads your Storybook: each story is a page the browser checks run on and held to the Figma variant it shows, its descriptions, tags and stories go into the specs and guidelines, and the Playground draws it live.
 - Writes and reads DSDS, and tries each new DSDS release before moving to it.
 - Reads code straight from GitHub or GitLab, on their own sites or your own host, without a clone.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.

@@ -1212,3 +1212,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cx-follow { display: block; white-space: nowrap; font-variant-numeric: tabular-nums; }   /* the count and its share on one line */
 .sg-cx-follow-bar { display: flex; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-space-xs); min-width: 7rem;   /* the bar 8px further under its count than it was */ }
 .sg-cx-follow-bar .sg-health-bar { flex: 1; height: calc(var(--sg-space-xs) * 1.5); }   /* as thick as the status dot in the same table */
+
+/* A component the team's Storybook draws: its story live in one frame on the stage, the copy of its markup kept under
+   it, unseen, for what reads markup (its tokens, its code, its variants). The frame is as tall as its story. */
+.pg-preview-col > .pg-preview.pg-preview--model { position: absolute; inset: 0 auto auto 0; width: 100%; visibility: hidden; pointer-events: none; z-index: -1; }
+.pg-preview-col > .pg-story { min-width: 0; min-height: 140px; overflow: auto; flex-shrink: 1; display: flex; align-items: safe center; justify-content: safe center; padding: var(--sg-space-m);
+  background-color: var(--sg-stage, var(--sg-bg)); --sg-checker: var(--sg-a2);
+  background-image: linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%), linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px; }
+.pg-story-frame { display: block; flex: none; width: 100%; height: 120px; border: 0; padding: 0; margin: 0; background: transparent; color-scheme: normal; visibility: hidden; }
+.pg-story-frame.is-drawn { visibility: visible; }
+/* Inspecting a story: the marks laid over its frame, where it is drawn, catching the clicks its controls would take. */
+.pg-preview-col > .pg-anatomy.pg-anatomy--live { position: absolute; display: block; min-height: 0; padding: 0; overflow: visible; background: transparent; z-index: 2; }
+.pg-anatomy--live > .pg-anat-stage { position: relative; }

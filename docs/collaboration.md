@@ -340,7 +340,8 @@ One row for each component, with one word per state. The cards above the table a
 
 Early development. Each component's page opens on its Playground: the component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch.
 
-- **Inspect.** Outlines each part, padding and gap. Click one to see what it is and its value (`chip padding left · --padding-s · 8px`), and click inside to go one level deeper.
+- **Live from your Storybook.** With a Storybook built to files, the Playground draws each component as its story does, its own script running: a disclosure opens, a menu drops down, a switch switches. The controls set the story's args through Storybook itself, so the story is never reloaded and nothing flickers. The Storybook is published beside the style guide, in its `storybook/` folder.
+- **Inspect.** Outlines each part, padding and gap. Click one to see what it is and its value (`chip padding left · --padding-s · 8px`), and click inside to go one level deeper. A live story is inspected where it is drawn, with the styles only its own page has.
 - **Figma beside the code.** Off unless `styleguide.figmaCompare` is `true` in `ds-config.json`. Then a Figma button shows Figma's image of the variant you set, beside the component or over it with a slider. The images come from `.design-system-engine-refs/` or, with `FIGMA_TOKEN` in `.env`, straight from Figma.
 - **Width.** Shows the component at each breakpoint your Figma file gives (Phone 350, Desktop 1680), else at 375, 768 and 1280 pixels, with your media queries applied.
 - **It works as in your products.** Your system's own scripts run (`systemScripts` in `ds-config.json`), a selection moves when you click it, and an overlay opens with its own animation.

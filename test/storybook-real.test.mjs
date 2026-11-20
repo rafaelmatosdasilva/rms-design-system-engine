@@ -31,6 +31,11 @@ before(async () => {
   dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'harbor-ds'), 'storybook-real-', { overlay: join(ENGINE, 'test', 'fixtures', 'harbor-stories') });
   const props = join(dir, 'figma', 'props.snapshot.json');
   writeFileSync(props, JSON.stringify({ ...JSON.parse(readFileSync(props, 'utf8')), disclosure: { nodeId: '9:1', properties: {}, annotations: [{ label: 'Role: disclosure' }] } }, null, 2));
+  // Figma draws a Large button taller than the default: the Large story is held to that variant, and the code, which
+  // draws every size at 36px, differs there.
+  const structure = join(dir, 'figma', 'structure.snapshot.json'), st = JSON.parse(readFileSync(structure, 'utf8'));
+  st.components.button.variants['variant=Primary, size=Large'] = { h: 44 };
+  writeFileSync(structure, JSON.stringify(st, null, 2));
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
   const built = spawnSync(join(TOOLS, '.bin', 'storybook'), ['build', '-o', 'storybook-static', '--quiet'], {
     cwd: dir, encoding: 'utf8', env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1', NO_COLOR: '1' }, timeout: budget(240000) });
@@ -86,4 +91,61 @@ test('parity measures each component on its own story when nothing else draws it
   assert.equal(snap.components.button.props.height.value, '36px', "Figma's button is 36px high");
   assert.equal(snap.components.button.props.height.confidence, 'verified', 'the browser and the CSS agree');
   assert.equal(snap.components.badge.props.height.value, '20px');
+});
+
+// Parity used to measure a component on its first story only. Each other story is now measured as its story draws it,
+// and held to the Figma variant its args show.
+test('each story is compared with its own Figma variant: Button · Large against size=Large', { skip: READY, timeout: budget(600000) }, async () => {
+  const snap = JSON.parse(readFileSync(join(dir, '.design-system-engine-out', 'code.snapshot.json'), 'utf8'));
+  const b = snap.components.button;
+  assert.deepEqual(b.instance.story, { state: 'Primary', variant: 'variant=Primary', default: true }, 'the base is measured on a story that shows the default variant');
+  assert.equal(b.stories.Large.variant, 'size=Large');
+  assert.equal(b.stories.Secondary.variant, 'variant=Secondary');
+  assert.equal(b.stories.Large.size.height, 36, 'measured as the story draws it');
+  assert.equal(b.stories.Huge, undefined, 'a story showing only what Figma lacks has nothing to be held to: the run names it instead');
+  const { compareComponents } = await import('../lib/capture-compare.mjs');
+  const vars = JSON.parse(readFileSync(join(dir, 'figma', 'vars.snapshot.json'), 'utf8'));
+  const structure = JSON.parse(readFileSync(join(dir, 'figma', 'structure.snapshot.json'), 'utf8')).components;
+  const maps = { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} };
+  const r = compareComponents(snap, structure, vars, JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')), maps);
+  const large = r.differ.find((d) => d.component === 'button' && d.field === 'height (size=Large, story Large)');
+  assert.ok(large, JSON.stringify(r.differ.filter((d) => d.component === 'button')));
+  assert.equal(large.figma, 44);
+  assert.equal(large.code, '36px');
+});
+
+// A copy of a component's markup runs nothing, so a component that needs its own script never answered a click in the
+// Playground. With a Storybook the Playground draws the team's story live: published beside the page, its args set by
+// the controls through Storybook's own channel (one load, no reload), and Inspect drawn over the story itself.
+test('the Playground draws the live story: its controls set the args, and Inspect reads the story where it is drawn', { skip: READY, timeout: budget(600000) }, async () => {
+  const r = run(dir, 'audit.mjs', ['--styleguide', '--no-a11y-bake']);
+  assert.equal(r.status === 0 || r.status === 1, true, `${r.stdout}\n${r.stderr}`.slice(-2000));
+  const out = join(dir, '.design-system-engine-out', 'styleguide');
+  assert.ok(existsSync(join(out, 'storybook', 'iframe.html')), 'the Storybook is published beside the page');
+  const { readPage, copyPage } = await import('../lib/styleguide-files.mjs');
+  const data = JSON.parse(readPage(join(out, 'index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(data.storybook, { base: 'storybook/' });
+  assert.deepEqual(data.components.find((c) => c.name === 'button').stories.map((s) => s.state), ['Primary', 'Secondary', 'Large', 'Loading', 'Huge']);
+  // A publishing job's copy carries it, or every live story would be a blank frame.
+  const pub = join(dir, 'published');
+  assert.ok(copyPage(join(out, 'index.html'), pub).includes('storybook/'));
+  assert.ok(existsSync(join(pub, 'storybook', 'iframe.html')));
+
+  const { serveStatic } = await import('../lib/storybook-stories.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue } = await import('../lib/cdp.mjs');
+  const server = await serveStatic(out), c = await launchChrome(CHROME);
+  try {
+    const { send, close } = await connectCDP(c.wsUrl);
+    const { sessionId } = await openPage(send, `${server.url}/index.html#c-button?variant=Secondary`);
+    const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    const story = `(() => { const f = [...document.querySelectorAll('.pg-story-frame')].find((x) => x.offsetParent); const b = f && f.classList.contains('is-drawn') && f.contentDocument && f.contentDocument.querySelector('#storybook-root .hb-button'); return b ? b.className : null; })()`;
+    assert.ok(await waitForTrue(send, sessionId, `/hb-button--secondary/.test(${story} || '')`, { attempts: 600, intervalMs: 50 }), `the story drawn as the control says: ${await ev(story)}`);
+    const frame = await ev(`(() => { const f = [...document.querySelectorAll('.pg-story-frame')].find((x) => x.offsetParent); return { h: parseFloat(f.style.height), body: Math.ceil(f.contentDocument.body.getBoundingClientRect().height), src: f.getAttribute('src') }; })()`);
+    assert.equal(frame.h, frame.body, 'the frame is as tall as its story');
+    assert.match(frame.src, /^storybook\/iframe\.html\?id=components-button--primary/, 'one story, its args set by the controls, never another page loaded');
+    await ev(`[...document.querySelectorAll('.pg-stage-tools button')].find((b) => b.offsetParent && /Inspect/.test(b.textContent)).click()`);
+    const hits = `(() => { const a = [...document.querySelectorAll('.pg-anatomy--live')].find((x) => x.offsetParent); return a ? [...a.querySelectorAll('[data-hit]')].map((h) => h.getAttribute('data-hit')) : []; })()`;
+    assert.ok(await waitForTrue(send, sessionId, `${hits}.includes('part 0 button')`, { attempts: 200, intervalMs: 50 }), JSON.stringify(await ev(hits)));
+    close();
+  } finally { c.kill(); await server.close(); }
 });
