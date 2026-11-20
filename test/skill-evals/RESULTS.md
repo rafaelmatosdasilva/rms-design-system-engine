@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: shadcn/ui scaffold in the guide (continuous evaluation)
+
+What changed since the entry for engine 35e9ed3, two below (measured beside the one under it, on its own branch): reference/usage.md and cookbook/build-from-figma.md name --framework shadcn and components.json. The guide changed in `cookbook/build-from-figma.md`, `reference/usage.md`.
+
+Guide set measured: `8d18a67a5e79` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md c92fab2f` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md dd1fcdbe` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 6b45849f` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine ec880234 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 76/79 | 78/79 |
+| Mean cost a run | 0.068 | 0.070 |
+| Input a run | 120k | 123k |
+| Turns a run | 4.2 | 4.2 |
+| Rule violations | 0 | 0 |
+| Runs stopped at a limit | 1 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed. Failed: no-cli-on-path #1: ran the engine by its path. no task changed state; 4 runs moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-20-the-guide-names-the-shadcn`.
 ## 2026-11: The accessibility page renamed, so GitHub shows no Accessibility tab (continuous evaluation)
 
 What changed since the entry below (engine 35e9ed3): The accessibility page is docs/test-accessibility.md, so GitHub shows no Accessibility tab beside the README. The guide changed in `cookbook/ci-and-hooks.md`.
