@@ -2,8 +2,8 @@ name: Screen readers
 
 # A real screen reader over the components, not the browser's word for what one would say: VoiceOver on a macOS runner
 # and NVDA on a Windows runner, each driven through Guidepup (lib/screen-reader.mjs, --hear) over the two fictional
-# systems in test/fixtures. Guidepup's own setup step lets each reader be driven on a runner nobody sits at; the engine
-# never changes a setting itself. What each reader said is kept as the run's record (heard-by-reader.json), which a
+# systems in test/fixtures. Guidepup's own setup (guidepup setup --ci) lets each reader be driven on a runner nobody sits
+# at; the engine never changes a setting itself. What each reader said is kept as the run's record (heard-by-reader.json), which a
 # style guide shows on each component's 4.1.2 row. It fails only when a reader could not run or a component was not
 # heard: what a reader said apart from the browser is the measurement, advisory, and is kept, never a failure.
 on:
@@ -52,10 +52,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      # VoiceOver allowed to be driven (macOS), a portable NVDA with Guidepup's add-on (Windows).
-      - uses: guidepup/setup-action@acf1a64cc26292ebe0db6a28d1341bd1bae93c65 # 0.21.0
-        with:
-          record: ${{ matrix.reader == 'voiceover' }}
       # Guidepup and its setup from their committed lockfile, found as a machine-wide one is: never put in a project.
       - name: Install Guidepup
         shell: bash
@@ -64,6 +60,13 @@ jobs:
           echo "NODE_PATH=$PWD/test/.reader-tools/node_modules" >> "$GITHUB_ENV"
       # The reader's own files Guidepup drives it with (NVDA itself, VoiceOver's preferences), each checked against the
       # sha256 Guidepup's manifest pins, into Guidepup's cache.
+      # The computer made ready to be driven, by the same Guidepup setup the lockfile pins: VoiceOver allowed to be
+      # controlled and its local preferences written (macOS), NVDA's settings (Windows). Guidepup's own GitHub action
+      # carried an older setup, which left out the preferences Guidepup 0.40 starts VoiceOver from.
+      - name: Set the runner up for a screen reader
+        shell: bash
+        working-directory: test/.reader-tools
+        run: ./node_modules/.bin/guidepup setup --ci
       - name: Fetch the reader's files
         shell: bash
         working-directory: test/.reader-tools
@@ -101,8 +104,6 @@ jobs:
         if: always()
         with:
           name: heard-${{ matrix.reader }}
-          path: |
-            heard/
-            recordings/
+          path: heard/
           if-no-files-found: ignore
           retention-days: 90

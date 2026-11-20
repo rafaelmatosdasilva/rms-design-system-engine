@@ -28,6 +28,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const run = readHeard(dir);
     console.log(`${dir}: ${heardLine(run) ?? 'no run'}`);
     for (const [name, c] of Object.entries(run?.components ?? {})) for (const l of c.lines ?? []) console.log(`   ${l.ok ? 'same ' : 'apart'} ${name} ${l.desc}: the browser says "${l.want}", the reader said "${l.said}"`);
+    for (const [name, c] of Object.entries(run?.components ?? {})) if (c.saidInstead) console.log(`   ${name}: what the reader said instead: ${c.saidInstead.map((x) => `"${x}"`).join(' · ')}`);
     for (const p of heardProblems(run, which)) { console.log(`::error title=${which} on ${dir}::${p}`); bad++; }
   }
   process.exit(bad ? 1 : 0);
