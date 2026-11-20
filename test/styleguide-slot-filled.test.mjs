@@ -1,7 +1,8 @@
 // A Figma slot whose content the component's own markup already holds (a group's radios) is drawn with that content,
-// marked as the slot over it: a dashed area named for the slot. It is never swapped for an empty box, which left a
-// group showing only an empty slot with its radios hidden, so its preview, its thumbnail and the checks that read the
-// preview all missed the real component. The code shown is the component's, with no mark of the Playground's.
+// marked as the slot over it in Inspect only: a dashed area named for the slot. The content is not the component's, so
+// the preview and its thumbnail show it unmarked. It is never swapped for an empty box, which left a group showing only
+// an empty slot with its radios hidden, so its preview, its thumbnail and the checks that read the preview all missed
+// the real component. The code shown is the component's, with no mark of the Playground's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -31,7 +32,7 @@ function choiceGroupProject() {
   return dir;
 }
 
-test('a slot its markup already fills shows that content, marked as the slot, and the code shown has no mark', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available', timeout: budget(300000) }, async () => {
+test('a slot its markup already fills shows that content, marked as the slot in Inspect only, and the code shown has no mark', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available', timeout: budget(300000) }, async () => {
   const dir = choiceGroupProject();
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -52,11 +53,10 @@ test('a slot its markup already fills shows that content, marked as the slot, an
         shown: radios.map((k) => getComputedStyle(k).display !== 'none' && getComputedStyle(k).visibility !== 'hidden' && box(k).height > 0),
         gone: g.querySelectorAll('.pg-slot-gone').length,
         marks: g.querySelectorAll('.tp-radio__mark').length, words: radios.map((k) => k.textContent.trim()),
-        mark: mark && { slot: mark.getAttribute('data-slot'), hidden: mark.getAttribute('aria-hidden'), outline: getComputedStyle(mark).outlineStyle, events: getComputedStyle(mark).pointerEvents,
-          covers: radios.every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }),
-          label: getComputedStyle(mark, '::after').content },
+        mark: mark && { slot: mark.getAttribute('data-slot'), hidden: mark.getAttribute('aria-hidden'), display: getComputedStyle(mark).display },
         code: code ? code.textContent : '',
         thumbRadios: thumb ? thumb.querySelectorAll('.tp-radio:not(.pg-slot-gone)').length : -1,
+        thumbMark: thumb ? [...thumb.querySelectorAll('.pg-slot-over')].map((n) => getComputedStyle(n).display) : null,
       });
     })()`;
     await waitForTrue(send, sessionId, `${read} !== null && document.querySelector('#c-choiceGroup .pg-code pre code').textContent.length > 0`, { attempts: 400, intervalMs: 50 });
@@ -69,19 +69,40 @@ test('a slot its markup already fills shows that content, marked as the slot, an
     assert.deepEqual(v.words, ['Basic', 'Pro'], 'and its words');
     assert.ok(v.mark, 'the slot is marked');
     assert.equal(v.mark.slot, 'Slot Options', 'named for the slot');
-    assert.equal(v.mark.label, '"Slot Options"', 'its name drawn on the page');
     assert.equal(v.mark.hidden, 'true', 'the mark is the page\'s, never read out');
-    assert.equal(v.mark.outline, 'dashed', 'drawn dashed, as every slot area');
-    assert.equal(v.mark.events, 'none', 'the radios under it still take a click');
-    assert.ok(v.mark.covers, 'the mark is the area the content takes');
+    assert.equal(v.mark.display, 'none', 'and unseen in the preview: the content is not the component\'s');
     assert.ok(v.code.trim(), 'the code is shown');
     assert.doesNotMatch(v.code, /pg-slot/, 'with no mark of the Playground\'s');
     assert.equal(v.thumbRadios, 2, 'the Index card\'s thumbnail shows the radios too');
+    assert.deepEqual(v.thumbMark, ['none'], 'unmarked');
+    // Beside Inspect, a button named for the slot says it is there, and marks its area in the preview while pressed.
+    const shownMark = `(() => { const b = [...document.querySelectorAll('#c-choiceGroup .pg-stage-tools button')].find((x) => x.textContent.trim() === 'Slot Options'); if (!b) return null;
+      b.click(); const g = document.querySelector('#c-choiceGroup .pg-preview .tp-choice-group'), mark = g.querySelector(':scope > .pg-slot-over'), box = (n) => n.getBoundingClientRect();
+      const r = { pressed: b.getAttribute('aria-pressed'), display: getComputedStyle(mark).display, covers: [...g.querySelectorAll('.tp-radio')].every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }) };
+      b.click(); r.after = [b.getAttribute('aria-pressed'), getComputedStyle(mark).display]; return JSON.stringify(r); })()`;
+    const sm = JSON.parse((await send('Runtime.evaluate', { expression: shownMark, returnByValue: true }, sessionId)).result.value);
+    assert.deepEqual(sm, { pressed: 'true', display: 'block', covers: true, after: ['false', 'none'] }, 'pressed, the area shows over the radios, and goes again');
+    // Inspect: the slot is marked over its content, named, and clicked it says what it is.
+    await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('#c-choiceGroup button')].find((b) => b.textContent.trim() === 'Inspect').click()` }, sessionId);
+    const inspect = `(() => {
+      const w = document.querySelector('#c-choiceGroup .pg-anat-wrap'); const mark = w && w.querySelector('.pg-slot-over'); if (!mark || !mark.getBoundingClientRect().width) return null;
+      const box = (n) => n.getBoundingClientRect(), radios = [...w.querySelectorAll('.tp-radio')];
+      return JSON.stringify({ outline: getComputedStyle(mark).outlineStyle, events: getComputedStyle(mark).pointerEvents, label: getComputedStyle(mark, '::after').content,
+        covers: radios.length === 2 && radios.every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }) });
+    })()`;
+    await waitForTrue(send, sessionId, `${inspect} !== null`, { attempts: 400, intervalMs: 50 });
+    const m = JSON.parse((await send('Runtime.evaluate', { expression: inspect, returnByValue: true }, sessionId)).result.value);
+    assert.equal(m.outline, 'dashed', 'drawn dashed, as every slot area');
+    assert.equal(m.label, '"Slot Options"', 'its name drawn');
+    assert.equal(m.events, 'none', 'never in the way of a click');
+    assert.ok(m.covers, 'the mark is the area the content takes, as Inspect lays it out');
   } finally { close(); browser.kill(); }
 });
 
 test('only a slot with nothing to show is an empty area in its place', () => {
   const tpl = templateText();
   assert.match(tpl, /if \(rs\.length\) \{[\s\S]*?fill\.classList\.add\('pg-slot-over'\);[\s\S]*?return;\n {10}\}/, 'content to show: marked over it');
+  assert.match(tpl, /\.pg-slot-area\.pg-slot-over \{ display: none;/, 'unseen in the preview and the thumbnails');
+  assert.match(tpl, /\.pg-anat-wrap \.pg-slot-area\.pg-slot-over, \.pg-slots-shown \.pg-slot-area\.pg-slot-over \{ display: block; \}/, 'seen in Inspect, and while its button is pressed');
   assert.match(tpl, /el\.insertBefore\(fill, kids\[0\] \|\| null\);\n {10}kids\.forEach\(function \(k\) \{ k\.classList\.add\('pg-slot-gone'\); \}\);/, 'none: the empty area, as before');
 });

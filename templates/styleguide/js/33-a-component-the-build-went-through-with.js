@@ -861,6 +861,7 @@
       wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
       marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
+      Array.prototype.forEach.call(copy.querySelectorAll('.pg-slot-over'), placeSlot);   // laid over its content as the copy lays it out
       root = copy; if (c.only) { try { root = copy.querySelector(c.only) || copy; } catch (err) { /* not a selector: the whole */ } }
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
@@ -1435,6 +1436,36 @@
     // a segmented control's segments) is the area that content takes, the parts of its other slots left as they are.
     var SLOTS = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value) && r.code; });
     function slotName(r) { return /^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name; }
+    // A slot marked over its content: laid over the area that content takes where it is drawn now (the preview, or
+    // Inspect's copy, which lays it out again), its content named by its place among the component's children.
+    function placeSlot(fill) {
+      var el = fill.parentElement; if (!el) return;
+      var on = (fill.getAttribute('data-kids') || '').split(',').map(function (i) { return el.children[+i]; }).filter(function (k) { return k && k !== fill; })
+        .map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
+      if (!on.length) return;
+      var b = el.getBoundingClientRect();
+      var x0 = Math.min.apply(null, on.map(function (q) { return q.left; })), y0 = Math.min.apply(null, on.map(function (q) { return q.top; }));
+      fill.style.left = (x0 - b.left - el.clientLeft) + 'px'; fill.style.top = (y0 - b.top - el.clientTop) + 'px';
+      fill.style.width = (Math.max.apply(null, on.map(function (q) { return q.right; })) - x0) + 'px';
+      fill.style.height = (Math.max.apply(null, on.map(function (q) { return q.bottom; })) - y0) + 'px';
+    }
+    // A slot whose content shows is said beside Inspect: a button named for it, which marks its area in the preview
+    // while it is pressed, so the slot is never found only by inspecting. One button for every such slot.
+    var slotBtn = null, slotsShown = false;
+    function slotButton() {
+      var tools = sec.querySelector('.pg-stage-tools');
+      if (ALL || !tools) return;
+      var names = SLOTS.map(slotName).filter(function (n, i, a) { return a.indexOf(n) === i; }), said = names.length === 1 ? names[0] : 'Slots';
+      if (!slotBtn) {
+        tools.insertAdjacentHTML('afterbegin', sysButton('button', said, ' aria-pressed="false"'));
+        slotBtn = tools.firstElementChild;
+        slotBtn.addEventListener('click', function () {
+          slotsShown = !slotsShown;
+          slotBtn.setAttribute('aria-pressed', slotsShown ? 'true' : 'false');
+          preview.classList.toggle('pg-slots-shown', slotsShown);
+        });
+      }
+    }
     function drawSlots() {
       if (!SLOTS || !SLOTS.length || !cur) return;
       // The parts that are not the slot's content: the slots the code gives a part of their own, and the parts the
@@ -1453,22 +1484,16 @@
           var h = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.bottom; })) - Math.min.apply(null, rs.map(function (q) { return q.top; })) : 0;
           var fill = document.createElement('div');
           fill.className = 'pg-slot-area pg-slot-fill'; fill.setAttribute('data-slot', slotName(r)); fill.setAttribute('aria-hidden', 'true');
-          // The component's own markup already fills the slot (a group's radios): that content shows, as it is, and the
-          // area it takes is marked over it, so the checks read the real content and the code shown stays the
-          // component's. The mark sits over the content, never in the flow, and follows it when the stage reflows.
+          // The component's own markup already fills the slot (a group's radios): that content shows, as it is, so the
+          // checks read the real content and the code shown stays the component's. The area it takes is marked over it,
+          // seen only in Inspect (its CSS), never in the flow, and it follows the content when the stage reflows.
           if (rs.length) {
             if (getComputedStyle(el).position === 'static') el.classList.add('pg-slot-host');
             fill.classList.add('pg-slot-over');
-            var place = function () {
-              var b = el.getBoundingClientRect(), on = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
-              if (!on.length) return;
-              var x0 = Math.min.apply(null, on.map(function (q) { return q.left; })), y0 = Math.min.apply(null, on.map(function (q) { return q.top; }));
-              fill.style.left = (x0 - b.left - el.clientLeft) + 'px'; fill.style.top = (y0 - b.top - el.clientTop) + 'px';
-              fill.style.width = (Math.max.apply(null, on.map(function (q) { return q.right; })) - x0) + 'px';
-              fill.style.height = (Math.max.apply(null, on.map(function (q) { return q.bottom; })) - y0) + 'px';
-            };
-            el.appendChild(fill); place();
-            if (window.ResizeObserver) new ResizeObserver(place).observe(el);
+            fill.setAttribute('data-kids', kids.map(function (k) { return Array.prototype.indexOf.call(el.children, k); }).join(','));
+            el.appendChild(fill); placeSlot(fill);
+            if (window.ResizeObserver) new ResizeObserver(function () { placeSlot(fill); }).observe(el);
+            slotButton();
             return;
           }
           // No content to show: an empty area in its place, at least the size a slot needs to be read, so the component

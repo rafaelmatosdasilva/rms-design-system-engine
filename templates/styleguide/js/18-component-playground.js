@@ -174,6 +174,7 @@
       return (a === 'checked' || a === 'disabled' || a === 'indeterminate') ? !!t[a] : t.getAttribute(a) === String(effect.attrs[a]);
     });
   }
+  function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)).filter(function (k) { return !inOther(e, k, sel); }) : []; } catch (x) { return []; } }
   // A part found inside another of the system's components drawn in this one (a group's radios, each a radioButton) is
   // that component's, never this one's, unless its selector names that component: a label guessed for a group's own
   // label once took every radio's label and mark with it.
@@ -184,7 +185,6 @@
     }
     return false;
   }
-  function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)).filter(function (k) { return !inOther(e, k, sel); }) : []; } catch (x) { return []; } }
   // A selector list searched one selector at a time, in its own order (the first is the best match), not in page order.
   function partsInOrder(e, sel) { return String(sel || '').split(',').reduce(function (acc, one) { return acc.concat(partsOf(e, one.trim()).filter(function (k) { return acc.indexOf(k) < 0; })); }, []); }
   function textLeaf(e, sel, used) {
