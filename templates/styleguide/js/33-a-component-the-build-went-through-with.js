@@ -1346,7 +1346,29 @@
     bottomBar();
     var cur = null;   // the element the props act on, as last drawn
     var leaves = {};   // the part each text prop wrote into, as last drawn
+    // What the person did in the component that no prop holds (a radio chosen in a group, words typed, an option picked):
+    // kept when it is drawn again (a mode changed, a prop set), as the same component keeps it in a product. Only what
+    // they changed from the markup's own, and never on a draw the page makes to check or picture its variants.
+    function usedState(e) {
+      return Array.prototype.map.call(e.querySelectorAll('input, select, textarea'), function (k) {
+        if (k.tagName === 'SELECT') return k.selectedIndex !== Array.prototype.findIndex.call(k.options, function (o) { return o.defaultSelected; }) ? { index: k.selectedIndex } : null;
+        if (/^(checkbox|radio)$/i.test(k.type)) return k.checked !== k.defaultChecked ? { checked: k.checked } : null;
+        return k.value !== k.defaultValue ? { value: k.value } : null;
+      });
+    }
+    function keepUsed(e, used) {
+      var ks = e.querySelectorAll('input, select, textarea');
+      if (!used || used.length !== ks.length) return;   // another markup: nothing to say which is which
+      used.forEach(function (u, i) {
+        if (!u) return;
+        var k = ks[i];
+        if ('index' in u && k.tagName === 'SELECT') k.selectedIndex = u.index;
+        else if ('checked' in u && /^(checkbox|radio)$/i.test(k.type)) k.checked = u.checked;
+        else if ('value' in u && k.tagName !== 'SELECT') k.value = u.value;
+      });
+    }
     function refresh() {
+      var used = !drawingVariants && !probing && !checking && cur && preview.contains(cur) ? usedState(cur) : null;
       preview.innerHTML = '';
       var e = baseElement(c, renderFor(c, state));
       preview.appendChild(e);
@@ -1372,6 +1394,7 @@
       // A part that is not a selector the browser parses draws the whole, so one bad name never stops the page.
       if (c.only) { var ones = []; try { ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); } catch (err) { /* not a selector */ } if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
       cur = e;
+      keepUsed(e, used);   // before the props, so one the person set in the controls still decides its own part
       var written = [], hidden = []; leaves = {};
       // Shows, hides and options first, text last, so a part a show prop draws gets its text.
       props.slice().sort(function (a, b) { return (a.type === 'TEXT') - (b.type === 'TEXT'); }).forEach(function (p) {

@@ -83,6 +83,12 @@ test('a slot its markup already fills shows that content, marked as the slot in 
       b.click(); r.after = [b.getAttribute('aria-pressed'), getComputedStyle(mark).display]; return JSON.stringify(r); })()`;
     const sm = JSON.parse((await send('Runtime.evaluate', { expression: shownMark, returnByValue: true }, sessionId)).result.value);
     assert.deepEqual(sm, { eye: [2, 1], pressed: 'true', display: 'block', covers: true, after: ['false', 'none'] }, 'its eye struck through, then open while the area shows over the radios, and the area goes again');
+    // What the person chose in it stays when the stage's mode changes: the component is drawn again, the choice with it.
+    const keep = `(() => { const g = () => document.querySelector('#c-choiceGroup .pg-preview .tp-choice-group'); const pro = g().querySelectorAll('.tp-radio input')[1]; pro.click();
+      const dark = [...document.querySelectorAll('#c-choiceGroup .pg-stage-mode button, #c-choiceGroup .pg-stage-mode [role=radio]')].find((b) => b.textContent.trim() === 'Dark'); if (!dark) return JSON.stringify({ dark: false });
+      const before = g(); dark.click(); return JSON.stringify({ dark: true, redrawn: g() !== before, chosen: [...g().querySelectorAll('.tp-radio input')].map((k) => k.checked) }); })()`;
+    const kept = JSON.parse((await send('Runtime.evaluate', { expression: keep, returnByValue: true }, sessionId)).result.value);
+    assert.deepEqual(kept, { dark: true, redrawn: true, chosen: [false, true] }, 'the radio chosen is still chosen once the mode changed');
     // Inspect: the slot is marked over its content, named, and clicked it says what it is.
     await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('#c-choiceGroup button')].find((b) => b.textContent.trim() === 'Inspect').click()` }, sessionId);
     const inspect = `(() => {
