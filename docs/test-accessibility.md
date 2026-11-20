@@ -84,6 +84,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **Roles from Figma.** Each component is held to the role in your Figma annotations, what it must expose (a toggle's pressed state, a field's label, a stepper's value) and what a person can do with it (Space flips a toggle, ArrowUp steps a stepper).
 - **Hidden components.** A modal, menu or popover kept behind a button is opened first, never with a button that deletes, sends or submits. One that nothing opens is said not checked, never clean.
 - **Signing in and dragging.** A password field that refuses paste or a password manager is found, and so is something moved only by dragging.
+- **An id used twice.** A label's `for`, a table cell's `headers`, an input's `list` or an `aria-*` reference that points at an id two elements share is found. The reference lands on the first one, which may be another copy of the component, so a click on the label ticks a box somewhere else. It is checked with axe-core or without it (WCAG 4.1.2).
 
 ### What you get
 
