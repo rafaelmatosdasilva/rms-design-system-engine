@@ -147,6 +147,17 @@ How your system is built, on both sides, is one page in the style guide's menu, 
 
 To keep it out of the menu, set `styleguide.construction` to `"unlisted"` ([all options](../reference/config.md)).
 
+### Taking a change in Figma back
+
+The engine only reads Figma, unless you say yes to a change: a rename, a description, the design team's to do page. Every change it writes there can be taken back.
+
+- **Every write records what it replaced.** Once the change has run, the engine writes the way back beside it.
+- **You see it before it runs.** The engine lists what the way back puts back, step by step, and runs it only after you say yes.
+- **All or nothing.** If part of a change cannot be put back, the way back changes nothing and says why. A file put back halfway looks undone when it is not.
+- **Its own frames are written again.** The to do page is simply drawn afresh on the next run.
+
+The full list of options is in the reference (`--reference usage`, *--figma-edits* and *The way back from a Figma write*).
+
 ## Lint your codebase rules
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.

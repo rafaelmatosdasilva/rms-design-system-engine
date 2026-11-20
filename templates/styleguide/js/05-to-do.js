@@ -63,7 +63,7 @@
   // A control the page draws itself (its segmented control, tooltip, card) is the template's, never the system's work:
   // no task. The system's own gaps are in Parity.
   // What the tokens owe (descriptions to write in Figma, a value written by hand twice, an alias to a removed token).
-  (DATA.systemTodo || []).forEach(function (t) { if (t.component) return;   /* one tied to a component is on that component's page */ TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, team: t.team, say: t.say, todo: t.todo, st: t.st, scope: t.scope || null }); });
+  (DATA.systemTodo || []).forEach(function (t) { if (t.component) return;   /* one tied to a component is on that component's page */ TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, team: t.team, say: t.say, todo: t.todo, st: t.st, scope: t.scope || null, figmaUrl: t.figmaUrl || null, found: t.found || null }); });
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
