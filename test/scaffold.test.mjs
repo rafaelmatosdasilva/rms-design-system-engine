@@ -50,7 +50,7 @@ test('--scaffold in build mode: asks what it cannot tell, hands back a patch, an
   cli();
   mkdirSync(join(root, 'src/styles'), { recursive: true });
   writeFileSync(join(root, 'src/styles/tokens.css'), readFileSync(join(root, '.design-system-engine-out/handback/tokens-to-build.css'), 'utf8'));
-  assert.match(cli('--scaffold').stdout, /needs what the components are written in \(vue or react\) and the folder they go in[\s\S]*NEXT: ask the person/);
+  assert.match(cli('--scaffold').stdout, /needs what the components are written in \(vue, react or shadcn\) and the folder they go in[\s\S]*NEXT: ask the person/);
   const out = cli('--scaffold', '--framework', 'vue', '--folder', 'src/components').stdout;
   assert.match(out, /🧱 10 files written from what is exact in Figma \(vue\), in build order/);
   assert.match(out, /• button → src\/components\/Button\.vue \+ src\/components\/button\.css/);

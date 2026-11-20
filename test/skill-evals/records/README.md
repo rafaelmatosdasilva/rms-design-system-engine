@@ -296,5 +296,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `tokens-and-github` | The 24 guide tasks on Haiku (engine fef91a1) | "Tokens for a team's own pipeline, and GitHub read as GitLab is" |
 | `2026-11-18-a-library-with-no-figma` | The 24 guide tasks on Haiku (engine 35e9ed3) | "A library with no Figma capture is read by its own code, not by the pairing's rules" |
 | `2026-11-20-the-accessibility-page-is-docs` | The 24 guide tasks on Haiku (engine 22f5c45) | "The accessibility page renamed, so GitHub shows no Accessibility tab" |
+| `2026-11-20-the-guide-names-the-shadcn` | The 24 guide tasks on Haiku (engine ec880234) | "shadcn/ui scaffold in the guide" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

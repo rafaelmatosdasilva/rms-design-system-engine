@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { cpSync, existsSync, readFileSync, symlinkSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startReactHarness, reactBuild, harnessModule, styleSpecifier, partOf } from '../lib/react-harness.mjs';
+import { startReactHarness, reactBuild, harnessModule, styleSpecifier, partOf, storyArgs } from '../lib/react-harness.mjs';
 import { codeComponents, rendersNothingOfItsOwn } from '../lib/component-source.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
@@ -39,6 +39,8 @@ test('a project with no React of its own is said so, and keeps the stand-in', as
 test('the page carries the markers every check already reads, so nothing downstream changes', () => {
   const mod = harnessModule([{ name: 'Chip', file: '/src/Chip.jsx', exportName: 'Chip', cases: [{ label: 'default', props: {} }] }], ['/src/styles/tokens.css']);
   assert.match(mod, /data-dse-component/);
+  // The page's script is written as text: one stray quote in it and nothing at all draws, with no error to read.
+  assert.doesNotThrow(() => new Function(mod.replace(/^import .*$/gm, '').replace(/\bawait\b/g, '')), 'the page module parses');
   assert.match(mod, /data-dse-case/);
   assert.match(mod, /window\.__dseHarnessReady = true/);
   assert.match(mod, /window\.__dseHarnessFailed/);
@@ -156,7 +158,10 @@ test('what React threw while drawing is said, a part is drawn inside its parent,
   put('ChoiceListItem', `import { useContext } from 'react';\nimport { ChoiceCtx } from './ChoiceList.jsx';\nexport function ChoiceListItem() { if (!useContext(ChoiceCtx)) throw new Error('ChoiceListItem must be inside a ChoiceList'); return <li className="bc-choice">One</li>; }`);
   put('Broken', `export function Broken() { throw new Error('needs a value it was not given'); }`);
   put('Closed', `export function Closed({ open = false }) { return open ? <div role="dialog" /> : null; }`);
-  const names = ['ChoiceList', 'ChoiceListItem', 'Broken', 'Closed'];
+  // Draws nothing without the keys it shows; its story gives them.
+  put('KeyHint', `export function KeyHint({ keys = [] }) { return keys.length ? <kbd className="bc-keys">{keys.join(' + ')}</kbd> : null; }`);
+  writeFileSync(join(dir, 'src', 'components', 'KeyHint.stories.jsx'), "export default { title: 'KeyHint' };\nexport const Default = { args: { keys: ['Mod', 'K'] } };\n");
+  const names = ['ChoiceList', 'ChoiceListItem', 'Broken', 'Closed', 'KeyHint'];
   const h = await startReactHarness(dir, { name: 'Beacon', paths: { themeCSS: 'src/styles/tokens.css' } }, names, { locate: locate(dir) });
   assert.ok(h.url, h.why);
   const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-react-' });
@@ -172,5 +177,17 @@ test('what React threw while drawing is said, a part is drawn inside its parent,
     assert.match(of('Broken')[0]?.why ?? '', /needs a value it was not given/, 'what it threw while React drew it is said');
     assert.match(of('Closed')[0]?.why ?? '', /drew nothing/, 'and one that drew nothing says so, not a blank box');
     assert.equal(of('Closed')[0]?.nothing, true);
+    assert.equal(of('KeyHint').length, 0, 'one that needs content draws with its stories\' props');
+    assert.equal(await inPage(`document.querySelector('[data-dse-component="KeyHint"] [data-dse-case]').getAttribute('data-dse-example') + ':' + document.querySelector('[data-dse-component="KeyHint"] .bc-keys')?.textContent`), 'Default:Mod + K');
   } finally { browser.kill(); await h.close?.(); }
+});
+
+test("a component's example props are its stories' args, read as text: the meta's under the first story's", () => {
+  const dir = tempDir('story-args-');
+  writeFileSync(join(dir, 'Hint.tsx'), '');
+  writeFileSync(join(dir, 'Hint.stories.tsx'), "export default { component: Hint, args: { size: 'small' } };\nexport const Default = { args: { keys: ['Mod', 'K'], onPress: () => {} } };\nexport const Other = { args: { keys: ['X'] } };\n");
+  assert.deepEqual(storyArgs(join(dir, 'Hint.tsx'), 'Hint'), { args: { size: 'small', keys: ['Mod', 'K'] }, story: 'Default' }, 'a handler is code, and left out');
+  writeFileSync(join(dir, 'Hint.stories.tsx'), "export default { component: Hint };\nexport const Basic = Template.bind({});\nBasic.args = { keys: ['A'] };\n");
+  assert.deepEqual(storyArgs(join(dir, 'Hint.tsx'), 'Hint'), { args: { keys: ['A'] }, story: 'Basic' }, 'and the older form, args given after');
+  assert.equal(storyArgs(join(dir, 'None.tsx'), 'None'), null);
 });

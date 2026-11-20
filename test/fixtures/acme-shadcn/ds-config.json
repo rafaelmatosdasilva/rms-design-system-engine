@@ -1,0 +1,5 @@
+{
+  "_note": "Acme, an invented shadcn/ui system for test/shadcn.test.mjs. Every name is invented.",
+  "figma": { "modes": [ { "name": "Light", "snapshotKey": "light", "cssSelector": "root" } ] },
+  "paths": { "themeCSS": "src/index.css" }
+}
