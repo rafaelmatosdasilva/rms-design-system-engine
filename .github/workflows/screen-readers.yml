@@ -16,7 +16,7 @@ on:
       - test/.reader-tools/**
       - .github/workflows/screen-readers.yml
   push:
-    branches: [main, ci/screen-readers]
+    branches: [main]
     paths:
       - lib/screen-reader.mjs
       - lib/a11y-check.mjs
@@ -58,8 +58,6 @@ jobs:
         run: |
           npm ci --prefix test/.reader-tools --no-audit --no-fund
           echo "NODE_PATH=$PWD/test/.reader-tools/node_modules" >> "$GITHUB_ENV"
-      # The reader's own files Guidepup drives it with (NVDA itself, VoiceOver's preferences), each checked against the
-      # sha256 Guidepup's manifest pins, into Guidepup's cache.
       # The computer made ready to be driven, by the same Guidepup setup the lockfile pins: VoiceOver allowed to be
       # controlled and its local preferences written (macOS), NVDA's settings (Windows). Guidepup's own GitHub action
       # carried an older setup, which left out the preferences Guidepup 0.40 starts VoiceOver from.
@@ -67,6 +65,8 @@ jobs:
         shell: bash
         working-directory: test/.reader-tools
         run: ./node_modules/.bin/guidepup setup --ci
+      # The reader's own files Guidepup drives it with (NVDA itself, VoiceOver's preferences), each checked against the
+      # sha256 Guidepup's manifest pins, into Guidepup's cache.
       - name: Fetch the reader's files
         shell: bash
         working-directory: test/.reader-tools

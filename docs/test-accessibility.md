@@ -242,8 +242,9 @@ rms-design-system-engine --hear
 
 - **The computer's own reader.** VoiceOver on a Mac, NVDA on Windows, driven through Guidepup. `--reader nvda` or
   `--reader voiceover` names one, and `--component menu` hears one component.
-- **Each control, as Tab reaches it.** Each component the style guide draws opens in a browser window in front. The
-  focus moves to each control in turn, and what the reader said is recorded.
+- **Each control, as Tab reaches it.** Each component the style guide draws opens in a browser window in front.
+  Tab is pressed through the reader itself, from the control before, and everything it says for that Tab is
+  recorded. A control Tab does not reach is marked as skipped.
 - **Held against the browser.** The name, the role and every state the browser gives must be in what was said, in
   that reader's own words ("dimmed" is VoiceOver's "unavailable"). A state it drops, or a name it never says, is
   listed with what it left out.
@@ -257,7 +258,10 @@ rms-design-system-engine --hear
 - **Heard for real in the engine's own CI.** Every week, and on each change to the screen reader code, GitHub runs
   VoiceOver on a macOS machine and NVDA on a Windows machine over the two fictional demo systems
   (`.github/workflows/screen-readers.yml`). Guidepup's own setup lets each reader be driven there. The run fails
-  when a reader cannot start or a component is not heard, and keeps what each reader said as its record.
+  when a reader cannot start, a component is not heard, or the reader is silent on every control. What each reader
+  said is kept as the run's record for 90 days.
+- **A reader that will not start says why.** The cause Guidepup gives comes with it, and on a Mac the one-time
+  steps are `npx @guidepup/setup` and then `npx @guidepup/setup install`.
 - **Windows finds its own Chrome.** Chrome under Program Files or the person's AppData is found without the PATH.
 
 ### Which browser answered it
