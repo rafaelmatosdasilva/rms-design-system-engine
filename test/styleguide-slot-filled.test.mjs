@@ -1,0 +1,79 @@
+// A Figma slot whose content the component's own markup already holds (a group's radios) is drawn with that content,
+// marked as the slot over it: a dashed area named for the slot. It is never swapped for an empty box, which left a
+// group showing only an empty slot with its radios hidden, so its preview, its thumbnail and the checks that read the
+// preview all missed the real component. The code shown is the component's, with no mark of the Playground's.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fixtureProject, budget } from './helpers.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
+
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+const CHROME = findChrome({ playwright: true });
+
+// The demo system with one more component, invented: choiceGroup, whose only Figma prop is a slot its markup fills.
+function choiceGroupProject() {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'sg-slot-');
+  const edit = (p, fn) => writeFileSync(join(dir, p), fn(readFileSync(join(dir, p), 'utf8')));
+  edit('src/figma-component-props.snapshot.json', (s) => JSON.stringify({ ...JSON.parse(s), choiceGroup: { nodeId: '40:1', properties: { 'Options#1:0': { type: 'SLOT' } }, annotations: [] } }));
+  edit('ds-config.json', (s) => { const c = JSON.parse(s); c.componentFiles.choiceGroup = 'src/components/ChoiceGroup.jsx'; return JSON.stringify(c); });
+  edit('structure-contract.mjs', (s) => s.replace("  field: { main: '.tp-field' },\n", "  field: { main: '.tp-field' },\n  choiceGroup: { main: '.tp-choice-group' },\n"));
+  writeFileSync(join(dir, 'src', 'components', 'ChoiceGroup.jsx'), 'export function ChoiceGroup({ children }) {\n  return <div className="tp-choice-group" role="radiogroup" aria-label="Plan">{children}</div>;\n}\n');
+  edit('apps/gallery/ui.html', (s) => s.replace('</main>', '  <div class="tp-choice-group" role="radiogroup" aria-label="Plan"><label class="tp-radio"><input type="radio" name="plan" checked> Basic</label><label class="tp-radio"><input type="radio" name="plan"> Pro</label></div>\n</main>'));
+  appendFileSync(join(dir, 'src', 'theme.css'), '\n.tp-choice-group { display: flex; flex-direction: column; gap: 8px; }\n.tp-radio { display: flex; gap: 8px; align-items: center; }\n');
+  return dir;
+}
+
+test('a slot its markup already fills shows that content, marked as the slot, and the code shown has no mark', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available', timeout: budget(300000) }, async () => {
+  const dir = choiceGroupProject();
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /Style guide check: the page uses only the system/, 'the mark is drawn with the page\'s own tokens');
+  const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'sg-slot-' });
+  const { send, close } = await connectCDP(browser.wsUrl);
+  try {
+    const { sessionId } = await openPage(send, pathToFileURL(file).href + '#c-choiceGroup');
+    const read = `(() => {
+      const g = document.querySelector('#c-choiceGroup .pg-preview .tp-choice-group'); if (!g) return null;
+      const box = (n) => n.getBoundingClientRect();
+      const mark = g.querySelector(':scope > .pg-slot-area');
+      const radios = [...g.querySelectorAll('.tp-radio')];
+      const code = document.querySelector('#c-choiceGroup .pg-code pre code');
+      const thumb = document.querySelector('.sg-thumb .tp-choice-group');
+      return JSON.stringify({
+        shown: radios.map((k) => getComputedStyle(k).display !== 'none' && getComputedStyle(k).visibility !== 'hidden' && box(k).height > 0),
+        gone: g.querySelectorAll('.pg-slot-gone').length,
+        mark: mark && { slot: mark.getAttribute('data-slot'), hidden: mark.getAttribute('aria-hidden'), outline: getComputedStyle(mark).outlineStyle, events: getComputedStyle(mark).pointerEvents,
+          covers: radios.every((k) => { const a = box(k), m = box(mark); return a.left >= m.left - 1 && a.right <= m.right + 1 && a.top >= m.top - 1 && a.bottom <= m.bottom + 1; }),
+          label: getComputedStyle(mark, '::after').content },
+        code: code ? code.textContent : '',
+        thumbRadios: thumb ? thumb.querySelectorAll('.tp-radio:not(.pg-slot-gone)').length : -1,
+      });
+    })()`;
+    await waitForTrue(send, sessionId, `${read} !== null && document.querySelector('#c-choiceGroup .pg-code pre code').textContent.length > 0`, { attempts: 400, intervalMs: 50 });
+    const v = JSON.parse((await send('Runtime.evaluate', { expression: read, returnByValue: true }, sessionId)).result.value);
+    assert.deepEqual(v.shown, [true, true], 'both radios show in the preview');
+    assert.equal(v.gone, 0, 'nothing of the content is hidden');
+    assert.ok(v.mark, 'the slot is marked');
+    assert.equal(v.mark.slot, 'Slot Options', 'named for the slot');
+    assert.equal(v.mark.label, '"Slot Options"', 'its name drawn on the page');
+    assert.equal(v.mark.hidden, 'true', 'the mark is the page\'s, never read out');
+    assert.equal(v.mark.outline, 'dashed', 'drawn dashed, as every slot area');
+    assert.equal(v.mark.events, 'none', 'the radios under it still take a click');
+    assert.ok(v.mark.covers, 'the mark is the area the content takes');
+    assert.ok(v.code.trim(), 'the code is shown');
+    assert.doesNotMatch(v.code, /pg-slot/, 'with no mark of the Playground\'s');
+    assert.equal(v.thumbRadios, 2, 'the Index card\'s thumbnail shows the radios too');
+  } finally { close(); browser.kill(); }
+});
+
+test('only a slot with nothing to show is an empty area in its place', () => {
+  const tpl = templateText();
+  assert.match(tpl, /if \(rs\.length\) \{[\s\S]*?fill\.classList\.add\('pg-slot-over'\);[\s\S]*?return;\n {10}\}/, 'content to show: marked over it');
+  assert.match(tpl, /el\.insertBefore\(fill, kids\[0\] \|\| null\);\n {10}kids\.forEach\(function \(k\) \{ k\.classList\.add\('pg-slot-gone'\); \}\);/, 'none: the empty area, as before');
+});

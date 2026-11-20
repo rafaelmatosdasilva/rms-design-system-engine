@@ -1429,8 +1429,8 @@
         Array.prototype.forEach.call(k.querySelectorAll('input, select, textarea, button:not(.sg-tip-btn)'), function (x) { x.disabled = !met; });
       });
     }
-    // Each slot of the component (a Figma SLOT) marked where it sits: the area it takes, named Slot inside it (and its own
-    // name when it has one), in place of the placeholder its markup holds. A slot the code gives a part of its own
+    // Each slot of the component (a Figma SLOT) marked where it sits: the area it takes, named Slot (and its own name when
+    // it has one). A slot the code gives a part of its own
     // (.modal-slot) is that part; one whose content the markup puts straight inside the component (a card, a status bar,
     // a segmented control's segments) is the area that content takes, the parts of its other slots left as they are.
     var SLOTS = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value) && r.code; });
@@ -1447,14 +1447,32 @@
         els.forEach(function (el) {
           if (el !== cur) { el.classList.add('pg-slot-area'); el.setAttribute('data-slot', slotName(r)); return; }
           if (el.querySelector(':scope > .pg-slot-fill')) return;
-          // The component itself holds the slot's content: that content gives way to an area in its place, at least the
-          // size a slot needs to be read, so the component grows around it and its other parts still show.
           var kids = Array.prototype.filter.call(el.children, function (k) { return !partSel.some(function (sel) { try { return k.matches(sel) || k.querySelector(sel); } catch (e) { return false; } }); });
           var rs = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
           var w = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.right; })) - Math.min.apply(null, rs.map(function (q) { return q.left; })) : 0;
           var h = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.bottom; })) - Math.min.apply(null, rs.map(function (q) { return q.top; })) : 0;
           var fill = document.createElement('div');
           fill.className = 'pg-slot-area pg-slot-fill'; fill.setAttribute('data-slot', slotName(r)); fill.setAttribute('aria-hidden', 'true');
+          // The component's own markup already fills the slot (a group's radios): that content shows, as it is, and the
+          // area it takes is marked over it, so the checks read the real content and the code shown stays the
+          // component's. The mark sits over the content, never in the flow, and follows it when the stage reflows.
+          if (rs.length) {
+            if (getComputedStyle(el).position === 'static') el.classList.add('pg-slot-host');
+            fill.classList.add('pg-slot-over');
+            var place = function () {
+              var b = el.getBoundingClientRect(), on = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
+              if (!on.length) return;
+              var x0 = Math.min.apply(null, on.map(function (q) { return q.left; })), y0 = Math.min.apply(null, on.map(function (q) { return q.top; }));
+              fill.style.left = (x0 - b.left - el.clientLeft) + 'px'; fill.style.top = (y0 - b.top - el.clientTop) + 'px';
+              fill.style.width = (Math.max.apply(null, on.map(function (q) { return q.right; })) - x0) + 'px';
+              fill.style.height = (Math.max.apply(null, on.map(function (q) { return q.bottom; })) - y0) + 'px';
+            };
+            el.appendChild(fill); place();
+            if (window.ResizeObserver) new ResizeObserver(place).observe(el);
+            return;
+          }
+          // No content to show: an empty area in its place, at least the size a slot needs to be read, so the component
+          // grows around it and its other parts still show.
           // Its width is the content's, never more than the room it has: a minimum would hold a component wider than a
           // narrow screen (a 469px action bar at 320px) and fail its reflow for a size the page set, not the system.
           fill.style.width = 'min(' + Math.max(w, 96) + 'px, 100%)'; fill.style.minHeight = Math.max(h, 40) + 'px';

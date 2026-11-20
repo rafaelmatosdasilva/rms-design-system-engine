@@ -246,7 +246,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
 .sg-cx-table { table-layout: fixed; width: 100%; min-width: 64rem; }   /* narrower, it scrolls: no word broken in two */
 .sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
 .sg-cx-table col.sg-cx-rule { width: 32%; } .sg-cx-table col.sg-cx-col { width: 12%; } .sg-cx-table col.sg-cx-follow-col { width: 16%; } .sg-cx-table col.sg-cx-owner-col { width: 16%; }   /* Follow it holds a count, its share and the bar under them */
-.sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
+.sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
 /* The Accessibility page's table: the criterion takes the room, who acts and the status keep theirs, so neither runs into the next. */
@@ -407,6 +407,11 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* A slot whose content sits straight inside the component: that content gives way to the slot area, which the
    component grows around. */
 .pg-slot-gone { display: none !important; }   /* what a slot area stands in for, gone whatever display the system gives it */
+/* Content the component's own markup puts in the slot: it shows, and the slot is marked over it, outside the flow,
+   with no tint and no pointer, so the content reads and works as it is. Its name sits above the area's corner. */
+.pg-slot-host { position: relative; }
+.pg-slot-area.pg-slot-over { position: absolute; min-width: 0; min-height: 0; background: none; pointer-events: none; outline-offset: 2px; }
+.pg-slot-area.pg-slot-over::after { inset: auto auto 100% 0; margin-bottom: var(--sg-space-xs); font-size: var(--sg-xs); }
 .pg-still, .pg-still * { transition: none !important; }   /* while its colours are measured */
 /* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
 .pg-stage-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-tint); }   /* the card's own edge and corners are the stage's */
