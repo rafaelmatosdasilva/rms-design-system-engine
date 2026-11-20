@@ -8,7 +8,8 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findFigmaConsole, stdioMcp, executeAnswer, figmaConsoleRunner, figmaConsoleAnswers, figmaConsoleOff } from '../lib/figma-console.mjs';
-import { chooseFigmaSource, refreshFromFigmaConsole, consoleLine } from '../lib/figma-source.mjs';
+import { chooseFigmaSource, refreshFromFigmaConsole, consoleLine, figmaRouteChoice, figmaRunner } from '../lib/figma-source.mjs';
+import { spawnSync } from 'node:child_process';
 import { captureWithFigmaCli } from '../lib/figma-capture.mjs';
 import { standinFigma, runOn } from './figma-console-standin.mjs';
 import { tempDir } from './helpers.mjs';
@@ -126,4 +127,63 @@ test('a read the bridge cannot finish keeps the snapshots already saved and says
   assert.equal(line.ok, false);
   assert.match(line.line, /were not read through Figma Console MCP \(figma_execute failed: Execution timed out after 120000ms\); the ones already saved are kept/);
   assert.match(line.line, /full structure was not read through Figma Console MCP \(.*\); the snapshots already saved are kept/);
+});
+
+test('the person chooses the route: figmaRoute in ds-config.json, or the environment, which wins; a wrong value says the ones there are', () => {
+  assert.equal(figmaRouteChoice({}, {}), 'auto');
+  assert.equal(figmaRouteChoice({ figmaRoute: 'Console' }, {}), 'console');
+  assert.equal(figmaRouteChoice({ figmaRoute: 'console' }, { DESIGN_SYSTEM_ENGINE_FIGMA_ROUTE: 'figma-cli' }), 'figma-cli');
+  assert.throws(() => figmaRouteChoice({ figmaRoute: 'rest' }, {}), /figmaRoute "rest" is not one of auto, figma-cli, console, mcp/);
+});
+
+test('a route chosen is that route only: never another in its place, and one that does not answer says why', async () => {
+  const at = (times) => (p) => times[Object.keys(times).find((k) => p.endsWith(k))] ?? null;
+  const all = { which: () => '/bin/figma-cli', answers: async () => true, safe: async () => true, consoleBridge: async () => ({ ok: true, why: 'it answers' }), env: { FIGMA_TOKEN: 't' }, mtime: () => null };
+  const c = (figmaRoute) => ({ figmaRoute, figmaFileKey: 'abc' });
+  assert.equal((await chooseFigmaSource('/p', c('mcp'), all)).route, 'mcp', 'mcp chosen: the session\'s Figma tool, though figma-cli and the bridge both answer');
+  assert.equal((await chooseFigmaSource('/p', c('console'), all)).route, 'figma-console', 'console chosen: asked before figma-cli');
+  assert.equal((await chooseFigmaSource('/p', c('figma-cli'), { ...all, consoleBridge: async () => { throw new Error('never asked'); } })).route, 'figma-cli');
+  await assert.rejects(chooseFigmaSource('/p', c('console'), { ...all, consoleBridge: async () => ({ ok: false, why: 'the Desktop Bridge plugin did not answer in 15 s' }) }), /figmaRoute is console, and Figma Console MCP was not reached: the Desktop Bridge plugin did not answer in 15 s/);
+  await assert.rejects(chooseFigmaSource('/p', c('figma-cli'), { ...all, which: () => null }), /figmaRoute is figma-cli, and figma-cli is not installed/);
+  await assert.rejects(chooseFigmaSource('/p', c('figma-cli'), { ...all, answers: async () => false, safe: async () => false }), /figmaRoute is figma-cli, and Figma did not answer it/);
+  // design.json is figma-cli's file: read first in auto and with figma-cli chosen, never with another route chosen.
+  const newer = { ...all, mtime: at({ 'design.json': 2, 'figma-vars.snapshot.json': 1 }) };
+  assert.equal((await chooseFigmaSource('/p', c('figma-cli'), newer)).route, 'design-json');
+  assert.equal((await chooseFigmaSource('/p', c('console'), newer)).route, 'figma-console');
+  assert.equal((await chooseFigmaSource('/p', c('mcp'), newer)).route, 'mcp');
+});
+
+test('every read beyond the capture gets one runner the same way: figma-cli, Figma Console MCP or none, as chosen', async () => {
+  const cli = async () => async () => 'cli';
+  let asked = null;
+  const bridge = async (cfg) => { asked = cfg; return { run: async (code, o) => `bridge:${o?.fileKey ?? cfg.figmaFileKey ?? 'active'}`, close() {} }; };
+  const cfg = { figmaFileKey: 'KEY1' };
+  const go = (chosen, more = {}) => figmaRunner('/p', cfg, { chosen, cli, bridge, cliAnswers: () => true, ...more });
+  assert.equal((await go('auto')).via, 'figma-cli', 'auto: figma-cli first');
+  assert.equal((await go('auto', { cliAnswers: () => false })).via, 'Figma Console MCP', 'auto: then the bridge');
+  assert.equal(await go('auto', { cliAnswers: () => false, bridge: async () => null }), null, 'auto: neither, so the script is written for the session\'s tool');
+  assert.equal(await go('mcp'), null, 'mcp chosen: the script for the session\'s tool, though figma-cli answers');
+  const r = await go('console');
+  assert.equal(r.via, 'Figma Console MCP', 'console chosen: the bridge, though figma-cli answers');
+  assert.equal(await r.run('x'), 'bridge:KEY1', 'in the design system\'s file');
+  assert.equal(await r.run('x', { fileKey: 'SCREEN' }), 'bridge:SCREEN', 'or the file a call names');
+  await go('console', { pin: false });
+  assert.equal(asked.figmaFileKey, undefined, 'pin: false runs in the file active in Figma');
+  assert.match((await go('figma-cli', { cliAnswers: () => false })).error, /figmaRoute is figma-cli, and figma-cli did not answer/);
+  assert.match((await go('console', { bridge: async () => null })).error, /figmaRoute is console, and Figma Console MCP is not configured/);
+  assert.match((await go('console', { bridge: async () => { throw new Error('the Desktop Bridge plugin did not answer in 30 s'); } })).error, /Figma Console MCP did not answer: the Desktop Bridge plugin did not answer in 30 s/);
+});
+
+test('a read the person runs is run through the bridge by the engine itself, with no script to copy: the effects, read in their checked chunks', () => {
+  const dir = project({ file: '.mcp.json', body: { mcpServers: { 'figma-console': standinEntry() } } }, { figmaRoute: 'console' });
+  const r = spawnSync(process.execPath, [join(HERE, '..', 'lib', 'audit.mjs'), '--figma-effects', '--keep-snapshots'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /Reading the effects in Figma through Figma Console MCP/);
+  assert.match(r.stdout, /✓ the effects of 12 components read from Figma → /);
+  assert.doesNotMatch(r.stdout, /NEXT: run it unchanged/, 'no script handed to a person');
+  // The route chosen not there: the read stops and says why, and writes no script for another route.
+  const off = project(null, { figmaRoute: 'console' });
+  const o = spawnSync(process.execPath, [join(HERE, '..', 'lib', 'audit.mjs'), '--figma-effects'], { cwd: off, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  assert.equal(o.status, 2);
+  assert.match(o.stdout, /❌ figmaRoute is console, and Figma Console MCP is not configured in this project/);
 });
