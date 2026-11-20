@@ -493,7 +493,7 @@ Your tools stay as they are, and the engine fits around them.
 - Reads code straight from GitHub or GitLab, on their own sites or your own host, without a clone.
 - Follows a Figma branch, so edits on the main file do not restart a long scan.
 - Reads very large Figma files in checked pieces, and only what changed on the next refresh.
-- Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
+- Reads Figma the best way available: figma-cli, Figma Console MCP, the Figma API, or the Figma tool of your Claude session.
 - Answers agents that have no terminal, such as prototyping tools, through MCP.
 
 ## What you can count on
