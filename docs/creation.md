@@ -348,6 +348,28 @@ Two more limits worth knowing:
 
 - **A store and translations are only owed where the page actually carries words of its own.** A page with nothing hardcoded has nothing to move yet, and asking would be inventing work.
 - **The engine says these, it never does them.** It does not write your product's code, so no route is registered and no translation key is created. This is the list a person works through, in their own project.
+### Handed over at a fixed point
+
+What you hand over is a tag, and whoever receives it should get the same answer when they check it again. So a prototype says once what it is built on, and every check can be held to it.
+
+- **Pin it before the first screen.** `rms-design-system-engine --prototype --pin` writes `design-system-pin.json` in the prototypes' own repository: the system's release (its tag, or `--system v2.3.0`), the intent layer's commit when it is a folder, and the commit the work starts from. Commit it with the prototypes. A second run keeps it, unless you name a new release.
+- **Check it at its tag.** `--prototype prototypes/Orders.vue --at handoff/orders/v1` reads the page as the tag has it, not as the folder has it today.
+- **Evidence or a draft.** The report opens by saying which. It is evidence only at a tag, with the system and the intent layer in front of it the ones pinned. Otherwise it says what is missing, such as "the system here is v2.2.0, the prototype pinned v2.3.0".
+- **What it added.** Every dependency the project's `package.json` gained or moved since the work began, with its version, for the building team to accept or refuse.
+- **Its demonstration code.** With your convention set, the check keeps the product's code apart from code that only simulates a service or stages the demonstration. A file named as demonstration code among the product's is a finding. A product file with demonstration branches lists the lines to take out.
+- **The copy of the system it holds**, held to the release it pinned. See [A copy of the system inside a product](audit.md#a-copy-of-the-system-inside-a-product).
+
+All of it goes on the handoff page (`--handoff`), written beside the prototypes, under Where it was checked, The copy of the system, Product and demonstration code and What it added to the project.
+
+The convention is yours. With none set, nothing is said about demonstration code:
+
+```json
+"prototype": {
+  "dir": "../acme-shop/prototypes",
+  "demo": { "simulated": ["src/mocks"], "staging": ["src/demo"], "marker": "ACME_DEMO", "words": ["mock", "fixture"] }
+}
+```
+
 ### The shapes a flow comes in
 
 Ask for a multi-step operation — sign in, a one-time code, a confirmation, a success page — and the engine used to check only that the pages linked. It knew nothing of the shapes, so a code step with no way to ask for another code passed, and so did a journey that quietly stopped halfway.
