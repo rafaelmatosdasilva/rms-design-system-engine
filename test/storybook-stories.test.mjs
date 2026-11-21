@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { componentOf, storiesByComponent, storyUrl, pagesFor, storyLines, spread, targetsFor, variantOf, figmaPropertiesOf, storyStateLines, staticBuild, serveStatic, STORY_READY, isDefaultVariant, sameComponent } from '../lib/storybook-stories.mjs';
 import { tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 // What Storybook 7 and later publishes as index.json. Each entry is one story: one component in one state.
 const INDEX_JSON = { v: 5, entries: {
@@ -33,7 +34,7 @@ test('every state is its own page, kept under its component and named as the tea
   assert.deepEqual(by.Button.map((s) => s.state), ['Primary', 'Disabled'], 'two states, not one component');
   assert.equal(by.Button.length, 2, 'the docs page is not a story');
   assert.equal(by.Field[0].state, 'With error');
-  assert.match(by.Button[0].file, /src\/Button\.tsx$/);
+  assert.match(slashed(by.Button[0].file), /src\/Button\.tsx$/);
   assert.deepEqual(storiesByComponent(STORIES_JSON).Button.map((s) => s.state), ['Primary'], 'stories.json reads the same');
   assert.deepEqual(storiesByComponent({}), {}, 'an index with nothing in it is nothing, never a crash');
 });

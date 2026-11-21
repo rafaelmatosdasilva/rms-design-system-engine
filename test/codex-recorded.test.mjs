@@ -31,7 +31,8 @@ function project() {
   writeFileSync(join(d, 'src', 'figma-vars.snapshot.json'), '{}\n');
   return d;
 }
-const place = (v, d) => JSON.parse(JSON.stringify(v).split('<project>').join(d));
+// The project's folder put back where the recording says <project>, escaped as JSON escapes it (a Windows folder's backslashes).
+const place = (v, d) => JSON.parse(JSON.stringify(v).split('<project>').join(JSON.stringify(d).slice(1, -1)));
 
 test('the recording holds every event the engine installs a hook for', () => {
   const events = new Set(ROWS.map((r) => r.event.hook_event_name));

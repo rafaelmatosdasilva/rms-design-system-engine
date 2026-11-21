@@ -36,7 +36,7 @@ test('parser: the mode gate shows its OK and FAIL lines, not only the skip count
   assert.equal(parseGateOutput({ status: 0, stdout: out, stderr: '' }, GATE_SUMMARY['mode-completeness-check.mjs']).lines.length, 3);
 });
 
-test('browser: a Chrome that never becomes ready gives up with a clear reason', async () => {
+test('browser: a Chrome that never becomes ready gives up with a clear reason', { skip: process.platform === 'win32' ? 'the stand-in browser is a shell script, which Windows does not run' : false }, async () => {
   const dir = makeFixture({});
   const fake = join(dir, 'fake-chrome.sh');
   writeFileSync(fake, '#!/bin/sh\nsleep 30\n');

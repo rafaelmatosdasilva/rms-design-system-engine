@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
@@ -276,8 +276,8 @@ test('mirrors: beside the work by default, or all in one folder on this computer
   const p = { host: 'gitlab.acme.test', path: 'team/design-store' };
   assert.equal(mirrorDir('/work', p, {}), join('/work', 'design-store'));
   // Per host and project, so two companies' projects of the same name never share a folder.
-  assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), join('/srv/mirrors', 'gitlab.acme.test', 'design-store'));
-  assert.equal(mirrorDir('/work', { host: 'gitlab.other.test', path: 'x/design-store' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), join('/srv/mirrors', 'gitlab.other.test', 'design-store'));
+  assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), resolve('/srv/mirrors', 'gitlab.acme.test', 'design-store'));
+  assert.equal(mirrorDir('/work', { host: 'gitlab.other.test', path: 'x/design-store' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), resolve('/srv/mirrors', 'gitlab.other.test', 'design-store'));
   assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '~/cache' }), join(homedir(), 'cache', 'gitlab.acme.test', 'design-store'));
   // Nothing from a host or a project name ever escapes the folder it is given.
   const hostile = mirrorDir('/work', { host: '../../etc', path: 'a/../../b' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' });

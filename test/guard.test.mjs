@@ -10,6 +10,7 @@ import { SAY, shellPath } from '../lib/route.mjs';
 import { installHooks, hooksStatus, upgradeHooks } from '../lib/hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 import { PROJECT } from '../lib/names.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const cfg = { paths: { snapshotVars: 'src/tokens-snap.json', themeCSS: 'src/theme.css' } };
@@ -74,12 +75,12 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   const s = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
   assert.equal(s.hooks.PreToolUse.length, 2);
-  assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router
-  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit|mcp__.*use_figma', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check, and the way back from a Figma write
-  assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the final check
+  assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the router
+  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit|mcp__.*use_figma', hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the edit check, and the way back from a Figma write
+  assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the final check
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
-  assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${join(ENGINE, 'guard.mjs')}"`, exists: true });
+  assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"`, exists: true });
   assert.equal(readFileSync(join(dir, '.gitignore'), 'utf8'), 'node_modules/\n.claude/settings.local.json\n');
   installHooks(dir, { remove: true });
   const after = JSON.parse(readFileSync(r.file, 'utf8'));

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, utimesSync, rmSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { workspaceDir, engineFiles, openWorkspace } from '../lib/workspace.mjs';
 import { STATE_FILE } from '../lib/gitlab-source.mjs';
@@ -22,10 +22,10 @@ function mirror(dir, mine = {}) {
 test('the workspace: none unless a setting asks, per host and project, never outside its folder', () => {
   assert.equal(workspaceDir(P, {}), null);
   assert.equal(workspaceDir(P, { DESIGN_SYSTEM_ENGINE_WORKSPACE: '  ' }), null, 'blank is not a setting');
-  assert.equal(workspaceDir(P, { DESIGN_SYSTEM_ENGINE_WORKSPACE: '/srv/ws' }), join('/srv/ws', 'gitlab.acme.test', 'design-store'));
+  assert.equal(workspaceDir(P, { DESIGN_SYSTEM_ENGINE_WORKSPACE: '/srv/ws' }), resolve('/srv/ws', 'gitlab.acme.test', 'design-store'));
   assert.equal(workspaceDir(P, { DESIGN_SYSTEM_ENGINE_WORKSPACE: '~/ws' }), join(homedir(), 'ws', 'gitlab.acme.test', 'design-store'));
   const hostile = workspaceDir({ host: '../../etc', path: 'a/../../b' }, { DESIGN_SYSTEM_ENGINE_WORKSPACE: '/srv/ws' });
-  assert.ok(hostile.startsWith('/srv/ws/') && !hostile.split('/').includes('..'), hostile);
+  assert.ok(hostile.startsWith(resolve('/srv/ws') + sep) && !hostile.split(sep).includes('..'), hostile);
 });
 
 test('the engine\'s files are what GitLab did not put there, its packages, state and harness page left out', () => {
