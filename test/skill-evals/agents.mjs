@@ -33,7 +33,7 @@ export const OTHER_AGENTS = {
     model: 'none',
     routes: ['shell'],
     version: () => terminalVersion(),
-    missing: null,               // the engine itself is all it needs
+    missing: 'no engine to run: the terminal is the engine\'s own command, so this only fails when the engine itself is missing.',
     prepare: () => {},
     turn: (o) => runTerminal(o),
   },
