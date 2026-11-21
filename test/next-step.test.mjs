@@ -89,6 +89,11 @@ test('the verification headline, each component passing, drifting or not checked
   // Nothing measured in a browser: nothing is "not checked" by the census, and the line says what passing means then.
   assert.match(verificationLine(verification(['card', 'chip'], d, null)), /^\*\*Components: 1 passing · 1 drifting \(chip\) · 0 not checked\.\*\* Nothing was measured in a browser this run/);
   assert.equal(verificationLine(verification([], d, census)), null);
+  // Inside Codex's sandbox (it sets CODEX_SANDBOX) Chrome cannot start: the line says so, with how to measure after all.
+  const unmeasured = verification(['card', 'chip'], d, null);
+  assert.match(verificationLine(unmeasured, { CODEX_SANDBOX: 'seatbelt' }), /inside Codex's sandbox, where Chrome cannot start[\s\S]*outside the sandbox/);
+  assert.doesNotMatch(verificationLine(unmeasured, {}), /sandbox/, 'said only where it is so');
+  assert.doesNotMatch(verificationLine(v, { CODEX_SANDBOX: 'seatbelt' }), /sandbox/, 'a run that measured has nothing to say about it');
   // Under the verdict in the summary; never on a run that writes the baseline.
   assert.match(buildSummary({ verdict: 'pass', headline: '**Components: 2 passing · 0 drifting · 0 not checked.**' }), /In parity\.[^\n]*\n\n\*\*Components: 2 passing/);
   assert.doesNotMatch(buildSummary({ verdict: 'baseline', baselineWritten: { count: 1 }, headline: '**Components: x**' }), /Components: x/);

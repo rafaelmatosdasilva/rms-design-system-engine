@@ -165,7 +165,7 @@ export const DEV = [
   { id: 'accept-radius-pt', prompt: 'aceita a diferença do raio do chip como dívida conhecida, mas mantém o resto estrito',
     score: (ctx) => [check('only that finding accepted', radiusAccepted(ctx.read('design-system-engine-baseline.json')))] },
   { id: 'props-question', prompt: 'what props does the chip take, and which values does its size accept?',
-    score: (ctx) => [check('asks the engine, not its memory', hasEngineRun(ctx, (c) => /--query/.test(c) && /chip/.test(c))), check('the size values as written', has(ctx.final, /\bM\b/, /\bL\b/)), check('no files changed', !ctx.changed.length, ctx.changed.join(', '))] },
+    score: (ctx) => [check('asks the engine, not its memory', hasEngineRun(ctx, (c) => /--query/.test(c) && /chip/i.test(c))), check('the size values as written', has(ctx.final, /\bM\b/, /\bL\b/)), check('no files changed', !ctx.changed.length, ctx.changed.join(', '))] },
   { id: 'new-ui-saved', mayChange: ['apps/gallery/ui.html', 'src/theme.css'], prompt: 'add a small green "Saved" confirmation next to the Save button on the gallery page',
     score: newUiScore },
   // Figma brought in line with the code: the engine lists the edits (the field states no role, the chip's differs);

@@ -47,9 +47,12 @@ export function codexHome(home, login = CODEX_LOGIN) {
 }
 
 // One turn's command line. The sandbox lets the run write its project and its HOME (where the engine keeps its pinned
-// tools and the browser its profile), as a person's own Codex would.
+// tools and the browser its profile), as a person's own Codex would. Inside it Chrome cannot start and the network is
+// off, so an engine command run there measures nothing in a browser; a person approves running it outside the sandbox
+// when Codex asks, and --approve-for-me hands that request to Codex's own automatic review, the headless stand-in for
+// that person. Nothing skips Codex's sandbox or its trust on its own.
 export function codexArgs({ prompt, model = null, resume = null, home }) {
-  const opts = ['--json', '-s', 'workspace-write', '--add-dir', home, '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
+  const opts = ['--json', '-s', 'workspace-write', '--approve-for-me', '--add-dir', home, '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
   return resume ? ['exec', 'resume', ...opts, resume, prompt] : ['exec', ...opts, prompt];
 }
 
@@ -57,7 +60,7 @@ export function codexArgs({ prompt, model = null, resume = null, home }) {
 export function unwrap(command) {
   const s = String(command ?? '');
   const m = /^\/\S*\/(?:ba|z)?sh\s+-l?c\s+(['"])([\s\S]*)\1$/.exec(s);
-  if (!m) return s;
+  if (!m) return /^\/\S*\/(?:ba|z)?sh\s+-l?c\s+(\S+)$/.exec(s)?.[1] ?? s;   // a one-word command, unquoted
   return m[1] === "'" ? m[2].replace(/'\\''/g, "'") : m[2].replace(/\\(["\\$`])/g, '$1');
 }
 

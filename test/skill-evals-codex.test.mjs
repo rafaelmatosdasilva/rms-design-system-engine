@@ -48,6 +48,7 @@ test('the command Codex ran, out of the shell it wraps it in', () => {
   assert.equal(unwrap("/bin/zsh -lc 'cat a.txt'"), 'cat a.txt');
   assert.equal(unwrap("/bin/bash -lc 'echo '\\''hi'\\'''"), "echo 'hi'");
   assert.equal(unwrap('/bin/zsh -lc "printf \'bye\' > b.txt"'), "printf 'bye' > b.txt");
+  assert.equal(unwrap('/bin/zsh -lc rms-design-system-engine'), 'rms-design-system-engine', 'a one-word command Codex left unquoted');
   assert.equal(unwrap('git status'), 'git status', 'a command with no shell around it is as it is');
 });
 
@@ -55,6 +56,7 @@ test('each turn: JSON events, the project and its HOME writable, the next turn o
   const first = codexArgs({ prompt: 'audit the chip', model: 'm', home: '/h' });
   assert.deepEqual(first.slice(0, 2), ['exec', '--json']);
   assert.ok(first.includes('workspace-write') && first.includes('/h'));
+  assert.ok(first.includes('--approve-for-me'), 'a request to run outside the sandbox goes to Codex\'s own review, as a person would approve it');
   assert.ok(!first.some((a) => /dangerously|bypass/.test(a)), 'no flag that skips Codex\'s own trust or sandbox');
   const next = codexArgs({ prompt: 'yes', resume: 't1', home: '/h' });
   assert.deepEqual([next[0], next[1], next.at(-2), next.at(-1)], ['exec', 'resume', 't1', 'yes']);
