@@ -60,6 +60,7 @@ test('each turn: JSON events, the project and its HOME writable, the next turn o
   assert.ok(!first.some((a) => /dangerously|bypass/.test(a)), 'no flag that skips Codex\'s own trust or sandbox');
   const next = codexArgs({ prompt: 'yes', resume: 't1', home: '/h' });
   assert.deepEqual([next[0], next[1], next.at(-2), next.at(-1)], ['exec', 'resume', 't1', 'yes']);
+  assert.ok(!next.includes('--approve-for-me') && !next.includes('--add-dir'), 'a later turn keeps the session\'s own options: Codex refuses them on resume');
 });
 
 test('a run\'s Codex holds only the person\'s login', () => {

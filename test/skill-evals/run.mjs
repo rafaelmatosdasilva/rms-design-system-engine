@@ -51,7 +51,7 @@ const V = arg('variant', OTHER?.variant ?? 'baseline'), MODEL = arg('model', OTH
 const ROUTE = arg('route', 'shell');
 if (!ROUTES[ROUTE]) { console.log(`✗ no route ${ROUTE}: ${Object.keys(ROUTES).join(', ')}`); process.exit(2); }
 // Each agent reaches the engine the way a person using it has it set up, with its own guide variant (agents.mjs).
-if (OTHER && (!OTHER.routes.includes(ROUTE) || V !== OTHER.variant)) { console.log(`✗ --agent ${AGENT} runs the ${OTHER.variant} variant by ${OTHER.routes.join(' or ')}: what a person using it has`); process.exit(2); }
+if (OTHER && (!OTHER.routes.includes(ROUTE) || !(OTHER.variants ?? [OTHER.variant]).includes(V))) { console.log(`✗ --agent ${AGENT} runs ${(OTHER.variants ?? [OTHER.variant]).join(' or ')} by ${OTHER.routes.join(' or ')}: what a person using it has`); process.exit(2); }
 const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
 // --source <a project of your own>: the same tasks, measured against a real design system instead of the fixture.
 // The system is never copied here and never written to: the project named is one set up with that team's profile,
@@ -128,7 +128,7 @@ async function one({ t, run }) {
   for (const prompt of t.prompts ?? [t.prompt]) {
     const text = `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`;
     const r = OTHER
-      ? await OTHER.turn({ cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
+      ? await OTHER.turn({ variantEnv: vr.env ?? {}, cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
       : await runClaude({ cwd: dir, home, path, prompt: text, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;

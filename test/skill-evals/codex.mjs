@@ -10,12 +10,13 @@
 // fingerprint it does not document: in a fresh CODEX_HOME the guard and the router never run (seen in Codex CLI
 // 0.171.0, at project and user level alike, with no word said). So these runs measure the guide in AGENTS.md alone;
 // the guard in Codex is held to what Codex really sends by test/codex-recorded.test.mjs.
-import { existsSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { envVar } from '../../lib/names.mjs';
 import { writeRules, rulesSection } from '../../lib/agent-rules.mjs';
+import { codexSkillText, SKILL_NAME } from '../../lib/codex-skill.mjs';
 
 // The CLI, where the person put it: DESIGN_SYSTEM_ENGINE_EVAL_CODEX, else the PATH. → an absolute path, or null.
 export function findCodex({ env = process.env, exists = existsSync, which = whichBin } = {}) {
@@ -32,7 +33,15 @@ export function codexVersion(cli = CODEX, run = execFileSync) {
 
 // The guide a Codex user reads: the section --agent-rules --write puts in AGENTS.md, written before the project's
 // first commit so it is the project's own and never read as the run's change.
-export const AGENTS_VARIANT = { name: 'agents', ref: 'working tree', text: rulesSection(), prefix: '', install: () => {}, rules: (dir) => writeRules(dir, 'AGENTS.md') };
+// The engine keeps its Codex skill out of these runs, so the section is all the guide they have.
+export const AGENTS_VARIANT = { name: 'agents', ref: 'working tree', text: rulesSection(), prefix: '', install: () => {}, rules: (dir) => writeRules(dir, 'AGENTS.md'), env: { DESIGN_SYSTEM_ENGINE_NO_CODEX_SKILL: '1' } };
+
+// What install.sh gives a Codex user: the engine's own guide as a Codex skill (lib/codex-skill.mjs), the same guide Claude
+// Code reads, asked for the way Codex asks for a skill, by its name first.
+export const CODEX_SKILL_VARIANT = {
+  name: 'codex-skill', ref: 'working tree', text: codexSkillText(), prefix: `$${SKILL_NAME} `,
+  install: (home) => { const dir = join(home, '.codex', 'skills', SKILL_NAME); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'SKILL.md'), codexSkillText()); },
+};
 
 // The login a run uses: the person's own Codex login, copied into the run's fresh CODEX_HOME (inside its throwaway
 // HOME, removed with it). Nothing else of the person's Codex comes along: no config, no trusted projects, no skills.
@@ -53,8 +62,10 @@ export function codexHome(home, login = CODEX_LOGIN) {
 // that person; it is the workspace-write sandbox itself, and Codex refuses -s beside it. Nothing skips Codex's sandbox
 // or its trust on its own.
 export function codexArgs({ prompt, model = null, resume = null, home }) {
-  const opts = ['--json', '--approve-for-me', '--add-dir', home, '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
-  return resume ? ['exec', 'resume', ...opts, resume, prompt] : ['exec', ...opts, prompt];
+  // A later turn (`exec resume`) takes no sandbox, approval or writable-folder options: the session keeps the ones it
+  // started with, and Codex refuses them there (a two-turn task never ran its second turn).
+  const shared = ['--json', '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
+  return resume ? ['exec', 'resume', ...shared, resume, prompt] : ['exec', ...shared, '--approve-for-me', '--add-dir', home, prompt];
 }
 
 // The command Codex ran, as the agent wrote it: Codex wraps each in the user's shell (`/bin/zsh -lc '…'`).
@@ -93,10 +104,10 @@ export function toStreamJson(codexEvents, { version = null } = {}) {
 }
 
 // One headless turn in Codex. Resolves as runClaude does: { events, sessionId, cost, error, infra, limit, stderr }.
-export function runCodex({ cwd, home, env, prompt, model = null, resume = null, timeoutMs = 15 * 60 * 1000, cli = CODEX, version = null }) {
+export function runCodex({ cwd, home, env, prompt, variantEnv = {}, model = null, resume = null, timeoutMs = 15 * 60 * 1000, cli = CODEX, version = null }) {
   return new Promise((resolve) => {
     if (!cli) { resolve({ events: [], sessionId: null, cost: 0, error: 'no codex on this machine', infra: 'no codex on this machine', limit: null, stderr: '' }); return; }
-    const child = spawn(cli, codexArgs({ prompt, model, resume, home }), { cwd, env: { ...env, CODEX_HOME: join(home, '.codex') }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cli, codexArgs({ prompt, model, resume, home }), { cwd, env: { ...env, ...variantEnv, CODEX_HOME: join(home, '.codex') }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
