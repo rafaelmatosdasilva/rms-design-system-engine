@@ -498,10 +498,14 @@ Some teams copy the system's components into their own repository at a release a
 
 - **The same** as the release: nothing to do.
 - **From an older release:** bring the copy up to the release.
+- **From a later release:** content a newer release already has, named. Move the pin to that release rather than ask the system for it.
 - **Changed in the copy:** content the system never had. A fix made there, an accessibility one most of all, reaches no other product, and is lost when the product is built from the system. Each one is listed by the commit that made it, as one request for the system to take or refuse.
 - **Missing from the copy**, or **only in the copy**, said too.
 
-`rms-design-system-engine --prototype --copies` checks every copy. A page that imports from a copy is held to the system's component it copies.
+`rms-design-system-engine --prototype --copies` checks every copy.
+
+- **The patch that brings the copy to its release.** The files from an older release and the ones missing from the copy are handed back as one patch (`.design-system-engine-out/handback/copy-<copy>.diff`), applied in the product with `git apply`. The changes made inside the copy are never in it: they are requests.
+- **Read in a moment.** Files are compared by their git object ids, and what each was found to be is kept by its content, so the next check reads again only what changed. A page that imports from a copy is held to the system's component it copies.
 
 ```json
 "copies": [{ "dir": "../acme-shop/src/library", "from": "components" }]

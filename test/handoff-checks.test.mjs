@@ -66,7 +66,7 @@ test('a prototype handed over at a tag: pinned, its copy of the system, its demo
   // The copy, on its own: one file from the older release, one changed in the copy, by the commit that changed it.
   r = engine(ds, '--prototype', '--copies');
   assert.equal(r.status, 1, r.stdout + r.stderr);
-  assert.match(r.stdout, /held to v1\.1\.0: 1 the same · 1 from an older release · 1 changed in the copy/);
+  assert.match(r.stdout, /held to v1\.1\.0: 1 the same · 1 from an older release · 0 from a later release · 1 changed in the copy/);
   assert.match(r.stdout, /bring the copy up to v1\.1\.0: HbBadge\.vue/);
   assert.match(r.stdout, /changed in the copy by [0-9a-f]+ "name the icon button": HbIconButton\.vue/);
 
