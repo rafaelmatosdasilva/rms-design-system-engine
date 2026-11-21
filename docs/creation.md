@@ -113,6 +113,8 @@ The settings are in [the configuration reference](../reference/config.md).
 - Build nothing by hand that a component covers.
 - Ask `--query` before guessing a name.
 
+**A colour asked for by how it looks or what it means** (`--query green`, `--query success`) is read from the tokens' own values in every mode, and from the names they carry. The answer lists the system's tokens that are that colour, or says plainly that the system has none, so an agent asked for "a small green Saved" uses the system's green or says there is none, instead of writing a hex value. A request for new UI that names a colour asks for it on its own.
+
 Each component's line names its props as the code takes them. Where Figma and the code call the same prop by different names, the code's name is the one printed, because what the agent writes is code and the Figma name is one the code refuses.
 
 **It also notices when an agent did not read.** `--catalog` remembers which components' cards it handed over, and `--check-ui` says which components the generated page used without one. It is a warning, never a refusal — a card can reach an agent another way — and a project where nothing has been handed over yet says nothing at all rather than flagging everything. Agents that skip a component's card are where most layout and prop mistakes start, so this names the cause instead of the symptoms.

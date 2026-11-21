@@ -73,7 +73,7 @@
        ✅ PASS  10/10 component property implementations
        ✅ PASS  2/2 Figma annotation acknowledgments
        ⚠️  MEASURED 2  (rendered in the browser, the component differs from Figma - advisory)
-       ⚠️  button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
+       ⚠️  button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]  → guard it so a disabled button keeps its look: .tp-button:not(:disabled):hover
        ↳ last changed 2026-01-01 by demo: "init" (<HASH>)
        ⚠️  chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
        ↳ last changed 2026-01-01 by demo: "init" (<HASH>)
@@ -333,7 +333,7 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
   - and 1 more
 
 **Measured differences** (rendered in the browser, advisory): 2
-- button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
+- button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]  → guard it so a disabled button keeps its look: .tp-button:not(:disabled):hover
 - chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
 
 **Not checked in this run**: 22

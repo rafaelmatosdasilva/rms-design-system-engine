@@ -140,7 +140,7 @@ test('a question about a component\'s props or a token routes to the query, with
 
 test('a request for new UI asks the system for the names and builds with them', () => {
   const b = r('add a small green "Saved" confirmation next to the Save button on the gallery page');
-  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-design-system-engine --query button']]);
+  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-design-system-engine --query button green']], 'the colour it names asked too');
   assert.match(b.notes.join(' '), /build it, in the file they name, with the design system's own components/);
   assert.match(b.notes.join(' '), /never invent one/);
   assert.equal(r('acrescenta um botão de cancelar ao formulário').recipe, 'ask-the-system');
@@ -340,4 +340,11 @@ test('a question about what a component does or is for is answered from the syst
   }
   assert.equal(r('check the button').recipe, 'audit-component', 'a request to check stays a check');
   assert.equal(r('fix the chip').recipe, 'fix-a-difference');
+});
+
+test('new UI that names a colour asks the system for that colour too', async () => {
+  const { colourWords } = await import('../lib/route.mjs');
+  assert.deepEqual(colourWords('a small green Saved'), ['green']);
+  assert.deepEqual(colourWords('um aviso vermelho de erro'), ['warning', 'red', 'error']);
+  assert.deepEqual(colourWords('add a card'), []);
 });

@@ -145,17 +145,25 @@ When you ask.
 
 ### From the terminal
 
-Ask in plain words, as you would in Claude Code:
+You can use the engine from any terminal, in two ways.
+
+- **With your agent in the terminal.** Claude Code (`claude`), Codex or Cursor's agent, set up with the engine as above. Everything works as it does in its desktop window, because the agent is the same.
+- **With the engine's own command, no agent at all.** Ask in plain words, as you would in Claude Code. This suits people who want no AI in the loop, and scripts.
 
 ```bash
 rms-design-system-engine "check the button"
 rms-design-system-engine "what does the badge do"
 ```
 
+With the engine's own command:
+
 - **The same road as in Claude Code.** The request is routed to the same recipe and the same command an agent would run.
 - **It asks what it needs**, one question at a time, with the default shown, and puts your answer where the command needs it (a Figma link, a folder).
 - **It follows each next step by itself**: when a command's next step is another of the engine's commands, it runs it.
 - **It stops where you decide**: a commit, an approval, a fix to make, or a step in Figma, said in plain words.
+- **It shows a fix as a patch** and applies it with `git apply` only on your yes. When your request asked for that one change ("fix it in the code"), the request is the yes, as in Claude Code. A patch with more than one change is always asked about.
+- **It changes Figma only on your yes**, and only through a Figma tool the engine runs itself (Figma Console MCP set up in the project). It then writes the way back and reads Figma again. With no such tool, it says what to connect.
+- **New code written from words goes to your agent.** Building a component from Figma or a page from a sentence needs a model, and the engine has none. So that step is handed to the agent you set up with the engine (Claude Code, then Codex, then Cursor), on your yes, or with your request as the yes when it asked for that code. The engine then checks what the agent wrote. It never installs an agent. With none set up, it says what to build and how to check it. `DESIGN_SYSTEM_ENGINE_AGENT=claude|codex|cursor|none` picks one, or none.
 - With no terminal to answer in (a script, CI), it takes each default and stops at the first question that has none.
 
 The same requests as terminal commands, for scripts and CI.
@@ -164,7 +172,7 @@ The same requests as terminal commands, for scripts and CI.
 rms-design-system-engine                       # the whole design system
 rms-design-system-engine --component input     # one component (or a few: input,button)
 rms-design-system-engine --check-ui ui.json     # check a UI an AI tool generated against your components
-rms-design-system-engine --query badge          # one component or token, names written exactly; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on; a name it does not know finds the closest by spelling, by its words and by what each is for ("main action"), and says what to ask next
+rms-design-system-engine --query badge          # one component or token, names written exactly; a colour by its look or meaning (--query green, --query success) lists the system's tokens that are that colour, or says it has none; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on; a name it does not know finds the closest by spelling, by its words and by what each is for ("main action"), and says what to ask next
 rms-design-system-engine --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
 rms-design-system-engine --keep --component chip --match height --reason "the product needs a larger tap target"   # keep a difference on purpose, with its reason
 rms-design-system-engine --only accessibility   # only the accessibility check
