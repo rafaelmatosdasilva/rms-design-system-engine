@@ -132,7 +132,7 @@ test('installed as the repository\'s own git hooks: git runs them, a commit warn
   const r = installGitHooks(dir, { engineDir: ENGINE });
   assert.deepEqual(r.written, ALL);
   assert.deepEqual(gitHooksStatus(dir).hooks, each('ours'));
-  assert.ok(statSync(join(r.dir, 'pre-push')).mode & 0o100);
+  assert.ok(process.platform === 'win32' || statSync(join(r.dir, 'pre-push')).mode & 0o100);   // Git for Windows runs a hook by its name: no executable bit there
   assert.match(readFileSync(join(r.dir, 'pre-push'), 'utf8'), /exec node '.*audit\.mjs' --git-check push/);
   assert.doesNotMatch(readFileSync(join(r.dir, 'pre-commit'), 'utf8'), new RegExp(dir));   // worktrees share hooks: no absolute project path
   assert.deepEqual(installGitHooks(dir, { engineDir: ENGINE }).written, []);   // idempotent

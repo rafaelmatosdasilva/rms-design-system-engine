@@ -83,7 +83,7 @@ test('judgeCandidate passes the component guidance (the "why") into the payload'
 });
 
 // the same cases per kind of guidance, compared with bare.
-test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', async () => {
+test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
   const { runLevels, levelLines } = await import('../lib/eval-run.mjs');
   const out = { bare: '<div style="color:#ff0000">x</div>', steering: '<button class="buttonPrimary"><svg/></button>', parity: '<button class="buttonPrimary">Go</button>' };
   const by = runLevels([{ id: 'a' }, { id: 'b' }], ctx, ['bare', 'steering', 'parity'], (c, level) => out[level], 2);
@@ -97,7 +97,7 @@ test('guidance levels: each level scored by the same checks, accessibility inclu
   assert.equal(lines[3], '  extra     not run: nothing to give');
 });
 
-test('guidance levels: the context each level gets, and the whole run from ds-config', async () => {
+test('guidance levels: the context each level gets, and the whole run from ds-config', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
   const { levelContext } = await import('../lib/eval-run.mjs');
   const { spawnSync } = await import('node:child_process');
   const { join } = await import('node:path');
