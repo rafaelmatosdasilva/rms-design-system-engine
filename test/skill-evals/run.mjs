@@ -194,7 +194,8 @@ if (fellRows.length) {
 // The agent's bundled skills, against the last recorded evaluation's: a new command line is said, never read as the guide.
 try {
   const { readFolder } = await import('./summarize.mjs');
-  const prev = /Records: `records\/([^`]+)`/.exec(readFileSync(join(HERE, 'RESULTS.md'), 'utf8'))?.[1];
+  const { lastRecordFor, recordRows } = await import('./record.mjs');
+  const prev = lastRecordFor(readFileSync(join(HERE, 'RESULTS.md'), 'utf8'), AGENT, (n) => recordRows(n));
   const before = prev && existsSync(join(HERE, 'records', prev)) ? readFolder(join(HERE, 'records', prev)).flatMap((x) => x.rows) : [];
   const said = cliLine(cliChange(rows, before));
   if (said) console.log(`⚠️  ${said}`);

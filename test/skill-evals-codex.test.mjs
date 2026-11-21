@@ -93,3 +93,13 @@ test('an agent besides Claude Code is one entry: its variant, model, routes, ver
   const run = readFileSync(new URL('./skill-evals/run.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(run, /'codex'|codex\.mjs/, 'run.mjs names no agent of its own: each is an entry in agents.mjs');
 });
+
+test('each agent is compared with its own last record, never with another agent\'s', async () => {
+  const { lastRecordFor } = await import('./skill-evals/record.mjs');
+  const results = 'Records: `records/codex-one`\n\nRecords: `records/claude-one`\n\nRecords: `records/codex-old`\n';
+  const rows = { 'codex-one': [{ agent: 'codex' }], 'claude-one': [{ task: 'x' }], 'codex-old': [{ agent: 'codex' }] };
+  const of = (n) => rows[n] ?? [];
+  assert.equal(lastRecordFor(results, 'claude', of), 'claude-one', 'a Claude run skips the Codex entry above it');
+  assert.equal(lastRecordFor(results, 'codex', of), 'codex-one');
+  assert.equal(lastRecordFor('Records: `records/gone`\n', 'claude', of), null, 'a record not here is no comparison');
+});
