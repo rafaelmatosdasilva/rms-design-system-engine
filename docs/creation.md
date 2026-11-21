@@ -358,6 +358,9 @@ What you hand over is a tag, and whoever receives it should get the same answer 
 - **What it added.** Every dependency the project's `package.json` gained or moved since the work began, with its version, for the building team to accept or refuse.
 - **Its demonstration code.** With your convention set, the check keeps the product's code apart from code that only simulates a service or stages the demonstration. A file named as demonstration code among the product's is a finding. A product file with demonstration branches lists the lines to take out.
 - **The copy of the system it holds**, held to the release it pinned. See [A copy of the system inside a product](audit.md#a-copy-of-the-system-inside-a-product).
+- **Which release it was held to.** The record kept beside each prototype (`<name>.check.json`) and its handoff page name the system's release and the commits read, so a pass opened months later never reads as a current one.
+- **A handoff in versions.** A handoff made at a tag is kept beside the prototypes (`<name>.handoffs/`), and the next one opens on what changed since: components used, findings fixed or new, gaps, dependencies, the copy of the system. A draft is compared with the last version, never kept as one.
+- **Before moving to another release.** `rms-design-system-engine --prototype --against v2.4.0` holds every prototype to that release, read from git into a folder of its own, and lists what it would break in each page and what it would fix. Nothing in the system's folder or the prototypes' is changed.
 
 All of it goes on the handoff page (`--handoff`), written beside the prototypes, under Where it was checked, The copy of the system, Product and demonstration code and What it added to the project.
 
