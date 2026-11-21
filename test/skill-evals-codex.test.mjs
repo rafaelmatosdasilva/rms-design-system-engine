@@ -117,3 +117,17 @@ test('the skill variant runs the engine\'s hooks, as a person who trusted them h
   CODEX_SKILL_VARIANT.rules(d);
   assert.ok(existsSync(join(d, '.codex')), 'a .codex folder, so --install-hooks writes the Codex hooks beside Claude Code\'s');
 });
+
+test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', async () => {
+  const { runCodex } = await import('./skill-evals/codex.mjs');
+  const fake = (lines) => { const d = tempDir('codex-fake-'); const f = join(d, 'codex'); writeFileSync(f, `#!/bin/sh\ncat <<'X'\n${lines.map((l) => JSON.stringify(l)).join('\n')}\nX\n`); return f; };
+  const { chmodSync } = await import('node:fs');
+  const answer = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'In Figma, select the chip and add an annotation in the Accessibility category.' } }, { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 40 } }]);
+  chmodSync(answer, 0o755);
+  const home = tempDir('codex-fake-home-');
+  const a = await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: answer });
+  assert.equal(a.infra, null, 'scored, not thrown out');
+  const empty = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'OK' } }, { type: 'turn.completed', usage: { input_tokens: 14154, output_tokens: 49 } }]);
+  chmodSync(empty, 0o755);
+  assert.match((await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: empty })).infra, /called nothing/);
+});

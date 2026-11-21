@@ -131,7 +131,9 @@ export function runCodex({ cwd, home, env, prompt, variantEnv = {}, hooks = fals
       // Refused, never scored: Codex that never started (no login, no network), or a usage limit.
       // Started, then called nothing and said next to nothing: the turn never ran (one run read 14k tokens and wrote 49),
       // so it says nothing about the guide, as a Claude run that spent nothing and called nothing (lib.mjs infraFailure).
-      const idle = started && result.num_turns === 0 && (result.usage?.output_tokens ?? 0) < 100;
+      // A short answer with no command is still an answer (toggle-note asks how to add a note in Figma, which needs no
+      // engine run): only a turn with no command and next to no words is one that never ran.
+      const idle = started && result.num_turns === 0 && (result.usage?.output_tokens ?? 0) < 100 && String(result.result ?? '').trim().length < 40;
       const infra = timedOut ? null : !started ? `Codex never started: ${err.trim().split('\n').slice(-3).join(' ').slice(0, 200)}` : result.api_error_status ? `Codex refused the run: ${result.result.slice(0, 200)}` : idle ? `Codex called nothing and said next to nothing: ${result.result.slice(0, 200)}` : null;
       resolve({ events, sessionId: result.session_id, cost: 0, error: timedOut ? `timed out after ${timeoutMs / 60000} min` : result.is_error && !infra ? result.result : null, infra, limit: timedOut ? 'timed out' : null, stderr: err.slice(-2000) });
     });
