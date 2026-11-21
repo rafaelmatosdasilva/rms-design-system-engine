@@ -38,9 +38,13 @@ export const AGENTS_VARIANT = { name: 'agents', ref: 'working tree', text: rules
 
 // What install.sh gives a Codex user: the engine's own guide as a Codex skill (lib/codex-skill.mjs), the same guide Claude
 // Code reads, asked for the way Codex asks for a skill, by its name first.
+// With the engine's hooks too, as a person has them once they trusted them (docs/setup.md): the project gets a .codex
+// folder before its first commit, so the engine's --install-hooks writes .codex/hooks.json beside Claude Code's, and
+// each turn runs them (hooks: true, codexArgs).
 export const CODEX_SKILL_VARIANT = {
-  name: 'codex-skill', ref: 'working tree', text: codexSkillText(), prefix: `$${SKILL_NAME} `,
+  name: 'codex-skill', ref: 'working tree', text: codexSkillText(), prefix: `$${SKILL_NAME} `, hooks: true,
   install: (home) => { const dir = join(home, '.codex', 'skills', SKILL_NAME); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'SKILL.md'), codexSkillText()); },
+  rules: (dir) => mkdirSync(join(dir, '.codex'), { recursive: true }),
 };
 
 // The login a run uses: the person's own Codex login, copied into the run's fresh CODEX_HOME (inside its throwaway
@@ -59,12 +63,18 @@ export function codexHome(home, login = CODEX_LOGIN) {
 // tools and the browser its profile), as a person's own Codex would. Inside it Chrome cannot start and the network is
 // off, so an engine command run there measures nothing in a browser; a person approves running it outside the sandbox
 // when Codex asks, and --approve-for-me hands that request to Codex's own automatic review, the headless stand-in for
-// that person; it is the workspace-write sandbox itself, and Codex refuses -s beside it. Nothing skips Codex's sandbox
-// or its trust on its own.
-export function codexArgs({ prompt, model = null, resume = null, home }) {
+// that person; it is the workspace-write sandbox itself, and Codex refuses -s beside it.
+//
+// hooks: the project's .codex/hooks.json runs, as it does for a person who trusted the project and its hooks once.
+// Codex keeps that trust in its own config by a fingerprint it does not document, so a run trusts its throwaway project
+// (--trust, saved in the run's own throwaway CODEX_HOME) and runs its hooks without a stored fingerprint
+// (--dangerously-bypass-hook-trust, which Codex names for automation that vets its hook sources: these projects hold
+// only the engine's own hooks, written by --install-hooks). The owner asked for the full evaluation, hooks included,
+// 21 November 2026. Never used outside these throwaway runs.
+export function codexArgs({ prompt, model = null, resume = null, home, hooks = false }) {
   // A later turn (`exec resume`) takes no sandbox, approval or writable-folder options: the session keeps the ones it
   // started with, and Codex refuses them there (a two-turn task never ran its second turn).
-  const shared = ['--json', '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
+  const shared = ['--json', '--skip-git-repo-check', ...(hooks ? ['--trust', '--dangerously-bypass-hook-trust'] : []), ...(model ? ['-m', model] : [])];
   return resume ? ['exec', 'resume', ...shared, resume, prompt] : ['exec', ...shared, '--approve-for-me', '--add-dir', home, prompt];
 }
 
@@ -104,10 +114,10 @@ export function toStreamJson(codexEvents, { version = null } = {}) {
 }
 
 // One headless turn in Codex. Resolves as runClaude does: { events, sessionId, cost, error, infra, limit, stderr }.
-export function runCodex({ cwd, home, env, prompt, variantEnv = {}, model = null, resume = null, timeoutMs = 15 * 60 * 1000, cli = CODEX, version = null }) {
+export function runCodex({ cwd, home, env, prompt, variantEnv = {}, hooks = false, model = null, resume = null, timeoutMs = 15 * 60 * 1000, cli = CODEX, version = null }) {
   return new Promise((resolve) => {
     if (!cli) { resolve({ events: [], sessionId: null, cost: 0, error: 'no codex on this machine', infra: 'no codex on this machine', limit: null, stderr: '' }); return; }
-    const child = spawn(cli, codexArgs({ prompt, model, resume, home }), { cwd, env: { ...env, ...variantEnv, CODEX_HOME: join(home, '.codex') }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cli, codexArgs({ prompt, model, resume, home, hooks }), { cwd, env: { ...env, ...variantEnv, CODEX_HOME: join(home, '.codex') }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });

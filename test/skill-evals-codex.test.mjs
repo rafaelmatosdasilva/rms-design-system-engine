@@ -104,3 +104,16 @@ test('each agent is compared with its own last record, never with another agent\
   assert.equal(lastRecordFor(results, 'codex', of), 'codex-one');
   assert.equal(lastRecordFor('Records: `records/gone`\n', 'claude', of), null, 'a record not here is no comparison');
 });
+
+test('the skill variant runs the engine\'s hooks, as a person who trusted them has them; the AGENTS.md side does not', async () => {
+  const withHooks = codexArgs({ prompt: 'p', home: '/h', hooks: true });
+  assert.ok(withHooks.includes('--trust') && withHooks.includes('--dangerously-bypass-hook-trust'));
+  assert.ok(!codexArgs({ prompt: 'p', home: '/h' }).some((a) => /trust/.test(a)), 'off unless the variant asks for it');
+  assert.ok(codexArgs({ prompt: 'p', home: '/h', hooks: true, resume: 't1' }).includes('--dangerously-bypass-hook-trust'), 'every turn of the task');
+  const { CODEX_SKILL_VARIANT, AGENTS_VARIANT } = await import('./skill-evals/codex.mjs');
+  assert.equal(CODEX_SKILL_VARIANT.hooks, true);
+  assert.notEqual(AGENTS_VARIANT.hooks, true);
+  const d = tempDir('codex-hooks-');
+  CODEX_SKILL_VARIANT.rules(d);
+  assert.ok(existsSync(join(d, '.codex')), 'a .codex folder, so --install-hooks writes the Codex hooks beside Claude Code\'s');
+});

@@ -128,7 +128,7 @@ async function one({ t, run }) {
   for (const prompt of t.prompts ?? [t.prompt]) {
     const text = `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`;
     const r = OTHER
-      ? await OTHER.turn({ variantEnv: vr.env ?? {}, cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
+      ? await OTHER.turn({ variantEnv: vr.env ?? {}, hooks: vr.hooks === true, cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
       : await runClaude({ cwd: dir, home, path, prompt: text, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;
