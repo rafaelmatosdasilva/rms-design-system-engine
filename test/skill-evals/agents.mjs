@@ -9,7 +9,8 @@ import { runCursor, cursorHome, cursorVersion } from './cursor.mjs';
 
 export const OTHER_AGENTS = {
   codex: {
-    variant: 'agents',           // the engine's section in AGENTS.md, as --agent-rules --write puts it there
+    variant: 'codex-skill',      // the engine's guide as a Codex skill, as install.sh puts it there
+    variants: ['codex-skill', 'agents'],   // agents: the AGENTS.md section alone (--agent-rules --write)
     model: 'gpt-6-luna',
     routes: ['shell'],           // Codex reaches the engine by its shell, as docs/setup.md sets it up
     version: () => codexVersion(),

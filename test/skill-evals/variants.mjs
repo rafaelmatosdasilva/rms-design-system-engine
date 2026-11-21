@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
 import { skillMd, guideAtRef } from '../../lib/skill-files.mjs';
-import { AGENTS_VARIANT } from './codex.mjs';
+import { AGENTS_VARIANT, CODEX_SKILL_VARIANT } from './codex.mjs';
 import { CURSOR_VARIANT } from './cursor.mjs';
 
 const GUIDE = 'rms-design-system-engine.md';
@@ -69,6 +69,7 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
     return { name, ref: 'built in', text, install: (home) => { mkdirSync(join(home, '.claude', 'commands'), { recursive: true }); writeFileSync(join(home, '.claude', 'commands', GUIDE), text); } };
   }
   if (name === 'agents') return AGENTS_VARIANT;
+  if (name === 'codex-skill') return CODEX_SKILL_VARIANT;
   if (name === 'cursor') return CURSOR_VARIANT;
   if (name === 'mcp') return { name, ref: 'none', text: '', engine: false, prefix: '', install: () => {} };
   throw new Error(`unknown variant ${name}`);

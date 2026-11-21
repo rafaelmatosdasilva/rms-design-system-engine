@@ -133,3 +133,14 @@ test('a design system\'s token set asked about is not a secret asked for', async
     assert.equal(f('Paste your Figma token here.'), true, 'a real secret still is');
   }
 });
+
+test('a request made the way Codex asks for a skill is routed as the Claude Code command is', async () => {
+  const { routePrompt } = await import('../lib/guard.mjs');
+  const { tempDir } = await import('./helpers.mjs');
+  const { writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const d = tempDir('route-dollar-');
+  writeFileSync(join(d, 'ds-config.json'), JSON.stringify({ paths: {} }));
+  for (const p of ['/rms-design-system-engine audit the chip', '$rms-design-system-engine audit the chip']) assert.match(routePrompt({ prompt: p }, { root: d, cfg: {} }) ?? '', /already routed/, p);
+  assert.equal(routePrompt({ prompt: 'audit the chip' }, { root: d, cfg: {} }), null, 'a request without the name is left to the agent');
+});

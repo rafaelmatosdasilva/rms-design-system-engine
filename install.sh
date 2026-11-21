@@ -57,6 +57,10 @@ fi
 mkdir -p "$COMMANDS_DIR"
 ln -sf "$CLONE_DIR/$SKILL_FILE" "$COMMANDS_DIR/$SKILL_FILE"
 
+# 2b. Codex reads the same guide as a skill of its own, when Codex is set up here ($CODEX_HOME, else ~/.codex). The
+#     engine keeps it current on each run (lib/codex-skill.mjs). Ask for it in Codex as $rms-design-system-engine <request>.
+node "$CLONE_DIR/lib/codex-skill.mjs" || true
+
 # 3. A named terminal command so you never type `node …/audit.mjs`: `rms-design-system-engine` runs from
 #    wherever you are.
 mkdir -p "$BIN_DIR"
