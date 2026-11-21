@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { figmaSnapshots, missingFigma, missingBrandFiles, takeBrandFiles, inputsOnRun, SETUP_PATH, STORE_LOGO, logoOf } from '../lib/styleguide-inputs.mjs';
 import { tempDir } from './helpers.mjs';
 
@@ -137,7 +137,7 @@ test('the style guide is never built from a capture that is not there', async ()
   const d = project({});
   writeFileSync(join(d, 'ds-config.json'), JSON.stringify(named()));
   const engine = join(ENGINE, 'lib', 'styleguide-gen.mjs');
-  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(engine)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(named())}, { partsOnly: true, offline: true }))`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(pathToFileURL(engine).href)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(named())}, { partsOnly: true, offline: true }))`], { encoding: 'utf8' });
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /❌ The Figma capture is not here/);
   assert.equal(existsSync(join(d, 'styleguide', 'index.html')), false, 'nothing was written');

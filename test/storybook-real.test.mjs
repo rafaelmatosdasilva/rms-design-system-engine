@@ -6,6 +6,7 @@
 //   npm ci --prefix test/.storybook-tools
 // Nothing here is a stand-in for Storybook: the index, the pages and the args are what `storybook build` wrote.
 import { test, before } from 'node:test';
+import { binIn, runBin } from '../lib/project-bin.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
@@ -37,7 +38,7 @@ before(async () => {
   st.components.button.variants['variant=Primary, size=Large'] = { h: 44 };
   writeFileSync(structure, JSON.stringify(st, null, 2));
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
-  const built = spawnSync(join(TOOLS, '.bin', 'storybook'), ['build', '-o', 'storybook-static', '--quiet'], {
+  const built = runBin(binIn(TOOLS, 'storybook'), ['build', '-o', 'storybook-static', '--quiet'], spawnSync, {
     cwd: dir, encoding: 'utf8', env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1', NO_COLOR: '1' }, timeout: budget(240000) });
   assert.equal(built.status, 0, `storybook build: ${built.stderr || built.stdout}`.slice(0, 1500));
   const r = run(dir, 'a11y-check.mjs', ['--json-out', join(dir, 'a11y.json')]);

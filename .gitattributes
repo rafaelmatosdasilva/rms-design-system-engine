@@ -1,0 +1,20 @@
+# Every text file of the engine keeps LF line endings on every machine, Windows included: the engine reads its own
+# recipes, guides, fixtures and goldens line by line, and a checkout that turned them into CRLF changed what every one
+# of those reads found. A team's own files are the team's; the engine reads them whichever ending they have.
+* text=auto eol=lf
+
+# Never text, whatever their content looks like.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.tgz binary
+*.gz binary

@@ -1,7 +1,7 @@
 // The folders tests make are deleted when the test process ends, and a run stopped before that is swept by the next.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, readdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -14,7 +14,7 @@ test('a test folder sits under one root named for its process', () => {
   const a = tempDir('one-'), b = tempDir('two-');
   assert.equal(dirname(a), dirname(b));
   assert.match(basename(dirname(a)), new RegExp(`^rms-test-${process.pid}-`));
-  assert.equal(dirname(dirname(a)), tmpdir());
+  assert.equal(dirname(dirname(a)), realpathSync.native(tmpdir()), 'under the system\'s temporary folder, by its real path');
 });
 
 test('the root is deleted when the process ends', () => {

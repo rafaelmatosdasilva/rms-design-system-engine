@@ -4,7 +4,7 @@
 // working directory. runGate() builds a throwaway project from a { path: content } map and
 // runs the gate against it (cwd = fixture), returning { code, out, dir }. `content` is written
 // verbatim when it is a string, otherwise as pretty JSON.
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync, rmSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir, availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -67,7 +67,9 @@ export function tempDir(prefix = 'tmp-') {
   if (!tempRoot) {
     const base = tmpdir();
     sweepTempRoots(base);
-    tempRoot = mkdtempSync(join(base, `${TEMP_ROOT_PREFIX}${process.pid}-`));
+    // The real, long path (a symlinked temp folder, or Windows' short RUNNER~1 names, never), as git and the engine read
+    // the folders made in it: a test compares what the engine prints with these paths.
+    tempRoot = realpathSync.native(mkdtempSync(join(base, `${TEMP_ROOT_PREFIX}${process.pid}-`)));
     process.on('exit', () => { try { rmSync(tempRoot, { recursive: true, force: true, maxRetries: 3 }); } catch { /* the next run sweeps it */ } });
   }
   return mkdtempSync(join(tempRoot, prefix));

@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingThemeCss, hostedSources, modeNames, retakeHosted, themeCssOnRun, HOSTED_FILE } from '../lib/token-css.mjs';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { tempDir } from './helpers.mjs';
 
@@ -128,7 +128,7 @@ test('the style guide is never built without the tokens it bakes into the page',
   const sg = await import('../lib/styleguide-gen.mjs');
   const engine = join(ENGINE, 'lib', 'styleguide-gen.mjs');
   // Run it in a process of its own, since a build with nothing to measure against stops the run.
-  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(engine)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(cfg)}, { partsOnly: true }))`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(pathToFileURL(engine).href)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(cfg)}, { partsOnly: true }))`], { encoding: 'utf8' });
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /❌ The design tokens are read from/);
   assert.match(r.stderr, /NEXT: tell the person which file is missing/);
