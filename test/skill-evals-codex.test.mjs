@@ -82,3 +82,14 @@ test('the agents variant is the AGENTS.md section a Codex user has, written into
   assert.ok(readFileSync(join(d, 'AGENTS.md'), 'utf8').startsWith(START));
   assert.ok(AGENTS_VARIANT.text.includes('--route'));
 });
+
+test('an agent besides Claude Code is one entry: its variant, model, routes, version, login and turn', async () => {
+  const { OTHER_AGENTS, AGENT_NAMES } = await import('./skill-evals/agents.mjs');
+  assert.deepEqual(AGENT_NAMES.slice(0, 2), ['claude', 'codex']);
+  for (const [name, a] of Object.entries(OTHER_AGENTS)) {
+    for (const k of ['variant', 'model', 'routes', 'version', 'missing', 'prepare', 'turn']) assert.ok(a[k] != null, `${name}: ${k}`);
+    assert.doesNotThrow(() => variant(a.variant), `${name}'s variant exists`);
+  }
+  const run = readFileSync(new URL('./skill-evals/run.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(run, /'codex'|codex\.mjs/, 'run.mjs names no agent of its own: each is an entry in agents.mjs');
+});
