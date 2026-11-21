@@ -125,7 +125,8 @@ test('a generate command that ignores its stdin still produces its candidate', a
   // A long prompt and a command that exits at once: writing the prompt can fail with EPIPE, never the candidate.
   const c = { id: 'x', prompt: 'p'.repeat(1024 * 1024) };
   // node, which every shell has: a POSIX echo of angle brackets is a redirection in Windows' cmd.
-  const say = `"${process.execPath}" -e "process.stdout.write('<b>ok</b>\\n')"`;
+  // node by its name, on every PATH: Windows' cmd takes the quotes off a command line that starts with one.
+  const say = `node -e "process.stdout.write('<b>ok</b>\\n')"`;
   for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, say, ''), '<b>ok</b>\n');
   assert.equal(generateCandidate(c, 'exit 3', ''), null);   // a failing command is still no candidate
 });

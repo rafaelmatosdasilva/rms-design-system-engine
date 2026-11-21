@@ -234,7 +234,7 @@ test('the router as a hook: a request made with the command arrives already rout
   const ctx = (prompt, cfg = {}) => routePrompt({ prompt }, { root: dir, engineDir: ENGINE, cfg, env });
   const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
-  assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(join(ENGINE, 'audit.mjs'))} --component chip\n`), chip);
+  assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(slashed(join(ENGINE, 'audit.mjs')))} --component chip\n`), chip);
   // A path the shell reads back as the path it was given. A backslash is never left to it: unquoted it escapes
   // whatever follows, and inside the quotes it would escape the closing quote, so a folder ending in one breaks the
   // command the hooks run.

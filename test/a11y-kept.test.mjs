@@ -14,6 +14,7 @@ import {
 } from '../lib/a11y-check.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { findChrome } from '../lib/cdp.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -29,7 +30,8 @@ test('the check is signed by the engine files its results rest on: never the tem
   for (const f of ['a11y-check.mjs', 'cdp.mjs', 'mode-resolver.mjs', 'vue-harness.mjs']) assert.ok(files.includes(f), f);
   for (const f of ['figma-link.mjs', 'styleguide-gen.mjs', 'readmes.mjs']) assert.ok(!files.includes(f), f);
   const fake = { '/e/a11y-check.mjs': "import './x.mjs'; await import('./figma-link.mjs');", '/e/x.mjs': '1', '/e/templates/styleguide.template.html': 't', '/e/wcag-page.js': 'w' };
-  const read = (f) => { if (!(f in fake)) throw new Error('none'); return fake[f]; };
+  // A file as the engine asks for it: resolved (C:\\e on Windows), keyed here with forward slashes.
+  const read = (f) => { const k = slashed(f).replace(/^[A-Za-z]:/, ''); if (!(k in fake)) throw new Error('none'); return fake[k]; };
   const before = checkSignature({ dir: '/e', read });
   fake['/e/x.mjs'] = '2';
   assert.notEqual(checkSignature({ dir: '/e', read }), before, 'a module the check imports changed');
@@ -365,7 +367,7 @@ test('the style guide\'s own CSS changed outside every stage: its parts are put 
 test('the signature follows what decides a result, not every line that lives near it', () => {
   const dir = join(ENGINE, 'lib');
   const source = (file) => readFileSync(join(dir, file), 'utf8');
-  const edited = (file, change) => ({ read: (f) => (f.endsWith(`/${file}`) ? change(source(file)) : readFileSync(f, 'utf8')) });
+  const edited = (file, change) => ({ read: (f) => (slashed(f).endsWith(`/${file}`) ? change(source(file)) : readFileSync(f, 'utf8')) });
   const base = { page: checkSignature({ dir, kind: 'page' }), component: checkSignature({ dir, kind: 'component' }) };
   const after = (file, change) => ({ page: checkSignature({ dir, kind: 'page', ...edited(file, change) }), component: checkSignature({ dir, kind: 'component', ...edited(file, change) }) });
   const same = (file, change, why) => { const a = after(file, change); assert.deepEqual(a, base, why); };
