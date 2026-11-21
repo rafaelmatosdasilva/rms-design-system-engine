@@ -103,3 +103,12 @@ test('whether the Figma file is reliable enough to compare is said with the Figm
   const s = buildSummary({ verdict: 'failed', gates: [tokens], data: '**Figma data was not refreshed in this run.**', figma: '**The Figma file is only partly reliable to compare.** x' });
   assert.match(s, /not refreshed in this run\.\*\*\n\n\*\*The Figma file is only partly reliable to compare\.\*\* x\n\n- \*\*Token values\*\* fails/);
 });
+
+test('inside Codex\'s sandbox, every run says the browser could not start, as the step before NEXT', async () => {
+  const { sandboxLine } = await import('../lib/run-diff.mjs');
+  const env = { CODEX_SANDBOX: 'seatbelt' };
+  assert.match(sandboxLine({ measured: false }, env), /Codex's sandbox[\s\S]*outside the sandbox[\s\S]*then follow the NEXT line/);
+  assert.equal(sandboxLine({ measured: true }, env), null, 'a run that measured in a browser has nothing to say about it');
+  assert.equal(sandboxLine({ measured: false }, {}), null, 'outside Codex nothing is said');
+  assert.equal(sandboxLine({ measured: false, said: 'inside Codex\'s sandbox, where Chrome cannot start' }, env), null, 'never twice: the full run\'s headline already said it');
+});
