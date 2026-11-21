@@ -147,4 +147,10 @@ import RadioGroup from '@/components/library/choices/RadioGroup'
   // The body the documentation does name is not questioned.
   const right = page.replace('<radio-group :options="[]"/>', '<dropdown :options="[]"/>').replace("import RadioGroup from '@/components/library/choices/RadioGroup'", "import Dropdown from '@/components/library/selects/Dropdown'");
   assert.deepEqual(checkPage('prototypes/Right.vue', right, system, { context }).findings.filter((f) => f.kind === 'rule').map((f) => f.message), []);
+
+  // Documentation that names a component by another of its names names it all the same: the component's own aliases,
+  // never the paths imports go through.
+  const aliased = { ...system, components: { ...system.components, RadioGroup: { ...system.components.RadioGroup, aliases: ['OptionList'] } } };
+  const byAlias = { ...context, rules: [{ title: 'Filters panel (templates, intent layer)', text: 'Each filter is an `OptionList`.', layer: 'templates' }] };
+  assert.deepEqual(checkPage('prototypes/Orders.vue', page, aliased, { context: byAlias }).findings.filter((f) => /never names/.test(f.message)).map((f) => f.message), []);
 });

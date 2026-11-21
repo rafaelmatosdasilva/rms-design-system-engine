@@ -231,6 +231,8 @@ After the AI edits a style, markup or component file, the hook reads only what t
 - What a [lesson](creation.md#lessons-a-correction-becomes-a-guard) became a check for: a prop combination or a value a person corrected before.
 - What a rule of your intent layer became a check for, once you said yes: also a prop or slot a component always has, and at most so many of a component on one screen.
 
+It reads the files of your system and of each product listed beside it (`pluginDirs` or `products`), and knows each component by the tag your code gives it (`AcmeButton` for `button`).
+
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 
 ### A short guide, recipes on demand
