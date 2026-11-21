@@ -119,6 +119,17 @@ Each component's line names its props as the code takes them. Where Figma and th
 
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. Under the tokens it says what each is for in your team's own words, from the descriptions you write on the variables in Figma, the brand's first, so an agent picks a colour by its purpose and not by its name alone. The notes your team writes in Figma outside any component (on its foundations, brand and pattern pages) are said too, by page, once the annotation categories are read (`--annotation-categories`); a note for whoever draws the file (Authoring) is left out. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
+### In a product beside your system
+
+A product checked out beside your system (listed in `pluginDirs` or `products` in `ds-config.json`) imports it by its package name, as products do: `import { AcmeButton } from '@acme/ds'`.
+
+- **Its components are your system's.** The page check follows the package's entry to each component's file, so a named import, a renamed one (`AcmeBadge as Pill`) and a default one all count.
+- **A name the package does not have is said as such**, with the nearest one it has.
+- **The edit check reads the product's files too**, each against its last commit in the product's own repository.
+- **Each card gives the import that works where the prototypes are.** In your system's folder, its own path. With `prototype.dir` set to a folder in the product, the package's name.
+
+The package's name is `imports.system` in `ds-config.json`, else the `name` in your system's own `package.json`.
+
 ### It clicks the page, not only draws it
 
 A page can look finished and do nothing. A menu toggle that never opens, a close button with no hover, a sortable header that sorts nothing — all of them photograph perfectly, and all of them cost a reviewer the time the check should have spent.
