@@ -10,7 +10,8 @@
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { ENGINE } from './lib.mjs';
+import { ENGINE, CLAUDE } from './lib.mjs';
+import { withCredentials } from '../../lib/model-login.mjs';
 import { CODEX, codexHome, CODEX_SKILL_VARIANT } from './codex.mjs';
 
 export const TERMINAL_VARIANT = { name: 'terminal', ref: 'working tree', text: '', prefix: '', install: () => {} };
@@ -54,7 +55,7 @@ export function toStreamJson(output, { code = 0, session = 'terminal', version =
 
 // The agent a terminal hands code to, as a person has it set up with the engine: --model names it (none, the
 // default: the terminal alone; codex: Codex with its engine skill and the person's own login, as install.sh leaves
-// it). What it does inside is measured with the terminal's run, its cost the agent's plan.
+// it; claude: Claude Code with the engine's skill and the person's setup-token login). What it does inside is measured with the terminal's run, its cost the agent's plan.
 export const HAND_TO = {
   none: () => ({ DESIGN_SYSTEM_ENGINE_AGENT: 'none' }),
   codex: (home) => {
@@ -62,6 +63,14 @@ export const HAND_TO = {
     codexHome(home);
     CODEX_SKILL_VARIANT.install(home);
     return { DESIGN_SYSTEM_ENGINE_AGENT: 'codex', CODEX_HOME: join(home, '.codex'), PATH_FIRST: dirname(CODEX) };
+  },
+  // Claude Code with the engine as install.sh leaves it (makeHome links it into the run's HOME) and the person's own
+  // long-lived login (`claude setup-token`, kept where model-login.mjs reads it): a fresh HOME has no keychain to read.
+  claude: () => {
+    if (!CLAUDE) throw new Error('no claude on this machine to hand code to');
+    const { CLAUDE_CODE_OAUTH_TOKEN: token, ANTHROPIC_API_KEY: key } = withCredentials({});
+    if (!token && !key) throw new Error('no Claude login a fresh HOME can use: run `claude setup-token` and keep the token where the engine reads it');
+    return { DESIGN_SYSTEM_ENGINE_AGENT: 'claude', PATH_FIRST: dirname(CLAUDE), ...(key ? { ANTHROPIC_API_KEY: key } : { CLAUDE_CODE_OAUTH_TOKEN: token }) };
   },
 };
 

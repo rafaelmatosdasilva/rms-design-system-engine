@@ -144,9 +144,9 @@ test('a file named in a request is not a request to change the code', async () =
 test('code written from words is handed to the agent installed with the engine, then checked by the engine', async () => {
   const { HAND_ASK, NO_AGENT } = await import('../lib/terminal-session.mjs');
   const BUILD = 'NEXT: Build button as written above, then run rms-design-system-engine --component button until it passes';
-  const session = async ({ text = 'build the button from Figma', agent, answer = '' }) => {
+  const session = async ({ text = 'build the button from Figma', agent, answer = '', recipe = 'build-from-figma' }) => {
     const said = [], ran = [], asked = [], handed = [];
-    const steps = await runSession({ text, state: {}, route: () => ({ recipe: 'build-from-figma', run: ['rms-design-system-engine --query button'], notes: [] }),
+    const steps = await runSession({ text, state: {}, route: () => ({ recipe, run: ['rms-design-system-engine --query button'], notes: [] }),
       ask: async (q) => { asked.push(q); return answer; },
       run: async (a) => { ran.push(a); return { code: 0, out: a[0] === '--query' ? BUILD : 'NEXT: none' }; },
       print: (l) => said.push(l),
@@ -158,7 +158,8 @@ test('code written from words is handed to the agent installed with the engine, 
   assert.deepEqual(asked.handed, ['build the button from Figma'], 'the request is the yes when it asked for the code');
   assert.deepEqual(asked.asked, []);
   assert.deepEqual(asked.ran, [['--query', 'button'], ['--component', 'button']], 'the engine checks what the agent wrote');
-  const other = await session({ text: 'the button again', agent: true });
+  // A request that is not for code, whose step still writes some, is asked about first.
+  const other = await session({ text: 'the button again', agent: true, recipe: 'audit-component' });
   assert.deepEqual(other.asked, [HAND_ASK('Claude Code')]);
   assert.deepEqual(other.handed, [], 'no answer is a no');
   const none = await session({ agent: false });
@@ -193,4 +194,28 @@ test('the agent is one the engine is installed in, asked as its person asks it, 
   assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_AGENT: 'codex' }, home, found }).name, 'Codex');
   assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_AGENT: 'none' }, home, found }), null);
   assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_HANDED: '1' }, home, found }), null, 'never back to the agent that asked');
+});
+
+test('a build or a prototype the engine\'s steps left unwritten goes to the agent, and the first step checks it after', async () => {
+  const ran = [], handed = [], asked = [];
+  const steps = await runSession({ text: 'make a settings page', state: {}, route: () => ({ recipe: 'prototype', run: ['rms-design-system-engine --component settings'], notes: [] }),
+    ask: async (q) => { asked.push(q); return ''; },
+    run: async (a) => { ran.push(a); return { code: 1, out: 'NEXT: the person decides which fix to make' }; },
+    print: () => {}, asksForChange: () => false,
+    agent: { name: 'Claude Code', hand: async (t) => { handed.push(t); return { code: 0 }; } } });
+  assert.deepEqual(handed, ['make a settings page'], 'asking for a prototype is asking for its code');
+  assert.deepEqual(asked, []);
+  assert.deepEqual(ran, [['--component', 'settings'], ['--component', 'settings']], 'checked again once written');
+  assert.equal(steps.filter((x) => x.kind === 'handed').length, 1);
+});
+
+test('a file the request asks to have written is written first, by the agent, and then the step checks it', async () => {
+  const ran = [], handed = [];
+  let there = false;
+  await runSession({ text: 'write the filter chip as JSON in ui/filter.json and check it', state: {}, route: () => ({ recipe: 'ask-the-system', run: ['rms-design-system-engine --check-ui ui/filter.json'], notes: [] }),
+    ask: async () => '', run: async (a) => { ran.push([...a, there]); return { code: 0, out: 'NEXT: none' }; }, print: () => {},
+    asksForChange: () => true, exists: () => there,
+    agent: { name: 'Claude Code', hand: async (t) => { handed.push(t); there = true; return { code: 0 }; } } });
+  assert.deepEqual(handed, ['write the filter chip as JSON in ui/filter.json and check it']);
+  assert.deepEqual(ran, [['--check-ui', 'ui/filter.json', true]], 'the check runs once the file is there');
 });

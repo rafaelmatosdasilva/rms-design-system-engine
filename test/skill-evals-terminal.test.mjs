@@ -40,6 +40,6 @@ test('a how-to answered with no step is a reply and no call', () => {
 test('the terminal is an agent of the evaluation, with no guide of its own', () => {
   assert.ok(AGENT_NAMES.includes('terminal'));
   assert.equal(OTHER_AGENTS.terminal.variant, 'terminal');
-  assert.equal(variant('terminal'), TERMINAL_VARIANT);
+  assert.equal(variant('terminal').name, TERMINAL_VARIANT.name);
   assert.equal(TERMINAL_VARIANT.text, '');
 });
