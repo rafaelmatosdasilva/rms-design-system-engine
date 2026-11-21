@@ -84,3 +84,14 @@ test('a second run reads again only the files whose content changed', () => {
   assert.equal(third.files.find((f) => f.rel === 'HbBadge.vue').state, 'changed');
   assert.deepEqual(first.counts, { same: 2, older: 1 });
 });
+
+test('a copy checked out with CRLF line endings, as git on Windows leaves it, is the same file as its release', () => {
+  const { ds, shop } = setUp();
+  for (const f of ['HbBadge.vue', 'HbButton.vue', 'HbIconButton.vue']) {
+    const file = join(shop, 'library', f);
+    writeFileSync(file, readFileSync(file, 'utf8').replace(/\r?\n/g, '\r\n'));
+  }
+  const r = copyCheck(ds, { dir: '../shop/library', from: 'components', release: 'v1.0.0' }, { cache: false });
+  const state = Object.fromEntries(r.files.map((f) => [f.rel, f.state]));
+  assert.deepEqual(state, { 'HbBadge.vue': 'same', 'HbButton.vue': 'same', 'HbIconButton.vue': 'same' }, 'only the line endings differ');
+});

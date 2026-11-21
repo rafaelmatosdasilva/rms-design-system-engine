@@ -9,6 +9,7 @@ import { resolveComponentFile, componentSourceFiles, textReader } from '../lib/c
 import { loadLocator } from '../lib/component-locator.mjs';
 import { projectState } from '../lib/route.mjs';
 import { readPage } from '../lib/styleguide-files.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const vue = (cls, style = '', script = '') => `<template><div class="${cls}"><slot /></div></template>\n<script setup>${script}</script>\n<style>${style}</style>\n`;
 const snap = (components, props = {}, colors = {}) => ({
@@ -16,7 +17,7 @@ const snap = (components, props = {}, colors = {}) => ({
   'src/figma-component-props.snapshot.json': { _updated: '2026-01-01T00:00:00.000Z', ...props },
   'src/figma-vars.snapshot.json': { _updated: '2026-01-01T00:00:00.000Z', color: { light: colors }, sizing: {} },
 });
-const rel = (dir, f) => f && f.slice(dir.length + 1);
+const rel = (dir, f) => f && slashed(f.slice(dir.length + 1));   // the file as the engine says it, with forward slashes
 
 test('names: words, folder forms and state words', () => {
   assert.deepEqual(words('HbIconButton'), ['hb', 'icon', 'button']);

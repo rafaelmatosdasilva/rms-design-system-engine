@@ -160,7 +160,7 @@ test('Safari through its WebDriver: a session, the page drawn at the width asked
   assert.match(whySafariRefused('Could not create a session: The Safari instance is already paired with another WebDriver session.'), /already being driven/);
 });
 
-test('safaridriver is waited for until it answers, and given up on with a reason', async () => {
+test('safaridriver is waited for until it answers, and given up on with a reason', { skip: process.platform === 'win32' ? 'Safari and its safaridriver are macOS only' : false }, async () => {
   const fake = await fakeSafari();
   try {
     const sh = join(tempDir('fake-sd-'), 'safaridriver');

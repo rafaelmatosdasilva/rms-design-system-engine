@@ -67,12 +67,20 @@ jobs:
         shell: bash
         # A shared runner has few cores and is often busy: the browser tests' time limits get the time it takes (a limit
         # made longer only delays a real hang, it never lets a failing test pass).
+        # The temporary folders on the checkout's own drive: a test project on C: and its tools on D: cross two drives,
+        # where a path from one to the other has no relative form (Storybook then reads .\D:\… and stops).
         env:
           RMS_TEST_TIME_SCALE: '3'
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: |
           set -o pipefail
+          # Git keeps line endings as the repository has them (.gitattributes), in the throwaway repositories the tests
+          # make too: the runner's default converts them on checkout, which no test project here asks for. A team's
+          # own CRLF files are read as git stores them (system-copy.mjs) and tested on their own.
+          git config --global core.autocrlf false
           code=0
-          node --test $(node test/shard.mjs ${{ matrix.shard }} 4) 2>&1 | tee test.log || code=$?
+          node --test --test-timeout=900000 $(node test/shard.mjs ${{ matrix.shard }} 4) 2>&1 | tee test.log || code=$?
           if [ "$code" != 0 ]; then
             grep -n '^not ok' test.log | while IFS= read -r line; do
               n=${line%%:*}

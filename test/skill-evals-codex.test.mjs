@@ -63,7 +63,7 @@ test('each turn: JSON events, the project and its HOME writable, the next turn o
   assert.ok(!next.includes('--approve-for-me') && !next.includes('--add-dir'), 'a later turn keeps the session\'s own options: Codex refuses them on resume');
 });
 
-test('a run\'s Codex holds only the person\'s login', () => {
+test('a run\'s Codex holds only the person\'s login', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
   const src = tempDir('codex-login-'), home = tempDir('codex-home-');
   writeFileSync(join(src, 'auth.json'), '{"tokens":{}}');
   writeFileSync(join(src, 'config.toml'), '[projects."/x"]\ntrust_level = "trusted"\n');
@@ -118,7 +118,7 @@ test('the skill variant runs the engine\'s hooks, as a person who trusted them h
   assert.ok(existsSync(join(d, '.codex')), 'a .codex folder, so --install-hooks writes the Codex hooks beside Claude Code\'s');
 });
 
-test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', async () => {
+test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, async () => {
   const { runCodex } = await import('./skill-evals/codex.mjs');
   const fake = (lines) => { const d = tempDir('codex-fake-'); const f = join(d, 'codex'); writeFileSync(f, `#!/bin/sh\ncat <<'X'\n${lines.map((l) => JSON.stringify(l)).join('\n')}\nX\n`); return f; };
   const { chmodSync } = await import('node:fs');
