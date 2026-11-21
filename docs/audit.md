@@ -491,6 +491,22 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 - **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has a hook of the same name (its own `pre-commit`, `post-commit`, …), or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
 - `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
+
+### A copy of the system inside a product
+
+Some teams copy the system's components into their own repository at a release and import from the copy. Read as it is, a copy passes for the system. So each file of it is held to the same file of the system at the release the product pinned (`--prototype --pin`), else the copy's own `release`.
+
+- **The same** as the release: nothing to do.
+- **From an older release:** bring the copy up to the release.
+- **Changed in the copy:** content the system never had. A fix made there, an accessibility one most of all, reaches no other product, and is lost when the product is built from the system. Each one is listed by the commit that made it, as one request for the system to take or refuse.
+- **Missing from the copy**, or **only in the copy**, said too.
+
+`rms-design-system-engine --prototype --copies` checks every copy. A page that imports from a copy is held to the system's component it copies.
+
+```json
+"copies": [{ "dir": "../acme-shop/src/library", "from": "components" }]
+```
+
 ## Measure Figma-code parity
 
 Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Compare Figma and code](features.md#measure-figma-code-parity) on the Commands page.
