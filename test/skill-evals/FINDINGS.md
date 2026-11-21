@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## A run the API dropped fails as if the agent never answered
+
+**Found** 21 November 2026, the evaluation of the change that teaches the agent the route the person chose to read Figma. **Fixed in** nothing yet; recorded against the runner's time limit in `test/skill-evals/run.mjs`.
+
+**Evidence.** `new-ui-saved` failed 3 of 10 runs (#6, #7, #8), each with 0 turns, $0.00 and no reply, all timed out within the same seventeen minutes, while #9 right after passed in 10 turns. Measured again on its own, one run at a time, it failed 2 of 10 (#0, #1) the same way and passed 8. Each failed run's transcript ends on `api_retry` with `error: "unknown"` after the model had started thinking; each run that got a reply passed, 15 of 15 across both measurements, in 6 to 13 turns.
+
+**Guesses ruled out.** That the guide change caused it: a run that never receives a reply has read nothing of the guide's answer, and every run that did receive one passed. That running three at once starved them: the second measurement ran one at a time and dropped two.
+
+**What changed.** Nothing in the engine. Left open: a run whose last event is an API retry is scored as a failure of the guide; it should be counted apart and run again, as a usage limit already is.
+
+---
+
 ## A check pinned to one wording failed the engine for asking a better question
 
 **Found** 18 November 2026, the evaluation of the change that reads a library with no Figma capture by its own code. **Fixed in** nothing yet; recorded against `figmaStepScore` in `test/skill-evals/tasks.mjs`.
