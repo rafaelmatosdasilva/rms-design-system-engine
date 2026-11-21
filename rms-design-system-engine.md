@@ -238,9 +238,8 @@ Route by intent:
 **Running the command means running the WHOLE thing - Phase 1 included - whenever Phase 1
 CAN run.** An unscoped invocation is a request for a full audit, not a Phase-2-only pass over
 whatever snapshots happen to be committed. So if a live refresh is available - a valid
-`FIGMA_TOKEN`, figma-cli, Figma Console MCP, an authorised Figma MCP, or the Plugin API
-(`use_figma`, which works on any plan with no token), read the way `figmaRoute` says when the
-person set it (`cookbook/refresh-figma.md`) - **do the Phase 1 refresh; do not skip it just because auditing the committed
+`FIGMA_TOKEN`, figma-cli, Figma Console MCP, an authorised Figma MCP or the Plugin API
+(`use_figma`: any plan, no token) - **do the Phase 1 refresh; do not skip it just because auditing the committed
 snapshots is fewer steps.** Skipping the refresh and reporting green against 5-day-old snapshots
 is the failure mode this line exists to prevent: stale snapshots pass against outdated data, so
 real DS drift (retuned tokens, a resized component) stays invisible while every gate reads green.
