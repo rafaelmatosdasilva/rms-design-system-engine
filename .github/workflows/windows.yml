@@ -1,0 +1,101 @@
+name: Windows
+
+# The whole suite on Windows, beside the Ubuntu run (tests.yml): the engine is proven on a platform only by the full
+# suite passing there, none skipped. The same steps as Ubuntu's, through the bash Windows runners carry, so a
+# difference between the two runs is the platform's and never the workflow's.
+on:
+  push:
+    branches: [feat/windows]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: windows ${{ matrix.shard }}/4
+    runs-on: windows-latest
+    strategy:
+      # A failing quarter does not stop the others: the run then names every failing test, not just the first ones.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Every tool below comes from its folder's committed lockfile (npm ci), so each run installs exactly the versions
+      # last tested, with the runner's own npm (a lockfile needs no peer resolution, so npm 10 is enough for Nuxt). The
+      # build scorer and the component harness read JSX with TypeScript, found as a machine-wide one is (NODE_PATH, tsc
+      # on the PATH).
+      - name: Install TypeScript
+        run: |
+          npm ci --prefix test/.ci-tools --no-audit --no-fund
+          echo "$PWD/test/.ci-tools/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "NODE_PATH=$PWD/test/.ci-tools/node_modules" >> "$GITHUB_ENV"
+      # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
+      # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
+      # test/vue-builds.test.mjs).
+      # ESLint, which test/lint.test.mjs runs over the engine's own code (docs/development.md#coding-standards).
+      - name: Install ESLint
+        run: npm ci --prefix test/.lint-tools --no-audit --no-fund
+      - name: Install the Vue build tools the Vue tests use
+        run: |
+          npm ci --prefix test/.vue-tools --no-audit --no-fund
+          npm ci --prefix test/.vue-cli-tools --no-audit --no-fund
+          npm ci --prefix test/.nuxt-tools --no-audit --no-fund
+      # The React harness draws a React project's components with that project's own React and Vite
+      # (test/react-harness.test.mjs). Without these its browser tests skip, and a skipped browser test checked
+      # nothing - which is what the skip count below refuses to let pass quietly.
+      - name: Install the React build tools the React tests use
+        run: npm ci --prefix test/.react-tools --no-audit --no-fund
+      # Storybook, which builds a team's stories into the pages the browser checks run on (test/storybook-real.test.mjs):
+      # real Storybook, never a stand-in, so a story is read as Storybook itself draws it.
+      - name: Install the Storybook a team builds its stories with
+        run: npm ci --prefix test/.storybook-tools --no-audit --no-fund
+      # DSDS's published schema, suite and examples for the pinned version, which the DSDS tests check against. Fetched,
+      # never committed (lib/dsds-release.mjs says why); the runner's Ruby turns DSDS's YAML examples into JSON.
+      - name: Fetch the pinned DSDS release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node lib/dsds-release.mjs fetch
+      # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
+      # Each failing test is also written as an annotation, so its name and first error lines show on the check.
+      - name: Run the test suite
+        id: suite
+        shell: bash
+        # A shared runner has few cores and is often busy: the browser tests' time limits get the time it takes (a limit
+        # made longer only delays a real hang, it never lets a failing test pass).
+        env:
+          RMS_TEST_TIME_SCALE: '3'
+        run: |
+          set -o pipefail
+          code=0
+          node --test $(node test/shard.mjs ${{ matrix.shard }} 4) 2>&1 | tee test.log || code=$?
+          if [ "$code" != 0 ]; then
+            grep -n '^not ok' test.log | while IFS= read -r line; do
+              n=${line%%:*}
+              echo "::error title=${line#*:}::$(sed -n "$((n+1)),$((n+40))p" test.log | grep -E "error|expected|actual|Error|message" | head -6 | tr '\n' ' ' | cut -c1-900)"
+            done
+          fi
+          # A browser test that skipped for want of Chrome checked nothing: the run fails, so a missing Chrome can never pass quietly.
+          skipped=$(grep -ciE '# SKIP .*chrome' test.log || true)
+          if [ "$skipped" != 0 ]; then
+            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
+            code=1
+          fi
+          # The number the badge shows, taken from the run's own summary rather than counted by hand: the README said
+          # "2,000+" for as long as somebody remembered to change it. Read before the exit, so a failed run still
+          # reports what it managed to count.
+          count=$(grep -m1 '^# tests ' test.log | awk '{print $3}')
+          echo "${count:-0}" > windows-count-${{ matrix.shard }}.txt
+          exit $code
+      # What this quarter counted, for the test job below to add up. Kept even when the quarter failed.
+      - name: Keep the count
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-count-${{ matrix.shard }}
+          path: windows-count-${{ matrix.shard }}.txt
+          retention-days: 1
