@@ -145,6 +145,19 @@ When you ask.
 
 ### From the terminal
 
+Ask in plain words, as you would in Claude Code:
+
+```bash
+rms-design-system-engine "check the button"
+rms-design-system-engine "what does the badge do"
+```
+
+- **The same road as in Claude Code.** The request is routed to the same recipe and the same command an agent would run.
+- **It asks what it needs**, one question at a time, with the default shown, and puts your answer where the command needs it (a Figma link, a folder).
+- **It follows each next step by itself**: when a command's next step is another of the engine's commands, it runs it.
+- **It stops where you decide**: a commit, an approval, a fix to make, or a step in Figma, said in plain words.
+- With no terminal to answer in (a script, CI), it takes each default and stops at the first question that has none.
+
 The same requests as terminal commands, for scripts and CI.
 
 ```bash

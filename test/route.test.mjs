@@ -333,3 +333,11 @@ test('a prototype that names the heading it should have is a prototype, never th
   assert.equal(route(ask, P).recipe, 'prototype', 'a Codex run that routed this got the full audit and its wording review');
   assert.equal(route('which headings and labels should someone look at first?', P).recipe, 'full-audit', 'the wording review is still asked for by its own words');
 });
+
+test('a question about what a component does or is for is answered from the system, never taken for a check', () => {
+  for (const [t, name] of [['what does the chip do', 'chip'], ['para que serve o chip?', 'chip'], ['when should I use the button', 'button'], ['what is the field for?', 'field']]) {
+    assert.deepEqual([r(t).recipe, r(t).run], ['ask-the-system', [`rms-design-system-engine --query ${name}`]], t);
+  }
+  assert.equal(r('check the button').recipe, 'audit-component', 'a request to check stays a check');
+  assert.equal(r('fix the chip').recipe, 'fix-a-difference');
+});
