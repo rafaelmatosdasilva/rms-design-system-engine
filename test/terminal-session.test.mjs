@@ -138,3 +138,57 @@ test('a file named in a request is not a request to change the code', async () =
   const { asksForChange } = await import('../lib/guard.mjs');
   assert.equal(asksCodeChange('set up the parity for this project, the tokens are in src/theme.css', asksForChange), false);
 });
+
+test('code written from words is handed to the agent installed with the engine, then checked by the engine', async () => {
+  const { HAND_ASK, NO_AGENT } = await import('../lib/terminal-session.mjs');
+  const BUILD = 'NEXT: Build button as written above, then run rms-design-system-engine --component button until it passes';
+  const session = async ({ text = 'build the button from Figma', agent, answer = '' }) => {
+    const said = [], ran = [], asked = [], handed = [];
+    const steps = await runSession({ text, state: {}, route: () => ({ recipe: 'build-from-figma', run: ['rms-design-system-engine --query button'], notes: [] }),
+      ask: async (q) => { asked.push(q); return answer; },
+      run: async (a) => { ran.push(a); return { code: 0, out: a[0] === '--query' ? BUILD : 'NEXT: none' }; },
+      print: (l) => said.push(l),
+      asksForChange: (t) => /^build\b/.test(t),
+      agent: agent && { name: 'Claude Code', hand: async (t) => { handed.push(t); return { code: 0 }; } } });
+    return { said, ran, asked, handed, steps };
+  };
+  const asked = await session({ agent: true });
+  assert.deepEqual(asked.handed, ['build the button from Figma'], 'the request is the yes when it asked for the code');
+  assert.deepEqual(asked.asked, []);
+  assert.deepEqual(asked.ran, [['--query', 'button'], ['--component', 'button']], 'the engine checks what the agent wrote');
+  const other = await session({ text: 'the button again', agent: true });
+  assert.deepEqual(other.asked, [HAND_ASK('Claude Code')]);
+  assert.deepEqual(other.handed, [], 'no answer is a no');
+  const none = await session({ agent: false });
+  assert.ok(none.said.includes(NO_AGENT));
+  assert.deepEqual(none.ran, [['--query', 'button']]);
+});
+
+test('a question is never handed to an agent to write code', async () => {
+  const handed = [];
+  await runSession({ text: 'what props does the chip take?', state: {}, route: () => ({ recipe: 'ask-the-system', run: ['rms-design-system-engine --query chip'], notes: [] }),
+    ask: async () => 'yes', run: async () => ({ code: 0, out: 'NEXT: Write the UI with these components and names, then check it with rms-design-system-engine --check-ui <file>' }),
+    print: () => {}, asksForChange: () => true, agent: { name: 'Claude Code', hand: async (t) => { handed.push(t); return { code: 0 }; } } });
+  assert.deepEqual(handed, []);
+});
+
+test('the agent is one the engine is installed in, asked as its person asks it, and never one that handed the request here', async () => {
+  const { handAgent } = await import('../lib/terminal-session.mjs');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const home = tempDir('hand-home-');
+  const found = (bin) => (bin === 'codex' || bin === 'claude' ? `/bin/${bin}` : null);
+  assert.equal(handAgent({ ROOT: home, env: { HOME: home }, home, found }), null, 'no agent has the engine');
+  mkdirSync(join(home, '.codex', 'skills', 'rms-design-system-engine'), { recursive: true });
+  writeFileSync(join(home, '.codex', 'skills', 'rms-design-system-engine', 'SKILL.md'), '#');
+  const codex = handAgent({ ROOT: home, env: { HOME: home }, home, found });
+  assert.equal(codex.name, 'Codex');
+  assert.deepEqual(codex.args('build the button'), ['exec', '--skip-git-repo-check', '--approve-for-me', '$rms-design-system-engine build the button']);
+  mkdirSync(join(home, '.claude', 'skills', 'rms-design-system-engine'), { recursive: true });
+  const claude = handAgent({ ROOT: home, env: { HOME: home }, home, found });
+  assert.equal(claude.name, 'Claude Code', 'Claude Code first when both have it');
+  assert.equal(claude.args('build the button')[1], '/rms-design-system-engine build the button');
+  assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_AGENT: 'codex' }, home, found }).name, 'Codex');
+  assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_AGENT: 'none' }, home, found }), null);
+  assert.equal(handAgent({ ROOT: home, env: { HOME: home, DESIGN_SYSTEM_ENGINE_HANDED: '1' }, home, found }), null, 'never back to the agent that asked');
+});

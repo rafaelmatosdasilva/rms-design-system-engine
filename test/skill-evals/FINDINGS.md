@@ -28,6 +28,7 @@ Newest first.
 - The hover-while-disabled finding names its guard (`.tp-button:not(:disabled):hover`), for every agent.
 - `--query` reads a colour by its look or meaning from the tokens' values (`--query green`: the system has none), a request for new UI asks for the colour it names, and a component's answer lists its own tokens with Figma's values.
 - Measured after: dev 18 of 18, heldout 6 of 6, route 3 of 4. What is left, `route-ui` and the build and prototype sets, is code written from words, which needs a model.
+- So the terminal hands that step to the agent set up with the engine (Claude Code, then Codex, then Cursor), on the person's yes or a request that asked for the code, and the engine checks what it wrote. `run.mjs --agent terminal --model codex` measures it through Codex. Its first run, `build-button`, wrote nothing: Codex had hit its plan's usage limit, and the terminal said nothing of it, so a stopped agent is now said as stopped. The hand-over is not measured yet. Codex's plan resets on 20 December 2026, and a run through Claude Code needs its command line and a login a fresh HOME can use (`claude setup-token`).
 
 ---
 

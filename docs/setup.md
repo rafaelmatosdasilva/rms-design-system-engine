@@ -145,12 +145,17 @@ When you ask.
 
 ### From the terminal
 
-Ask in plain words, as you would in Claude Code:
+You can use the engine from any terminal, in two ways.
+
+- **With your agent in the terminal.** Claude Code (`claude`), Codex or Cursor's agent, set up with the engine as above. Everything works as it does in its desktop window, because the agent is the same.
+- **With the engine's own command, no agent at all.** Ask in plain words, as you would in Claude Code. This suits people who want no AI in the loop, and scripts.
 
 ```bash
 rms-design-system-engine "check the button"
 rms-design-system-engine "what does the badge do"
 ```
+
+With the engine's own command:
 
 - **The same road as in Claude Code.** The request is routed to the same recipe and the same command an agent would run.
 - **It asks what it needs**, one question at a time, with the default shown, and puts your answer where the command needs it (a Figma link, a folder).
@@ -158,6 +163,7 @@ rms-design-system-engine "what does the badge do"
 - **It stops where you decide**: a commit, an approval, a fix to make, or a step in Figma, said in plain words.
 - **It shows a fix as a patch** and applies it with `git apply` only on your yes. When your request asked for that one change ("fix it in the code"), the request is the yes, as in Claude Code. A patch with more than one change is always asked about.
 - **It changes Figma only on your yes**, and only through a Figma tool the engine runs itself (Figma Console MCP set up in the project). It then writes the way back and reads Figma again. With no such tool, it says what to connect.
+- **New code written from words goes to your agent.** Building a component from Figma or a page from a sentence needs a model, and the engine has none. So that step is handed to the agent you set up with the engine (Claude Code, then Codex, then Cursor), on your yes, or with your request as the yes when it asked for that code. The engine then checks what the agent wrote. It never installs an agent. With none set up, it says what to build and how to check it. `DESIGN_SYSTEM_ENGINE_AGENT=claude|codex|cursor|none` picks one, or none.
 - With no terminal to answer in (a script, CI), it takes each default and stops at the first question that has none.
 
 The same requests as terminal commands, for scripts and CI.

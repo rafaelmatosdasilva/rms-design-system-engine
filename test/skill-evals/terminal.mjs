@@ -8,9 +8,10 @@
 // so the tasks and their checks are the same ones the agents are held to. With no terminal to ask in, a question takes
 // its default, as a script running the command would have it.
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { ENGINE } from './lib.mjs';
+import { CODEX, codexHome, CODEX_SKILL_VARIANT } from './codex.mjs';
 
 export const TERMINAL_VARIANT = { name: 'terminal', ref: 'working tree', text: '', prefix: '', install: () => {} };
 
@@ -51,11 +52,28 @@ export function toStreamJson(output, { code = 0, session = 'terminal', version =
   return out;
 }
 
+// The agent a terminal hands code to, as a person has it set up with the engine: --model names it (none, the
+// default: the terminal alone; codex: Codex with its engine skill and the person's own login, as install.sh leaves
+// it). What it does inside is measured with the terminal's run, its cost the agent's plan.
+export const HAND_TO = {
+  none: () => ({ DESIGN_SYSTEM_ENGINE_AGENT: 'none' }),
+  codex: (home) => {
+    if (!CODEX) throw new Error('no codex on this machine to hand code to');
+    codexHome(home);
+    CODEX_SKILL_VARIANT.install(home);
+    return { DESIGN_SYSTEM_ENGINE_AGENT: 'codex', CODEX_HOME: join(home, '.codex'), PATH_FIRST: dirname(CODEX) };
+  },
+};
+
 // One turn: the request typed in the task's project. A later turn of the same task is a new command, as a person types
 // one (a terminal keeps no conversation). → what runClaude returns.
-export function runTerminal({ cwd, env, prompt, timeoutMs = 15 * 60 * 1000, version = terminalVersion(), engine = ENGINE }) {
+export function runTerminal({ cwd, env, home, prompt, model = 'none', timeoutMs = 15 * 60 * 1000, version = terminalVersion(), engine = ENGINE }) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [join(engine, 'lib', 'audit.mjs'), prompt], { cwd, env: { ...env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let hand;
+    try { hand = (HAND_TO[model] ?? HAND_TO.none)(home); } catch (e) { resolve({ events: [], sessionId: null, cost: 0, error: e.message, infra: e.message, limit: null, stderr: '' }); return; }
+    const { PATH_FIRST, ...handEnv } = hand;
+    const path = PATH_FIRST ? `${PATH_FIRST}:${env.PATH ?? ''}` : env.PATH;
+    const child = spawn(process.execPath, [join(engine, 'lib', 'audit.mjs'), prompt], { cwd, env: { ...env, ...handEnv, PATH: path, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
