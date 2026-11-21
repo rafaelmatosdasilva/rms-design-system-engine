@@ -256,7 +256,7 @@ Advice on keeping the system's own token layer healthy as it grows (`🧭 System
 - A colour token the code mixes at 0%, so it never shows. A `color-mix()` gives all of the mix to the other colour, often an opacity token given to the wrong side. It is read through a stylesheet function that returns one, such as a Sass `@function`.
 - The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
 - The common set a system lacks:
-  - It lists the system against the 23 components most product UIs need (button, link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, badge, icon, pagination, progress, skeleton, empty state).
+  - It lists the system against the 23 components nearly every product builds with (button, link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, badge, icon, pagination, progress, skeleton, empty state).
   - Three columns: Figma, the code and the intent layer. A side the engine has nothing to read from is left out, never counted as missing.
   - It matches by meaning, not exact name: a modal is a dialog, a snackbar a toast, a TextField a text input, an IconButton a button.
   - It names each one missing on every side, and each that is on some sides only.
@@ -302,16 +302,35 @@ What two or more products work around is the system asking for a change (`rms-de
 - Decisions are kept in `design-system-engine-proposals.json`. A rejected proposal is said in one line with its reason, never drafted again as new.
 - The full check says in one line, under the drift check, how many are open. The proposals are written to `handback/proposals.md`.
 
-#### One inspection report
+#### System health report
 
-Ask for an inspection and the engine reads what it already found as one report (`rms-design-system-engine --inspection`). Run the full check first: the report reads its results.
+Ask how healthy your design system is and the engine answers from what it already found (`rms-design-system-engine --health`). Run the full check first: the report reads its results.
 
-- Ten questions: coverage, best practices, accessibility, shared language, testing, orchestration across design, code and docs, governance, adoption, machine-readable docs and agent access.
-- Each gets a rating (green, yellow or red) and the evidence behind it, such as "9 of 12 checks pass".
-- Each says what the engine could not see, such as a browser that was not here.
-- A question with no evidence gets no rating. It says why, and never guesses.
-- Each names what only an interview answers, such as who decides what goes into the system.
-- The report is written to `.design-system-engine-out/inspection.md`.
+- Thirteen questions, grouped by the engine's four layers:
+  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens.
+  - **Contracts**, does the code hold: the team's own rules, accessibility in every theme, tests and stories.
+  - **Intent**, is it whole and explained: the parts nearly every product builds with, each component's purpose and when to use it, releases against the team's own documents.
+  - **Evaluation**, is it used: products on the system and keeping up, whether an agent can learn it, and whether what agents build with it passes.
+- Each answer is good, mixed or poor, with the evidence behind it, such as "9 of 12 checks pass".
+- Each says what the engine did not see, such as a browser that is not installed.
+- A question with no evidence is left unanswered. It says why and names the command that would answer it, and never guesses.
+- Each names what only the team can tell, such as who decides what goes into the system.
+- Each report is kept, so the next one says which answers got better or worse.
+- The report is written to `.design-system-engine-out/system-health.md`. `--inspection` is the command's earlier name and still works.
+
+#### A product's way onto the system
+
+Ask for an adoption plan and the engine turns what it found about a product into the steps that bring it onto the system (`rms-design-system-engine --adoption-plan <product>`). Run the full check first: it reads the product's copies, own components and version from it.
+
+- Every finding gets one of four answers, each with who acts:
+  - **Use the system's**: the system has the token or component. The product's team switches.
+  - **Ask the system**: the system lacks it, such as a value used in three places with no token. The system's team answers, in Figma first and then in code.
+  - **Keep, with a reason**: a person decides it stays.
+  - **Move up a version**: the product runs an older version.
+- Each item lists its places, file and line, and a size from how many places it touches (S, M or L).
+- The steps put what needs no decision first, so the product's count falls at once.
+- Each step ends on the engine check that goes quiet once it is done, such as the census listing no value a token says.
+- The engine changes nothing in the product: the plan is written to `.design-system-engine-out/handback/adoption-<product>.md`.
 
 #### Browser support
 

@@ -295,6 +295,24 @@ Tabs, segmented controls, steppers, side rails, accordions and pagination all co
 
 **What it deliberately does not ask:** whether the right panel sits behind the right tab. A composition does not say which choice shows which part, so one `opens` anywhere on the page is enough. Guessing the pairing would be an opinion with nothing under it — which is the thing this check exists to catch.
 
+### A page made elsewhere, rebuilt from the system
+
+A page an AI tool or a person made with styles of its own is rebuilt from your components (`--prototype --from-page <page.html or link>`).
+
+- **What each part is for comes from its markup, never its looks.** Its landmarks, roles, headings and controls, and the names the page gave its own parts: a class called `promo-card` is a card, whatever it is painted.
+- **Each part becomes your component for that job**, with the page's words in it and an option its class already says, such as a primary button.
+- **What the system lacks stays visible.** It becomes a Missing box or a marked stand-in and goes on the gaps list, never a part styled for the occasion.
+- **Before and after, in numbers.** Values typed by hand, style rules, inline styles, classes and fonts of its own, against what the rebuild holds.
+- **The page itself is never changed.** The rebuild is a starting point in `prototypes/`, checked and drawn like any prototype.
+
+### A prototype as text
+
+Any prototype can be drawn as plain text to paste into code review, a ticket or a thread (`--prototype <file> --text`).
+
+- Every box is one of your components with its name, its words and its options.
+- A part the check found wrong, or one the system lacks, carries a numbered mark, with a note under the drawing.
+- It is drawn from the checked composition, so a name your system does not hold can never look like one of its parts.
+
 ### What a prototype still owes a developer
 
 Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.

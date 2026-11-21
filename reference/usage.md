@@ -70,7 +70,7 @@ rms-design-system-engine --update                        # update to the latest 
 rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink
 rms-design-system-engine --trend                         # show last 20 audit runs + pass/fail trend
 rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
-rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
+rms-design-system-engine --code-drift                    # list props the code has and Figma does not (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
 rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
 rms-design-system-engine --sign-off "chip size=xl" --by "<who>"  # a named person signs off what an edit adds to the system itself (a token, a component's option): the hook lets that edit through; --sign-off alone lists them
@@ -94,7 +94,8 @@ rms-design-system-engine --code-connect-draft [--form=classic|template]  # a dra
 rms-design-system-engine --contract-changes [--record] [--base <folder>] [--fail-on=unaccounted|breaking|never]  # on a merge request: what it changes in each component's contract against the base (--record keeps it on the base branch), with the products that use each; fails only on a breaking change no sign-off, release or new major accounts for. A renamed prop or value is handed back in handback/renames.md, with a patch for each product.
 rms-design-system-engine --proposals                     # the same override or detach in two or more products, drafted as a proposal with where it was seen and what it would reach (handback/proposals.md)
 rms-design-system-engine --proposal <id> --accept|--reject "<why>"|--research --by "<who>"   # a person's decision on one, kept in design-system-engine-proposals.json
-rms-design-system-engine --inspection                    # the engine's results as one inspection report: ten questions, each with a rating, its evidence, what it could not see and what only an interview answers (inspection.md)
+rms-design-system-engine --health                        # how healthy the system is: thirteen questions under Facts, Contracts, Intent and Evaluation, each good, mixed or poor with its evidence, what it did not see, the command to answer it and what only the team can tell, and what changed since the last report (system-health.md; --inspection is its earlier name)
+rms-design-system-engine --adoption-plan [<product>]     # what it takes to bring a product onto the system: each value typed by hand, copy or own version of a component and the version it runs, answered use the system's, ask the system, keep with a reason or move up a version, with who acts, a size, and steps that each end on the check that says done (handback/adoption-<product>.md)
 rms-design-system-engine --mistakes                      # for each component, the mistakes its kind is known for that its page does not say, and each written one without why or what instead
 rms-design-system-engine --guidance-rating [--extract]   # how much an agent can take from the guidance: ready, partial or thin per component; --extract asks a model (your tokens)
 rms-design-system-engine --judge-pages                  # only when asked, since it spends the person's model tokens: a model judges each Showroom screen (its screenshot, code, components and brief) on named decisions (pageJudgment.decisions); advisory, cached by screenshot, shown under the screen's page review, with its cost
@@ -1070,7 +1071,7 @@ whenNotToUse/useInstead guidance, naming those with no description so agent-read
 full list with `--contract-completeness`); **exemption debt** (every escape-hatch surfaced for periodic review, tagged by legibility:
 temporary vs permanent, owner, and review-by, so temporary bypasses get cleared and permanent ones stay
 accountable; totals each run, full list with `--exemption-debt`); **code→design drift** (props that
-exist in code but not in Figma, surfaced as a "sync back to the design" advisory so code-ahead-of-design
+the code has and Figma does not, surfaced as a "sync back to the design" advisory so code-ahead-of-design
 is visible; the engine only surfaces it, the designer decides; totals each run, full list with
 `--code-drift`; each component's line names its props); **component code** (`component-faults.mjs`: what a screen
 runs into in a Vue component's own file, read without running it, each with its line: an element no rule styles, a
@@ -2204,6 +2205,28 @@ component) is read as layout and listed as a template or component the system co
 border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
 the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
 in `prototypes/` is kept unless `--force`.
+
+`rms-design-system-engine --prototype --from-page <page.html | https://…>` rebuilds a page made outside the system (an AI
+tool's page, a hand-made one) from the system's own components (`page-rebuild.mjs`), as `prototypes/<page>.json`, drawn
+at once. What each part is for is read from its markup, never its looks: its landmark (header, nav, main, footer, form),
+its role, its headings, its controls, and the names it gave its own parts, read as the common set reads a component's
+name (a class `promo-card` is a card). A name on something that holds controls names what it holds, so a `nav-links`
+around three links is three links. Each job is the system's component the common set reads as that job, with the page's
+words in its text option and an option its class already says (a `btn-primary` is the system's `primary` where it has
+one). A job no component of the system does is a Missing box with the need on it, and a part made to hold others (a
+card, a dialog) keeps what it holds, drawn by the engine's layout and marked `standInFor`. Each lack goes on the gaps
+list. It prints what the page writes by hand before (values, style rules, inline styles, classes, fonts loaded) and what
+the rebuild holds after, each region with what it was read as and the component it became, and writes the same to
+`.design-system-engine-out/prototypes/<page>.rebuild.md`. The page itself is only read. A starting point already there
+is kept unless `--force`. `--text` adds the text drawing. A linked stylesheet is not fetched, and the counts say so.
+
+`rms-design-system-engine --prototype <composition.json> --text [--width 72]` draws the composition as plain text
+(`prototype-text.mjs`), after the check has read it: the page in a double frame, each of the system's components boxed
+with its name, its words and its options, a Row side by side and a Stack one under the other, a heading by its level,
+and a Missing box or a stand-in in a dashed frame. A part the check found wrong, or one the system lacks, carries a
+numbered mark, and the notes under the drawing say each in the check's words. Under it are the components used and the
+arrangement no component of the system does. Written to `.design-system-engine-out/prototypes/<name>.txt`. Exit 1 when the
+composition breaks a rule, the drawing still printed with its marks.
 
 #### --figma-descriptions (what each token and component is for, written into Figma)
 

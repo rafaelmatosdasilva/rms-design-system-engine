@@ -1,4 +1,4 @@
-// The common set most product UIs need, listed against the system in Figma, in the code and in the intent layer.
+// The common set nearly every product builds with, listed against the system in Figma, in the code and in the intent layer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { COMMON_SET, commonOf, leftOut, commonSet, tokenCategories, commonSetLines } from '../lib/common-set.mjs';
@@ -22,7 +22,7 @@ test('three columns: each one missing everywhere, each on some sides only, a sid
   assert.deepEqual(set.sides, ['figma', 'code', 'documented']);
   assert.deepEqual(row('card'), { id: 'card', kept: undefined, figma: ['Card'], code: [], documented: [] });
   const lines = commonSetLines(set);
-  assert.match(lines[0], /^The system has 4 of the 23 components most product UIs need \(Figma 3, the code 3, the intent layer 1\)\. Missing on every side, so each product builds its own: link, text input, select, /);
+  assert.match(lines[0], /^The system has 4 of the 23 components nearly every product builds with \(Figma 3, the code 3, the intent layer 1\)\. Missing on every side, so each product builds its own: link, text input, select, /);
   assert.match(lines[0], /Add each, or say why it stays out in ds-config\.json → commonSet\.leaveOut:$/);
   assert.deepEqual(lines.slice(1), [
     '   · dialog (Modal) is in Figma and the code but not in the intent layer',
@@ -42,7 +42,7 @@ test('a gap left on purpose is said as kept with its reason, never as missing', 
   const names = COMMON_SET.map((c) => c.id).filter((id) => id !== 'toast');
   const lines = commonSetLines(commonSet({ figma: names, code: names }, { leaveOut }));
   assert.deepEqual(lines, [
-    'The system has 22 of the 23 components most product UIs need (Figma 22, the code 22):',
+    'The system has 22 of the 23 components nearly every product builds with (Figma 22, the code 22):',
     '   · toast is left out on purpose: Products report with an alert in the page.',
   ]);
   const all = commonSetLines(commonSet({ figma: COMMON_SET.map((c) => c.id), code: COMMON_SET.map((c) => c.id) }));

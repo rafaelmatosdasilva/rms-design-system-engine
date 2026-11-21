@@ -181,8 +181,8 @@
          Not verified: rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
   ✅  [25]  What this audit actually checked                    Pass
 
-  [verified] the 25 gates above are mechanically checked against Figma; checked 3 of 3 DS components (see gate 25).
-  [advisory] the notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail; a gate marked ⏭ was not checked.
+  Checked by the engine: the 25 gates above, each compared with Figma by code; checked 3 of 3 DS components (see gate 25).
+  Signals, not pass or fail: the notes below (exemption debt, code drift, accessibility, layering). A gate marked ⏭ was not checked.
 
 ────────────────────────────────────────────────────────────
 
@@ -198,7 +198,7 @@
 🧭 System health: 4 things to keep the system healthy as it grows. Advisory.
      11 of 11 semantic tokens have no description in Figma (action/primary/color, action/primary/text/color, radius/control, space/2, space/3, …): what a token is for is what an agent reads to pick it.
      The system has error, success colours and no warning or info colour, so a product colours that state by hand: add it, or say in the intent layer what to use.
-     The system has 2 of the 23 components most product UIs need (Figma 2, the code 2). Missing on every side, so each product builds its own: link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, icon, pagination, progress, skeleton, empty state. Add each, or say why it stays out in ds-config.json → commonSet.leaveOut.
+     The system has 2 of the 23 components nearly every product builds with (Figma 2, the code 2). Missing on every side, so each product builds its own: link, text input, select, checkbox, radio, switch, form field, dialog, menu, tabs, table, card, alert, toast, tooltip, avatar, icon, pagination, progress, skeleton, empty state. Add each, or say why it stays out in ds-config.json → commonSet.leaveOut.
      The system is tokenised in 4 of the 5 token categories (colour, spacing, radius, typography). No tokens for elevation. Add tokens for it, or say why it stays out in ds-config.json → commonSet.leaveOut:
         · typography has tokens in Figma but none in the code, which writes 2 values of it by hand
 
