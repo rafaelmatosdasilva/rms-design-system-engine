@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { a11yLintSetup, a11yLintFindings, a11yLintLines, frameworkOf } from '../lib/a11y-lint.mjs';
 import { tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const project = (files) => {
   const dir = tempDir('a11y-lint-');
@@ -46,7 +47,7 @@ test("its findings are the team's ESLint's own, kept to the accessibility plugin
   let asked = null;
   const run = (bin, args) => { asked = { bin, args }; const e = new Error('exit 1'); e.stdout = JSON.stringify(report); throw e; };
   const r = a11yLintFindings(dir, ['src/Avatar.jsx', 'src/Card.jsx', 'src/card.css'], undefined, { run });
-  assert.match(asked.bin, /node_modules\/\.bin\/eslint$/, "the project's own ESLint, never one fetched");
+  assert.match(slashed(asked.bin), /node_modules\/\.bin\/eslint$/, "the project's own ESLint, never one fetched");
   assert.deepEqual(asked.args, ['--format', 'json', 'src/Avatar.jsx', 'src/Card.jsx'], 'a stylesheet is not linted by it');
   assert.equal(r.ran, true);
   assert.deepEqual(r.findings.map((f) => `${f.file}:${f.line} ${f.rule} ${f.severity}`),

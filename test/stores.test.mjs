@@ -326,7 +326,7 @@ test('no token: a store is read with the person\'s own git access, under its pat
   run(['config', 'user.email', 'demo@example.com']); run(['config', 'user.name', 'Demo']);
   mkdirSync(join(src, 'snapshots'), { recursive: true });
   writeFileSync(join(src, 'snapshots', 'figma-vars.snapshot.json'), '{"a":1}\n');
-  writeFileSync(join(src, 'snapshots', 'deep', 'x.snapshot.json').replace('deep/', 'deep-'), '{"b":2}\n');
+  writeFileSync(join(src, 'snapshots', 'deep-x.snapshot.json'), '{"b":2}\n');
   writeFileSync(join(src, 'README.md'), 'outside the path\n');
   run(['add', '-A']); run(['commit', '-qm', 'one']);
 

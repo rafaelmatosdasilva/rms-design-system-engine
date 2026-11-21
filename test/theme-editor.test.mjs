@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { systemSlug, themesFolder, ownThemeDirs, readThemes, editorData, THEMES_HOME } from '../lib/theme-editor.mjs';
 import { templateText } from '../lib/styleguide-template.mjs';
 import { fixtureProject, budget, tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -117,7 +118,7 @@ test('the theme editor in the page: New theme opens its starts, From scratch its
     // real Downloads folder on every run), and the theme is kept, applied and in the link.
     await run(`(() => { const n = document.getElementById('ts-name'); n.value = 'Coral Reef'; n.dispatchEvent(new Event('input', { bubbles: true })); const p = document.getElementById('ts-primary-hex'); p.value = '#e11d48'; p.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#sg-theme-panel [data-ts="create"]').click(); })()`);
     const asked = await until(`(() => { const d = document.querySelector('dialog.sg-dialog[open]'); return d ? d.textContent : null; })()`);
-    assert.ok(asked.includes(`${themes.replace(homedir(), '~')}/${sys}`), 'the folder named as the setup writes it: ' + asked);
+    assert.ok(asked.includes(`${slashed(themes.replace(homedir(), '~'))}/${sys}`), 'the folder named as the setup writes it: ' + asked);
     await run(`document.querySelector('dialog.sg-dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true }))`);
     const kept = JSON.parse(await until(`localStorage.getItem('sg-ts-themes:' + '${sys}')`, (v) => v && v.includes('Coral Reef')));
     const made = kept.find((x) => x.name === 'Coral Reef');

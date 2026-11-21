@@ -429,7 +429,7 @@ test('a page counts as loaded only once it is no longer the about:blank a new ta
   assert.equal(new Function('location', 'document', `return ${pageLoadedExpression()}`)({ href: 'http://localhost:6006/' }, { readyState: 'complete' }), true);
 });
 
-test('a page that was not checked says so in --json, with the reason, never as a clean result', () => {
+test('a page that was not checked says so in --json, with the reason, never as a clean result', { skip: process.platform === 'win32' ? 'its browser that exits at once is /usr/bin/false, which Windows does not have' : false }, () => {
   const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
   // A browser that exits at once. /usr/bin/false is on Linux and macOS alike (macOS has no /bin/false, so the
   // engine would skip the path and start a real Chrome).

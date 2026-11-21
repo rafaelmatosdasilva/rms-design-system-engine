@@ -346,7 +346,7 @@ test('a component looked for by a class the code never gives an element is said 
 test('[axe] the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
   const { axeCachePath, axeCached } = await import('../lib/a11y-check.mjs');
   const home = tempDir('axe-home-');
-  assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
+  assert.match(slashed(axeCachePath(home)), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
   assert.equal(axeCached(home), null, 'nothing kept yet');
   mkdirSync(dirname(axeCachePath(home)), { recursive: true });
   writeFileSync(axeCachePath(home), 'not axe');

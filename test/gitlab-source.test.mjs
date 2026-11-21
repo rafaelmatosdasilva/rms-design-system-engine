@@ -281,6 +281,6 @@ test('mirrors: beside the work by default, or all in one folder on this computer
   assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '~/cache' }), join(homedir(), 'cache', 'gitlab.acme.test', 'design-store'));
   // Nothing from a host or a project name ever escapes the folder it is given.
   const hostile = mirrorDir('/work', { host: '../../etc', path: 'a/../../b' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' });
-  assert.ok(hostile.startsWith('/srv/mirrors/') && !hostile.split('/').includes('..'), hostile);
+  assert.ok(hostile.startsWith(resolve('/srv/mirrors') + sep) && !hostile.split(sep).includes('..'), hostile);
   assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '   ' }), join('/work', 'design-store'), 'blank is not a setting');
 });

@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { captureWithFigmaCli } from '../lib/figma-capture.mjs';
 import { standinFigma, runOn } from './figma-console-standin.mjs';
 import { tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STANDIN = join(HERE, 'figma-console-standin.mjs');
@@ -30,7 +31,7 @@ const standinEntry = (env = {}) => ({ command: process.execPath, args: [STANDIN,
 const fast = { pause: async () => {} };
 
 test('the server is found in the project\'s MCP config by its package, a stdio entry only, never one by URL or another server', () => {
-  const at = (files) => (p) => { const k = Object.keys(files).find((f) => p.endsWith(f)); if (!k) throw new Error('none'); return JSON.stringify(files[k]); };
+  const at = (files) => (p) => { const k = Object.keys(files).find((f) => slashed(p).endsWith(f)); if (!k) throw new Error('none'); return JSON.stringify(files[k]); };
   const npx = { command: 'npx', args: ['-y', 'figma-console-mcp@latest'], env: { ENABLE_MCP_APPS: 'false' } };
   assert.deepEqual(findFigmaConsole('/p', { read: at({ '/.mcp.json': { mcpServers: { figma: { command: 'npx', args: ['figma-developer-mcp'] }, 'figma-console': npx } } }) }),
     { file: '.mcp.json', name: 'figma-console', command: 'npx', args: ['-y', 'figma-console-mcp@latest'], env: { ENABLE_MCP_APPS: 'false' } });

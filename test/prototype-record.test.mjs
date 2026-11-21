@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkRecord, writeCheck, readChecks, byComponent, checkLine, checkFile } from '../lib/prototype-record.mjs';
 import { tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const items = [
   { component: 'Field', kind: 'prop', message: 'Field has no prop "hint"', gap: true, why: 'its page shows no example of it in use' },
@@ -45,7 +46,7 @@ test('kept beside the page, read back by name, and only ours', () => {
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   const rec = checkRecord({ name: 'SignIn', file: 'prototypes/SignIn.jsx', used: { Button: 1 }, items });
   const at = writeCheck(dir, 'prototypes', rec);
-  assert.match(at, /prototypes\/SignIn\.check\.json$/);
+  assert.match(slashed(at), /prototypes\/SignIn\.check\.json$/);
   assert.equal(checkFile('SignIn'), 'SignIn.check.json');
   assert.match(JSON.parse(readFileSync(at, 'utf8')).$description, /carried with it wherever the prototype goes/);
   // A file that is not one of ours is left alone, and a folder with none gives none: a prototype nobody has
