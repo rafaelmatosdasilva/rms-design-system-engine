@@ -20,6 +20,24 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** gpt-6-luna: 2 of 54 runs failed. Failed: audit-chip #1: names the 36 vs 32 combination; disabled-hover #0: names the guard. Each task passed its other two runs: once Codex did not rerun outside its sandbox when NEXT asked, once it quoted the finding and left out the guard. Codex on a ChatGPT plan names no cost, so a run's cost reads 0; its tokens say what it spent. What these runs taught is in FINDINGS.md (In Codex, the browser could not start). Records: `records/codex-agents-md`.
 
+## 2026-11: Findings: a run the API dropped fails as if the agent never answered (continuous evaluation)
+
+What changed since the entry below (engine 18584c2d): Figma is read through Figma Console MCP where the project configures it (#605); Screen readers heard for real: VoiceOver and NVDA in CI (#600); The team's own linters run with its own config, presets included, and one that cannot run says why (#604); Every Figma read through the route the person chooses: figma-cli, Figma Console MCP or the session's Figma tool (#606); Svelte is parked: nothing more is built for it, and what is there stays (#607); The guard checked against what Codex really sends, and shell edits judged as edits (#608); The engine's own checks held against the W3C's ACT Rules, IBM's checker beside axe-core, and Test accessibility is Stable (#609); The engine's own health report, prototypes drawn as text, pages rebuilt from the system, and adoption plans (#610); The agent reads Figma the way the person chose, and a read run by a runner takes every note's words; The main guide names the two runners without passing its size; Findings: a run the API dropped fails as if the agent never answered. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `e43f004c30ca` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 40c4e23a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md d3ee4f50` `rms-design-system-engine.md b258f8bd`
+
+| Haiku, engine 521b0652 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 78/79 |
+| Mean cost a run | 0.060 | 0.058 |
+| Input a run | 108k | 98k |
+| Turns a run | 3.8 | 3.5 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 79 runs failed, fewer passes than the entry below. Failed: audit-all #0: names a measured difference. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-21-findings-a-run-the-api`.
+
 ## 2026-11: The engine's own health report, prototypes as text, pages rebuilt from the system, and adoption plans (continuous evaluation)
 
 What changed since the entry below (engine a08807eb): The inspection rebuilt as thirteen questions of the engine's own; --prototype --text; --prototype --from-page; --adoption-plan; recipe lines in prototype and burndown. The guide changed in `cookbook/burndown.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.

@@ -320,3 +320,10 @@ test('a check made by hand is the person\'s to record: --checked runs when they 
   assert.equal(j(run('rm design-system-engine-checked.json'), 'audit the badge'), 'ask');
   assert.equal(j({ tool_name: 'Edit', tool_input: { file_path: '/p/design-system-engine-checked.json' } }, 'I checked the badge'), 'pass');
 });
+
+test('the engine\'s report is read whole: a run piped into head or tail is refused, one read in full is not', () => {
+  for (const c of ['rms-design-system-engine 2>&1 | head -300', 'rms-design-system-engine --recipe full-audit | tail -50', 'node lib/audit.mjs --styleguide | head'])
+    assert.match(judge(bash(c), { userText: 'audit everything' })?.reason ?? '', /read whole: its summary and the differences the browser measured/, c);
+  for (const c of ['rms-design-system-engine', 'rms-design-system-engine 2>&1', 'ls | head -5', 'rms-design-system-engine --route "x"; git log | head -3'])
+    assert.equal(judge(bash(c), { userText: 'audit everything' })?.decision === 'deny' && /read whole/.test(judge(bash(c), { userText: 'audit everything' }).reason), false, c);
+});

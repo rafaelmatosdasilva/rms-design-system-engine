@@ -268,6 +268,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 - **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and skips any hook it has not trusted. Interactive Codex says so when it opens ("Hooks need review"), but `codex exec` skips them without a word. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
 - **Let the engine leave Codex's sandbox.** By default Codex runs commands in a sandbox with no network, where Chrome cannot start, so nothing is measured in a browser and Figma cannot be reached. The engine then starts no browser at all, and its `NEXT:` line asks the agent to run the same command again outside the sandbox. Approve that request when Codex asks.
 - **Shell edits are checked too.** Codex often edits a file with a shell command such as `sed -i` rather than `apply_patch`. The guard judges such a command the same way as a patch, and the check after an edit runs on each file the command wrote.
+- **The engine's report is read whole.** Its summary, and the differences a browser measured, come at its end. So the guard refuses an engine command piped into `head` or `tail`, in every tool, and asks for the same command without it.
 
 **Where they differ from Claude Code.**
 

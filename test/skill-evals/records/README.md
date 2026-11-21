@@ -300,6 +300,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-20-the-guide-names-the-shadcn` | The 24 guide tasks on Haiku (engine ec880234) | "shadcn/ui scaffold in the guide" |
 | `2026-11-20-identity-a-token-is-a` | The 24 guide tasks on Haiku (engine a08807eb) | "Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer" |
 | `own-kits` | The 24 guide tasks on Haiku (engine 18584c2d) | "The engine's own health report, prototypes as text, pages rebuilt from the system, and adoption plans" |
+| `2026-11-21-findings-a-run-the-api` | The 24 guide tasks on Haiku (engine 521b0652) | "Findings: a run the API dropped fails as if the agent never answered" |
 | `codex-agents-md` | The 18 guide tasks on gpt-6-luna (engine 4cfcd2f7) | "The guide in Codex: the 18 guide tasks with the AGENTS.md a Codex user has" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
