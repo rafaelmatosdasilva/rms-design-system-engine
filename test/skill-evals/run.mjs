@@ -3,7 +3,10 @@
 //
 //   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|prototype-figma|route
 //        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
-//        [--source <a project of your own>]
+//        [--source <a project of your own>] [--agent claude|codex]
+//
+// --agent codex runs each task in OpenAI Codex (codex.mjs) with the agents variant: the engine's section in AGENTS.md,
+// as a Codex user has it. Its rows say so (agent, runner), and go to files of their own.
 //
 // --source measures the same tasks against a real design system instead of the four-component fixture: name a
 // project set up with that team's profile, and the engine brings in what it reads. The system is never copied
@@ -35,13 +38,19 @@ import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO, PROTO_FIGMA } from './proto-tasks.mjs';
 import { variant } from './variants.mjs';
+import { runCodex, codexHome, codexVersion } from './codex.mjs';
+import { childEnv } from './lib.mjs';
 import { envVar } from '../../lib/names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i === -1 ? d : process.argv[i + 1]; };
-const V = arg('variant', 'baseline'), MODEL = arg('model', 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
+const AGENT = arg('agent', 'claude');
+if (!['claude', 'codex'].includes(AGENT)) { console.log(`✗ no agent ${AGENT}: claude, codex`); process.exit(2); }
+const V = arg('variant', AGENT === 'codex' ? 'agents' : 'baseline'), MODEL = arg('model', AGENT === 'codex' ? 'gpt-6-luna' : 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
 const ROUTE = arg('route', 'shell');
 if (!ROUTES[ROUTE]) { console.log(`✗ no route ${ROUTE}: ${Object.keys(ROUTES).join(', ')}`); process.exit(2); }
+// Codex reaches the engine by its shell, as docs/setup.md sets it up, and reads AGENTS.md: the agents variant.
+if (AGENT === 'codex' && (ROUTE !== 'shell' || V !== 'agents')) { console.log('✗ --agent codex runs the agents variant by the shell: the AGENTS.md section a Codex user has'); process.exit(2); }
 const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
 // --source <a project of your own>: the same tasks, measured against a real design system instead of the fixture.
 // The system is never copied here and never written to: the project named is one set up with that team's profile,
@@ -74,14 +83,14 @@ const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: 
 // credentials choose (runnerOf). This line used to ask the PATH for a bare `claude` while every run spawned the one
 // lib.mjs had resolved, so a machine whose shell does not carry it died here in a stack, measuring nothing; and on
 // the SDK route it recorded the version of a program no run used.
-const { runner, version: cliVersion } = agentOf();
+const { runner, version: cliVersion } = AGENT === 'codex' ? { runner: 'codex', version: codexVersion() } : agentOf();
 if (!cliVersion) {
-  console.log(runner === 'cli'
+  console.log(runner === 'codex' ? '✗ no `codex` on this machine: npm i -g @openai/codex, then codex login, or point DESIGN_SYSTEM_ENGINE_EVAL_CODEX at it.' : runner === 'cli'
     ? '✗ no `claude` on this machine, and the runs go through it: install Claude Code (https://claude.com/claude-code), or point DESIGN_SYSTEM_ENGINE_EVAL_CLI at it. Looked on the PATH, beside this node, in ~/.local/bin and in ~/.claude/local.'
     : '✗ no Agent SDK, and the runs go through it (an API key is set): npm ci --prefix test/.eval-tools. Unset ANTHROPIC_API_KEY to run on the plan\'s login through the command line instead.');
   process.exit(2);
 }
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(AGENT !== 'claude' ? { agent: AGENT } : {}), ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
@@ -110,12 +119,16 @@ async function one({ t, run }) {
   const out = outFor(t);
   if (!out) throw new Error('private tasks need DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT');
   mkdirSync(join(out, 'transcripts'), { recursive: true });
-  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [] });
+  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [], rules: vr.rules ?? null });
   const { home, path } = makeHome(vr, { cliOnPath: t.cliOnPath !== false });
+  if (AGENT === 'codex') codexHome(home);
   const events = [];
   let sessionId = null, error = null, limit = null;
   for (const prompt of t.prompts ?? [t.prompt]) {
-    const r = await runClaude({ cwd: dir, home, path, prompt: `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
+    const text = `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`;
+    const r = AGENT === 'codex'
+      ? await runCodex({ cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
+      : await runClaude({ cwd: dir, home, path, prompt: text, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;
     if (r.infra) {
