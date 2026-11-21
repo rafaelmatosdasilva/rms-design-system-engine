@@ -11,7 +11,7 @@ What the engine does for design and product teams. Every part reads the same kno
 | [Check your Figma library rules](#check-your-figma-library-rules) | The patterns, architecture and rules your Figma library is built on, each break listed, with a score for how well you follow them. | Ready to use |
 | [Lint your codebase rules](#lint-your-codebase-rules) | The patterns, architecture and rules your codebase is built on, each break listed, with a score for how well you follow them. | Ready to use |
 | [Measure Figma-code parity](#measure-figma-code-parity) | Every difference between Figma and the code in colours, sizes, states and spacing, in every mode, with the fix for each. | Ready to use |
-| [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component and state, each failure tied to its WCAG criterion. | Early development |
+| [Test accessibility](#test-accessibility) | Contrast, keyboard focus, touch targets and zoom on every component and state, each failure tied to its WCAG criterion. | Ready to use |
 
 ### Documentation
 
@@ -163,7 +163,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 ## Test accessibility
 
-**Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
+**Ready to use** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
 
 *Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, and from VoiceOver or NVDA themselves only when you ask.*
 

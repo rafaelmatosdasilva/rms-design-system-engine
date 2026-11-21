@@ -12,6 +12,8 @@ How the engine tests the accessibility of every component, and of your products'
   - [Video and sound](#video-and-sound)
   - [Judgement calls, pre-sorted](#judgement-calls-pre-sorted)
   - [What a screen reader actually says](#what-a-screen-reader-actually-says)
+  - [A second rule engine](#a-second-rule-engine)
+  - [Checked against the W3C's own cases](#checked-against-the-w3cs-own-cases)
   - [Which browser answered it](#which-browser-answered-it)
 
 ## Test accessibility
@@ -302,6 +304,36 @@ each component the style guide draws:
 The other criteria a browser decides (what an input does when it changes, dragging, content on hover, a focus hidden
 by something else) are still tried in Chrome alone, and their rows say so. Rendered parity is drawn in the same
 browsers (see [Measure Figma-code parity](audit.md#in-the-browser)), through the same drivers.
+
+### A second rule engine
+
+IBM's Equal Access Checker (Apache 2.0) has rules of its own. Install it once, then turn it on with
+`"a11y": { "ibm": true }` in `ds-config.json` (or `--ibm`), and it runs on the same pages as axe-core and the engine's
+own checks:
+
+```bash
+node lib/a11y-check.mjs --fetch-ibm
+```
+
+- **Confirmed.** When it raises the same element under the same criterion as another check, that problem counts as
+  confirmed. That is the strongest automated evidence there is.
+- **Only IBM.** What only it finds is listed under its own rules, marked as IBM's. A failure only it raises is a
+  warning, and one it asks a person to verify is an advisory, so it never stops a run on its own.
+- **Only the others.** The run says how many problems the engine or axe-core raised and IBM did not.
+- **Optional, and asked for.** It runs only when turned on, from the engine's own cache or `a11y.ibmPath`, never
+  fetched during a run, so the same project gives the same report on every computer. The pinned version's SHA-384
+  must match, and the check is whole without it.
+
+### Checked against the W3C's own cases
+
+The W3C publishes, for each Accessibility Conformance Testing (ACT) rule, pages that must pass, pages that must fail,
+and pages the rule does not apply to. The engine's own checks run on every case of each rule they stand for, with
+axe-core left out, so only the engine's code answers.
+
+- **Every case agrees, or is listed with why.** A disagreement nobody has explained fails the run.
+- **Run in CI.** `.github/workflows/act-rules.yml` runs every case on each change to the checks, and once a week.
+- **Run it yourself.** `node lib/act-rules.mjs fetch`, then `node lib/act-rules.mjs run`. `node lib/act-rules.mjs rules`
+  lists the rules mapped, and why the others are not.
 
 ### How sure each finding is
 

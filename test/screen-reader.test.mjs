@@ -169,3 +169,19 @@ test('a field\'s name and value count when the reader says them apart, as NVDA d
   assert.ok(compareSaid('edit text, Name, Ada', 'Name, edit, selected Ada', 'nvda').ok);
   assert.equal(compareSaid('edit text, Name, Ada', 'Name, edit', 'nvda').ok, false, 'the value left out is still a finding');
 });
+
+test('a line whose speech caught only the hint is completed by what the reader has under its cursor', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  const dir = makeFixture({});
+  const page = join(dir, 'page.html');
+  writeFileSync(page, '<!doctype html><html><body><section id="c-one"><div class="pg-preview"><button>Continue</button></div></section></body></html>');
+  const chrome = await launchChrome(CHROME);
+  const { send, close } = await connectCDP(chrome.wsUrl);
+  try {
+    const { sessionId } = await openPage(send, 'about:blank');
+    const reader = { which: 'voiceover', said: async () => 'You are currently on a button.', item: async () => 'Continue button' };
+    const got = await hearComponents({ url: () => pathToFileURL(page).href, names: ['one'], reader, send, sessionId, settleMs: 0, rootOf: (n) => `#c-${n} .pg-preview` });
+    const [line] = got.components.one.lines;
+    assert.equal(line.ok, true);
+    assert.match(line.said, /Continue button/);
+  } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
+});

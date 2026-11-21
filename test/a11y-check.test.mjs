@@ -169,11 +169,23 @@ test('contrastFindings flags #777 on white as normal-text fail but passes it as 
   assert.equal(large.length, 0, 'ratio ~4.48 clears the 3:1 large-text bar');
 });
 
-test('contrastFindings reports a gradient/image background as cannot-compute, not a fail', () => {
+test('contrastFindings reports an image background as cannot-compute, not a fail', () => {
   const out = contrastFindings([{ desc: 'div.hero', text: 'X', color: 'rgb(0,0,0)', bgLayers: [], fontSize: 16, fontWeight: '400', bgImage: true }], 'Dark');
   assert.equal(out.length, 1);
-  assert.equal(out[0].cannotCompute, 'background-image/gradient');
+  assert.equal(out[0].cannotCompute, 'background-image');
   assert.equal(out[0].ratio, undefined);
+});
+
+test('contrastFindings measures what is drawn: a gradient where the text sits, a shadow, opacity, and leaves alone what is not words', () => {
+  const t = (over) => ({ desc: 'p', text: 'Some text', color: 'rgb(51,51,51)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false, ...over });
+  const grad = ['rgb(255, 255, 255)', 'rgb(0, 0, 255)'];
+  assert.equal(contrastFindings([t({ gradient: grad })], 'L').length, 1, 'its worst stop, when where the text sits is not known');
+  assert.equal(contrastFindings([t({ gradient: grad, gradientSpan: [0, 0.3] })], 'L').length, 0, 'only the light stretch the text covers');
+  assert.equal(contrastFindings([t({ color: 'rgb(102,102,102)', shadow: 'rgb(170, 170, 170)' })], 'L').length, 1, 'a grey shadow behind grey letters');
+  assert.equal(contrastFindings([t({ color: 'rgb(0,0,0)', bgLayers: ['rgb(115,115,115)'], shadow: 'rgb(255, 255, 255)' })], 'L').length, 0, 'a white halo lifts black letters off grey');
+  assert.equal(contrastFindings([t({ color: 'rgb(0,0,0)', opacity: 0.3 })], 'L').length, 1, 'faded by opacity');
+  assert.equal(contrastFindings([t({ text: '----====****', color: 'rgb(200,200,200)' })], 'L').length, 0, 'symbols are not words');
+  assert.equal(contrastFindings([t({ color: 'rgb(255,255,255)', hidden: true })], 'L').length, 0, 'hidden and drawn in its background\'s colour is not visible text');
 });
 
 test('a good pair produces no finding', () => {
