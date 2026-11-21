@@ -3,13 +3,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { writeFileSync, rmSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { ibmFindings, ibmIntact, fetchIbmSource, IBM_JS, IBM_VERSION } from '../lib/a11y-ibm.mjs';
 import { WCAG21_KIND } from '../lib/wcag21.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 
@@ -36,7 +35,7 @@ test('an element and a criterion IBM shares with another check is confirmed, the
 
 test('only the pinned copy runs: a changed file is refused, and nothing is fetched unless asked', async () => {
   assert.equal(ibmIntact('not the checker'), false);
-  const home = mkdtempSync(join(tmpdir(), 'ibm-home-'));
+  const home = tempDir('ibm-home-');
   try {
     let asked = 0;
     assert.equal(await fetchIbmSource({}, { home, fetchImpl: async () => { asked++; return { ok: true, text: async () => 'x' }; } }), null);
@@ -46,9 +45,11 @@ test('only the pinned copy runs: a changed file is refused, and nothing is fetch
 });
 
 test(`in a real browser: IBM's rules ${IBM_VERSION} run on a page and confirm what the engine's own check raised`, { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available', timeout: budget(180000) }, async () => {
-  const src = await fetchIbmSource({}, { download: true });
+  // Into a home of its own: the computer's own cache is left as it was, so no other test finds IBM installed.
+  const home = tempDir('ibm-cache-');
+  const src = await fetchIbmSource({}, { download: true, home });
   assert.ok(src, 'the pinned copy is fetched (online) or already cached');
-  const dir = mkdtempSync(join(tmpdir(), 'ibm-page-'));
+  const dir = tempDir('ibm-page-');
   const page = join(dir, 'p.html');
   writeFileSync(page, '<!doctype html><html lang="en"><head><title>t</title></head><body><main><p class="low" style="color:#aaa;background:#fff">Low contrast words</p><img class="logo" src="x.png"></main></body></html>');
   const chrome = await launchChrome(CHROME);
@@ -63,5 +64,5 @@ test(`in a real browser: IBM's rules ${IBM_VERSION} run on a page and confirm wh
     assert.ok(results.some((r) => r.sc.includes('1.1.1') && r.desc === 'img.logo'), v);
     const got = ibmFindings(results, [{ kind: 'contrast', desc: 'p.low' }], [], WCAG21_KIND);
     assert.ok(got.confirmed.some((c) => c.kind === 'contrast'), 'the engine\'s contrast finding is confirmed');
-  } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
+  } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
 });

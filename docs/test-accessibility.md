@@ -307,8 +307,9 @@ browsers (see [Measure Figma-code parity](audit.md#in-the-browser)), through the
 
 ### A second rule engine
 
-IBM's Equal Access Checker (Apache 2.0) has rules of its own. Once it is installed, it runs on the same pages as
-axe-core and the engine's own checks:
+IBM's Equal Access Checker (Apache 2.0) has rules of its own. Install it once, then turn it on with
+`"a11y": { "ibm": true }` in `ds-config.json` (or `--ibm`), and it runs on the same pages as axe-core and the engine's
+own checks:
 
 ```bash
 node lib/a11y-check.mjs --fetch-ibm
@@ -319,8 +320,9 @@ node lib/a11y-check.mjs --fetch-ibm
 - **Only IBM.** What only it finds is listed under its own rules, marked as IBM's. A failure only it raises is a
   warning, and one it asks a person to verify is an advisory, so it never stops a run on its own.
 - **Only the others.** The run says how many problems the engine or axe-core raised and IBM did not.
-- **Optional.** The engine runs it only from its own cache, or from `a11y.ibmPath`, never fetched during a run. The
-  pinned version's SHA-384 must match. `--no-ibm` or `a11y.ibm: false` leaves it out, and the check is whole without it.
+- **Optional, and asked for.** It runs only when turned on, from the engine's own cache or `a11y.ibmPath`, never
+  fetched during a run, so the same project gives the same report on every computer. The pinned version's SHA-384
+  must match, and the check is whole without it.
 
 ### Checked against the W3C's own cases
 
