@@ -1,0 +1,20 @@
+// test/skill-evals/agents.mjs - the agents a skill evaluation can run its tasks in besides Claude Code (run.mjs --agent).
+//
+// Each is what a person using that agent has: its own guide variant, its default model, the program and its version,
+// what a run's fresh HOME needs (its login), and one turn as runClaude does it: { events, sessionId, cost, error,
+// infra, limit, stderr }, with events in Claude Code's stream-json so every scorer reads them unchanged. A new agent
+// is one entry here and a module of its own beside codex.mjs.
+import { runCodex, codexHome, codexVersion } from './codex.mjs';
+
+export const OTHER_AGENTS = {
+  codex: {
+    variant: 'agents',           // the engine's section in AGENTS.md, as --agent-rules --write puts it there
+    model: 'gpt-6-luna',
+    routes: ['shell'],           // Codex reaches the engine by its shell, as docs/setup.md sets it up
+    version: () => codexVersion(),
+    missing: 'no `codex` on this machine: npm i -g @openai/codex, then codex login, or point DESIGN_SYSTEM_ENGINE_EVAL_CODEX at it.',
+    prepare: (home) => codexHome(home),
+    turn: (o) => runCodex(o),
+  },
+};
+export const AGENT_NAMES = ['claude', ...Object.keys(OTHER_AGENTS)];

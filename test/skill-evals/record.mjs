@@ -26,6 +26,26 @@ const ENGINE = dirname(dirname(HERE));   // the engine's own folder: test/skill-
 const SKIP = /(^|\/)(node_modules|\.cache|dist|build\/static|coverage)(\/|$)|(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?)$/;
 const MAX = 40 * 1024;
 
+// The last entry recorded for this agent: an entry for another agent (a Codex run, whose rows say agent: 'codex') is
+// never the one a Claude run is compared with, nor the other way round, since their models and runners share nothing.
+// rowsOf(name) → that record's rows. → the record's name, or null.
+export function lastRecordFor(results, agent = 'claude', rowsOf = () => []) {
+  for (const m of String(results).matchAll(/Records: `records\/([^`]+)`/g)) {
+    const rows = rowsOf(m[1]);
+    if (!rows.length) continue;
+    if ((rows[0].agent ?? 'claude') === agent) return m[1];
+  }
+  return null;
+}
+export function recordRows(name, base = join(HERE, 'records')) {
+  const dir = join(base, name);
+  if (!existsSync(dir)) return [];
+  const out = [];
+  const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (f.endsWith('.jsonl')) out.push(...readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)); } };
+  walk(dir);
+  return out;
+}
+
 export function pruneRow(row) {
   if (/^private/.test(row.task)) return null;
   const files = {};
@@ -199,7 +219,8 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const moved = sh(['diff', '--name-only', engines[0], 'HEAD', '--', ...GUIDE_PATHS], ENGINE);
     if (moved) { console.log(`✗ the guide changed after the measured engine ${engines[0]}: ${moved.split('\n').join(', ')}; measure again`); process.exit(2); }
     const results = readFileSync(join(HERE, 'RESULTS.md'), 'utf8');
-    const prevName = /Records: `records\/([^`]+)`/.exec(results)?.[1];
+    const agentNow = recordRows(name)[0]?.agent ?? 'claude';
+    const prevName = lastRecordFor(results, agentNow, (n) => recordRows(n));
     const before = prevName && existsSync(join(HERE, 'records', prevName)) ? sidesOf(join(HERE, 'records', prevName)) : {};
     const prevEngine = [...new Set(Object.values(before).map((x) => x.engine))][0] ?? '';
     // The entry before may name a commit that is not here (a squashed or rebased branch, a fresh clone). Say so and

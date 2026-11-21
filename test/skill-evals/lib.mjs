@@ -117,7 +117,9 @@ export function projectHash(source = DEMO) {
 // engine: false (the build evaluation's MCP-only side) leaves out everything the skill gives a project: its config,
 // the Figma snapshots it captured, and its hooks.
 // skillFiles: what else the skill made in a real project (its contracts, records, snapshots), left out with it.
-export function makeProject(source, setup, { engine = true, skillFiles = [] } = {}) {
+// rules: a variant's instruction file (the agents variant's AGENTS.md), written before the first commit so it is the
+// project's own and never the run's change.
+export function makeProject(source, setup, { engine = true, skillFiles = [], rules = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'skill-eval-'));
   cpSync(source, dir, { recursive: true, filter: (p) => !NOT_PROJECT.test(p) });
   const today = new Date().toISOString();
@@ -126,6 +128,7 @@ export function makeProject(source, setup, { engine = true, skillFiles = [] } = 
   }
   setup?.(dir);
   if (!engine) for (const p of ['ds-config.json', 'src/figma', ...skillFiles]) rmSync(join(dir, p), { recursive: true, force: true });
+  rules?.(dir);
   const env = { ...process.env, ...GIT_ENV };
   execFileSync('git', ['init', '-q'], { cwd: dir, env });
   if (engine && existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });

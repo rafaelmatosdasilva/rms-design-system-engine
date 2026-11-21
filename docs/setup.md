@@ -249,7 +249,7 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 
 - **You get** the answers about your system (each component's props, each token and what it is for), the check of a UI an AI tool built, and every audit the command line runs.
 - **In Cursor and Codex you also get** the guide and the [hooks that keep the rules](#the-hooks-keep-the-rules), set up as below.
-- **You don't get** the skill evaluation anywhere but Claude Code: it runs on Claude, so how well another tool follows the guide is not measured yet.
+- **Measured in Claude Code and Codex.** The skill evaluation runs the same tasks in both. In Codex the guide in `AGENTS.md` passed 52 of 54 runs of the 18 guide tasks (Codex CLI 0.171.0). How well Cursor and the other tools follow it is not measured yet.
 
 ### In Cursor and Codex
 
@@ -266,6 +266,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
   1. **The project.** Open `codex` in the project and choose "Trust and continue". Until the project is trusted, Codex skips its `.codex` folder with only a warning, so no hook runs and nothing is checked.
   2. **The hooks.** Type `/hooks` and trust each one.
 - **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and skips any hook it has not trusted. Interactive Codex says so when it opens ("Hooks need review"), but `codex exec` skips them without a word. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
+- **Let the engine leave Codex's sandbox.** By default Codex runs commands in a sandbox with no network, where Chrome cannot start, so nothing is measured in a browser and Figma cannot be reached. The engine then starts no browser at all, and its `NEXT:` line asks the agent to run the same command again outside the sandbox. Approve that request when Codex asks.
 - **Shell edits are checked too.** Codex often edits a file with a shell command such as `sed -i` rather than `apply_patch`. The guard judges such a command the same way as a patch, and the check after an edit runs on each file the command wrote.
 - **The engine's report is read whole.** Its summary, and the differences a browser measured, come at its end. So the guard refuses an engine command piped into `head` or `tail`, in every tool, and asks for the same command without it.
 
@@ -273,7 +274,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 
 - **Neither can ask you before a file edit.** Where Claude Code would ask, Cursor and Codex hold the edit and tell the agent why. Ask for the change in your own words and the agent can try again. Cursor still asks you before a command, such as a push.
 - **Cursor routes from the guide, not the hook.** Its hooks cannot add the route to your message, so the line in `AGENTS.md` does it.
-- **Not measured yet.** The skill evaluation runs on Claude, so how reliably each tool follows the guide is still to be measured.
+- **Measured in Codex, not yet in Cursor.** In Codex the 18 guide tasks passed 52 of 54 runs. The two misses were a browser finding left out of a reply, each time on a task that passed its other two runs. The run measured the guide alone: Codex runs no hook it was not told to trust, so the guard is checked separately, against what Codex really sends.
 
 ### Another tool with a terminal
 

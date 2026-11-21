@@ -3,7 +3,10 @@
 //
 //   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|prototype-figma|route
 //        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
-//        [--source <a project of your own>]
+//        [--source <a project of your own>] [--agent claude|<another agent in agents.mjs>]
+//
+// --agent runs each task in another agent (agents.mjs: OpenAI Codex today) with what a person using it has, its own
+// guide variant among it. Its rows say so (agent, runner), and go to files of their own.
 //
 // --source measures the same tasks against a real design system instead of the four-component fixture: name a
 // project set up with that team's profile, and the engine brings in what it reads. The system is never copied
@@ -35,13 +38,20 @@ import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO, PROTO_FIGMA } from './proto-tasks.mjs';
 import { variant } from './variants.mjs';
+import { OTHER_AGENTS, AGENT_NAMES } from './agents.mjs';
+import { childEnv } from './lib.mjs';
 import { envVar } from '../../lib/names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i === -1 ? d : process.argv[i + 1]; };
-const V = arg('variant', 'baseline'), MODEL = arg('model', 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
+const AGENT = arg('agent', 'claude');
+if (!AGENT_NAMES.includes(AGENT)) { console.log(`✗ no agent ${AGENT}: ${AGENT_NAMES.join(', ')}`); process.exit(2); }
+const OTHER = OTHER_AGENTS[AGENT] ?? null;   // an agent besides Claude Code (agents.mjs), or null
+const V = arg('variant', OTHER?.variant ?? 'baseline'), MODEL = arg('model', OTHER?.model ?? 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
 const ROUTE = arg('route', 'shell');
 if (!ROUTES[ROUTE]) { console.log(`✗ no route ${ROUTE}: ${Object.keys(ROUTES).join(', ')}`); process.exit(2); }
+// Each agent reaches the engine the way a person using it has it set up, with its own guide variant (agents.mjs).
+if (OTHER && (!OTHER.routes.includes(ROUTE) || V !== OTHER.variant)) { console.log(`✗ --agent ${AGENT} runs the ${OTHER.variant} variant by ${OTHER.routes.join(' or ')}: what a person using it has`); process.exit(2); }
 const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
 // --source <a project of your own>: the same tasks, measured against a real design system instead of the fixture.
 // The system is never copied here and never written to: the project named is one set up with that team's profile,
@@ -74,14 +84,14 @@ const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: 
 // credentials choose (runnerOf). This line used to ask the PATH for a bare `claude` while every run spawned the one
 // lib.mjs had resolved, so a machine whose shell does not carry it died here in a stack, measuring nothing; and on
 // the SDK route it recorded the version of a program no run used.
-const { runner, version: cliVersion } = agentOf();
+const { runner, version: cliVersion } = OTHER ? { runner: AGENT, version: OTHER.version() } : agentOf();
 if (!cliVersion) {
-  console.log(runner === 'cli'
+  console.log(OTHER ? `✗ ${OTHER.missing}` : runner === 'cli'
     ? '✗ no `claude` on this machine, and the runs go through it: install Claude Code (https://claude.com/claude-code), or point DESIGN_SYSTEM_ENGINE_EVAL_CLI at it. Looked on the PATH, beside this node, in ~/.local/bin and in ~/.claude/local.'
     : '✗ no Agent SDK, and the runs go through it (an API key is set): npm ci --prefix test/.eval-tools. Unset ANTHROPIC_API_KEY to run on the plan\'s login through the command line instead.');
   process.exit(2);
 }
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(AGENT !== 'claude' ? { agent: AGENT } : {}), ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
@@ -110,12 +120,16 @@ async function one({ t, run }) {
   const out = outFor(t);
   if (!out) throw new Error('private tasks need DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT');
   mkdirSync(join(out, 'transcripts'), { recursive: true });
-  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [] });
+  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [], rules: vr.rules ?? null });
   const { home, path } = makeHome(vr, { cliOnPath: t.cliOnPath !== false });
+  OTHER?.prepare(home);
   const events = [];
   let sessionId = null, error = null, limit = null;
   for (const prompt of t.prompts ?? [t.prompt]) {
-    const r = await runClaude({ cwd: dir, home, path, prompt: `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
+    const text = `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`;
+    const r = OTHER
+      ? await OTHER.turn({ cwd: dir, home, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: process.env.CHROME_PATH ?? '', PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), prompt: text, model: MODEL, resume: sessionId, version: cliVersion })
+      : await runClaude({ cwd: dir, home, path, prompt: text, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;
     if (r.infra) {
@@ -180,7 +194,8 @@ if (fellRows.length) {
 // The agent's bundled skills, against the last recorded evaluation's: a new command line is said, never read as the guide.
 try {
   const { readFolder } = await import('./summarize.mjs');
-  const prev = /Records: `records\/([^`]+)`/.exec(readFileSync(join(HERE, 'RESULTS.md'), 'utf8'))?.[1];
+  const { lastRecordFor, recordRows } = await import('./record.mjs');
+  const prev = lastRecordFor(readFileSync(join(HERE, 'RESULTS.md'), 'utf8'), AGENT, (n) => recordRows(n));
   const before = prev && existsSync(join(HERE, 'records', prev)) ? readFolder(join(HERE, 'records', prev)).flatMap((x) => x.rows) : [];
   const said = cliLine(cliChange(rows, before));
   if (said) console.log(`⚠️  ${said}`);

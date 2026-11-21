@@ -6,6 +6,8 @@
 //   skill     the same content as a native Claude Code Skill (SKILL.md built from the main file), its recipes
 //             and reference as files beside it
 //   bare      a few lines that hand every request to the engine's router: how much guide is still needed
+//   agents    the engine's section in AGENTS.md, as --agent-rules --write puts it there: what Codex and other agents
+//             read (run with --agent codex, codex.mjs)
 //   mcp       no skill and no engine at all: Claude with only what the Figma MCP returned (the build evaluation's
 //             baseline). The request goes in as written, with no command in front of it.
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, existsSync } from 'node:fs';
@@ -13,6 +15,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
 import { skillMd, guideAtRef } from '../../lib/skill-files.mjs';
+import { AGENTS_VARIANT } from './codex.mjs';
 
 const GUIDE = 'rms-design-system-engine.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -62,6 +65,7 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
     const text = BARE;
     return { name, ref: 'built in', text, install: (home) => { mkdirSync(join(home, '.claude', 'commands'), { recursive: true }); writeFileSync(join(home, '.claude', 'commands', GUIDE), text); } };
   }
+  if (name === 'agents') return AGENTS_VARIANT;
   if (name === 'mcp') return { name, ref: 'none', text: '', engine: false, prefix: '', install: () => {} };
   throw new Error(`unknown variant ${name}`);
 }

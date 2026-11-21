@@ -89,6 +89,11 @@ test('the verification headline, each component passing, drifting or not checked
   // Nothing measured in a browser: nothing is "not checked" by the census, and the line says what passing means then.
   assert.match(verificationLine(verification(['card', 'chip'], d, null)), /^\*\*Components: 1 passing · 1 drifting \(chip\) · 0 not checked\.\*\* Nothing was measured in a browser this run/);
   assert.equal(verificationLine(verification([], d, census)), null);
+  // Inside Codex's sandbox (it sets CODEX_SANDBOX) Chrome cannot start: the line says so, with how to measure after all.
+  const unmeasured = verification(['card', 'chip'], d, null);
+  assert.match(verificationLine(unmeasured, { CODEX_SANDBOX: 'seatbelt' }), /inside Codex's sandbox, where Chrome cannot start[\s\S]*outside the sandbox/);
+  assert.doesNotMatch(verificationLine(unmeasured, {}), /sandbox/, 'said only where it is so');
+  assert.doesNotMatch(verificationLine(v, { CODEX_SANDBOX: 'seatbelt' }), /sandbox/, 'a run that measured has nothing to say about it');
   // Under the verdict in the summary; never on a run that writes the baseline.
   assert.match(buildSummary({ verdict: 'pass', headline: '**Components: 2 passing · 0 drifting · 0 not checked.**' }), /In parity\.[^\n]*\n\n\*\*Components: 2 passing/);
   assert.doesNotMatch(buildSummary({ verdict: 'baseline', baselineWritten: { count: 1 }, headline: '**Components: x**' }), /Components: x/);
@@ -97,4 +102,34 @@ test('the verification headline, each component passing, drifting or not checked
 test('whether the Figma file is reliable enough to compare is said with the Figma data, before what fails', () => {
   const s = buildSummary({ verdict: 'failed', gates: [tokens], data: '**Figma data was not refreshed in this run.**', figma: '**The Figma file is only partly reliable to compare.** x' });
   assert.match(s, /not refreshed in this run\.\*\*\n\n\*\*The Figma file is only partly reliable to compare\.\*\* x\n\n- \*\*Token values\*\* fails/);
+});
+
+test('inside Codex\'s sandbox, every run says the browser could not start, as the step before NEXT', async () => {
+  const { sandboxLine } = await import('../lib/run-diff.mjs');
+  const env = { CODEX_SANDBOX: 'seatbelt' };
+  assert.match(sandboxLine({ measured: false }, env), /Codex's sandbox[\s\S]*outside the sandbox[\s\S]*then follow the NEXT line/);
+  assert.equal(sandboxLine({ measured: true }, env), null, 'a run that measured in a browser has nothing to say about it');
+  assert.equal(sandboxLine({ measured: false }, {}), null, 'outside Codex nothing is said');
+  assert.equal(sandboxLine({ measured: false, said: 'inside Codex\'s sandbox, where Chrome cannot start' }, env), null, 'never twice: the full run\'s headline already said it');
+});
+
+test('inside Codex\'s sandbox no browser is started at all: the launch is refused at once, with the reason', async () => {
+  const { launchChrome, sandboxRefusal, SANDBOX_NO_BROWSER } = await import('../lib/cdp.mjs');
+  const { launchFirefox } = await import('../lib/bidi.mjs');
+  assert.equal(sandboxRefusal({}), null);
+  // A path that would fail if spawned: refused before any spawn, so the error is the sandbox's, never a crash's.
+  await assert.rejects(launchChrome('/nonexistent/chrome', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  await assert.rejects(launchFirefox('/nonexistent/firefox', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  const { launchSafari } = await import('../lib/webdriver.mjs');
+  await assert.rejects(launchSafari('/nonexistent/safaridriver', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  assert.doesNotMatch(SANDBOX_NO_BROWSER, /did not start within|exited before DevTools was ready/, 'never a reason the launcher tries again');
+});
+
+test('a design system\'s token set asked about is not a secret asked for', async () => {
+  const { asksForSecret } = await import('../lib/guard.mjs');
+  const { asksForToken } = await import('./skill-evals/rules.mjs');
+  for (const f of [asksForSecret, asksForToken]) {
+    assert.equal(f('You can name existing XL variables or share the token set.'), false);
+    assert.equal(f('Paste your Figma token here.'), true, 'a real secret still is');
+  }
 });
