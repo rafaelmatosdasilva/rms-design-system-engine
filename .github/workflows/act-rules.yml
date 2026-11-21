@@ -1,0 +1,47 @@
+name: ACT Rules
+
+# The engine's own accessibility checks held against the W3C's ACT Rules test cases (lib/act-rules.mjs): every case of
+# each rule a check stands for, through the real engine with axe-core left out, so only the engine's own code answers.
+# It fails when a case disagrees with what the W3C expects and is not listed, with why, as known. The cases are
+# fetched from the pinned commit, never committed.
+on:
+  pull_request:
+    paths:
+      - lib/wcag-page.js
+      - lib/wcag21.mjs
+      - lib/a11y-check.mjs
+      - lib/page-criteria.mjs
+      - lib/act-rules.mjs
+      - .github/workflows/act-rules.yml
+  push:
+    branches: [main]
+    paths:
+      - lib/wcag-page.js
+      - lib/wcag21.mjs
+      - lib/a11y-check.mjs
+      - lib/page-criteria.mjs
+      - lib/act-rules.mjs
+      - .github/workflows/act-rules.yml
+  schedule:
+    - cron: '29 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  act:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Fetch the pinned ACT Rules cases
+        run: node lib/act-rules.mjs fetch
+      # The runner's Chrome, as the suite uses it.
+      - name: Run every case through the engine
+        env:
+          RMS_TEST_TIME_SCALE: '3'
+        run: node lib/act-rules.mjs run

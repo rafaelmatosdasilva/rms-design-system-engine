@@ -18,6 +18,8 @@ node_modules
 # DSDS's published schema, suite and examples, fetched for the DSDS tests (node lib/dsds-release.mjs fetch), never
 # kept here: its licence and comments name people and companies, and this repository names none.
 test/.dsds/
+# The W3C's ACT Rules test cases, fetched for the ACT run (node lib/act-rules.mjs fetch), never kept here.
+test/.act/
 
 # private parity plans/roadmap (local-only, never published)
 plans/
