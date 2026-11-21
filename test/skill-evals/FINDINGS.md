@@ -8,6 +8,27 @@ Newest first.
 
 ---
 
+## In Cursor's agent, no hook ran, and a stopped run read as an empty answer
+
+**Found** 21 November 2026, the first evaluation in Cursor's command-line agent (`run.mjs --agent cursor`, cursor-agent 2026.11.19-f005e9d, model Auto). **Not measured in full yet:** the free plan's usage limit stopped it after 23 of the 54 runs of the 18 guide tasks, all 23 passed.
+
+**Evidence.**
+- *The hooks.* The engine's hooks were in the project's `.cursor/hooks.json`, as `--install-hooks --tool cursor` writes them. A hook that only wrote its event's name to a file was put first under every event, in the project and then in `~/.cursor/hooks.json`, and `cursor-agent -p --trust --force` ran a command: nothing was written, for either. Each tool call's `hookAdditionalContexts` came back empty, and the guard never wrote its per-turn state.
+- *The login.* A run with a fresh HOME said "Authentication required". Cursor keeps its token in the macOS keychain and finds it through HOME, so with the keychain folder linked into the run's HOME (nothing copied out of it) the same run logged in.
+- *The limit.* Two runs of `visual-howto` returned an init event and no result. Asked again, Cursor printed "ActionRequiredError: You've hit your usage limit" on stderr, never in its events.
+
+**Guesses ruled out.**
+- That Cursor ignores AGENTS.md: it ran `--route` first in every run read by hand, and asked to write a hand-made colour it refused, naming the system's tokens.
+- That the hooks file was malformed: it is the file the engine writes for the Cursor editor, and the logging hook added to it ran nowhere either.
+- That Cursor's sandbox would stop Chrome, as Codex's does: it is off by default (`sandbox.mode` "disabled"), and the runs' audits measured in the browser.
+
+**What changed.**
+- `cursor.mjs` reads Cursor's real shapes: an edit's content from `streamContent`, a shell's output from `interleavedOutput`.
+- A run that stops before its result takes its reason from stderr, and the plan's usage limit is a refusal, never scored.
+- The setup page says Cursor's command-line agent ran no hooks, so there the guide works alone. Until a version runs them, Cursor's runs measure the guide without the guard, and the prototype tasks (which Claude Code's Stop hook sends back when a reply is incomplete) are expected to score lower for it.
+
+---
+
 ## In Codex, the browser could not start, and nothing said so in a way the agent acted on
 
 **Found** 21 November 2026, the first evaluations in OpenAI Codex (`run.mjs --agent codex`, CLI 0.171.0). **Fixed in** this branch, measured at 52/54 on engine 4cfcd2f7.
