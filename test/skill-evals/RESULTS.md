@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The engine's own health report, prototypes as text, pages rebuilt from the system, and adoption plans (continuous evaluation)
+
+What changed since the entry below (engine a08807eb): The inspection rebuilt as thirteen questions of the engine's own; --prototype --text; --prototype --from-page; --adoption-plan; recipe lines in prototype and burndown. The guide changed in `cookbook/burndown.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `c833b6efebcd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d07c296a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md beb4d7ca` `rms-design-system-engine.md 5a1c7a2b`
+
+| Haiku, engine 18584c2d | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | 0.057 | 0.060 |
+| Input a run | 100k | 108k |
+| Turns a run | 3.6 | 3.8 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 100k, in 3.8 turns against 3.6. no task changed state, and no run moved: the same result. Records: `records/own-kits`.
+
 ## 2026-11: Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer (continuous evaluation)
 
 What changed since the entry below (engine 7f55035f): A guide's own redraw is not a component's popup, and a browser that never answers is closed (#584); React: why a component did not draw, a part drawn inside its parent, parity without a contract, the team's accessibility lint (#581); shadcn/ui systems read as their own kind of React, and a component that needs content drawn with its stories' props (#582); No browser a stopped run left keeps running, and the guide is pictured once its tries are done (#585); shadcn/ui: Radix's states drawn and compared, the prop that sets each read from the classes that style it (#586); README: each tool and standard badge links to its own website (#587); Accessibility: an id a label or reference points at, used twice (#589); Storybook follow-ups: disagreements as changes, a hosted Storybook, play functions, its settings documented (#590); Playground: a slot's own content shows, its area marked by an eye button and in Inspect (#591); A Tailwind system's style guide page draws its components with its compiled Tailwind, its reset kept to the drawings (#588); A Firefox slow to start is given a second try, as Chrome is (#592); A style guide test stuck mid-way says the page's script errors and its address (#593); Playground: what the person chose in a component stays when it is drawn again (#594); The Identity and Status pages at laptop widths, and browser support read from the web platform's own data; Identity: a token is a component's past its layer, and a layer that shares a component's name stays the layer. The guide changed in `cookbook/build-from-figma.md`, `reference/config.md`, `reference/usage.md`.
