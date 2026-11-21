@@ -55,7 +55,7 @@ test('the command Codex ran, out of the shell it wraps it in', () => {
 test('each turn: JSON events, the project and its HOME writable, the next turn on the same thread', () => {
   const first = codexArgs({ prompt: 'audit the chip', model: 'm', home: '/h' });
   assert.deepEqual(first.slice(0, 2), ['exec', '--json']);
-  assert.ok(first.includes('workspace-write') && first.includes('/h'));
+  assert.ok(first.includes('/h') && !first.includes('-s'), 'the sandbox is the one --approve-for-me sets (Codex refuses -s beside it)');
   assert.ok(first.includes('--approve-for-me'), 'a request to run outside the sandbox goes to Codex\'s own review, as a person would approve it');
   assert.ok(!first.some((a) => /dangerously|bypass/.test(a)), 'no flag that skips Codex\'s own trust or sandbox');
   const next = codexArgs({ prompt: 'yes', resume: 't1', home: '/h' });

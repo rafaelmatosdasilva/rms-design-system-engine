@@ -50,9 +50,10 @@ export function codexHome(home, login = CODEX_LOGIN) {
 // tools and the browser its profile), as a person's own Codex would. Inside it Chrome cannot start and the network is
 // off, so an engine command run there measures nothing in a browser; a person approves running it outside the sandbox
 // when Codex asks, and --approve-for-me hands that request to Codex's own automatic review, the headless stand-in for
-// that person. Nothing skips Codex's sandbox or its trust on its own.
+// that person; it is the workspace-write sandbox itself, and Codex refuses -s beside it. Nothing skips Codex's sandbox
+// or its trust on its own.
 export function codexArgs({ prompt, model = null, resume = null, home }) {
-  const opts = ['--json', '-s', 'workspace-write', '--approve-for-me', '--add-dir', home, '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
+  const opts = ['--json', '--approve-for-me', '--add-dir', home, '--skip-git-repo-check', ...(model ? ['-m', model] : [])];
   return resume ? ['exec', 'resume', ...opts, resume, prompt] : ['exec', ...opts, prompt];
 }
 
