@@ -48,6 +48,7 @@ test('a Cursor error ends the run as an error, and a usage limit as a refusal', 
   const failed = toStreamJson([RUN[0], { type: 'result', subtype: 'error', is_error: true, result: 'You have hit your usage limit', session_id: S }]).at(-1);
   assert.equal(failed.is_error, true);
   assert.equal(failed.api_error_status, 429, 'refused, so never scored');
+  assert.equal(toStreamJson([RUN[0], { type: 'result', is_error: true, result: 'ActionRequiredError: You\'ve hit your usage limit Get Cursor Pro for more Agent usage', session_id: S }]).at(-1).api_error_status, 429, 'the free plan\'s limit, as Cursor prints it, is a refusal');
   assert.equal(toStreamJson([RUN[0], { type: 'result', is_error: true, result: 'connection reset', session_id: S }]).at(-1).api_error_status, null, 'any other error is the run\'s');
 });
 

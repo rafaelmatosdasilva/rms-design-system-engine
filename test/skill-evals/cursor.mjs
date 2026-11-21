@@ -6,6 +6,11 @@
 // `cursor-agent -p --output-format stream-json` in a fresh HOME holding only the person's Cursor login. Its events are
 // turned into the stream-json events every scorer already reads (context(), cliOf(), infraFailure()), as Codex's are
 // (codex.mjs), so the tasks and their checks are the same ones Claude's and Codex's runs are held to.
+//
+// cursor-agent -p runs no hook: neither the project's .cursor/hooks.json nor one in ~/.cursor, with the workspace
+// trusted (seen in cursor-agent 2026.11.19, with a hook that only logs its event: nothing was logged). The hooks are
+// still installed, as a person has them, and a version that runs them is measured with them; until then these runs
+// measure the guide in AGENTS.md alone, as Codex's do.
 import { existsSync, mkdirSync, copyFileSync, chmodSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -132,7 +137,7 @@ export function toStreamJson(cursorEvents, { version = null } = {}) {
     type: 'result', subtype: failed ? 'error' : 'success', is_error: !!failed, result: failed ?? (String(result?.result ?? '') || last), session_id: session,
     total_cost_usd: 0, num_turns: calls, duration_ms: result?.duration_ms ?? 0,
     usage: { input_tokens: u.inputTokens ?? u.input_tokens ?? 0, output_tokens: u.outputTokens ?? u.output_tokens ?? 0, cache_read_input_tokens: u.cacheReadTokens ?? u.cache_read_input_tokens ?? 0 },
-    ...(failed ? { api_error_status: /usage limit|rate limit|429|quota|out of (fast )?requests/i.test(failed) ? 429 : null } : {}),
+    ...(failed ? { api_error_status: /usage limit|rate limit|429|quota|out of (fast )?requests|ActionRequiredError/i.test(failed) ? 429 : null } : {}),
   });
   return out;
 }
@@ -150,6 +155,8 @@ export function runCursor({ cwd, home, env, prompt, model = null, resume = null,
     child.on('close', () => {
       clearTimeout(timer);
       const raw = out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      // Cursor that stops before its result (a usage limit, a dropped connection) says why on stderr, not in its events.
+      if (!raw.some((e) => e.type === 'result') && err.trim()) raw.push({ type: 'result', is_error: true, result: err.trim().split('\n').filter((l) => /\S/.test(l)).slice(-2).join(' '), session_id: raw.find((e) => e.session_id)?.session_id });
       const events = toStreamJson(raw, { version });
       const result = events.at(-1);
       const started = raw.some((e) => e.type === 'system' && e.subtype === 'init');
