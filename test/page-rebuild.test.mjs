@@ -91,3 +91,15 @@ test('--prototype --from-page writes a starting point, draws it, and leaves the 
   assert.match(again.stdout, /already there and may hold your own edits/);
   assert.match(readFileSync(join(dir, 'prototypes', 'landing.json'), 'utf8'), /mine/);
 });
+
+test('the reader stays linear on a malformed tag, decodes each entity once, and drops an unclosed comment', () => {
+  const t0 = Date.now();
+  readHtml(`<A\t!=${'""\t!='.repeat(5000)}`);
+  assert.ok(Date.now() - t0 < 1000, 'a malformed tag is read in linear time');
+  const p = find(readHtml('<body><p>a &amp;lt; b &#65; &copy;</p></body>'), (n) => n.tag === '#text')[0];
+  assert.equal(p.text, 'a &lt; b A &copy;');
+  const t = readHtml('<body><p>kept</p><!-- <button>gone</button></body>');
+  assert.equal(find(t, (n) => n.tag === 'button').length, 0);
+  const a = find(readHtml('<body><input type="email" placeholder=\'you\' disabled/><br/></body>'), (n) => n.tag === 'input')[0];
+  assert.deepEqual(a.attrs, { type: 'email', placeholder: 'you', disabled: '' });
+});
