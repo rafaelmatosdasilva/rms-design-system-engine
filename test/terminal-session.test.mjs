@@ -57,6 +57,14 @@ test('a session asks what the command marks, runs it, follows a NEXT command, an
   assert.match(said.join('\n'), /Your call: Commit ds-config\.json when you asks?/i);
 });
 
+test('where the command is not on the PATH, the router writes the engine\'s path, and the step is what follows it', async () => {
+  const ran = [];
+  const cmd = 'node /opt/engine/audit.mjs';
+  const route = () => ({ recipe: 'audit-component', run: [`${cmd} --component button`], notes: [] });
+  await runSession({ text: 'check the button', state: { cmd }, route, ask: async () => '', run: async (a) => { ran.push(a); return { code: 0, out: 'NEXT: none' }; }, print: () => {} });
+  assert.deepEqual(ran, [['--component', 'button']]);
+});
+
 test('with no answer to a question, nothing runs', async () => {
   const ran = [];
   const route = () => ({ recipe: 'first-setup', run: ["rms-design-system-engine --init --figma-url='<the Figma link>'"], notes: [], ask: 'the link' });
@@ -71,7 +79,7 @@ test('the command as a person types it: a request in words routed and run on a r
   for (const a of [['init', '-q'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'i']]) execFileSync('git', a, { cwd: ds });
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), 'check the button'], { cwd: ds, encoding: 'utf8', input: '', env: { ...process.env, NO_COLOR: '1', CI: '1', DESIGN_SYSTEM_ENGINE_CHROME: 'none' }, timeout: budget(240000) });
   assert.match(r.stdout, /^→ Check one component/m);
-  assert.match(r.stdout, /^\$ rms-design-system-engine --component button$/m);
+  assert.match(r.stdout, /^\$ rms-design-system-engine --component button$/m, 'the step, never the engine\'s path as one of its words');
   assert.match(r.stdout, /SCOPED TO: button/);
   assert.doesNotMatch(r.stdout, /^NEXT:/m, 'the NEXT line is acted on, not printed');
   assert.match(r.stdout, /^Your call: /m);
