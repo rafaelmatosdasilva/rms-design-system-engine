@@ -327,3 +327,9 @@ test('a routed command an MCP tool runs is said as that tool too, for an agent w
   assert.match(t, /^RUN \(no shell\): the summary tool$/m);
   assert.doesNotMatch(t, /RUN \(no shell\):.*styleguide/, 'a command no tool runs is not offered as one');
 });
+
+test('a prototype that names the heading it should have is a prototype, never the wording review', () => {
+  const ask = 'prototype an empty state for the projects list with our design system: a heading, one sentence saying there are no projects yet, an illustration, and a button to create a project.';
+  assert.equal(route(ask, P).recipe, 'prototype', 'a Codex run that routed this got the full audit and its wording review');
+  assert.equal(route('which headings and labels should someone look at first?', P).recipe, 'full-audit', 'the wording review is still asked for by its own words');
+});

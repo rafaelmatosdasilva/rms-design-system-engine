@@ -60,6 +60,7 @@ test('each turn: JSON events, the project and its HOME writable, the next turn o
   assert.ok(!first.some((a) => /dangerously|bypass/.test(a)), 'no flag that skips Codex\'s own trust or sandbox');
   const next = codexArgs({ prompt: 'yes', resume: 't1', home: '/h' });
   assert.deepEqual([next[0], next[1], next.at(-2), next.at(-1)], ['exec', 'resume', 't1', 'yes']);
+  assert.ok(!next.includes('--approve-for-me') && !next.includes('--add-dir'), 'a later turn keeps the session\'s own options: Codex refuses them on resume');
 });
 
 test('a run\'s Codex holds only the person\'s login', () => {
@@ -102,4 +103,31 @@ test('each agent is compared with its own last record, never with another agent\
   assert.equal(lastRecordFor(results, 'claude', of), 'claude-one', 'a Claude run skips the Codex entry above it');
   assert.equal(lastRecordFor(results, 'codex', of), 'codex-one');
   assert.equal(lastRecordFor('Records: `records/gone`\n', 'claude', of), null, 'a record not here is no comparison');
+});
+
+test('the skill variant runs the engine\'s hooks, as a person who trusted them has them; the AGENTS.md side does not', async () => {
+  const withHooks = codexArgs({ prompt: 'p', home: '/h', hooks: true });
+  assert.ok(withHooks.includes('--trust') && withHooks.includes('--dangerously-bypass-hook-trust'));
+  assert.ok(!codexArgs({ prompt: 'p', home: '/h' }).some((a) => /trust/.test(a)), 'off unless the variant asks for it');
+  assert.ok(codexArgs({ prompt: 'p', home: '/h', hooks: true, resume: 't1' }).includes('--dangerously-bypass-hook-trust'), 'every turn of the task');
+  const { CODEX_SKILL_VARIANT, AGENTS_VARIANT } = await import('./skill-evals/codex.mjs');
+  assert.equal(CODEX_SKILL_VARIANT.hooks, true);
+  assert.notEqual(AGENTS_VARIANT.hooks, true);
+  const d = tempDir('codex-hooks-');
+  CODEX_SKILL_VARIANT.rules(d);
+  assert.ok(existsSync(join(d, '.codex')), 'a .codex folder, so --install-hooks writes the Codex hooks beside Claude Code\'s');
+});
+
+test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', async () => {
+  const { runCodex } = await import('./skill-evals/codex.mjs');
+  const fake = (lines) => { const d = tempDir('codex-fake-'); const f = join(d, 'codex'); writeFileSync(f, `#!/bin/sh\ncat <<'X'\n${lines.map((l) => JSON.stringify(l)).join('\n')}\nX\n`); return f; };
+  const { chmodSync } = await import('node:fs');
+  const answer = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'In Figma, select the chip and add an annotation in the Accessibility category.' } }, { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 40 } }]);
+  chmodSync(answer, 0o755);
+  const home = tempDir('codex-fake-home-');
+  const a = await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: answer });
+  assert.equal(a.infra, null, 'scored, not thrown out');
+  const empty = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'OK' } }, { type: 'turn.completed', usage: { input_tokens: 14154, output_tokens: 49 } }]);
+  chmodSync(empty, 0o755);
+  assert.match((await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: empty })).infra, /called nothing/);
 });

@@ -253,7 +253,11 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 
 ### In Cursor and Codex
 
-Both read the guide from the project's instructions and run the same guard as Claude Code, as their own hooks. In the project, run:
+Both read the guide and run the same guard as Claude Code, as their own hooks.
+
+- **In Codex the whole guide is a skill.** When Codex is set up on your computer, the installer also puts the engine's guide where Codex reads skills (`~/.codex/skills/rms-design-system-engine`), and the engine keeps it current. Ask for it the way Codex asks for a skill: `$rms-design-system-engine audit the chip`. The engine routes a request asked that way just as it routes `/rms-design-system-engine` in Claude Code.
+
+In the project, run:
 
 ```bash
 rms-design-system-engine --agent-rules --write
@@ -274,7 +278,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 
 - **Neither can ask you before a file edit.** Where Claude Code would ask, Cursor and Codex hold the edit and tell the agent why. Ask for the change in your own words and the agent can try again. Cursor still asks you before a command, such as a push.
 - **Cursor routes from the guide, not the hook.** Its hooks cannot add the route to your message, so the line in `AGENTS.md` does it.
-- **Measured in Codex, not yet in Cursor.** In Codex the 18 guide tasks passed 52 of 54 runs. The two misses were a browser finding left out of a reply, each time on a task that passed its other two runs. The run measured the guide alone: Codex runs no hook it was not told to trust, so the guard is checked separately, against what Codex really sends.
+- **Measured in Codex, not yet in Cursor.** In Codex the 18 guide tasks passed 52 of 54 runs, with the short guide in `AGENTS.md`. The other sets (building from Figma, prototypes, the held-out tasks), and Codex with the whole guide as a skill, are still to be measured. The two misses were a browser finding left out of a reply, each time on a task that passed its other two runs. The run measured the guide alone: Codex runs no hook it was not told to trust, so the guard is checked separately, against what Codex really sends.
 
 ### Another tool with a terminal
 
