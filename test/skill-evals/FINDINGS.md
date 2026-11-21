@@ -8,6 +8,26 @@ Newest first.
 
 ---
 
+## In Codex, the browser could not start, and nothing said so in a way the agent acted on
+
+**Found** 21 November 2026, the first evaluations in OpenAI Codex (`run.mjs --agent codex`, CLI 0.171.0). **Fixed in** this branch, measured at 52/54 on engine 4cfcd2f7.
+
+**Evidence.** The first run scored 43/54, and every check that needs a browser failed: `audit-chip`, `audit-all` and `disabled-hover`, 3 of 3 each. The audit output said "Chrome failed to start (Chrome exited before DevTools was ready)". Codex runs commands in a sandbox (it sets `CODEX_SANDBOX=seatbelt` and `CODEX_SANDBOX_NETWORK_DISABLED=1`) where Chrome aborts at startup, and on a Mac each try left a crash report. A warning above the NEXT line was relayed and then ignored ("the audit didn't report a disabled-hover issue"). The same step as the NEXT line's first clause was followed: Codex asked to run the command again outside the sandbox, `--approve-for-me` let Codex's own review approve it, and the task passed.
+
+**Guesses ruled out.**
+- That the translation of Codex's events was wrong: the engine runs, NEXT lines and replies read correctly from the stream, and a run inspected by hand showed the same commands.
+- That Codex ignores AGENTS.md: it ran `--route` first in every run.
+- That the timeouts in the second run (8 of 54, silent for 15 minutes) were the guide's: one rerun by hand finished at once, and with two runs at a time instead of three none timed out.
+
+**What changed.**
+- No browser is started inside Codex's sandbox (`lib/cdp.mjs` `sandboxRefusal`, and the Firefox and Safari launchers). The structure check says "measured in the browser: not run" instead of dropping the section.
+- When nothing was measured in a browser there, the summary says why, and NEXT begins with the rerun outside the sandbox, on a full run as on a scoped one, never on a run that wrote the baseline.
+- The AGENTS.md section said "Never on your own: ... accept a difference as debt": Codex read never as never and refused when asked (2 runs). The section now keeps never for what is never done and says the rest waits for the person's ask.
+- "share the token set" read as asking for a secret, in the guard as in the evaluation's rule.
+- A Codex run that called nothing and wrote 49 tokens is now refused as not run.
+
+---
+
 ## A check pinned to one wording failed the engine for asking a better question
 
 **Found** 18 November 2026, the evaluation of the change that reads a library with no Figma capture by its own code. **Fixed in** nothing yet; recorded against `figmaStepScore` in `test/skill-evals/tasks.mjs`.

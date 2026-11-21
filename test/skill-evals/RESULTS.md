@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The guide in Codex: the 18 guide tasks with the AGENTS.md a Codex user has (continuous evaluation)
+
+What changed since the entry below: First measurement in OpenAI Codex (CLI 0.171.0, gpt-6-luna): run.mjs --agent codex, the agents variant, hooks not trusted in a fresh CODEX_HOME so the guide alone; runs leave Codex's sandbox through --approve-for-me when the engine's NEXT line asks.
+
+Guide set measured: `c833b6efebcd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 9307056b` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d07c296a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md beb4d7ca` `rms-design-system-engine.md 5a1c7a2b`
+
+| gpt-6-luna, engine 4cfcd2f7 | Entry below | This version |
+|---|---|---|
+| The 18 guide tasks | - | 52/54 |
+| Mean cost a run | - | 0.000 |
+| Input a run | - | 68k |
+| Turns a run | - | 3.1 |
+| Rule violations | - | 0 |
+
+**Reading.** gpt-6-luna: 2 of 54 runs failed. Failed: audit-chip #1: names the 36 vs 32 combination; disabled-hover #0: names the guard. Each task passed its other two runs: once Codex did not rerun outside its sandbox when NEXT asked, once it quoted the finding and left out the guard. Codex on a ChatGPT plan names no cost, so a run's cost reads 0; its tokens say what it spent. What these runs taught is in FINDINGS.md (In Codex, the browser could not start). Records: `records/codex-agents-md`.
+
 ## 2026-11: The engine's own health report, prototypes as text, pages rebuilt from the system, and adoption plans (continuous evaluation)
 
 What changed since the entry below (engine a08807eb): The inspection rebuilt as thirteen questions of the engine's own; --prototype --text; --prototype --from-page; --adoption-plan; recipe lines in prototype and burndown. The guide changed in `cookbook/burndown.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
