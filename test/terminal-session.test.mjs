@@ -94,7 +94,9 @@ test('the command as a person types it: a request in words routed and run on a r
   for (const a of [['init', '-q'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'i']]) execFileSync('git', a, { cwd: ds });
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), 'check the button'], { cwd: ds, encoding: 'utf8', input: '', env: { ...process.env, NO_COLOR: '1', CI: '1', DESIGN_SYSTEM_ENGINE_CHROME: 'none' }, timeout: budget(240000) });
   assert.match(r.stdout, /^→ Check one component/m);
-  assert.match(r.stdout, /^\$ rms-design-system-engine --component button$/m, 'the step, never the engine\'s path as one of its words');
+  // The command as it runs: the engine's name, or its path where the name is not on the PATH, and never that path as
+  // one of the step's own words.
+  assert.match(r.stdout, /^\$ (rms-design-system-engine|node .*audit\.mjs"?) --component button$/m, 'the step, never the engine\'s path as one of its words');
   assert.match(r.stdout, /SCOPED TO: button/);
   assert.doesNotMatch(r.stdout, /^NEXT:/m, 'the NEXT line is acted on, not printed');
   assert.match(r.stdout, /^Your call: /m);
