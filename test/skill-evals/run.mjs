@@ -5,7 +5,7 @@
 //        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
 //        [--source <a project of your own>] [--agent claude|<another agent in agents.mjs>]
 //
-// --agent runs each task in another agent (agents.mjs: OpenAI Codex today) with what a person using it has, its own
+// --agent runs each task in another agent (agents.mjs: OpenAI Codex and Cursor) with what a person using it has, its own
 // guide variant among it. Its rows say so (agent, runner), and go to files of their own.
 //
 // --source measures the same tasks against a real design system instead of the four-component fixture: name a

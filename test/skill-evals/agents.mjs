@@ -5,6 +5,7 @@
 // infra, limit, stderr }, with events in Claude Code's stream-json so every scorer reads them unchanged. A new agent
 // is one entry here and a module of its own beside codex.mjs.
 import { runCodex, codexHome, codexVersion } from './codex.mjs';
+import { runCursor, cursorHome, cursorVersion } from './cursor.mjs';
 
 export const OTHER_AGENTS = {
   codex: {
@@ -16,6 +17,15 @@ export const OTHER_AGENTS = {
     missing: 'no `codex` on this machine: npm i -g @openai/codex, then codex login, or point DESIGN_SYSTEM_ENGINE_EVAL_CODEX at it.',
     prepare: (home) => codexHome(home),
     turn: (o) => runCodex(o),
+  },
+  cursor: {
+    variant: 'cursor',           // AGENTS.md as for Codex, and the guard as Cursor's own hooks (--install-hooks --tool cursor)
+    model: 'auto',               // what a Cursor user gets unless they pick a model
+    routes: ['shell'],           // Cursor reaches the engine by its shell, as docs/setup.md sets it up
+    version: () => cursorVersion(),
+    missing: 'no `cursor-agent` on this machine: curl https://cursor.com/install -fsS | bash, then cursor-agent login, or point DESIGN_SYSTEM_ENGINE_EVAL_CURSOR at it.',
+    prepare: (home) => cursorHome(home),
+    turn: (o) => runCursor(o),
   },
 };
 export const AGENT_NAMES = ['claude', ...Object.keys(OTHER_AGENTS)];

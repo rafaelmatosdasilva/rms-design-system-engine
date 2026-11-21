@@ -249,7 +249,7 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 
 - **You get** the answers about your system (each component's props, each token and what it is for), the check of a UI an AI tool built, and every audit the command line runs.
 - **In Cursor and Codex you also get** the guide and the [hooks that keep the rules](#the-hooks-keep-the-rules), set up as below.
-- **Measured in Claude Code and Codex.** The skill evaluation runs the same tasks in both. In Codex the guide in `AGENTS.md` passed 52 of 54 runs of the 18 guide tasks (Codex CLI 0.171.0). How well Cursor and the other tools follow it is not measured yet.
+- **Measured in Claude Code and Codex.** The skill evaluation runs the same tasks in both. In Codex the guide in `AGENTS.md` passed 52 of 54 runs of the 18 guide tasks (Codex CLI 0.171.0). Cursor's measurement has started (see below), and how well the other tools follow it is not measured yet.
 
 ### In Cursor and Codex
 
@@ -266,7 +266,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 
 - **The guide.** The first command writes the engine's section into the instruction files the project already has, or into `AGENTS.md`, which both tools read, when it has none. A project with a `.cursor/rules` folder also gets `.cursor/rules/design-system.mdc`. To choose the file yourself, use `--write=AGENTS.md`. It tells the agent to route each request first (`--route`) and follow what it prints, the same recipes Claude Code follows.
 - **The guard.** The second writes `.cursor/hooks.json` and `.codex/hooks.json`. Name only the tools you use. A project that already has a `.cursor` or `.codex` folder gets them with every `--install-hooks`. Hooks you wrote there are kept, and both files are added to `.gitignore`, since they hold this machine's path to the engine.
-- **Trust them once.** Cursor runs a project's hooks in a trusted workspace. Codex needs two trusts, in this order:
+- **Trust them once.** Cursor runs a project's hooks in a trusted workspace, in the editor. Its command-line agent (`cursor-agent`) ran none in our test, project or user hooks alike, so there the guide in `AGENTS.md` works alone. Codex needs two trusts, in this order:
   1. **The project.** Open `codex` in the project and choose "Trust and continue". Until the project is trusted, Codex skips its `.codex` folder with only a warning, so no hook runs and nothing is checked.
   2. **The hooks.** Type `/hooks` and trust each one.
 - **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and skips any hook it has not trusted. Interactive Codex says so when it opens ("Hooks need review"), but `codex exec` skips them without a word. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
@@ -278,7 +278,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 
 - **Neither can ask you before a file edit.** Where Claude Code would ask, Cursor and Codex hold the edit and tell the agent why. Ask for the change in your own words and the agent can try again. Cursor still asks you before a command, such as a push.
 - **Cursor routes from the guide, not the hook.** Its hooks cannot add the route to your message, so the line in `AGENTS.md` does it.
-- **Measured in Codex, not yet in Cursor.** In Codex the 18 guide tasks passed 52 of 54 runs, with the short guide in `AGENTS.md`. The other sets (building from Figma, prototypes, the held-out tasks), and Codex with the whole guide as a skill, are still to be measured. The two misses were a browser finding left out of a reply, each time on a task that passed its other two runs. The run measured the guide alone: Codex runs no hook it was not told to trust, so the guard is checked separately, against what Codex really sends.
+- **Measured in Codex, started in Cursor.** In Codex the 18 guide tasks passed 52 of 54 runs, with the short guide in `AGENTS.md`. The other sets (building from Figma, prototypes, the held-out tasks), and Codex with the whole guide as a skill, are still to be measured. The two misses were a browser finding left out of a reply, each time on a task that passed its other two runs. The run measured the guide alone: Codex runs no hook it was not told to trust, so the guard is checked separately, against what Codex really sends. In Cursor's agent the first 23 runs of the 18 guide tasks all passed, until its free plan's usage limit stopped the evaluation. The full measurement follows.
 
 ### Another tool with a terminal
 
