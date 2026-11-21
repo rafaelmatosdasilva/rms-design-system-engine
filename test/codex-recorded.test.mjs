@@ -4,8 +4,10 @@
 // field Codex renames shows up here and not in a person's project. Recorded 21 November 2026; record again when a
 // Codex release changes its hooks.
 //
-// Three runs: an edit the person asked for (Codex made it with `sed -i`, not apply_patch), a patch to a Figma snapshot
-// (refused), and a question (no edit). Each is replayed in order, so the guard remembers the prompt as it did live.
+// Four runs: an edit the person asked for (Codex made it with `sed -i`, not apply_patch), a patch to a Figma snapshot
+// (refused), a question (no edit), and a question that tells Codex to run a `sed -i` (held: recorded once the shell
+// edit was judged as an edit, so its answer is the fix seen working in Codex). Each is replayed in order, so the guard
+// remembers the prompt as it did live, and must answer each event as Codex heard it answer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -34,7 +36,9 @@ const place = (v, d) => JSON.parse(JSON.stringify(v).split('<project>').join(d))
 test('the recording holds every event the engine installs a hook for', () => {
   const events = new Set(ROWS.map((r) => r.event.hook_event_name));
   for (const e of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop']) assert.ok(events.has(e), e);
-  assert.deepEqual(runs, ['edit-asked', 'snapshot-patch', 'question']);
+  assert.deepEqual(runs, ['edit-asked', 'snapshot-patch', 'question', 'shell-edit-unasked']);
+  const held = ROWS.find((r) => r.run === 'shell-edit-unasked' && r.event.tool_name === 'Bash' && r.guard);
+  assert.equal(JSON.parse(held.guard).hookSpecificOutput.permissionDecision, 'deny', 'the unasked sed was held in Codex itself');
 });
 
 test('Codex\'s fields are the ones the engine reads', () => {

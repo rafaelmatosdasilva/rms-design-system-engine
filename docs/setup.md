@@ -265,7 +265,7 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 - **Trust them once.** Cursor runs a project's hooks in a trusted workspace. Codex needs two trusts, in this order:
   1. **The project.** Open `codex` in the project and choose "Trust and continue". Until the project is trusted, Codex skips its `.codex` folder with only a warning, so no hook runs and nothing is checked.
   2. **The hooks.** Type `/hooks` and trust each one.
-- **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and quietly skips any hook it has not trusted. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
+- **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and skips any hook it has not trusted. Interactive Codex says so when it opens ("Hooks need review"), but `codex exec` skips them without a word. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
 - **Shell edits are checked too.** Codex often edits a file with a shell command such as `sed -i` rather than `apply_patch`. The guard judges such a command the same way as a patch, and the check after an edit runs on each file the command wrote.
 
 **Where they differ from Claude Code.**
