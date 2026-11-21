@@ -72,7 +72,8 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
   if (name === 'agents') return AGENTS_VARIANT;
   if (name === 'codex-skill') return CODEX_SKILL_VARIANT;
   if (name === 'cursor') return CURSOR_VARIANT;
-  if (name === 'terminal') return TERMINAL_VARIANT;
+  // What install.sh gives a person in a terminal: the engine's command for Claude Code too, which a hand-over asks by.
+  if (name === 'terminal') return { ...TERMINAL_VARIANT, install: variant('cookbook').install };
   if (name === 'mcp') return { name, ref: 'none', text: '', engine: false, prefix: '', install: () => {} };
   throw new Error(`unknown variant ${name}`);
 }

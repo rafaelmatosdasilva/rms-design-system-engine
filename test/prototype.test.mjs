@@ -411,3 +411,12 @@ test('what the engine writes beside a composition is not one', async () => {
   assert.ok(!isComposition('conventions.json'));
   assert.ok(!isComposition('orders.handoff.md'));
 });
+
+test('a page named that is not there is said as itself, and the usage names a page in the system\'s code first', () => {
+  const dir = tempDir('proto-missing-');
+  writeFileSync(join(dir, 'ds-config.json'), '{}');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--prototype', 'prototypes/Missing.jsx'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1' } });
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /❌ No file at prototypes\/Missing\.jsx/);
+  assert.match(r.stdout, /Usage: \S+ --prototype <page\.jsx \| page\.vue \| page\.html>/);
+});
