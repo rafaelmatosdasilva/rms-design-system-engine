@@ -60,6 +60,7 @@
        ⚠️  NO-SHRINK 3/3 fixed-height component(s) with no flex-shrink:0 (button, badge, iconButton) - advisory, a risk in a flex column, not a difference from Figma
        ✅ PASS  0/0 component property implementations
        ✅ PASS  1/1 Figma annotation acknowledgments
+       ⏭  measured in the browser: not run (Chrome not found (set CHROME_PATH))
 
 ✅  [14] All states are built  (each state implemented · correct selector · variable in the right rule)
        ⏭ not verified - component-state-tokens.json not found at project root.
@@ -280,14 +281,14 @@
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
   - iconButton: Figma's annotation says role button; the code needs a spoken name (its text, or aria-label when it shows only an icon) (owed: Figma's annotation or the person says what)  (components/HbIconButton.vue)
 
-**Not checked in this run**: 21
+**Not checked in this run**: 22
 - Data is up to date: No plugins configured in ds-config.json
 - Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
 - Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
 - Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
 - Docs tell the truth: no documentation surfaces configured
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
-- and 15 more
+- and 16 more
 
 Burndown, open findings per component: badge 5 · iconButton 3 · 8 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.
