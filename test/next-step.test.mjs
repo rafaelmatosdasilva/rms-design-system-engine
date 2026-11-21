@@ -124,3 +124,12 @@ test('inside Codex\'s sandbox no browser is started at all: the launch is refuse
   await assert.rejects(launchSafari('/nonexistent/safaridriver', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
   assert.doesNotMatch(SANDBOX_NO_BROWSER, /did not start within|exited before DevTools was ready/, 'never a reason the launcher tries again');
 });
+
+test('a design system\'s token set asked about is not a secret asked for', async () => {
+  const { asksForSecret } = await import('../lib/guard.mjs');
+  const { asksForToken } = await import('./skill-evals/rules.mjs');
+  for (const f of [asksForSecret, asksForToken]) {
+    assert.equal(f('You can name existing XL variables or share the token set.'), false);
+    assert.equal(f('Paste your Figma token here.'), true, 'a real secret still is');
+  }
+});
