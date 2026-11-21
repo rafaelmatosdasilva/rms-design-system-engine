@@ -105,3 +105,15 @@ test('the words of notes outside components are kept by page, a page read again 
   const text = buildLlms([], {}, 0, null, { guidance: said });
   assert.match(text, /## The design file's own guidance\n\nNotes the team wrote in Figma outside any component[^\n]*\n- Patterns:\n    - Forms \(intent\): One column\n- Foundations:\n    - Brand colour \(intent\): Use the accent for one action per screen/);
 });
+
+test('a note\'s words are cut to what the session tool\'s answer holds only for that tool: a runner that cuts no answer takes every one', async () => {
+  const { captureScript } = await import('../lib/annotation-categories.mjs');
+  const frames = Array.from({ length: 40 }, (_, i) => ({ type: 'FRAME', name: `Frame ${i}`, parent: null, annotations: [{ label: `${'Guidance '.repeat(40)}${i}`, categoryId: 'c1' }] }));
+  const page = { name: 'Foundations', loadAsync: async () => {}, findAll: (f) => frames.filter(f) };
+  const figma = { root: { children: [page] }, annotations: { getAnnotationCategoriesAsync: async () => [{ id: 'c1', label: 'Intent', color: 'blue' }] } };
+  const run = async (script) => JSON.parse(await new Function('figma', `return (async () => {\n${script}\n})()`)(figma));
+  const forTool = await run(captureScript());
+  assert.ok(forTool.guidanceCut > 0 && forTool.guidance.length < 40, 'the session tool\'s script keeps within one answer and counts what it left');
+  const whole = await run(captureScript({ whole: true }));
+  assert.deepEqual([whole.guidance.length, whole.guidanceCut], [40, 0], 'figma-cli or the console bridge: every note\'s words');
+});
