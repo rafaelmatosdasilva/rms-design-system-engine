@@ -112,3 +112,15 @@ test('inside Codex\'s sandbox, every run says the browser could not start, as th
   assert.equal(sandboxLine({ measured: false }, {}), null, 'outside Codex nothing is said');
   assert.equal(sandboxLine({ measured: false, said: 'inside Codex\'s sandbox, where Chrome cannot start' }, env), null, 'never twice: the full run\'s headline already said it');
 });
+
+test('inside Codex\'s sandbox no browser is started at all: the launch is refused at once, with the reason', async () => {
+  const { launchChrome, sandboxRefusal, SANDBOX_NO_BROWSER } = await import('../lib/cdp.mjs');
+  const { launchFirefox } = await import('../lib/bidi.mjs');
+  assert.equal(sandboxRefusal({}), null);
+  // A path that would fail if spawned: refused before any spawn, so the error is the sandbox's, never a crash's.
+  await assert.rejects(launchChrome('/nonexistent/chrome', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  await assert.rejects(launchFirefox('/nonexistent/firefox', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  const { launchSafari } = await import('../lib/webdriver.mjs');
+  await assert.rejects(launchSafari('/nonexistent/safaridriver', { env: { CODEX_SANDBOX: 'seatbelt' } }), (e) => e.message === SANDBOX_NO_BROWSER);
+  assert.doesNotMatch(SANDBOX_NO_BROWSER, /did not start within|exited before DevTools was ready/, 'never a reason the launcher tries again');
+});
