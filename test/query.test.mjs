@@ -123,3 +123,22 @@ test('a name asked in the singular finds the system\'s irregular plural, and the
   assert.deepEqual(nearest('index', [], [{ path: 'z/indices/overlay' }]), ['z/indices/overlay']);
   assert.deepEqual(nearest('radius', [], [{ path: 'spacing/s' }]), [], 'nothing alike, nothing said');
 });
+
+test('a colour asked for by its look or its meaning is read from the tokens\' values, and none is an answer too', () => {
+  const tokens = [
+    { path: 'field/border/error/color', value: '#c4231b', modes: { light: '#c4231b', dark: '#ff7a70' } },
+    { path: 'button/background/color', value: '#1f5fd6', modes: null },
+    { path: 'text/color', value: '#1b2433', modes: null },
+    { path: 'space/m', value: '8px', modes: null },
+  ];
+  const varOf = (p) => `--${p.replace(/\/color$/, '').replace(/\//g, '-')}`;
+  const red = answer('red', { tokens, varOf });
+  assert.equal(red.kind, 'colour');
+  assert.deepEqual(red.matches.map((m) => m.path), ['field/border/error/color']);
+  assert.equal(red.colours, 3, 'only colours are counted, never a size');
+  assert.deepEqual(answer('error', { tokens, varOf }).matches.map((m) => m.path), ['field/border/error/color']);
+  assert.deepEqual(answer('blue', { tokens, varOf }).matches.map((m) => m.path), ['button/background/color'], 'a near-black text colour is not blue');
+  const green = answerLines(answer('success', { tokens, varOf }));
+  assert.match(green[0], /^success: the system has no green colour\. None of its 3 colour tokens is green/);
+  assert.equal(answer('cardTile', { tokens, varOf }).kind, 'none', 'any other word is still a name');
+});

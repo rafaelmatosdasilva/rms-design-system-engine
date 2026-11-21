@@ -6,6 +6,7 @@
 // is one entry here and a module of its own beside codex.mjs.
 import { runCodex, codexHome, codexVersion } from './codex.mjs';
 import { runCursor, cursorHome, cursorVersion } from './cursor.mjs';
+import { runTerminal, terminalVersion } from './terminal.mjs';
 
 export const OTHER_AGENTS = {
   codex: {
@@ -26,6 +27,15 @@ export const OTHER_AGENTS = {
     missing: 'no `cursor-agent` on this machine: curl https://cursor.com/install -fsS | bash, then cursor-agent login, or point DESIGN_SYSTEM_ENGINE_EVAL_CURSOR at it.',
     prepare: (home) => cursorHome(home),
     turn: (o) => runCursor(o),
+  },
+  terminal: {
+    variant: 'terminal',         // no guide and no model: the engine's command and the person's own words (terminal-session.mjs)
+    model: 'none',
+    routes: ['shell'],
+    version: () => terminalVersion(),
+    missing: null,               // the engine itself is all it needs
+    prepare: () => {},
+    turn: (o) => runTerminal(o),
   },
 };
 export const AGENT_NAMES = ['claude', ...Object.keys(OTHER_AGENTS)];

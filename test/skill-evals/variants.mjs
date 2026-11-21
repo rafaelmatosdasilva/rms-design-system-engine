@@ -19,6 +19,7 @@ import { ENGINE } from './lib.mjs';
 import { skillMd, guideAtRef } from '../../lib/skill-files.mjs';
 import { AGENTS_VARIANT, CODEX_SKILL_VARIANT } from './codex.mjs';
 import { CURSOR_VARIANT } from './cursor.mjs';
+import { TERMINAL_VARIANT } from './terminal.mjs';
 
 const GUIDE = 'rms-design-system-engine.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -71,6 +72,7 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
   if (name === 'agents') return AGENTS_VARIANT;
   if (name === 'codex-skill') return CODEX_SKILL_VARIANT;
   if (name === 'cursor') return CURSOR_VARIANT;
+  if (name === 'terminal') return TERMINAL_VARIANT;
   if (name === 'mcp') return { name, ref: 'none', text: '', engine: false, prefix: '', install: () => {} };
   throw new Error(`unknown variant ${name}`);
 }

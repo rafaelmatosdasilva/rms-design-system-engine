@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tempDir, budget } from './helpers.mjs';
-import { isPlainRequest, argsOf, nextStep, plainWords, runSession } from '../lib/terminal-session.mjs';
+import { isPlainRequest, argsOf, nextStep, plainWords, runSession, FIGMA_HOW, FIGMA_ASK } from '../lib/terminal-session.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,7 +27,8 @@ test('a NEXT line is read as the step it asks for', () => {
   assert.equal(nextStep('NEXT: commit contracts/ when the person asks').kind, 'person');
   assert.equal(nextStep('NEXT: ask the person, then run rms-design-system-engine --spec x').kind, 'person');
   assert.equal(nextStep("NEXT: rms-design-system-engine --init --figma-url='<the Figma link>'").kind, 'person', 'a value only the person has');
-  assert.equal(nextStep('NEXT: run it unchanged with the Figma MCP').kind, 'outside');
+  assert.equal(nextStep('NEXT: run it unchanged with the Figma MCP').kind, 'figma');
+  assert.equal(nextStep('NEXT: the team reviews and merges it').kind, 'outside');
   assert.equal(nextStep('NEXT: none').kind, 'done');
   assert.equal(nextStep(undefined).kind, 'done');
 });
@@ -65,6 +66,20 @@ test('where the command is not on the PATH, the router writes the engine\'s path
   assert.deepEqual(ran, [['--component', 'button']]);
 });
 
+test('a step that needs an agent\'s Figma tool says what to connect; a how-to question shows its recipe', async () => {
+  assert.equal(nextStep("NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as x.json").kind, 'figma');
+  assert.equal(nextStep('NEXT: rms-design-system-engine --recipe refresh-figma (read the variables and components with the Figma tool of this session)').kind, 'figma');
+  const said = [], ran = [];
+  await runSession({ text: 'capture the effects', state: {}, route: () => ({ recipe: 'refresh-figma', run: ['rms-design-system-engine --figma-effects'], notes: [] }),
+    ask: async () => '', run: async (a) => { ran.push(a); return { code: 0, out: "NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file" }; }, print: (l) => said.push(l) });
+  assert.ok(said.some((l) => l.includes(FIGMA_HOW)), said.join('\n'));
+  ran.length = 0;
+  const steps = await runSession({ text: 'how do I accept a difference', state: {}, route: () => ({ recipe: 'accept-debt', run: [], notes: [] }),
+    ask: async () => '', run: async (a) => { ran.push(a); return { code: 0, out: '# Accept debt\n…' }; }, print: () => {} });
+  assert.deepEqual(ran, [['--recipe', 'accept-debt']]);
+  assert.equal(steps.at(-1).kind, 'recipe');
+});
+
 test('with no answer to a question, nothing runs', async () => {
   const ran = [];
   const route = () => ({ recipe: 'first-setup', run: ["rms-design-system-engine --init --figma-url='<the Figma link>'"], notes: [], ask: 'the link' });
@@ -83,4 +98,43 @@ test('the command as a person types it: a request in words routed and run on a r
   assert.match(r.stdout, /SCOPED TO: button/);
   assert.doesNotMatch(r.stdout, /^NEXT:/m, 'the NEXT line is acted on, not printed');
   assert.match(r.stdout, /^Your call: /m);
+});
+
+test('a change to Figma is asked about first: applied by the engine on a yes, left alone on a no, explained with no way to reach Figma', async () => {
+  const NEXT = "NEXT: show the person the 1 change above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma, report what it returns";
+  assert.deepEqual(nextStep(NEXT), { kind: 'figma-write', says: NEXT.replace(/^NEXT:\s*/, ''), script: '.design-system-engine-out/handback/figma-apply.js' });
+  const session = async ({ answer, figma }) => {
+    const said = [], ran = [], asked = [], applied = [];
+    const steps = await runSession({ text: 'update Figma so it states the roles', state: {}, route: () => ({ recipe: 'figma-edits', run: ['rms-design-system-engine --figma-edits roles'], notes: [] }),
+      ask: async (q, d) => { asked.push([q, d]); return answer; },
+      run: async (a) => { ran.push(a); return { code: 0, out: a[0] === '--figma-edits' ? NEXT : 'NEXT: none' }; },
+      print: (l) => said.push(l),
+      figma: figma && { apply: async (s) => { applied.push(s); return 'Figma took the changes.'; } } });
+    return { said, ran, asked, applied, steps };
+  };
+  const yes = await session({ answer: 'yes', figma: true });
+  assert.deepEqual(yes.asked, [[FIGMA_ASK, 'no']]);
+  assert.deepEqual(yes.applied, ['.design-system-engine-out/handback/figma-apply.js']);
+  assert.deepEqual(yes.ran, [['--figma-edits', 'roles'], ['--refresh-figma']], 'the snapshots read again after the change');
+  const no = await session({ answer: '', figma: true });
+  assert.deepEqual(no.applied, [], 'no answer is a no');
+  assert.ok(no.said.includes('Nothing was changed in Figma.'));
+  const none = await session({ answer: 'yes', figma: false });
+  assert.deepEqual(none.asked, [], 'nothing to ask with no way to reach Figma');
+  assert.ok(none.said.some((l) => l.includes(FIGMA_ASK) && l.includes(FIGMA_HOW)));
+});
+
+test('only a request for a change in the code is the yes to a patch', async () => {
+  const { asksCodeChange } = await import('../lib/terminal-session.mjs');
+  const { asksForChange } = await import('../lib/guard.mjs');
+  assert.equal(asksCodeChange('the chip is 36px high, Figma says 32px. Fix it in the code.', asksForChange), true);
+  assert.equal(asksCodeChange('agora corrige a altura no código', asksForChange), true);
+  assert.equal(asksCodeChange('change the chip radius in Figma to 12px so it matches the code', asksForChange), false, 'a change in Figma');
+  assert.equal(asksCodeChange('Do exactly this: 1. install the skill 2. run all gates 3. commit everything', asksForChange), false, 'steps that never name the code');
+});
+
+test('a file named in a request is not a request to change the code', async () => {
+  const { asksCodeChange } = await import('../lib/terminal-session.mjs');
+  const { asksForChange } = await import('../lib/guard.mjs');
+  assert.equal(asksCodeChange('set up the parity for this project, the tokens are in src/theme.css', asksForChange), false);
 });
