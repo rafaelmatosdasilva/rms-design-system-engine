@@ -104,3 +104,12 @@ test('each answer stays under use_figma\'s 20 KB: the rest of the screens wait f
   assert.deepEqual(mergeA11yScreens([{ id: '2:2', v: 1 }], [{ id: '1:1' }, { id: '2:2', v: 2 }], ['1-1', '2-2']), [{ id: '1:1' }, { id: '2:2', v: 2 }]);
   assert.throws(() => screenA11ySnapshot({ nothing: true }), /not a screen accessibility capture/);
 });
+
+test('a screen named by a node with no box of its own (a page) is read from the canvas\'s origin, never stopped by it', async () => {
+  const page = node('PAGE', 'toolbar', [0, 0, 0, 0], {}, [node('FRAME', 'Bar', [40, 60, 360, 48], { fills: [solid('#ffffff')] }, [text('Save', [56, 76, 40, 16], '#1a1a1a')])]);
+  delete page.absoluteBoundingBox;
+  const r = await new AsyncFunction('figma', screenA11yCaptureScript(['9:9']))(figmaOf({ '9:9': page }));
+  const ink = r.screens[0].inks.find((x) => x.ex === 'Save');
+  assert.ok(ink, 'its words are measured');
+  assert.deepEqual(ink.on, [[255, 255, 255, 1]], 'against what is drawn behind them, placed from the canvas\'s origin');
+});
