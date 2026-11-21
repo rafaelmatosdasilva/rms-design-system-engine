@@ -6,7 +6,7 @@
 // `cursor-agent -p --output-format stream-json` in a fresh HOME holding only the person's Cursor login. Its events are
 // turned into the stream-json events every scorer already reads (context(), cliOf(), infraFailure()), as Codex's are
 // (codex.mjs), so the tasks and their checks are the same ones Claude's and Codex's runs are held to.
-import { existsSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, chmodSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
@@ -43,17 +43,21 @@ export const CURSOR_VARIANT = {
   },
 };
 
-// The login a run uses: the person's own, copied into the run's fresh HOME (removed with it). Cursor keeps its CLI
-// settings and login in ~/.cursor/cli-config.json; nothing else of the person's Cursor comes along (no rules, no MCP
-// servers, no trusted workspaces). DESIGN_SYSTEM_ENGINE_EVAL_CURSOR_API_KEY, when set, is passed as CURSOR_API_KEY instead.
+// The login a run uses: the person's own. Cursor keeps its CLI settings in ~/.cursor/cli-config.json, copied into the
+// run's fresh HOME (removed with it), and its token in the macOS keychain, which it finds through HOME: so the run's
+// HOME points at the person's keychain folder (a link, nothing copied out of it), as Claude's runs carry the plan's
+// token. Seen with cursor-agent 2026.11.19: a fresh HOME without it says "Authentication required". Nothing else of the
+// person's Cursor comes along (no rules, no MCP servers, no trusted workspaces). DESIGN_SYSTEM_ENGINE_EVAL_CURSOR_API_KEY,
+// when set, is passed as CURSOR_API_KEY instead, and the keychain is left out.
 export const CURSOR_LOGIN = join(envVar(process.env, 'EVAL_CURSOR_HOME') ?? join(homedir(), '.cursor'), 'cli-config.json');
-export function cursorHome(home, login = CURSOR_LOGIN, env = process.env) {
+export function cursorHome(home, login = CURSOR_LOGIN, env = process.env, keychains = join(homedir(), 'Library', 'Keychains')) {
   const dir = join(home, '.cursor');
   mkdirSync(dir, { recursive: true });
   if (envVar(env, 'EVAL_CURSOR_API_KEY')) return dir;
   if (!existsSync(login)) throw new Error(`no Cursor login at ${login}: run \`cursor-agent login\` once`);
   copyFileSync(login, join(dir, 'cli-config.json'));
   chmodSync(join(dir, 'cli-config.json'), 0o600);
+  if (keychains && existsSync(keychains)) { mkdirSync(join(home, 'Library'), { recursive: true }); symlinkSync(keychains, join(home, 'Library', 'Keychains')); }
   return dir;
 }
 
@@ -80,7 +84,7 @@ function toolOf(tc = {}) {
   const name = NAMES[kind] ?? kind;
   const input = name === 'Bash' ? { command: String(a.command ?? '') }
     : name === 'Write' ? { file_path: path, content: a.fileText ?? a.contents ?? a.content ?? '' }
-    : name === 'Edit' ? { file_path: path, new_string: a.newString ?? a.new_string ?? '', ...(kind === 'delete' ? { deleted: true } : {}) }
+    : name === 'Edit' ? { file_path: path, new_string: a.newString ?? a.new_string ?? a.streamContent ?? call.result?.success?.afterFullFileContent ?? '', ...(kind === 'delete' ? { deleted: true } : {}) }
     : name === 'Grep' || name === 'Glob' ? { pattern: a.pattern ?? a.globPattern ?? '', path }
     : name === 'Read' ? { file_path: path } : a;
   return { name, input, result: call.result };
@@ -92,7 +96,7 @@ function resultOf(r) {
   const bad = r.failure ?? r.error ?? r.rejected;
   const ok = r.success ?? (bad ? null : r);
   const v = ok ?? bad ?? {};
-  const text = typeof v === 'string' ? v : [v.stdout, v.stderr].some((s) => s != null) ? [v.stdout, v.stderr].filter(Boolean).join('\n')
+  const text = typeof v === 'string' ? v : v.interleavedOutput != null ? v.interleavedOutput : [v.stdout, v.stderr].some((s) => s != null) ? [v.stdout, v.stderr].filter(Boolean).join('\n')
     : v.content ?? v.output ?? v.message ?? v.reason ?? JSON.stringify(v);
   const exit = v.exitCode ?? v.exit_code;
   return { text: String(text ?? ''), isError: !!bad || (exit != null && exit !== 0) };

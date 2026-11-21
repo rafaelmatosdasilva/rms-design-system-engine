@@ -1,8 +1,9 @@
 // The skill evaluation in Cursor (test/skill-evals/cursor.mjs): its events read as Claude Code's, so every scorer reads
-// a Cursor run unchanged; its command line; the login a run carries; the guide and the guard a Cursor user has.
+// a Cursor run unchanged; its command line; the login a run carries; the guide and the guard a Cursor user has. The
+// events are the shapes cursor-agent 2026.11.19 printed with `-p --output-format stream-json`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, statSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync, cpSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
 import { toStreamJson, cursorArgs, cursorHome, CURSOR_VARIANT } from './skill-evals/cursor.mjs';
@@ -17,10 +18,10 @@ const RUN = [
   { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'audit the chip' }] }, session_id: S },
   { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'I’ll route this first.' }] }, session_id: S },
   { type: 'tool_call', subtype: 'started', call_id: 'c1', tool_call: { shellToolCall: { args: { command: 'rms-design-system-engine --route "audit the chip"' } } }, session_id: S },
-  { type: 'tool_call', subtype: 'completed', call_id: 'c1', tool_call: { shellToolCall: { args: { command: 'rms-design-system-engine --route "audit the chip"' }, result: { success: { exitCode: 0, stdout: 'ROUTE: audit-component\nNEXT: rms-design-system-engine --component chip\n', stderr: '' } } } }, session_id: S },
+  { type: 'tool_call', subtype: 'completed', call_id: 'c1', tool_call: { shellToolCall: { args: { command: 'rms-design-system-engine --route "audit the chip"' }, result: { success: { command: 'rms-design-system-engine --route "audit the chip"', exitCode: 0, signal: '', stdout: 'ROUTE: audit-component\nNEXT: rms-design-system-engine --component chip\n', stderr: '', interleavedOutput: 'ROUTE: audit-component\nNEXT: rms-design-system-engine --component chip\n' }, isBackground: false } } }, session_id: S },
   { type: 'tool_call', subtype: 'completed', call_id: 'c2', tool_call: { shellToolCall: { args: { command: 'rms-design-system-engine --component chip' }, result: { failure: { exitCode: 1, stdout: 'Not in parity.\n', stderr: '' } } } }, session_id: S },
   { type: 'tool_call', subtype: 'completed', call_id: 'c3', tool_call: { readToolCall: { args: { path: 'src/theme.css' }, result: { success: { content: ':root {}', totalLines: 1 } } } }, session_id: S },
-  { type: 'tool_call', subtype: 'completed', call_id: 'c4', tool_call: { editToolCall: { args: { path: 'src/theme.css', newString: '--x: 1px;' }, result: { success: {} } } }, session_id: S },
+  { type: 'tool_call', subtype: 'completed', call_id: 'c4', tool_call: { editToolCall: { args: { path: 'src/theme.css', streamContent: '--x: 1px;\n' }, result: { success: { path: 'src/theme.css', linesAdded: 1, linesRemoved: 0, afterFullFileContent: '--x: 1px;\n', message: 'Wrote contents to src/theme.css' } } } }, session_id: S },
   { type: 'tool_call', subtype: 'completed', call_id: 'c5', tool_call: { mcpToolCall: { args: { providerIdentifier: 'design-system', toolName: 'query', args: { name: 'chip' } }, result: { success: { content: 'chip: size M|L' } } } }, session_id: S },
   { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Not in parity: the chip radius.' }] }, session_id: S },
   { type: 'result', subtype: 'success', is_error: false, duration_ms: 4200, result: 'Not in parity: the chip radius.', session_id: S, usage: { inputTokens: 40000, outputTokens: 300, cacheReadTokens: 2000 } },
@@ -34,7 +35,8 @@ test('a Cursor run reads as a Claude Code run: its commands, the engine runs, it
   assert.equal(ctx.bash[1].isError, true, 'a command that failed is said so');
   assert.deepEqual(ctx.nextLines, ['rms-design-system-engine --component chip'], 'its output is what the scorers read');
   assert.equal(ctx.calls.find((c) => c.name === 'Read').input.file_path, 'src/theme.css');
-  assert.equal(ctx.calls.find((c) => c.name === 'Edit').input.file_path, 'src/theme.css', 'an edit is an Edit of its file');
+  const edit = ctx.calls.find((c) => c.name === 'Edit');
+  assert.deepEqual([edit.input.file_path, edit.input.new_string], ['src/theme.css', '--x: 1px;\n'], 'an edit is an Edit of its file, with what it wrote');
   assert.deepEqual(ctx.mcp.map((m) => m.tool), ['query'], 'the engine\'s MCP server read as Claude\'s runs name it');
   assert.equal(ctx.final, 'Not in parity: the chip radius.', 'the reply');
   assert.deepEqual([ctx.usage.input, ctx.usage.output, ctx.usage.cost], [42000, 300, 0], 'tokens; a Cursor plan names no cost');
@@ -63,11 +65,13 @@ test('a run\'s Cursor holds only the person\'s login', () => {
   const src = tempDir('cursor-login-'), home = tempDir('cursor-home-');
   writeFileSync(join(src, 'cli-config.json'), '{"authInfo":{}}');
   writeFileSync(join(src, 'mcp.json'), '{"mcpServers":{}}');
-  const dir = cursorHome(home, join(src, 'cli-config.json'), {});
+  const keys = tempDir('cursor-keychains-');
+  const dir = cursorHome(home, join(src, 'cli-config.json'), {}, keys);
+  assert.equal(readlinkSync(join(home, 'Library', 'Keychains')), keys, 'the keychain Cursor keeps its token in, linked, never copied');
   assert.equal(readFileSync(join(dir, 'cli-config.json'), 'utf8'), '{"authInfo":{}}');
   assert.equal(statSync(join(dir, 'cli-config.json')).mode & 0o777, 0o600);
   assert.equal(existsSync(join(dir, 'mcp.json')), false, 'none of their MCP servers or settings');
-  assert.throws(() => cursorHome(tempDir('cursor-home-'), join(src, 'none.json'), {}), /cursor-agent login/);
+  assert.throws(() => cursorHome(tempDir('cursor-home-'), join(src, 'none.json'), {}, keys), /cursor-agent login/);
 });
 
 test('the cursor variant is what a Cursor user has: the AGENTS.md section and the guard as Cursor\'s own hooks', () => {
