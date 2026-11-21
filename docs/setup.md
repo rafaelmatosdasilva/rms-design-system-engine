@@ -262,7 +262,11 @@ rms-design-system-engine --install-hooks --tool cursor,codex
 
 - **The guide.** The first command writes the engine's section into the instruction files the project already has, or into `AGENTS.md`, which both tools read, when it has none. A project with a `.cursor/rules` folder also gets `.cursor/rules/design-system.mdc`. To choose the file yourself, use `--write=AGENTS.md`. It tells the agent to route each request first (`--route`) and follow what it prints, the same recipes Claude Code follows.
 - **The guard.** The second writes `.cursor/hooks.json` and `.codex/hooks.json`. Name only the tools you use. A project that already has a `.cursor` or `.codex` folder gets them with every `--install-hooks`. Hooks you wrote there are kept, and both files are added to `.gitignore`, since they hold this machine's path to the engine.
-- **Trust them once.** Cursor runs a project's hooks in a trusted workspace. Codex runs them once you trust them: open `/hooks` in Codex and trust each one.
+- **Trust them once.** Cursor runs a project's hooks in a trusted workspace. Codex needs two trusts, in this order:
+  1. **The project.** Open `codex` in the project and choose "Trust and continue". Until the project is trusted, Codex skips its `.codex` folder with only a warning, so no hook runs and nothing is checked.
+  2. **The hooks.** Type `/hooks` and trust each one.
+- **Trust a new one after an update.** Codex remembers each hook by its place and a fingerprint of what it runs, and skips any hook it has not trusted. Interactive Codex says so when it opens ("Hooks need review"), but `codex exec` skips them without a word. An engine update leaves the hooks you trusted exactly as they were and adds a new one beside them, so everything you trusted keeps working. Open `/hooks` and trust the new one, or that check alone is skipped. Codex may also ask about the folder again, and saying yes keeps what you trusted before.
+- **Shell edits are checked too.** Codex often edits a file with a shell command such as `sed -i` rather than `apply_patch`. The guard judges such a command the same way as a patch, and the check after an edit runs on each file the command wrote.
 
 **Where they differ from Claude Code.**
 
