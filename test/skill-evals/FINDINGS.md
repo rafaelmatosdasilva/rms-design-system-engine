@@ -8,6 +8,18 @@ Newest first.
 
 ---
 
+## An agent that kept the first 300 lines reported an audit it never read to the end
+
+**Found** 21 November 2026, the evaluation of the guide that names the route the person chose to read Figma (78/79). **Fixed in** `lib/guard.mjs`: an engine command piped into `head` or `tail` is refused, with the reason.
+
+**Evidence.** `audit-all` #0 ran `rms-design-system-engine 2>&1 | head -300`, so the report it relayed stopped before the differences the browser measured, and the check `names a measured difference` failed. #1 and #2 read the report whole and passed.
+
+**Guesses ruled out.** That the guide change under measurement caused it: it touches how Figma is read, and the audit's report and its order are unchanged. That the audit printed too little: the difference is in the report, past line 300.
+
+**What changed.** The guard refuses the cut command and asks for it whole. The main guide is at its size limit, so the rule lives where it is enforced rather than as another line to read.
+
+---
+
 ## A run the API dropped fails as if the agent never answered
 
 **Found** 21 November 2026, the evaluation of the change that teaches the agent the route the person chose to read Figma. **Fixed in** nothing yet; recorded against the runner's time limit in `test/skill-evals/run.mjs`.
