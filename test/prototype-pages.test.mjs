@@ -179,3 +179,17 @@ test('every build checks every prototype, and checks again only what moved: its 
   await checkAll(root, { version: '1.1.0', run });
   assert.ok(ran.includes('prototypes/Orders.vue'), 'the system moved');
 });
+
+test('each width a prototype was drawn at is kept with its check: whether it fits, and what only longer words break', async () => {
+  const { widthResults, widthLine, checkRecord } = await import('../lib/prototype-record.mjs');
+  const fit = { widths: ['Phone (375px)', 'Desktop (1280px)'], findings: [
+    { kind: 'cut', widths: ['Phone (375px)'], asWritten: true },
+    { kind: 'wraps', widths: ['Phone (375px)', 'Desktop (1280px)'], asWritten: false },
+    { kind: 'target', component: 'chip', widths: ['Phone (375px)'], asWritten: true },
+  ] };
+  const w = widthResults(fit);
+  assert.deepEqual(w, [{ width: 'Phone (375px)', fits: false, problems: 1, longer: 1 }, { width: 'Desktop (1280px)', fits: true, problems: 0, longer: 1 }], 'a tap target is the system\'s own, and longer words a translation\'s');
+  assert.equal(widthLine(w), '📏 Each width: Phone (375px) 1 problem · Desktop (1280px) fits');
+  assert.deepEqual(checkRecord({ name: 'A', widths: w }).widths, w, 'kept with the check, where a team\'s own exit criterion reads it');
+  assert.deepEqual(widthResults(null), [], 'not drawn: nothing said');
+});
