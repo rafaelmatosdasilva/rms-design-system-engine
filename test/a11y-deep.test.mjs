@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture, runGate, budget } from './helpers.mjs';
+import { makeFixture, runGate, budget, standIn } from './helpers.mjs';
 import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../lib/a11y-check.mjs';
 import { stateContrastFindings, tokenContrastFindings, tintedVars } from '../lib/contrast-check.mjs';
 import { deriveContrastPairs } from '../lib/pair-derive.mjs';
@@ -429,11 +429,10 @@ test('a page counts as loaded only once it is no longer the about:blank a new ta
   assert.equal(new Function('location', 'document', `return ${pageLoadedExpression()}`)({ href: 'http://localhost:6006/' }, { readyState: 'complete' }), true);
 });
 
-test('a page that was not checked says so in --json, with the reason, never as a clean result', { skip: process.platform === 'win32' ? 'its browser that exits at once is /usr/bin/false, which Windows does not have' : false }, () => {
+test('a page that was not checked says so in --json, with the reason, never as a clean result', {}, () => {
   const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
-  // A browser that exits at once. /usr/bin/false is on Linux and macOS alike (macOS has no /bin/false, so the
-  // engine would skip the path and start a real Chrome).
-  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: '/usr/bin/false' } });
+  // A browser that exits at once.
+  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: standIn(dir, 'chrome', 'process.exit(1);\n') } });
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.match(d.notChecked, /^Chrome failed to start/);
   assert.equal(d.issues, undefined);

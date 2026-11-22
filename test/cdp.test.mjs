@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { budget, tempDir } from './helpers.mjs';
+import { budget, tempDir, standIn } from './helpers.mjs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED, sweepDeadProfiles } from '../lib/cdp.mjs';
 
@@ -149,15 +149,17 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
 
 // A busy machine can take longer than the limit to start a browser once: a start that timed out is tried once more,
 // and one that cannot work (no browser there) fails at once.
-test('a browser start that timed out is tried once more; one that cannot start is not', { skip: process.platform === 'win32' ? 'the stand-in browser is a shell script, which Windows does not run' : false, timeout: budget(30000) }, async () => {
-  const { chmodSync } = await import('node:fs');
+test('a browser start that timed out is tried once more; one that cannot start is not', { timeout: budget(30000) }, async () => {
   const dir = tempDir('cdp-retry-');
-  const fake = join(dir, 'chrome.sh'), count = join(dir, 'count');
+  const count = join(dir, 'count');
   // The first start says nothing (it times out); the second announces its socket. Three seconds to announce it: a busy
   // machine (a full run, a browser check beside it) can take more than half a second only to start a shell, and the
   // first start still times out, since it says nothing for five.
-  writeFileSync(fake, `#!/bin/sh\nif [ -f "${count}" ]; then echo "DevTools listening on ws://127.0.0.1:1/devtools/browser/x" >&2; sleep 5; else touch "${count}"; sleep 5; fi\n`);
-  chmodSync(fake, 0o755);
+  const fake = standIn(dir, 'chrome', `const fs = require('node:fs');
+if (fs.existsSync(${JSON.stringify(count)})) process.stderr.write('DevTools listening on ws://127.0.0.1:1/devtools/browser/x\\n');
+else fs.writeFileSync(${JSON.stringify(count)}, '');
+setTimeout(() => {}, 5000);
+`);
   const b = await launchChrome(fake, { timeoutMs: 3000, retryAfterMs: 10 });
   assert.match(b.wsUrl, /^ws:\/\/127\.0\.0\.1:1\//);
   b.kill();

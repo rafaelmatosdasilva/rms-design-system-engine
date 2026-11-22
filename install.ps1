@@ -8,7 +8,7 @@
 # What it does, with nothing that needs an administrator:
 #   - clones the engine (or updates it) into %USERPROFILE%\.claude\skills\rms-design-system-engine
 #   - links the skill's guide into %USERPROFILE%\.claude\commands, so /rms-design-system-engine works in Claude Code
-#   - writes the terminal command, rms-design-system-engine.cmd, into %USERPROFILE%\.local\bin, and puts that folder on
+#   - writes the terminal command (rms-design-system-engine.cmd, and a bash script for Git Bash) into %USERPROFILE%\.local\bin, and puts that folder on
 #     the user's PATH
 #   - keeps axe-core and the web-features data the checks read, and says what is missing (Chrome or Edge, TypeScript)
 param(
@@ -57,9 +57,12 @@ try { New-Item -ItemType HardLink -Path $Target -Target (Join-Path $CloneDir $Sk
 catch { Copy-Item (Join-Path $CloneDir $SkillFile) $Target; $Notes += "ℹ️  The guide was copied into $CommandsDir (a link was refused): run this installer again after an update." }
 try { node (Join-Path $CloneDir 'lib\codex-skill.mjs') } catch { }
 
-# The terminal command, for PowerShell and the command prompt alike.
+# The terminal command, for PowerShell and the command prompt alike, and a bash script beside it for Git Bash, the shell
+# Claude Code runs its commands in on Windows, which starts a .cmd only by its full name.
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 Set-Content -Encoding ASCII -Path (Join-Path $BinDir 'rms-design-system-engine.cmd') -Value "@node `"$CloneDir\audit.mjs`" %*"
+$Audit = (Join-Path $CloneDir 'audit.mjs') -replace '\\', '/'
+[IO.File]::WriteAllText((Join-Path $BinDir 'rms-design-system-engine'), "#!/usr/bin/env bash`nexec node `"$Audit`" `"`$@`"`n")
 $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (-not (($UserPath -split ';') -contains $BinDir)) {
   [Environment]::SetEnvironmentVariable('Path', (@($UserPath, $BinDir) | Where-Object { $_ }) -join ';', 'User')

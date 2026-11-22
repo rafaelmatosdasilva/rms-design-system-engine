@@ -2,9 +2,10 @@
 // rule gets a known-good and a known-bad run; a scorer that passes a bad run fails here. No model tokens.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, rmSync, realpathSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join, dirname } from 'node:path';
+import { join, dirname, delimiter } from 'node:path';
+import { onPath } from '../lib/project-bin.mjs';
 import { execFileSync } from 'node:child_process';
 import { context, decisionPoints, afterPass, makeHome, cleanup, findClaude, agentOf, cliChange, cliLine, ENGINE_SCRIPT, ENGINE_CALL } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken, handEdits } from './skill-evals/rules.mjs';
@@ -342,22 +343,26 @@ test('a change of runner is said as itself, never as a version going backwards',
   assert.match(cliLine(cliChange(rows('sdk', '2.1.301'), rows(undefined, '2.1.318'))), /where the runs before went through a runner nothing recorded/);
 });
 
-test('the CLI that runs each task is found where it is installed, not only on the PATH', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
+test('the CLI that runs each task is found where it is installed, not only on the PATH', () => {
   const at = (...ok) => (p) => ok.includes(p);
   const none = () => null;
+  // Windows runs only a program with its extension: the installer writes claude.exe there.
+  const exe = process.platform === 'win32' ? '.exe' : '';
+  const nodeDir = join('/n', 'bin'), node = join(nodeDir, 'node');
   // The PATH first: a CLI the person put there is the one they mean.
-  assert.equal(findClaude({ env: {}, exists: () => false, which: () => '/usr/local/bin/claude', execPath: '/n/bin/node' }), '/usr/local/bin/claude');
+  assert.equal(findClaude({ env: {}, exists: () => false, which: () => '/usr/local/bin/claude', execPath: node }), '/usr/local/bin/claude');
   // Then beside the running node, which is where an installer that ships both puts it - and where the shell that
   // starts an evaluation does not always look, so a whole run died in a stack having measured nothing.
-  assert.equal(findClaude({ env: {}, exists: at('/n/bin/claude'), which: none, execPath: '/n/bin/node' }), '/n/bin/claude');
+  assert.equal(findClaude({ env: {}, exists: at(join(nodeDir, 'claude') + exe), which: none, execPath: node }), join(nodeDir, 'claude') + exe);
   // Then where the installers put it.
-  assert.match(findClaude({ env: {}, exists: (p) => /\.local\/bin\/claude$/.test(p), which: none, execPath: '/n/bin/node' }), /\.local\/bin\/claude$/);
-  assert.match(findClaude({ env: {}, exists: (p) => /\.claude\/local\/claude$/.test(p), which: none, execPath: '/n/bin/node' }), /\.claude\/local\/claude$/);
+  const ends = (...parts) => (p) => p.endsWith(join(...parts) + exe);
+  assert.ok(ends('.local', 'bin', 'claude')(findClaude({ env: {}, exists: ends('.local', 'bin', 'claude'), which: none, execPath: node })));
+  assert.ok(ends('.claude', 'local', 'claude')(findClaude({ env: {}, exists: ends('.claude', 'local', 'claude'), which: none, execPath: node })));
   // Nowhere: null, so the caller says what is missing instead of spawning a bare name and dying in ENOENT.
-  assert.equal(findClaude({ env: {}, exists: () => false, which: none, execPath: '/n/bin/node' }), null);
+  assert.equal(findClaude({ env: {}, exists: () => false, which: none, execPath: node }), null);
   // Named by hand, and taken only when it is there: a path that is wrong is said, never quietly replaced.
-  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/claude' }, exists: at('/opt/claude'), which: () => '/usr/bin/claude', execPath: '/n/bin/node' }), '/opt/claude');
-  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/gone' }, exists: () => false, which: () => '/usr/bin/claude', execPath: '/n/bin/node' }), null);
+  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/claude' }, exists: at('/opt/claude'), which: () => '/usr/bin/claude', execPath: node }), '/opt/claude');
+  assert.equal(findClaude({ env: { DESIGN_SYSTEM_ENGINE_EVAL_CLI: '/opt/gone' }, exists: () => false, which: () => '/usr/bin/claude', execPath: node }), null);
 });
 
 test('a run whose shell could not start the engine is refused, not scored', async () => {
@@ -523,20 +528,27 @@ test('a run that failed in the harness is tried once more at once, never waited 
   assert.equal(afterPass(2), 'stop');
 });
 
-test('a run\'s shell finds the node the evaluation runs on, and still no engine installed elsewhere on the machine', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
+test('a run\'s shell finds the node the evaluation runs on, and still no engine installed elsewhere on the machine', () => {
   // A run's shell starts from the new HOME with no profile: only its PATH says where node is. A node kept in
   // ~/.local/bin went with the filter that hides an installed engine there, and every call to the engine failed.
-  const { home, path } = makeHome({ install: () => {} });
+  // The shell is the one the agent's commands run in: /bin/sh, and on Windows Git Bash, which Claude Code runs there.
+  const win = process.platform === 'win32';
+  const shell = win ? join(dirname(dirname(onPath('git'))), 'bin', 'bash.exe') : '/bin/sh';
+  const sh = (h, cmd) => execFileSync(shell, ['-c', cmd], { env: { ...(win ? { SYSTEMROOT: process.env.SYSTEMROOT } : {}), PATH: h.path, HOME: h.home }, encoding: 'utf8' }).trim();
+  const same = (a, b) => assert.equal(realpathSync(a), realpathSync(b));
+  const h = makeHome({ install: () => {} });
   try {
-    const sh = (cmd) => execFileSync('/bin/sh', ['-c', cmd], { env: { PATH: path, HOME: home }, encoding: 'utf8' }).trim();
-    assert.equal(sh('node -p process.execPath'), process.execPath, 'the evaluation\'s own node, whatever folder it lives in');
-    assert.match(sh('rms-design-system-engine --version 2>&1; echo "exit $?"'), /exit [01]$/, 'the engine\'s command runs: node is found');
-    assert.ok(!path.split(':').some((p) => /\.local\/bin/.test(p)), 'an engine installed in ~/.local/bin stays hidden');
+    same(sh(h, 'node -p process.execPath'), process.execPath);
+    assert.match(sh(h, 'rms-design-system-engine --version 2>&1; echo "exit $?"'), /exit [01]$/, 'the engine\'s command runs: node is found');
+    if (win) assert.ok(existsSync(join(h.home, 'bin', 'rms-design-system-engine.cmd')), 'and the command PowerShell and the command prompt run');
+    assert.ok(!h.path.split(delimiter).some((p) => /[\\/]\.local[\\/]bin/.test(p)), 'an engine installed in ~/.local/bin stays hidden');
     // A task that takes the command away keeps node: the guide's "node <install-dir>/audit.mjs" still runs.
     const bare = makeHome({ install: () => {} }, { cliOnPath: false });
-    try { assert.equal(execFileSync('/bin/sh', ['-c', 'command -v node'], { env: { PATH: bare.path, HOME: bare.home }, encoding: 'utf8' }).trim(), join(bare.home, 'bin', 'node')); }
-    finally { cleanup(bare.home); }
-  } finally { cleanup(home); }
+    try {
+      same(sh(bare, 'node -p process.execPath'), process.execPath);
+      assert.match(sh(bare, 'command -v rms-design-system-engine || echo none'), /^none$/, 'and no engine command');
+    } finally { cleanup(bare.home); }
+  } finally { cleanup(h.home); }
 });
 
 test('the engine run by its path is seen however the path is written, a quoted one with a space in it too', () => {

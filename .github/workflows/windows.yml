@@ -93,10 +93,12 @@ jobs:
               echo "::error title=${line#*:}::$(sed -n "$((n+1)),$((n+40))p" test.log | grep -E "error|expected|actual|Error|message" | head -6 | tr '\n' ' ' | cut -c1-900)"
             done
           fi
-          # A browser test that skipped for want of Chrome checked nothing: the run fails, so a missing Chrome can never pass quietly.
-          skipped=$(grep -ciE '# SKIP .*chrome' test.log || true)
+          # A test that skipped checked nothing on Windows, whatever its reason: a missing tool, or a stand-in only another
+          # system runs. The run fails on any, so "proven on Windows" never hides a test that did not run there.
+          grep -E '# SKIP' test.log | while IFS= read -r line; do echo "::error title=Skipped on Windows::${line#*- }"; done
+          skipped=$(grep -cE '# SKIP' test.log || true)
           if [ "$skipped" != 0 ]; then
-            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
+            echo "::error title=Tests skipped::$skipped test(s) skipped on Windows; every one must run."
             code=1
           fi
           # The number the badge shows, taken from the run's own summary rather than counted by hand: the README said
@@ -164,3 +166,58 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           '{"tool_name":"Read","tool_input":{"file_path":"x"}}' | node (Join-Path $engine 'guard.mjs')
           if ($LASTEXITCODE) { throw "the hook failed (exit $LASTEXITCODE)" }
+      # Git Bash is the shell Claude Code runs its commands in on Windows, and it starts a .cmd only by its full name: the
+      # installer's bash script beside it is what an agent there calls.
+      - name: The terminal command runs from Git Bash, as Claude Code calls it
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          out=$(rms-design-system-engine --route "check the button" 2>&1)
+          echo "$out"
+          echo "$out" | grep -q 'ROUTE: ' || { echo "::error::the command did not route the request from Git Bash"; exit 1; }
+
+  # Windows' Linux (WSL) runs the Linux installer, install.sh, as a person there has it: the same proof as the PowerShell
+  # install above, in a distribution of WSL on the same runner.
+  wsl:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Vampire/setup-wsl@4c48163d9f981914dd8caa0fc335fe19cca5bff4 # v7.2.0
+        with:
+          distribution: Ubuntu-24.04
+          additional-packages: ca-certificates curl git xz-utils
+      # Node from nodejs.org, checked against the checksums it publishes: the distribution's own is older than the engine needs.
+      - name: Node in WSL
+        shell: wsl-bash {0}
+        run: |
+          set -euo pipefail
+          v=v22.23.5; f=node-$v-linux-x64.tar.xz
+          cd /tmp
+          curl -fsSLO "https://nodejs.org/dist/$v/$f"
+          curl -fsSL "https://nodejs.org/dist/$v/SHASUMS256.txt" | grep " $f\$" | sha256sum -c -
+          mkdir -p ~/.node && tar -xJf "$f" -C ~/.node --strip-components=1
+          ~/.node/bin/node --version
+      - name: Install from install.sh
+        shell: wsl-bash {0}
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.node/bin:$HOME/.local/bin:$PATH"
+          git config --global --add safe.directory "$PWD"
+          git branch -f ci-install HEAD
+          RMS_DSE_REPO="file://$PWD" RMS_DSE_REF=ci-install bash install.sh
+          test -x ~/.local/bin/rms-design-system-engine || { echo "::error::the terminal command was not written"; exit 1; }
+          test -e ~/.claude/commands/rms-design-system-engine.md || { echo "::error::the guide is not where Claude Code finds it"; exit 1; }
+      - name: The terminal command routes a request, the MCP server answers and a hook reads a tool call
+        shell: wsl-bash {0}
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.node/bin:$HOME/.local/bin:$PATH"
+          engine=~/.claude/skills/rms-design-system-engine
+          mkdir -p /tmp/a-project && cd /tmp/a-project
+          out=$(rms-design-system-engine --route "check the button" 2>&1); echo "$out"
+          echo "$out" | grep -q 'ROUTE: ' || { echo "::error::the command did not route the request"; exit 1; }
+          init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'
+          answer=$( (echo "$init"; sleep 5) | timeout 30 node "$engine/mcp.mjs" | head -1 || true); echo "${answer:0:200}"
+          echo "$answer" | grep -q '"serverInfo"' || { echo "::error::the MCP server gave no answer"; exit 1; }
+          echo '{"tool_name":"Read","tool_input":{"file_path":"x"}}' | node "$engine/guard.mjs"

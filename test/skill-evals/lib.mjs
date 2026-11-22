@@ -5,14 +5,15 @@
 // Every run is isolated: a fresh copy of the project (its snapshots dated today, one git commit, the
 // project's hooks installed), a fresh HOME holding only the variant's guide, the same engine for every
 // variant, a fixed tool list, a turn limit and a dollar budget. Only the guide differs between variants.
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
-import { join, dirname, basename, relative, sep } from 'node:path';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync, statSync, copyFileSync } from 'node:fs';
+import { join, dirname, basename, relative, sep, delimiter } from 'node:path';
 import { createHash } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../../lib/cdp.mjs';
 import { envVar } from '../../lib/names.mjs';
+import { onPath } from '../../lib/project-bin.mjs';
 
 export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -70,10 +71,16 @@ export function findClaude({ env = process.env, exists = existsSync, which = whi
   const onPath = which('claude');
   if (onPath) return onPath;
   // Then where it installs itself. Beside the running node comes first: an installer that ships both puts them together.
-  for (const p of [join(dirname(execPath), 'claude'), join(homedir(), '.local', 'bin', 'claude'), join(homedir(), '.claude', 'local', 'claude')]) if (exists(p)) return p;
-  return null;
+  // On Windows the installer writes claude.exe.
+  const exe = process.platform === 'win32' ? '.exe' : '';
+  for (const p of [join(dirname(execPath), 'claude'), join(homedir(), '.local', 'bin', 'claude'), join(homedir(), '.claude', 'local', 'claude')]) if (exists(p + exe)) return p + exe;
+  // Last, the one installed for the evaluation from its lockfile (npm ci --prefix test/.claude-cli-tools), as CI's
+  // Windows runner has it: the program itself, from the package for this system.
+  const own = join(ENGINE, 'test', '.claude-cli-tools', 'node_modules', '@anthropic-ai', `claude-code-${process.platform}-${process.arch}`, `claude${exe}`);
+  return exists(own) ? own : null;
 }
-function whichBin(name) { try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() || null; } catch { return null; } }
+// Found by the engine itself (project-bin.mjs onPath), since Windows has no `which`.
+const whichBin = (name) => onPath(name);
 export const CLAUDE = findClaude();
 
 // The version of what actually runs each task, which is not always the same program. With an API key the runs go
@@ -159,6 +166,13 @@ function walk(dir) {
 
 // A HOME with only the variant installed, and a bin folder with the terminal command (unless the task
 // takes it away). Returns { home, path }.
+// A link to the engine's own files. Windows lets only an administrator (or developer mode) make a symbolic link: there a
+// folder is joined by a junction, which needs no rights, and a file is copied.
+export function linkTo(target, at) {
+  if (process.platform !== 'win32') return symlinkSync(target, at);
+  if (statSync(target).isDirectory()) return symlinkSync(target, at, 'junction');
+  copyFileSync(target, at);
+}
 export function makeHome(variant, { cliOnPath = true } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'skill-eval-home-'));
   // Where install.sh puts the engine, so the guide's "node <install-dir>/audit.mjs" finds this engine and
@@ -166,7 +180,7 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   mkdirSync(join(home, '.claude', 'skills'), { recursive: true });
   variant.install(home);
   if (variant.engine === false) cliOnPath = false;   // no skill, no engine: nothing of it on the machine
-  else if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
+  else if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) linkTo(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
   const bin = join(home, 'bin');
   mkdirSync(bin, { recursive: true });
   // The node this evaluation runs on, first on the path. The run's shell starts from the new HOME with no profile, and
@@ -174,14 +188,19 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   // there, every run lost node, each call to the engine failed with "node: not found", and a run measured a broken
   // machine as a broken guide (15 of 79). The engine's command and the guide's "node <install-dir>/audit.mjs" both
   // find it here.
-  symlinkSync(process.execPath, join(bin, 'node'));
+  // On Windows, which links a file only for an administrator, node's own folder comes next on the path instead.
+  const win = process.platform === 'win32';
+  if (!win) symlinkSync(process.execPath, join(bin, 'node'));
   if (cliOnPath) {
     for (const name of ['rms-design-system-engine']) {
-      writeFileSync(join(bin, name), `#!/usr/bin/env bash\nexec node "${join(ENGINE, 'audit.mjs')}" "$@"\n`);
+      // A bash script for a Unix shell and for Git Bash, the shell Claude Code runs on Windows, and on Windows a .cmd
+      // beside it for PowerShell and the command prompt: the same two install.ps1 writes.
+      writeFileSync(join(bin, name), `#!/usr/bin/env bash\nexec node "${join(ENGINE, 'audit.mjs').split(sep).join('/')}" "$@"\n`);
       chmodSync(join(bin, name), 0o755);
+      if (win) writeFileSync(join(bin, `${name}.cmd`), `@node "${join(ENGINE, 'audit.mjs')}" %*\r\n`);
     }
   }
-  const path = [bin, ...String(process.env.PATH).split(':').filter((p) => !/\.local\/bin/.test(p))].join(':');
+  const path = [bin, ...(win ? [dirname(process.execPath)] : []), ...String(process.env.PATH ?? process.env.Path ?? '').split(delimiter).filter((p) => p && !/[\\/]\.local[\\/]bin/.test(p))].join(delimiter);
   return { home, path };
 }
 
@@ -195,7 +214,10 @@ const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUD
 const KEEP_ENV = new Set(['CLAUDE_CODE_OAUTH_TOKEN']);
 export function childEnv(env, extra = {}) {
   const keep = env.ANTHROPIC_API_KEY ? new Set() : KEEP_ENV;
-  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => keep.has(k) || !DROP.some((re) => re.test(k)))), ...extra };
+  // Windows reads a name in any case (its PATH is Path): a variable the run sets replaces the parent's in every case,
+  // never sits beside it for whichever the child happens to read.
+  const set = new Set(Object.keys(extra).map((k) => k.toUpperCase()));
+  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => !set.has(k.toUpperCase()) && (keep.has(k) || !DROP.some((re) => re.test(k))))), ...extra };
 }
 
 // A run that did not run: the API refused it (a usage limit, a 429, an overload) or it spent nothing and
@@ -272,7 +294,8 @@ export async function runClaude({ cwd, home, path, prompt, model, resume = null,
   // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
   const base = withCredentials(process.env);
-  const env = childEnv(base, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+  // On Windows a program finds its home through USERPROFILE, not HOME: both name the run's own.
+  const env = childEnv(base, { HOME: home, PATH: path, ...(process.platform === 'win32' ? { USERPROFILE: home } : {}), CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
   const { events, err, timedOut } = runnerOf(base) === 'sdk'
     ? await viaSdk(prompt, sdkOptions({ model, maxTurns, budget, resume, route, cwd, env }), timeoutMs)
     : await viaCli(claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd }), { cwd, env }, timeoutMs);

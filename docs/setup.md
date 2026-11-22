@@ -44,8 +44,10 @@ irm https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engin
 - **The same install as on a Mac or Linux.** The engine goes into `%USERPROFILE%\.claude\skills\rms-design-system-engine`, the skill's guide where Claude Code finds it, and the terminal command `rms-design-system-engine` into `%USERPROFILE%\.local\bin`, which is put on your PATH. Open a new terminal for the command to be found.
 - **Chrome or Edge.** The engine finds either where Windows installs them (Program Files or your AppData). Edge draws pages with the same engine as Chrome.
 - **A company's setup** passes its two values: `& ([scriptblock]::Create((irm <the installer's link>))) -Client <team> -Profile <the profile's link>`.
-- **Git Bash and WSL** run the bash installer above as they would on Linux.
-- **Proven on every change.** The full suite runs on a Windows runner beside Ubuntu's for every pull request, none skipped. The same run installs the engine from PowerShell and starts the terminal command, the MCP server and the hooks.
+- **PowerShell, the command prompt and Git Bash** all run the command it writes. Git Bash is the shell Claude Code runs its commands in on Windows, so the installer puts a bash script beside the `.cmd` for it.
+- **WSL** is Linux: inside it, run the bash installer above, as on Linux.
+- **Proven on every change.** The full suite runs on a Windows runner beside Ubuntu's for every pull request, and the run fails if a single test is skipped. The same run installs the engine from PowerShell, and from the bash installer inside WSL, and starts the terminal command (from PowerShell and Git Bash), the MCP server and the hooks.
+- **The skill evaluation on Windows.** The guide's tasks run in Claude Code on a Windows runner (the Skill evaluation on Windows workflow, started by hand), scored as on a Mac.
 
 ### A company's own setup
 

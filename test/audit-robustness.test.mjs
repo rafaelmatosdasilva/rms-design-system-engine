@@ -2,13 +2,13 @@
 // survives an environment without `node` on PATH.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, chmodSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseGateOutput, GATE_SUMMARY } from '../lib/audit-parse.mjs';
 import { launchChrome } from '../lib/cdp.mjs';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, standIn } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -36,11 +36,9 @@ test('parser: the mode gate shows its OK and FAIL lines, not only the skip count
   assert.equal(parseGateOutput({ status: 0, stdout: out, stderr: '' }, GATE_SUMMARY['mode-completeness-check.mjs']).lines.length, 3);
 });
 
-test('browser: a Chrome that never becomes ready gives up with a clear reason', { skip: process.platform === 'win32' ? 'the stand-in browser is a shell script, which Windows does not run' : false }, async () => {
+test('browser: a Chrome that never becomes ready gives up with a clear reason', async () => {
   const dir = makeFixture({});
-  const fake = join(dir, 'fake-chrome.sh');
-  writeFileSync(fake, '#!/bin/sh\nsleep 30\n');
-  chmodSync(fake, 0o755);
+  const fake = standIn(dir, 'fake-chrome', 'setTimeout(() => {}, 30000);\n');
   const t0 = Date.now();
   // Tried twice (a busy machine gets one more go), then given up.
   await assert.rejects(launchChrome(fake, { timeoutMs: 400, retryAfterMs: 10 }), /did not start within 0.4s/);
