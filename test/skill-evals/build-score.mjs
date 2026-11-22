@@ -99,6 +99,16 @@ const CODE_EXT = ['.jsx', '.tsx', '.js', '.ts', '.mjs'];
 // A project file's path on the page: from the project's root, in a URL's slashes on every system (Windows' relative()
 // gives backslashes, which a URL drops).
 const fromRoot = (dir, f) => '/' + slashed(relative(dir, f));
+// A function run in the page with values handed to it as data (Runtime.callFunctionOn's arguments), never written into
+// the code it runs: a component's props, its class or a token name stay values whatever they hold.
+async function callIn(send, sessionId, fn, ...args) {
+  const g = await send('Runtime.evaluate', { expression: 'globalThis' }, sessionId);
+  const r = await send('Runtime.callFunctionOn', { functionDeclaration: String(fn), objectId: g.result.objectId, arguments: args.map((value) => ({ value })), awaitPromise: true, returnByValue: true }, sessionId);
+  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
+  return r.result?.value;
+}
+// How a scheme is set on the page: data-theme, a class, or the media query alone (Emulation, set beside it).
+const SET_SCHEME = `function (dm) { const h = document.documentElement; if (dm === 'data') h.setAttribute('data-theme', 'dark'); else h.removeAttribute('data-theme'); h.classList.toggle('dark', dm === 'class'); h.classList.toggle('theme-dark', dm === 'class'); }`;
 const walk = (dir, out = []) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (/^(node_modules|\.git|\.design-system-engine-out|\.claude|contracts|figma-mcp)$/.test(e.name)) continue;
@@ -181,7 +191,8 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
   const { send, close } = await connectCDP(chrome.wsUrl);
   const out = {};
   try {
-    const { sessionId } = await openPage(send, `http://127.0.0.1:${port}/__page.html`);
+    // The export to pick goes in the page's address, read there: the code the page runs carries nothing written into it.
+    const { sessionId } = await openPage(send, `http://127.0.0.1:${port}/__page.html?want=${encodeURIComponent(exportName)}`);
     await waitForTrue(send, sessionId, 'location.protocol === "http:" && document.readyState === "complete" && !!document.getElementById("root")', { attempts: 200 });
     await send('DOM.enable', {}, sessionId); await send('CSS.enable', {}, sessionId);
     const ev = async (expression) => {
@@ -190,7 +201,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
       return r.result.value;
     };
     // Load the module once; find the component: the named export, the default, or any function export.
-    const loaded = await ev(`import('/__component.js').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
+    const loaded = await ev(`import('/__component.js').then((m) => { const want = String(new URLSearchParams(location.search).get('want') || '').toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
       window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };
@@ -199,16 +210,16 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
       let m = null;
       for (const dm of darkModes) {
         await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dm === 'media' ? 'dark' : 'light' }] }, sessionId);
-        await ev(`(() => { const h = document.documentElement; ${dm === 'data' ? "h.setAttribute('data-theme','dark');" : "h.removeAttribute('data-theme');"} h.classList.toggle('dark', ${dm === 'class'}); h.classList.toggle('theme-dark', ${dm === 'class'});
-          const root = document.getElementById('root'); root.innerHTML = ''; const host = document.createElement('div'); host.id = 'case'; host.style.display = 'inline-block'; root.append(host);
-          try { const node = window.__h(window.__C, ${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
+        await callIn(send, sessionId, SET_SCHEME, dm);
+        await callIn(send, sessionId, `function (props) { const root = document.getElementById('root'); root.innerHTML = ''; const host = document.createElement('div'); host.id = 'case'; host.style.display = 'inline-block'; root.append(host);
+          try { const node = window.__h(window.__C, props); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } }`, c.props ?? null);
         if (c.pseudo?.length) {
           const { root } = await send('DOM.getDocument', { depth: -1 }, sessionId);
-          const own = await ev(`(() => { const t = document.querySelector('#case > *'); return !!(t && !t.classList.contains(${JSON.stringify(cls)}) && document.querySelector('#case .' + ${JSON.stringify(cls)})); })()`);
+          const own = await callIn(send, sessionId, `function (cls) { const t = document.querySelector('#case > *'); return !!(t && !t.classList.contains(cls) && document.querySelector('#case .' + CSS.escape(cls))); }`, cls);
           const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: own ? `#case .${cls}` : '#case > *' }, sessionId);
           if (nodeId) await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: c.pseudo }, sessionId);
         }
-        m = await ev(c.script ? `(${c.script})('#case')` : `(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
+        m = c.script ? await callIn(send, sessionId, c.script, '#case') : await callIn(send, sessionId, MEASURE, '#case', label, cls);
         if (!c.dark || (m && c.expectDark && c.expectDark(m))) break;
       }
       out[c.id] = m;
@@ -272,9 +283,8 @@ export async function cssVariables(dir, names, expectDark = null) {
     await waitForTrue(send, sessionId, 'location.protocol === "http:" && document.readyState === "complete" && !!document.getElementById("root")', { attempts: 200 });
     const read = async (dm) => {
       await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dm === 'media' ? 'dark' : 'light' }] }, sessionId);
-      const r = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => { const h = document.documentElement; ${dm === 'data' ? "h.setAttribute('data-theme','dark');" : "h.removeAttribute('data-theme');"} h.classList.toggle('dark', ${dm === 'class'}); h.classList.toggle('theme-dark', ${dm === 'class'});
-        const cs = getComputedStyle(h); return Object.fromEntries(${JSON.stringify(names)}.map((n) => [n, cs.getPropertyValue(n).trim()])); })()` }, sessionId);
-      return r.result.value;
+      await callIn(send, sessionId, SET_SCHEME, dm);
+      return callIn(send, sessionId, `function (names) { const cs = getComputedStyle(document.documentElement); return Object.fromEntries(names.map((n) => [n, cs.getPropertyValue(n).trim()])); }`, names);
     };
     const light = await read(null);
     let dark = null;
