@@ -361,10 +361,20 @@ What you hand over is a tag, and whoever receives it should get the same answer 
 - **Its demonstration code.** With your convention set, the check keeps the product's code apart from code that only simulates a service or stages the demonstration. A file named as demonstration code among the product's is a finding. A product file with demonstration branches lists the lines to take out.
 - **The copy of the system it holds**, held to the release it pinned. See [A copy of the system inside a product](audit.md#a-copy-of-the-system-inside-a-product).
 - **Which release it was held to.** The record kept beside each prototype (`<name>.check.json`) and its handoff page name the system's release and the commits read, so a pass opened months later never reads as a current one.
-- **A handoff in versions.** A handoff made at a tag is kept beside the prototypes (`<name>.handoffs/`), and the next one opens on what changed since: components used, findings fixed or new, gaps, dependencies, the copy of the system. A draft is compared with the last version, never kept as one.
+- **A handoff in versions.** A handoff made at a tag is kept beside the prototypes (`<name>.handoffs/`), and the next one opens on what changed since: components used, findings fixed or new, gaps, dependencies, the copy of the system, what people wrote. A draft is compared with the last version, never kept as one.
+- **Each version as it was given.** At a tag, the whole page is kept as `<name>.handoffs/<tag>.md` and never rewritten. Checking the same tag again leaves it as it is and says so, so months later the team that built the feature reads exactly what it was given.
+- **What only people can say.** The first handoff writes `<name>.handoff-notes.md` beside the prototype, once. From then on it is yours, and the engine never writes it again. It has six parts, each with an owner line (`Owner: not assigned · Date: —` until someone takes it):
+  - **Off the happy path:** what each screen does when something fails, while it waits, when there is nothing to show, on a slow connection.
+  - **Data that shows each state:** the accounts and records to open each of those with.
+  - **Where each rule is decided:** in the screen, or in a service the screen only shows.
+  - **Decided on purpose:** where it departs from the system or the designed screen, and why, so nobody puts it back.
+  - **Open questions:** what is not decided yet, and who answers each.
+  - **Before it ships:** what looks simple here and is not.
+
+  The handoff page carries what you wrote, with who stands behind each part, and says which parts are still empty and which have no owner. The file travels with the prototype, so the next version starts from what this one said. Given at a tag, it is read as the tag holds it.
 - **Before moving to another release.** `rms-design-system-engine --prototype --against v2.4.0` holds every prototype to that release, read from git into a folder of its own, and lists what it would break in each page and what it would fix. Nothing in the system's folder or the prototypes' is changed.
 
-All of it goes on the handoff page (`--handoff`), written beside the prototypes, under Where it was checked, The copy of the system, Product and demonstration code and What it added to the project.
+All of it goes on the handoff page (`--handoff`), written beside the prototypes, under Where it was checked, What the people who made it say, The copy of the system, Product and demonstration code and What it added to the project.
 
 The convention is yours. With none set, nothing is said about demonstration code:
 
