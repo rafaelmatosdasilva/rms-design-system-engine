@@ -76,10 +76,11 @@ test('the line a person reads says what was kept and where', () => {
 });
 
 test("a prototype's own files travel with it, and nothing else in the folder does", async () => {
-  const src = readFileSync(new URL('../lib/stores.mjs', import.meta.url), 'utf8');
-  const takes = new Function('rel', `return ${/prototypes: \(rel\) => (.*),\n/.exec(src)[1]}`);
-  for (const f of ['SignIn.jsx', 'Filters.json', 'SignIn.comments.json', 'SignIn.check.json', 'SignIn.handoff.md']) assert.equal(takes(f), true, f);
+  const { TAKES } = await import('../lib/stores.mjs');
+  const takes = TAKES.prototypes;
+  for (const f of ['SignIn.jsx', 'Filters.json', 'SignIn.comments.json', 'SignIn.check.json', 'SignIn.handoff.md', 'SignIn.handoff-notes.md']) assert.equal(takes(f), true, f);
   // The check record travelled only because it happens to be JSON, and the handoff did not travel at all. Named
-  // now, so neither is an accident of the extension.
-  for (const f of ['notes.txt', 'random.md', 'screenshot.png', 'sub/Deep.vue']) assert.equal(takes(f), false, f);
+  // now, so neither is an accident of the extension. A product's folder is one level, never two.
+  for (const f of ['Orders/SignIn.vue', 'Orders/SignIn.check.json', 'Orders/SignIn.handoffs/v1.json', 'Orders/SignIn.screens/@phone.png']) assert.equal(takes(f), true, f);
+  for (const f of ['notes.txt', 'random.md', 'screenshot.png', 'a/b/Deep.vue', 'Orders/SignIn.screens/notes.txt']) assert.equal(takes(f), false, f);
 });
