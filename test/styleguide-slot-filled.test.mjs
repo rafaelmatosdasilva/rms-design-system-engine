@@ -36,7 +36,7 @@ test('a slot its markup already fills shows that content, marked as the slot in 
   const dir = choiceGroupProject();
   const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /Style guide check: the page uses only the system/, 'the mark is drawn with the page\'s own tokens');
+  assert.match(r.stdout, /Style guide check: the page's look is the system's/, 'the mark is drawn with the page\'s own tokens');
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
   const browser = await launchChrome(CHROME, { tmpPrefix: 'sg-slot-' });
   const { send, close } = await connectCDP(browser.wsUrl);
