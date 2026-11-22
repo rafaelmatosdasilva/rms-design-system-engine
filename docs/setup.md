@@ -33,6 +33,20 @@ Two more are optional, and each decides how much a run can see. The installer ch
 
 > **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
 
+### On Windows
+
+Install from PowerShell, with no administrator needed:
+
+```powershell
+irm https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.ps1 | iex
+```
+
+- **The same install as on a Mac or Linux.** The engine goes into `%USERPROFILE%\.claude\skills\rms-design-system-engine`, the skill's guide where Claude Code finds it, and the terminal command `rms-design-system-engine` into `%USERPROFILE%\.local\bin`, which is put on your PATH. Open a new terminal for the command to be found.
+- **Chrome or Edge.** The engine finds either where Windows installs them (Program Files or your AppData). Edge draws pages with the same engine as Chrome.
+- **A company's setup** passes its two values: `& ([scriptblock]::Create((irm <the installer's link>))) -Client <team> -Profile <the profile's link>`.
+- **Git Bash and WSL** run the bash installer above as they would on Linux.
+- **Proven on every change.** The full suite runs on a Windows runner beside Ubuntu's for every pull request, none skipped. The same run installs the engine from PowerShell and starts the terminal command, the MCP server and the hooks.
+
 ### A company's own setup
 
 A team whose setup lives in a profile installs everything with one line: the engine, the team's own command, a work folder and the token to reach their projects.
@@ -52,7 +66,7 @@ The skill updates itself. Once a day, before an audit, it pulls the latest versi
 - It only does this when the install is on `main` with no local changes, and never on CI.
 - `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off.
 - `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind.
-- A new version is published on GitHub every 25 merged changes, listing everything that went into it, so each version is a comparable piece of work rather than whatever happened to land in a given week. A security fix, or a fix for a problem that stops people, comes out at once. Your install does not wait for either: it follows the latest code once a day, so a change reaches you the day after it is merged. Watch the repository (**Watch → Custom → Releases**) to hear about each version.
+- A new version is published on GitHub every 15 merged changes, listing everything that went into it, so each version is a comparable piece of work rather than whatever happened to land in a given week. A security fix, or a fix for a problem that stops people, comes out at once. Your install does not wait for either: it follows the latest code once a day, so a change reaches you the day after it is merged. Watch the repository (**Watch → Custom → Releases**) to hear about each version.
 - `rms-design-system-engine --doctor` checks the install, axe-core included. The install fetches axe-core, so the first accessibility check needs no network.
 
 Keep a single copy. Link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.

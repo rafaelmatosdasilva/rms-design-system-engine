@@ -5,7 +5,8 @@ name: Windows
 # difference between the two runs is the platform's and never the workflow's.
 on:
   push:
-    branches: [feat/windows]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -112,3 +113,54 @@ jobs:
           name: windows-count-${{ matrix.shard }}
           path: windows-count-${{ matrix.shard }}.txt
           retention-days: 1
+
+  # The install a person on Windows does, from PowerShell, of this very commit: install.ps1 clones it, writes the
+  # terminal command and puts it on the PATH. Then each way in is started the Windows way: the command found on that
+  # PATH routes a request, the MCP server answers its first message, and a hook reads a tool call.
+  install:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install from PowerShell
+        shell: pwsh
+        run: |
+          git branch ci-install
+          $env:RMS_DSE_REPO = "file:///$($PWD.Path -replace '\\','/')"
+          $env:RMS_DSE_REF = 'ci-install'
+          ./install.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $bin = Join-Path $HOME '.local\bin'
+          if (-not (Test-Path (Join-Path $bin 'rms-design-system-engine.cmd'))) { throw 'the terminal command was not written' }
+          if (-not ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' -contains $bin)) { throw 'its folder is not on the PATH' }
+          if (-not (Test-Path (Join-Path $HOME '.claude\commands\rms-design-system-engine.md'))) { throw 'the guide is not where Claude Code finds it' }
+          $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - name: The terminal command routes a request
+        shell: pwsh
+        run: |
+          $dir = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'a-project')
+          Push-Location $dir
+          $out = rms-design-system-engine --route "check the button" 2>&1 | Out-String
+          Pop-Location
+          Write-Host $out
+          if ($LASTEXITCODE -or $out -notmatch 'ROUTE: ') { throw 'the command did not route the request' }
+      - name: The MCP server answers, and a hook reads a tool call
+        shell: pwsh
+        run: |
+          $engine = Join-Path $HOME '.claude\skills\rms-design-system-engine'
+          $check = Join-Path $env:RUNNER_TEMP 'mcp-answers.cjs'
+          Set-Content -Encoding utf8 -Path $check -Value @'
+          const { spawn } = require('node:child_process');
+          const p = spawn(process.execPath, [process.argv[2]], { stdio: ['pipe', 'pipe', 'inherit'] });
+          let out = '';
+          p.stdout.on('data', (d) => { out += d; if (out.includes('\n')) { console.log(out.slice(0, 200)); p.kill(); process.exit(/"serverInfo"/.test(out) ? 0 : 1); } });
+          p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'ci', version: '0' } } }) + '\n');
+          setTimeout(() => { console.log('the MCP server gave no answer'); process.exit(1); }, 30000).unref();
+          '@
+          node $check (Join-Path $engine 'mcp.mjs')
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          '{"tool_name":"Read","tool_input":{"file_path":"x"}}' | node (Join-Path $engine 'guard.mjs')
+          if ($LASTEXITCODE) { throw "the hook failed (exit $LASTEXITCODE)" }
