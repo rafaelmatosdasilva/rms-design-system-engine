@@ -713,7 +713,8 @@ what failed, what is open, where to read the whole of it, and a link to the job.
 
 Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#measure-figma-code-parity) and give the reason.
 
-- It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
+- It is recorded in `design-system-engine-kept.json` with the reason, who decided and when, and who owns it (`--owner`, else you). Commit it.
+- The reason has to say something. One that is too short, only says it is on purpose (intentional, by design), repeats another kept difference's words, or is short and names nothing the difference is about is refused, and you write it again.
 - Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
 - A kept difference never fails a check. It is listed under Kept on purpose, in the differences list and on the component's Parity area, with its reason.
 - It is that exact difference that is kept. If Figma or the code changes its value, the difference is open again.
@@ -721,6 +722,33 @@ Some differences are decisions, not mistakes. When your team decides to keep one
 - `--keep` alone lists what is kept. `--unkeep --match <words>` takes one back.
 
 This is not debt. Debt (`--baseline`) is a difference you will fix later. A kept difference is one you decided to keep.
+
+### Every exception says why, and whose
+
+Three things stop a finding from failing a run: a difference kept on purpose, a value `ds-config.json` excuses (`knownHardcodedExceptions`), and debt accepted with `--baseline`. Each is a decision, so each says why it exists, who answers for it and since when.
+
+- **Kept differences** need a reason that says something, and record an owner (`--owner`, else whoever kept it).
+- **Excused values** are written `{ "file", "pattern", "reason", "owner", "since" }`. Each run lists the ones with no reason, owner or date, or with a reason that says nothing.
+- **Accepted debt** keeps `--reason` and `--owner` on each line it accepts. Each run lists the lines with neither.
+- **Adding to any of these waits for you.** The AI asks first, and it never writes a reason for you.
+
+### A rule that reached zero stays at zero
+
+A code or Figma rule most components follow is a warning until your team decides it. Once every component follows it, it is **held**: the next break fails `--construction-check`, as a rule your team decided does. The date it was first followed by all is kept in `contracts/construction.json`, so commit it. A rule your team answered no to is never held.
+
+### A deprecation has one release of grace
+
+A component or token marked deprecated with a date (`@since 2026-11-01`) or a version (`@since 2.4.0`) warns while products move off it. Once two releases of the system (its git tags) have shipped since then, every place that still uses it fails the run, each one named with what replaces it. A deprecation with no date only warns.
+
+### Which layer each finding belongs to
+
+A change is checked three ways, and the report keeps them apart:
+
+- **Rules.** The engine answers yes or no, the same every time. Every gate is one.
+- **Guidance.** A model reads the change against what your team wrote (`--judge-a11y`), for a person to confirm.
+- **Taste.** How it looks and reads. Only a person in a review can call it.
+
+Each finding in `findings.json` says its `layer`, and what its check did with it (`does`): **prevents** (the hook held the edit), **catches** (it fails the run) or **advises** (it is said, and stops nothing). The end of each run's summary says what each layer answered and what is left for the reviewer.
 
 ### Nothing passes by accident
 
