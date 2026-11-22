@@ -413,7 +413,7 @@
     if (panelWant && !(openPanel && openPanel._open && openPanel._key === panelWant)) whenThere(function () {
       // A rule's panel (cx:<id>) opens wherever its row is, the Rules page or a component's Rules area.
       // A documentation row's (doc:<file>) wherever its row is too, the Documentation page or a component's area.
-      return /^doc:/.test(panelWant) ? ((target._openKey && target._openKey(panelWant)) || !!(DOC_PAGE && DOC_PAGE.open(panelWant))) : /^row:/.test(panelWant) ? openRowKey(panelWant) : /^cx:/.test(panelWant) ? !!(RULES_PAGE && RULES_PAGE.open(panelWant)) : /^tk:/.test(panelWant) ? !!(tkPanelOpen && tkPanelOpen(panelWant)) : false;
+      return /^doc:/.test(panelWant) ? ((target._openKey && target._openKey(panelWant)) || !!(DOC_PAGE && DOC_PAGE.open(panelWant))) : /^row:/.test(panelWant) ? openRowKey(panelWant) : /^cx:/.test(panelWant) ? !!(RULES_PAGE && RULES_PAGE.open(panelWant)) : /^tk:/.test(panelWant) ? !!(tkPanelOpen && tkPanelOpen(panelWant)) : !!(target._openKey && target._openKey(panelWant));   // any other page's own (req:, proto:), by the page itself
     }, function () {});
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     pageTop();

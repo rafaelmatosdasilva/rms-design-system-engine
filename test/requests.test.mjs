@@ -104,3 +104,13 @@ test('the style guide has a Requests page beside Status: a row a need, its panel
   assert.match(tpl, /NAV_MARK\.requests = /);
   assert.match(readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.requests = rows\.map/);
 });
+
+test('a request that names a component shows on that component\'s page, in the Requests page\'s own table and panel', async () => {
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const tpl = templateText();
+  assert.match(tpl, /REQ_PAGE = \{ of: function \(name\) \{ return REQ\.filter\(function \(x\) \{ return x\.closest === name \|\| x\.used === name; \}\); \}, tableHTML: tableHTML, wire: wire, open: openKey \}/);
+  assert.match(tpl, /\['requests', 'Requests'\]/, 'an area of its own on the component\'s page');
+  assert.match(tpl, /REQ_PAGE\.tableHTML\(compReq\)/);
+  assert.match(tpl, /requests: 'requests', log: 'history'/, 'its own address, #c-<name>/requests');
+  assert.match(tpl, /REQ_PAGE\.wire\(sec\.querySelector\('\.pg-area\[data-area="requests"\] \.pg-doc'\), compReq\)/);
+});

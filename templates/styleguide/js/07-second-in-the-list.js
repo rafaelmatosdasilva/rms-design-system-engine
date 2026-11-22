@@ -354,7 +354,7 @@
   // most asked first. Status is what the system owes itself, this is what others ask it for. A row opens its panel:
   // what to do, who asked, what it uses meanwhile, the team's decision and the tracker's ticket. The decision is the
   // team's, made with the command the panel names, never a button here.
-  var REQ = DATA.requests || [];
+  var REQ = DATA.requests || [], REQ_PAGE = null;
   var reqKey = function (x) { return 'req:' + x.key; };
   if (REQ.length) (function () {
     hr(); navLink('requests', 'requests');
@@ -388,13 +388,95 @@
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Requests', KIND[x.kind] || capital(x.kind)], title: x.need, body: body });
       panelShow(m, from);
     };
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-req-table"><thead><tr><th>Need</th><th>Asked by</th><th>Decision</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + REQ.map(rowHTML).join('') + '</tbody></table></div></div>');
+    // The table, for this page and for a component's Requests area alike: the rows given, each keeping its number in
+    // the page's own list (data-req-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-req-table"><thead><tr><th>Need</th><th>Asked by</th><th>Decision</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (x) { return rowHTML(x, REQ.indexOf(x)); }).join('') + '</tbody></table></div></div>'; };
     var open = function (tr) { if (tr) reqPanel(+tr.getAttribute('data-req-row'), tr); };
-    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-req-row]')); });
-    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-req-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
-    sec._openKey = function (key) { var i = REQ.findIndex(function (x) { return reqKey(x) === key; }); if (i >= 0) reqPanel(i, null); return i >= 0; };
-    var nOf = function (st) { return REQ.filter(function (x) { return x.status === st; }).length; };
-    pageBar(sec, { said: 'requests', chips: [{ key: 'new', label: 'New', n: nOf('new'), dot: 'figma' }, { key: 'look again', label: 'Look again', n: nOf('look again'), dot: 'differs' }, { key: 'decided', label: 'Decided', n: nOf('decided'), dot: 'match' }, { key: 'built', label: 'Built', n: nOf('built'), dot: 'match' }, { key: 'closed', label: 'Closed', n: nOf('closed') + nOf('merged'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+    // A row opens its panel on a click or Enter, and the status chips above the table count the rows given: scoped to
+    // where the table is (this page, or a component's area).
+    var wire = function (scope, list) {
+      scope.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-req-row]')); });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-req-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+      var nOf = function (st) { return list.filter(function (x) { return x.status === st; }).length; };
+      pageBar(scope, { said: 'requests', chips: [{ key: 'new', label: 'New', n: nOf('new'), dot: 'figma' }, { key: 'look again', label: 'Look again', n: nOf('look again'), dot: 'differs' }, { key: 'decided', label: 'Decided', n: nOf('decided'), dot: 'match' }, { key: 'built', label: 'Built', n: nOf('built'), dot: 'match' }, { key: 'closed', label: 'Closed', n: nOf('closed') + nOf('merged'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+    };
+    var openKey = function (key) { var i = REQ.findIndex(function (x) { return reqKey(x) === key; }); if (i >= 0) reqPanel(i, null); return i >= 0; };
+    sec.insertAdjacentHTML('beforeend', tableHTML(REQ));
+    sec._openKey = openKey;
+    wire(sec, REQ);
+    // A component's Requests area: what teams ask for that names it, as the thing the system has nearest or the thing
+    // they use meanwhile.
+    REQ_PAGE = { of: function (name) { return REQ.filter(function (x) { return x.closest === name || x.used === name; }); }, tableHTML: tableHTML, wire: wire, open: openKey };
+  })();
+  // Prototypes: each one a part of its own (prototype-pages.mjs), with a list of them all. A row opens its page in the
+  // side panel: what to do, its screens at each width, where its last check stands and against which release, what the
+  // system lacks for it, the components it uses, its handoff with each version and what changed, what people wrote
+  // for it and what they said. The page reads what is kept beside each prototype and changes nothing of it.
+  var PROTO = DATA.prototypes || [];
+  var protoKey = function (x) { return 'proto:' + x.name; };
+  var PROTO_ST = { 'not checked': ['figma', 'Not checked'], findings: ['differs', 'Has findings'], lacks: ['differs', 'Lacks in the system'], holds: ['match', 'Holds'] };
+  var protoDot = function (st) { var s = PROTO_ST[st] || PROTO_ST['not checked']; return '<span class="pg-par-status pg-par--' + s[0] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(s[1]) + '</span>'; };
+  if (PROTO.length) (function () {
+    if (!REQ.length) hr();   // its group's rule, which Requests draws when it is there
+    navLink('prototypes', 'prototypes');
+    var sec = section('prototypes', 'Prototypes', 'Prototypes', '');
+    var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
+    var cmd = function (t) { return '<p class="sg-il-line"><code>' + esc(t) + '</code></p>'; };
+    var lastVersion = function (x) { return x.versions.length ? x.versions[x.versions.length - 1] : null; };
+    var rowHTML = function (x, i) {
+      var v = lastVersion(x);
+      return '<tr class="sg-row-open" tabindex="0" data-proto-row="' + i + '" data-chip="' + esc(x.state) + '"><td><strong>' + esc(x.name) + '</strong></td>'
+        + '<td>' + (x.check && x.check.at ? esc(dayShort(x.check.at)) : '<span class="pg-dim">Never</span>') + '</td>'
+        + '<td>' + (x.lacked.length ? esc(String(x.lacked.length)) : '<span class="pg-dim">Nothing</span>') + '</td>'
+        + '<td>' + (v ? esc(v.version || 'Draft') : '<span class="pg-dim">Not given</span>') + '</td>'
+        + '<td>' + protoDot(x.state) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
+    };
+    var protoPanel = function (i, from) {
+      var x = PROTO[i]; if (!x) return;
+      var m = panelShell('sg-proto-panel', 'Prototypes'); m._key = protoKey(x);
+      var c = x.check;
+      var check = x.file ? 'rms-design-system-engine --prototype ' + x.file : null;
+      var todo = x.state === 'not checked' ? line('Check it, so this page can say whether it holds up against the system.') + (check ? cmd(check) : '')
+        : x.state === 'findings' ? line('Fix what its last check found, then check it again.') + (check ? cmd(check) : '')
+        : x.state === 'lacks' ? line('Decide what the system lacks for it, on the Requests page.') + (DATA.requests && DATA.requests.length ? '<p class="sg-il-line"><a href="#requests">Requests</a></p>' : '')
+        : '';
+      // Its screens, one width at a time, as the last draw pictured them.
+      var screens = x.screens.length ? '<div class="sg-proto-screens">' + (x.screens.length > 1 ? segHTML(x.screens.map(function (s) { return { v: s.label, label: capital(s.label) }; }), 'Width') : '')
+        + x.screens.map(function (s, j) { return '<figure class="sg-proto-screen" data-w="' + esc(s.label) + '"' + (j ? ' hidden' : '') + '><img src="' + esc(s.src) + '" width="' + s.w + '" height="' + s.h + '" alt="' + esc(x.name + ', as drawn at ' + s.label + ' width') + '"></figure>'; }).join('') + '</div>' : line('Not drawn yet. Its screens show here once the engine has drawn it.');
+      var status = '<p>' + protoDot(x.state) + '</p>' + (c ? kvOne([['Checked', esc(when(c.at))], ['Against the system', c.system ? esc(c.system) : ''], ['At its commit', c.commit ? '<code>' + esc(String(c.commit).slice(0, 8)) + '</code>' : ''], ['At its tag', c.tag ? '<code>' + esc(c.tag) + '</code>' : '']]) : '');
+      var found = c && c.items.length ? kvList(c.items.map(function (it) { return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)]]; })) + (c.owes.length ? line('It owes ' + c.owes.join(' · ')) : '') : c && c.owes.length ? line('It owes ' + c.owes.join(' · ')) : '';
+      var lacked = x.lacked.length ? x.lacked.map(function (g) { return line(g.need + (g.times > 1 ? ' (in ' + g.times + ' places)' : '')); }).join('') : '';
+      var used = c && Object.keys(c.used).length ? '<p class="sg-il-line">' + namePills(Object.keys(c.used)) + '</p>' : '';
+      var handoff = x.versions.length ? kvList(x.versions.slice().reverse().map(function (v) { return [['Version', '<code>' + esc(v.version || 'Draft') + '</code>'], ['Given', v.at ? esc(dayShort(v.at)) : ''], ['What changed', v.since.length ? v.since.map(esc).join(' · ') : '']]; })) : '';
+      var notes = x.notes ? kvList(x.notes.map(function (p) { return [['Part', esc(p.title)], ['Owner', esc(p.owner || 'Not assigned')], ['Says', p.empty ? '<span class="pg-dim">Empty</span>' : esc(p.body)]]; })) : '';
+      var open = x.comments.filter(function (k) { return !k.done; }), done = x.comments.filter(function (k) { return k.done; });
+      var said = x.comments.length ? kvList(open.concat(done).map(function (k) { return [['Said', esc(k.says)], ['By', k.by ? esc(k.by) : ''], ['On', k.on && k.on.component ? namePills([k.on.component]) : ''], ['When', k.at ? esc(dayShort(k.at)) : ''], ['Answered', k.done ? esc(k.answer || 'Closed') : '']]; })) : '';
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it is about, its status, the rest.
+      var body = panelCard('What to do', todo)
+        + panelCard('Its screens', screens)
+        + panelCard('Status', status)
+        + panelCard('What its last check found', found, { bare: true })
+        + panelCard('What the system lacks for it', lacked)
+        + panelCard('Components it uses', used)
+        + panelCard('Its handoff', handoff, { bare: true })
+        + panelCard('What people wrote for it', notes, { bare: true })
+        + panelCard('What people said', said, { bare: true });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Prototypes'], title: x.name, body: body });
+      var shots = m.querySelector('.sg-proto-screens');
+      if (shots) {
+        var pick = function (w) { Array.prototype.forEach.call(shots.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === w); }); Array.prototype.forEach.call(shots.querySelectorAll('.sg-proto-screen'), function (f) { f.hidden = f.getAttribute('data-w') !== w; }); };
+        shots.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) pick(b.getAttribute('data-v')); });
+        pick(x.screens[0].label);
+      }
+      panelShow(m, from);
+    };
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-proto-table"><thead><tr><th>Prototype</th><th>Last checked</th><th>System lacks</th><th>Handoff</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + PROTO.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var openRow = function (tr) { if (tr) protoPanel(+tr.getAttribute('data-proto-row'), tr); };
+    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; openRow(e.target.closest('tr[data-proto-row]')); });
+    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-proto-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRow(tr); } });
+    sec._openKey = function (key) { var i = PROTO.findIndex(function (x) { return protoKey(x) === key; }); if (i >= 0) protoPanel(i, null); return i >= 0; };
+    var nOf = function (st) { return PROTO.filter(function (x) { return x.state === st; }).length; };
+    pageBar(sec, { said: 'prototypes', chips: ['not checked', 'findings', 'lacks', 'holds'].map(function (k) { return { key: k, label: PROTO_ST[k][1], n: nOf(k), dot: PROTO_ST[k][0] }; }).filter(function (c) { return c.n; }) });
   })();
   // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
   // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a

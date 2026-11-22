@@ -160,7 +160,22 @@ What teams ask your system for, and what your team decided. Status is what the s
 - **Your team decides.** Each request is New until someone decides it: kept out of the system (with its reason), accepted in the product, accepted for now (with a day to look again), or brought into the system. `rms-design-system-engine --request "<key>" --decide out --why "…" --by "<who>"` records it in `design-system-engine-requests.json`, to commit.
 - **It closes by itself.** A request brought into the system is Built once no prototype lacks it any more. One accepted for now comes back on its day.
 - **Agents are told.** A need kept out of the system is a decision every agent reads before it asks, so nobody asks for it again.
+- **On its component's page too.** A request that names a component, as the nearest thing your system has or the thing a prototype uses meanwhile, shows in that component's Requests area: the Requests page's own table, chips and panel.
+- **GitHub and GitLab need no tooling of yours.** Name the project in `ds-config.json` (`requests.issues`, else your `issues` project) and `--requests` opens one issue per open request there, with its key in the body. It looks for an open issue a person already wrote for the same need first, and takes that one instead of opening another. Each issue's state comes back as the answer: closed, or declined when it is closed as not planned (or labelled won't fix, on GitLab). An issue the engine opened for a request that is built, or that nobody asks for any more, is closed with the reason said. Issues are opened only where `writes.issues` lets the engine, never on CI. The token is `GITHUB_TOKEN` or `GITLAB_TOKEN` in your `.env`.
 - **Your tracker stays yours.** The engine never talks to a tracker it does not know. `rms-design-system-engine --requests` writes the open requests, each with its key, to `.design-system-engine-out/requests/requests.json`. Your own tooling takes them to your tracker and writes its answers by key to `design-system-engine-requests.answers.json`: the state (open, closed, declined, or a duplicate of another key), the ticket's link and a reason. A request leaves the list when your tracker closes or declines it, or when no prototype lacks it, whichever comes first. A decline is kept as a decision, with its reason.
+
+### Prototypes
+
+Each prototype is a part of its own, with a page of its own. The Prototypes page lists every prototype in your prototypes folder, with when it was last checked, what the system lacks for it, its latest handoff and its status: Not checked, Has findings, Lacks in the system, or Holds. A row opens that prototype's page in the side panel.
+
+- **What to do.** The command to check it, what to fix, or the Requests page to decide what it lacks.
+- **Its screens.** The pictures the last draw took of it, one width at a time (Phone, Tablet, Desktop).
+- **Where its last check stands.** When it ran, against which release of the system, and at which commit or tag.
+- **What its last check found,** each finding with its component, and what the system lacks for it, a line a need.
+- **Its handoff.** Each version given at a tag, its day and what changed since the one before.
+- **What people wrote and said.** Each part of its handoff notes with its owner, and every comment on it, open ones first, with the answer each closed one got.
+
+A component's page links each prototype that uses it to that prototype's own page. The page reads what is kept beside each prototype and changes none of it.
 
 ### Each component's page
 
@@ -179,6 +194,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
+| Requests | The Requests page's own table, filtered to what teams ask for that names this component, with the same chips, each row opening the same panel. Shown only when a request names it |
 | History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it, its changes in Figma and code not committed yet |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.

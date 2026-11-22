@@ -387,6 +387,7 @@
     // The Documentation page's rows for it, as the page has them (drawn first when it is not yet).
     if (!DOC_PAGE && fillDocs) { fillDocs(); fillDocs = null; }
     var compDocs = DOC_PAGE ? DOC_PAGE.of(c.name) : [];
+    var compReq = REQ_PAGE ? REQ_PAGE.of(c.name) : [];   // what teams ask for that names it (the Requests page's rows)
     // An area is shown only with something to show: Parity once something is compared (built from the code alone,
     // nothing is), Documentation once it has a row or a state, Used in once products' pages are read (USAGE_READ). The
     // History area leaves itself out when nothing names the component (fillHistoryArea).
@@ -410,7 +411,7 @@
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return areaShown(a[0]) && (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c) || !!storybookHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return areaShown(a[0]) && (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'requests' || compReq.length) && (a[0] !== 'rules' || compRules.length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c) || !!storybookHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         // Documentation counts what its table shows, the Documentation page's rows for it in their words, as Rules does
@@ -462,11 +463,15 @@
       // to decide (RULES_PAGE, 07-second-in-the-list.js), with the page's filters and sorting, each row opening the same
       // panel (the owner's, 16 November 2026). No line above the table: each rule's own panel has See in Figma.
       (compRules.length ? '<div class="pg-area" data-area="rules"><div class="pg-footer"><div class="pg-doc pg-par" id="' + esc(cid(c.name)) + '-rules">' + RULES_PAGE.tableHTML(compRules) + '</div></div></div>' : '') +
+      // Requests: the Requests page's own table, filtered to what teams ask for that names it, with the page's chips, each
+      // row opening the same panel (REQ_PAGE, 07-second-in-the-list.js).
+      (compReq.length ? '<div class="pg-area" data-area="requests"><div class="pg-footer"><div class="pg-doc pg-par">' + REQ_PAGE.tableHTML(compReq) + '</div></div></div>' : '') +
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
-    // Its Rules, Documentation and History areas: the pages' own tables, wired as the pages wire them.
+    // Its Rules, Documentation, Requests and History areas: the pages' own tables, wired as the pages wire them.
     if (compRules.length) RULES_PAGE.wire(sec.querySelector('.pg-area[data-area="rules"] .pg-doc'), compRules);
     if (compDocs.length) DOC_PAGE.wire(sec.querySelector('.pg-area[data-area="docs"] .pg-doc'), compDocs);
+    if (compReq.length) REQ_PAGE.wire(sec.querySelector('.pg-area[data-area="requests"] .pg-doc'), compReq);
     fillHistoryArea(sec, c);
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // The team's own story, when the project has a Storybook (DATA.storybook, published beside the page): the Playground
