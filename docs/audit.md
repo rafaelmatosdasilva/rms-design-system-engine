@@ -322,8 +322,8 @@ What two or more products work around is the system asking for a change (`rms-de
 
 Ask how healthy your design system is and the engine answers from what it already found (`rms-design-system-engine --health`). Run the full check first: the report reads its results.
 
-- Thirteen questions, grouped by the engine's four layers:
-  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens.
+- Fourteen questions, grouped by the engine's four layers:
+  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens, can one colour stand in for another at the same step.
   - **Contracts**, does the code hold: the team's own rules, accessibility in every theme, tests and stories.
   - **Intent**, is it whole and explained: the parts nearly every product builds with, each component's purpose and when to use it, releases against the team's own documents.
   - **Evaluation**, is it used: products on the system and keeping up, whether an agent can learn it, and whether what agents build with it passes.
@@ -404,7 +404,9 @@ A system with colour scales (blue 100 to 900, red 100 to 900) numbers its steps 
 - **A step that splits is listed.** On the system's own page surface, in each mode, a step that reaches 4.5:1 in some colours and falls under it in others, with how light each one looks (OKLCH lightness).
 - **So is a swap that would break.** A text colour or a surface that points at a step today and passes, and would fall under its ratio at the same step of another colour, with the colours that break it.
 - **Both are to decide, never to fix.** Even out the steps, or say in the intent layer which colours may not stand in for each other.
-- A system with a single scale (a neutral grey) has nothing to compare, so the Rules page shows neither.
+- **Where a colour is picked.** The style guide's colour page shows each step the scales share, every colour's token at it with its contrast on the page in each mode, and each step's card says whether it reads in every colour, in none, or splits, with the colours that fall short.
+- **In the health report.** "Can one colour stand in for another at the same step?" is answered from the same lists.
+- A system with a single scale (a neutral grey) has nothing to compare, so the Rules page, the colour page and the health report show none of it.
 
 #### Mode combinations
 
