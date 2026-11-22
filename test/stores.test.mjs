@@ -4,7 +4,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush, lastWriterOf } from '../lib/stores.mjs';
 import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../lib/intent-changes.mjs';
@@ -748,6 +748,19 @@ test('prototypes are a part: read into the project\'s own folder, and what a per
   writeFileSync(join(dir, 'prototypes', 'screenshot.png'), 'not a prototype');
   const mine = localFiles(dir, cfg, 'prototypes');
   assert.deepEqual([...mine.keys()].sort(), ['Flow.json', 'Reset.vue', 'Signup.vue']);
+});
+
+test('a prototype travels whole, in its product\'s folder: its check, notes, handoff versions and pictures with it', () => {
+  const dir = project();
+  const cfg = cfgWith({ prototypes: { read: { gitlab: LINK, path: 'protos' } } });
+  const at = (rel, text = 'x') => { mkdirSync(join(dir, 'prototypes', dirname(rel)), { recursive: true }); writeFileSync(join(dir, 'prototypes', rel), text); };
+  at('Orders/orders-list.vue'); at('Orders/orders-list.check.json', '{}'); at('Orders/orders-list.comments.json', '{}'); at('Orders/orders-list.handoff-notes.md');
+  at('Orders/orders-list.handoffs/v1.json', '{}'); at('Orders/orders-list.handoffs/v1.md'); at('Orders/orders-list.screens/@phone.png'); at('Orders/orders-list.screens/.empty.png');
+  at('Orders/notes.txt'); at('Orders/deeper/x.vue'); at('Orders/orders-list.screens/a.txt'); at('stray.png');
+  assert.deepEqual([...localFiles(dir, cfg, 'prototypes').keys()].sort(), [
+    'Orders/orders-list.check.json', 'Orders/orders-list.comments.json', 'Orders/orders-list.handoff-notes.md',
+    'Orders/orders-list.handoffs/v1.json', 'Orders/orders-list.handoffs/v1.md', 'Orders/orders-list.screens/.empty.png', 'Orders/orders-list.screens/@phone.png', 'Orders/orders-list.vue',
+  ], 'one product folder deep, and only what a prototype keeps');
 });
 
 // ── Telling a CI the git host cannot reach ────────────────────────────────────────────────────────────────────────

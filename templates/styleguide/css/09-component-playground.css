@@ -863,6 +863,20 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* A page shown in a panel says what it is under: the page the panel opened from, before its own group. */
 .sg-section-badge[data-trail]::before { content: attr(data-trail) '\00a0\203A\00a0'; }
 .sg-panel-body { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
+/* A prototype's screens: one width at a time, at most the panel's width, its switch above it. */
+.sg-proto-screens { display: flex; flex-direction: column; gap: var(--sg-space-s); }
+.sg-proto-screen { margin: 0; }
+.sg-proto-screen img { display: block; max-width: 100%; height: auto; border: 1px solid var(--sg-border); }
+/* The Prototypes page: its Grid or Table switch at the right under the title, and each card its widest screen in small,
+   from the top of the page down. */
+.sg-proto-view { display: flex; justify-content: flex-end; margin-bottom: var(--sg-space-m); }
+.sg-proto-grid[hidden], .sg-proto-tablecard[hidden] { display: none; }   /* the view not chosen, whatever display its own class gives it */
+.pg-par-table.sg-proto-table thead th, .pg-par-table.sg-proto-table thead th .sg-mx-sort { white-space: normal; text-align: left; }   /* a two-word head (System version) wraps rather than running into the next */
+.sg-proto-thumb { overflow: hidden; }
+.sg-proto-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.sg-proto-none { padding: var(--sg-cell-x); }   /* the empty state's words held off the card's edge, as every card holds them */
+.sg-proto-none > p { margin: 0 0 var(--sg-space-s); }
+.sg-proto-none .sg-decide { margin-top: var(--sg-space-m); }
 .sg-panel-body .pg-inspect-head { top: var(--sg-panel-head-h, 0px); }   /* a card's head right under the panel's head, whose own bottom padding is the gap: the first card starts there, so its head never rests lower than it sits, over its own first line */
 .sg-panel-body .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-panel-head-h, 0px) + var(--pg-card-head-h, 0px)); }   /* its table's head under it */
 .sg-tk-none { margin: 0; padding: var(--sg-space-m) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); }
