@@ -139,6 +139,16 @@ The style guide has a page of its own for accessibility, under Documentation in 
 ### Contrast
 
 - Measured against what is really painted behind each text, the layers at its centre in paint order, so text over a sibling or a `::before` is measured on that.
+- **Over a gradient, a shadow or with opacity.** A gradient is measured where the text sits, a text shadow is read as
+  what the letters are read against, and opacity fades the colour as it is drawn.
+- **Over an image, read from the pixels.** Text on a photo or a pattern has no one colour behind it. The engine hides
+  only that text, captures the box its letters sit in as the browser draws it, and measures against the worst stretch
+  of those pixels (the 10th or 90th percentile of brightness, whichever reads worse). A dark corner counts, and a stray
+  sparkle does not.
+  - **Said as a measurement.** The finding says it was read from the pixels, with the median colour and the worst.
+  - **A warning, never a blocker on its own.** WCAG asks for 4.5:1 and says nothing of how a photo is read, so this is
+    the engine's measurement rather than a standard's.
+  - **Not measured when it cannot be captured.** Text that cannot be drawn on screen is said as not measured, never as passing.
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
