@@ -50,9 +50,10 @@ test('the suite runs in four quarters that cover every file, and the required ch
   }
   assert.match(wf, /fail-fast: false/, 'a failing quarter does not hide the others\' failures');
   const sum = wf.slice(wf.indexOf('\n  test:'), wf.indexOf('\n  badge:'));
-  assert.match(sum, /needs: suite\n {4}if: always\(\)/, 'the check runs even when a quarter failed, and says so');
+  assert.match(sum, /needs: \[suite, playwright\]\n {4}if: always\(\)/, 'the check runs even when a quarter failed, and says so');
   assert.match(sum, /RESULT: \$\{\{ needs\.suite\.result \}\}/);
-  assert.match(sum, /\[ "\$RESULT" = success \]\n/, 'it fails unless every quarter passed');
+  assert.match(sum, /PLAYWRIGHT: \$\{\{ needs\.playwright\.result \}\}/);
+  assert.match(sum, /\[ "\$RESULT" = success \] && \[ "\$PLAYWRIGHT" = success \]\n/, 'it fails unless every quarter and every Playwright run passed');
   assert.match(sum, /awk '\{s\+=\$1\} END\{print s\+0\}'/, 'the badge counts every quarter\'s tests');
   assert.match(wf, /count-\$\{\{ matrix\.shard \}\}\.txt/);
 });

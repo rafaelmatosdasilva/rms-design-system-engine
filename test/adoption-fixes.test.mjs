@@ -62,6 +62,10 @@ test('a reply that asks the person for a secret goes back once, whatever the rou
   // a design token the agent will add, or one named as a CSS variable, is not a secret asked for
   assert.equal(asksForSecret('Once you provide that, I\'ll add the green token and build the "Saved" confirmation next to the Save button'), false);
   assert.equal(asksForSecret('Please tell me who should sign off on the `--text-positive` token.'), false);
+  // A size asked for as a design token (a real evaluation run, which the hook sent back as a secret asked for).
+  assert.equal(asksForSecret('**What should the XL chip\'s dimensions be?** Please provide:\n- **Height** (in pixels or as a token reference)'), false);
+  assert.equal(asksForSecret('Please provide the token names you want XL bound to.'), false);
+  assert.equal(asksForSecret('Please provide your Figma token reference so I can read the file.'), true, 'a Figma token is still a secret');
   assert.equal(asksForSecret('Once you provide the token, I\'ll add the page.'), true);
   // A colour asked for and a design token to add, seen in a real run: not a secret, never sent back.
   assert.equal(asksForSecret("What hex color should I add for the success state? Once you provide the color, I'll add it as a new token to the design system and then use it."), false);

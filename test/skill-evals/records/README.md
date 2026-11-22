@@ -309,5 +309,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-22-a-product-s-health-asked` | The 25 guide tasks on Haiku (engine 8e3db454) | "A product's own health report, its screens drawn from the system, and formats read as part of the system" |
 | `2026-11-22-the-colour-scales-steps-on` | The 25 guide tasks on Haiku (engine 9259e348) | "The colour scales' steps on the colour page and in the health report" |
 | `2026-11-22-the-semantic-token-named-first` | The 25 guide tasks on Haiku (engine 308c49d2) | "The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node" |
+| `2026-11-22-the-driver-line-is-said` | The 25 guide tasks on Haiku (engine 173c07df) | "Playwright drives the browsers when it is here" |
+| `2026-11-22-playwright-s-browsers-are-handed` | The 25 guide tasks on Haiku (engine 3ada1a33) | "Playwright's browsers are handed over as the computer's other finds are, and the required check waits on its runs" |
+| `2026-11-22-option-tab-in-webkit-on` | The 25 guide tasks on Haiku (engine e62ca645) | "Option-Tab in WebKit on macOS alone: Tab alone reaches links in WebKit on Linux and Windows" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

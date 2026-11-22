@@ -23,15 +23,26 @@ Two things are required. The installer refuses to go on without them.
 | **Git** | The install is a clone, so updates are a pull and never a re-download. |
 | **Node.js 22 or newer** | The engine talks to Chrome over Node's built-in WebSocket, which older versions do not have. |
 
-Two more are optional, and each decides how much a run can see. The installer checks for them and prints the one line that installs whatever is missing.
+Four more are optional, and each decides how much a run can see. The installer checks for them and prints the one line that installs whatever is missing.
 
 | Optional | What you lose without it | How to get it |
 |---|---|---|
 | **Google Chrome** | Nothing is measured as a browser draws it: rendered parity, the accessibility check and every picture are skipped. | [Install Chrome](https://google.com/chrome), or point `CHROME_PATH` at the one you already keep. |
 | **Firefox** | Rendered parity is drawn in Chrome alone, so a value Firefox draws differently goes unseen. | [Install Firefox](https://www.mozilla.org/firefox/), or point `FIREFOX_PATH` at the one you keep. Safari needs nothing installed: turn its remote automation on once with `safaridriver --enable`. |
 | **TypeScript 5** | Your components' JSX and props are read from their text alone, so fewer components are understood. | A project with its own `typescript` 5 is already fine. Otherwise `npm i -g typescript@5`. |
+| **Playwright** | Nothing: the engine's own drivers open Chrome, Firefox and Safari. With it, WebKit runs headless on Linux and Windows too, Safari's engine on any computer, with no setting to turn on. | `node lib/playwright.mjs --fetch --browsers` in the engine's folder keeps a pinned copy in the engine's own cache and installs its Firefox and WebKit. A project's own `playwright` is used as it is. See [Playwright, when it is here](#playwright-when-it-is-here). |
 
 > **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
+
+### Playwright, when it is here
+
+The engine opens every browser with its own small drivers, which need nothing but the browser. [Playwright](https://playwright.dev/) is free and open source (Apache 2.0), and when it is here it opens the browsers it has instead. Every check runs the same either way and gives the same answers.
+
+- **Where it is found.** The project's own `playwright` or `playwright-core` comes first. After that the engine looks for its pinned copy (Playwright 1.65.1), kept in `~/.cache/rms-design-system-engine` and checked against its SHA-512. Nothing is put in your project.
+- **What it drives.** Chrome is always the one on your computer. Firefox and WebKit are Playwright's own builds for its version, so they count only once they are installed (`--browsers`).
+- **What you gain.** WebKit, Safari's engine, runs headless on macOS, Linux and Windows and can be put in light or dark. Rendered parity and the accessibility criteria a browser decides are then tried in WebKit by default, beside Firefox.
+- **What a run says.** Its browser lines name the driver: `Playwright 1.65.1 (the engine's pinned copy): drives Chrome, Firefox and WebKit`.
+- **Turning it off.** `DESIGN_SYSTEM_ENGINE_PLAYWRIGHT=none` keeps the engine's own drivers, wherever Playwright is. A browser named by its own setting (`FIREFOX_PATH`, `WEBKIT_PATH`) is always opened by the engine's own driver.
 
 ### On Windows
 

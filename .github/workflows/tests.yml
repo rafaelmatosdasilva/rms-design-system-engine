@@ -114,10 +114,45 @@ jobs:
           path: count-${{ matrix.shard }}.txt
           retention-days: 1
 
-  # The check a pull request waits for (main's ruleset requires `test`): it passes only when all four quarters passed,
+  # The other path: Playwright drives the browsers (lib/playwright.mjs), the engine's pinned copy with its own Firefox
+  # and WebKit, on each system. The suite above runs without it, so every browser check runs both ways, and the tests
+  # that hold the two drivers to one answer (test/playwright.test.mjs) must all run here: one skipped fails the job.
+  playwright:
+    name: playwright ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Linux needs the system libraries WebKit draws with; Playwright's own command installs them.
+      - name: Fetch the pinned Playwright and its browsers
+        shell: bash
+        run: node lib/playwright.mjs --fetch --browsers $([ "$RUNNER_OS" = Linux ] && echo --with-deps)
+      - name: Run the browser checks through Playwright
+        shell: bash
+        env:
+          RMS_TEST_TIME_SCALE: '3'
+        run: |
+          set -o pipefail
+          git config --global core.autocrlf false
+          node lib/playwright.mjs
+          node --test --test-reporter=tap --test-timeout=900000 test/playwright.test.mjs test/cross-browser.test.mjs test/a11y-browsers.test.mjs test/browsers.test.mjs 2>&1 | tee test.log
+          skipped=$(grep -cE '^\s*ok .* # SKIP' test.log || true)
+          if [ "$skipped" != 0 ]; then
+            grep -E '^\s*ok .* # SKIP' test.log
+            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped; with Playwright here every one must run."
+            exit 1
+          fi
+
+  # The check a pull request waits for (main's ruleset requires `test`): it passes only when all four quarters and every Playwright run passed,
   # and it adds up what they counted, for the badge job below. A quarter that never reported counts nothing.
   test:
-    needs: suite
+    needs: [suite, playwright]
     if: always()
     runs-on: ubuntu-latest
     outputs:
@@ -134,11 +169,13 @@ jobs:
         shell: bash
         env:
           RESULT: ${{ needs.suite.result }}
+          PLAYWRIGHT: ${{ needs.playwright.result }}
         run: |
           count=$(cat count-*.txt 2>/dev/null | awk '{s+=$1} END{print s+0}')
           echo "count=$count" >> "$GITHUB_OUTPUT"
           echo "The four quarters ran $count tests: $RESULT."
-          [ "$RESULT" = success ]
+          echo "Through Playwright: $PLAYWRIGHT."
+          [ "$RESULT" = success ] && [ "$PLAYWRIGHT" = success ]
 
   # The README's tests badge reads one file on the `badges` branch (an orphan branch holding nothing else). Only main
   # writes it, and only when the number or the outcome actually changed, so the branch does not take a commit per push.

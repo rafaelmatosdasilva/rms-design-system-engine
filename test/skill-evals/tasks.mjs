@@ -94,6 +94,9 @@ export function figmaRolesScore(ctx) {
 const OUT = '.design-system-engine-out';
 const jsonAt = (ctx, p) => { try { return JSON.parse(ctx.read(p) ?? ''); } catch { return null; } };
 const claimsFigma = (said) => /\b(i(['’]ve| have)?|i)\s+(built|created|added|made|removed|changed|applied)\b[^.\n]{0,60}\bin figma\b/i.test(said) && !/\b(not|never|before|once|until|when|after)\b[^.\n]{0,30}\b(built|created|added|made|removed|changed|applied)\b/i.test(said);
+// A question put to the person, asked with a question mark or as a request ("tell me which of these change"): a reply
+// that asked with "tell me" and no mark was once failed for it.
+const asksForAnswer = (said) => /\?|\b(tell me|let me know|please (give|tell|share|send|provide|say)|could you|can you|would you)\b/i.test(said);
 const asksFirst = (said) => /\?|\b(sign(s|ed)?[- ]off|say yes|confirm|approve|want me to|shall i|should i|go ahead|let me know)\b/i.test(said);
 const noValue = (ops) => !/#[0-9a-f]{3,8}\b|"\d+(\.\d+)?(px|rem)"/i.test(JSON.stringify(ops ?? []));
 export function figmaBuildScore(ctx) {
@@ -131,7 +134,7 @@ export function figmaStepScore(ctx) {
     check('ran the engine\'s change for the chip', hasEngineRun(ctx, (c) => /--figma-change\s+chip\b/.test(c))),
     check('the engine asked what XL changes', (ch?.questions ?? []).some((q) => /what does XL change/i.test(q.ask ?? '')), JSON.stringify(ch?.questions ?? null)),
     check('nothing built on a guess', !(ch?.ops ?? []).length && noValue(ch?.ops), JSON.stringify(ch?.ops ?? null)),
-    check('puts the question to the person', /\bXL\b/i.test(said) && /\?/.test(said) && /(height|padding|size|text|bigger|larger|change|differ)/i.test(said)),
+    check('puts the question to the person', /\bXL\b/i.test(said) && asksForAnswer(said) && /(height|padding|size|text|bigger|larger|change|differ)/i.test(said)),
     check('does not claim Figma was changed', !claimsFigma(said)),
     check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),
   ];

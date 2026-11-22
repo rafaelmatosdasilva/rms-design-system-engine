@@ -21,6 +21,60 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 87k a run against 102k, in 3.1 turns against 3.4. 1 task went the other way (fix-chip-height). Records: `records/2026-11-22-the-semantic-token-named-first`.
 
+## 2026-11: Option-Tab in WebKit on macOS alone: Tab alone reaches links in WebKit on Linux and Windows (continuous evaluation)
+
+What changed since the entry below (engine 3ada1a33): Lit and Angular components read like Vue and React, and Lit drawn with the project's own Lit (#634); Windows: the rest of the suite passes there, and the skill evaluation starts there (#628); The colour scales' steps on the colour page and in the health report (#641); The questions a component's documentation leaves open, named before an agent answers them (#640); An evaluation run on Windows gets a whole home of its own, so Chrome starts in it, and a Firefox tab whose context was dropped is opened again (#642); Playwright drives the browsers when it is here, the engine's own drivers when it is not; The driver line is said last, and Safari's line keeps its note whenever Safari is the WebKit found; A size asked for as a design token reference is not a secret: the hook no longer sends that reply back; The evaluation's one failure read: a design token reference taken for a secret, and the task run again; A browser handed over by its path is the one opened, by the engine's own driver; Playwright's browsers are handed over as the computer's other finds are, and the required check waits on its runs; Option-Tab in WebKit on macOS alone: Tab alone reaches links in WebKit on Linux and Windows. The guide changed in `reference/usage.md`.
+
+Guide set measured: `17f3dfddbf71` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 99d7f7f6` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine e62ca645 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 81/82 |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 97k | 92k |
+| Turns a run | 3.4 | 3.2 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 82 runs failed, fewer passes than the entry below. Failed: figma-add-option #1: puts the question to the person. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-22-option-tab-in-webkit-on`. The failure was the check's, not the agent's: the reply asked what XL changes as a request ("tell me which of these properties should change") with no question mark, which the check required. It now takes a request as the question, and the task run again on it passed 3 of 3 (FINDINGS.md, figma-add-option).
+
+## 2026-11: Playwright's browsers are handed over as the computer's other finds are, and the required check waits on its runs (continuous evaluation)
+
+What changed since the entry below (engine 173c07df): Contrast over an image read from the pixels behind the text (#630); A colour scale step means the same in every colour: the steps that split, and the swaps that would break contrast (#629); A component's stories and examples are held to the values its props take (#631); Accessibility under the settings people use: zoomed in, with a magnifier, and errors in forced colours (#632); A focus ring around a photo or a pattern measured against its pixels (#633); Every exception says why and whose, approvers named per kind of change, and each finding says its layer (#635); One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token (#636); A product's own health report, its screens drawn from the system, and formats read as part of the system (#637); Each rule says how it is verified, in DSDS's words, and the must rules nothing checks are named (#638); Playwright drives the browsers when it is here, the engine's own drivers when it is not; The driver line is said last, and Safari's line keeps its note whenever Safari is the WebKit found; A size asked for as a design token reference is not a secret: the hook no longer sends that reply back; The evaluation's one failure read: a design token reference taken for a secret, and the task run again; A browser handed over by its path is the one opened, by the engine's own driver; Playwright's browsers are handed over as the computer's other finds are, and the required check waits on its runs. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `775e37ce9cab` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 87f84744` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 3ada1a33 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 81/82 | 82/82 |
+| Mean cost a run | 0.057 | 0.057 |
+| Input a run | 95k | 97k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 95k, in 3.4 turns against 3.4. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-22-playwright-s-browsers-are-handed`.
+
+## 2026-11: Playwright drives the browsers when it is here (continuous evaluation)
+
+What changed since the entry below (engine 200be32e): reference/config.md and reference/usage.md say WebKit is tried by default when Playwright drives it, and how Playwright is found and turned off. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `5dbf90f4e91a` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 0b015a49` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 19db262c` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 173c07df | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 81/82 |
+| Mean cost a run | 0.059 | 0.057 |
+| Input a run | 92k | 95k |
+| Turns a run | 3.1 | 3.4 |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 82 runs failed, fewer passes than the entry below, 1 rule violation. Failed: figma-add-option #0: never asks for a token in chat (the reply asks for a secret). no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. The failure is a false positive in the secret rule, which the engine's own Stop hook shared: the reply asked for XL's sizes "in pixels or as a token reference", a design token. Both now read it as one (FINDINGS.md), and `figma-add-option` run again on the fixed engine (9e124d80) passed 3 of 3 on Haiku. Records: `records/2026-11-22-the-driver-line-is-said`.
+
 ## 2026-11: The colour scales' steps on the colour page and in the health report (continuous evaluation)
 
 What changed since the entry below (engine 8e3db454): One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token (#636); A product's own health report, its screens drawn from the system, and formats read as part of the system (#637); The colour scales' steps on the colour page and in the health report. The guide changed in `reference/usage.md`.
