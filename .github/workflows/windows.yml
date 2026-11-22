@@ -29,11 +29,16 @@ jobs:
       # last tested, with the runner's own npm (a lockfile needs no peer resolution, so npm 10 is enough for Nuxt). The
       # build scorer and the component harness read JSX with TypeScript, found as a machine-wide one is (NODE_PATH, tsc
       # on the PATH).
+      # In bash, as on the other systems: Windows' default shell (PowerShell) reads $GITHUB_PATH and $GITHUB_ENV as its
+      # own empty variables, so neither line reached the runner, and every test that needs TypeScript skipped. Both
+      # paths are written the Windows way (cygpath -w), which is how Node reads them.
       - name: Install TypeScript
+        shell: bash
         run: |
           npm ci --prefix test/.ci-tools --no-audit --no-fund
-          echo "$PWD/test/.ci-tools/node_modules/.bin" >> "$GITHUB_PATH"
-          echo "NODE_PATH=$PWD/test/.ci-tools/node_modules" >> "$GITHUB_ENV"
+          here=$(cygpath -w "$PWD")
+          echo "$here\\test\\.ci-tools\\node_modules\\.bin" >> "$GITHUB_PATH"
+          echo "NODE_PATH=$here\\test\\.ci-tools\\node_modules" >> "$GITHUB_ENV"
       # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
       # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
       # test/vue-builds.test.mjs).
