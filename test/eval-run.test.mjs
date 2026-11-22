@@ -2,7 +2,8 @@
 // assembles the DS var/class universe from the project files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { runEvals, loadContext, generateCandidate, judgeCandidate, summarize } from '../lib/eval-run.mjs';
 import { makeFixture, tempDir } from './helpers.mjs';
 
@@ -125,8 +126,11 @@ test('a generate command that ignores its stdin still produces its candidate', a
   // A long prompt and a command that exits at once: writing the prompt can fail with EPIPE, never the candidate.
   const c = { id: 'x', prompt: 'p'.repeat(1024 * 1024) };
   // node, which every shell has: a POSIX echo of angle brackets is a redirection in Windows' cmd.
-  // node by its name, on every PATH: Windows' cmd takes the quotes off a command line that starts with one.
-  const say = `node -e "process.stdout.write('<b>ok</b>\\n')"`;
+  // A script of its own, run by node: no angle bracket or quote on the command line for Windows' cmd to read.
+  const { tempDir } = await import('./helpers.mjs');
+  const script = join(tempDir('generate-'), 'say.mjs');
+  writeFileSync(script, "process.stdout.write('<b>ok</b>\\n');\n");
+  const say = `node ${JSON.stringify(script)}`;
   for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, say, ''), '<b>ok</b>\n');
   assert.equal(generateCandidate(c, 'exit 3', ''), null);   // a failing command is still no candidate
 });
