@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { tempDir } from './helpers.mjs';
 import { join } from 'node:path';
 import { classKind, classComponentApi, classRootClass, templateOf } from '../lib/class-components.mjs';
 import { textComponentApi, extractProps, extractEvents, extractSlots, codeComponents, rootClassOf, usedComponents } from '../lib/component-source.mjs';
@@ -135,8 +135,8 @@ test('Angular: decorated inputs (an alias, required, a setter) and outputs, ng-c
 });
 
 test('Angular signals: input, input.required and model, output, and a template in its own file', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ng-'));
-  try {
+  const dir = tempDir('ng-');
+  {
     writeFileSync(join(dir, 'switch.component.html'), NG_SIGNALS_HTML);
     const file = join(dir, 'switch.component.ts');
     writeFileSync(file, NG_SIGNALS);
@@ -149,7 +149,7 @@ test('Angular signals: input, input.required and model, output, and a template i
     assert.deepEqual(api.slots, { named: ['hint'], default: false });
     assert.match(templateOf(file, NG_SIGNALS), /acmeSwitch/);
     assert.equal(rootClassOf(file, NG_SIGNALS), 'acmeSwitch');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
 });
 
 test('the shared readers give a class component the same shape a Vue or React one has', () => {
@@ -164,8 +164,8 @@ test('the shared readers give a class component the same shape a Vue or React on
 });
 
 test('a library of Lit or Angular components is found, each by its file, its spec and stories left out', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cls-'));
-  try {
+  const dir = tempDir('cls-');
+  {
     mkdirSync(join(dir, 'src/components'), { recursive: true });
     writeFileSync(join(dir, 'src/components/acme-button.ts'), LIT_TS);
     writeFileSync(join(dir, 'src/components/acme-chip.js'), LIT_JS);
@@ -175,7 +175,7 @@ test('a library of Lit or Angular components is found, each by its file, its spe
     writeFileSync(join(dir, 'src/components/tokens.ts'), 'export const x = 1;');
     const found = codeComponents(dir, {});
     assert.deepEqual(found.map((c) => [c.name, c.cls]).sort(), [['acme-button', 'acmeButton'], ['acme-chip', 'acmeChip'], ['badge', 'acmeBadge']]);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
 });
 
 test('a component used by its custom element tag counts as used', () => {
@@ -231,8 +231,8 @@ export default class AcmeMenu extends AcmeElement {
 });
 
 test('Angular as a large library writes it: getter inputs, inputs from a base class, select lists and a selector list', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ng-base-'));
-  try {
+  const dir = tempDir('ng-base-');
+  {
     writeFileSync(join(dir, 'acme-base.ts'), `import { Directive, Input, input, booleanAttribute } from '@angular/core';
 @Directive()
 export class AcmeBase {
@@ -261,5 +261,5 @@ export class AcmeAction extends AcmeBase {
     assert.equal(api.props.busy.default, false);
     assert.deepEqual(api.slots, { named: ['acmeIcon', 'iconEnd'], default: true }, 'a select list is named by the attribute it asks for, never what it rules out');
     assert.equal(api.tag, 'button[acmeAction]');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
 });
