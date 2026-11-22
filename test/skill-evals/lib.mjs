@@ -212,6 +212,16 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
 const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^DESIGN_SYSTEM_ENGINE_EVAL/];
 // A run on an API key keeps only the key, so it is never billed to the plan instead.
 const KEEP_ENV = new Set(['CLAUDE_CODE_OAUTH_TOKEN']);
+// A run's environment: a fresh user's (childEnv) whose home is the run's own. On Windows a home is more than HOME: a
+// program finds it through USERPROFILE, and its data in AppData (LOCALAPPDATA, APPDATA). With USERPROFILE moved and
+// those two left on the real profile, Chrome could not tell its own default folder apart and refused every start
+// ("DevTools remote debugging requires a non-default data directory"), so an evaluation on Windows lost every browser
+// check. The run's home gets its own AppData, laid out as Windows lays one out.
+export function runEnv(base, { home, path, chrome = '' }) {
+  const win = process.platform === 'win32';
+  if (win) for (const d of [join(home, 'AppData', 'Local'), join(home, 'AppData', 'Roaming')]) mkdirSync(d, { recursive: true });
+  return childEnv(base, { HOME: home, PATH: path, ...(win ? { USERPROFILE: home, LOCALAPPDATA: join(home, 'AppData', 'Local'), APPDATA: join(home, 'AppData', 'Roaming') } : {}), CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+}
 export function childEnv(env, extra = {}) {
   const keep = env.ANTHROPIC_API_KEY ? new Set() : KEEP_ENV;
   // Windows reads a name in any case (its PATH is Path): a variable the run sets replaces the parent's in every case,
@@ -295,7 +305,7 @@ export async function runClaude({ cwd, home, path, prompt, model, resume = null,
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
   const base = withCredentials(process.env);
   // On Windows a program finds its home through USERPROFILE, not HOME: both name the run's own.
-  const env = childEnv(base, { HOME: home, PATH: path, ...(process.platform === 'win32' ? { USERPROFILE: home } : {}), CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+  const env = runEnv(base, { home, path, chrome });
   const { events, err, timedOut } = runnerOf(base) === 'sdk'
     ? await viaSdk(prompt, sdkOptions({ model, maxTurns, budget, resume, route, cwd, env }), timeoutMs)
     : await viaCli(claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd }), { cwd, env }, timeoutMs);
