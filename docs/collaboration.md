@@ -236,6 +236,12 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
 - **Each rule is about its own component.** A page that documents two components often writes each name as a heading among its rules. That line is not a rule, and the rules under it are about that component. A count of something inside it ("a maximum of 2 visible buttons" under a footer bar) is not a count of the bar on a screen, so it gets no guard.
 - **A guard never contradicts the component.** A value its code takes is never forbidden outright, nor a setting the page's own lines use. Such a rule means something else, and stays one a person judges.
 - **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
+- **Each says how it is verified, in DSDS's words.** Every rule in a contract and in the DSDS view carries `checkedBy`:
+  `automated` when a check holds it (with `checks` pointing at that check), `assisted` for a judgment rule once a model
+  has judged your screens (`--judge-pages`), since a person still makes the call, and `manual` otherwise.
+- **A promise with no check behind it is named.** A must or must-not rule that nothing checks reads exactly like one
+  a check enforces, to a person and to an agent. `--check-intent` lists them, and the Documentation panel marks each
+  one ("Must, no check behind it") and counts them.
 - **English and Portuguese.** The same rule, written in either, is read the same way.
 
 With no intent layer, every row can still be finished.
