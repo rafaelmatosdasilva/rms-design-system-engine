@@ -263,6 +263,13 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
 - **Each says how it is verified, in DSDS's words.** Every rule in a contract and in the DSDS view carries `checkedBy`:
   `automated` when a check holds it (with `checks` pointing at that check), `assisted` for a judgment rule once a model
   has judged your screens (`--judge-pages`), since a person still makes the call, and `manual` otherwise.
+- **Each rule kept as a decision.** A rule without the decision behind it is argued again by every agent. So each
+  says how strongly it binds (its level), the wrong move it exists to stop (its example, which for a must-not shows
+  what not to do, or words such as "instead of" or "never"), and the decision that settled it (a link to a decision
+  record, an ADR number, or a DSDS ref). `--check-intent` lists each rule missing one of them, with what it lacks, and
+  never fails on it.
+- **A rule the team turned down stays a decision.** A no to a proposed guard or rewrite is kept in the decisions log
+  for the page it is about, so no one proposes it again.
 - **A promise with no check behind it is named.** A must or must-not rule that nothing checks reads exactly like one
   a check enforces, to a person and to an agent. `--check-intent` lists them, and the Documentation panel marks each
   one ("Must, no check behind it") and counts them.
