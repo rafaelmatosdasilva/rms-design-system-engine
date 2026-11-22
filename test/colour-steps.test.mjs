@@ -59,9 +59,9 @@ test('a semantic colour that would fall under its ratio at the same step of anot
 
 test('one ramp, or none, says nothing', () => {
   const one = { color: { light: { 'primitives/blue/100': '#dbeafe', 'primitives/blue/300': '#93c5fd', 'primitives/blue/600': '#1d4ed8', 'surface/base/color': '#fff' } } };
-  assert.deepEqual(stepContrast(one), []);
-  assert.deepEqual(stepSwaps(one), []);
-  assert.deepEqual(stepContrast({}), []);
+  assert.equal(stepContrast(one).length, 0);
+  assert.equal(stepSwaps(one).length, 0);
+  assert.equal(stepContrast({}).length, 0);
 });
 
 test('the Rules page says both as the tokens\' to decide, and nothing when the scales hold', () => {
@@ -86,4 +86,23 @@ test('a step written in the name (Neutral 600, red-600) is a step, and each mode
   const found = stepContrast(v);
   assert.ok(found.some((f) => f.mode === 'light' && f.step === '600' && f.fail[0].family === 'primitives/Sand'), 'on white, Sand 600 falls under where Sea 600 reaches it');
   assert.ok(!found.some((f) => f.mode === 'dark' && f.step === '600'), 'in dark the ramps run the other way, and both 600s reach it on the dark surface');
+});
+
+test('a component\'s own text on its own background is a pair a swap can break, as the contrast check pairs them', () => {
+  const v = { color: { light: { ...ramps, 'surface/page/color': '#ffffff', 'button/background/color': '#1d4ed8', 'button/text/color': '#ffffff' } },
+    aliases: { light: { 'button/background/color': ['primitives/blue/600'] } } };
+  const found = stepSwaps(v);
+  const bg = found.find((f) => f.side === 'surface' && f.surface === 'button/background/color');
+  assert.ok(bg, 'white on blue/600 passes, and on yellow/600 it would not');
+  assert.ok(bg.breaks.some((b) => b.family === 'primitives/yellow'));
+  assert.match(stepSwapLines([bg])[0].value, /^under button\/text\/color, from blue\/600: yellow\/600 is/);
+});
+
+test('each rule says how many it compared, so the page says how many follow it', () => {
+  const rules = tokenRules({ vars });
+  const steps = rules.find((r) => r.id === 'tokens-step-contrast');
+  assert.ok(steps.of >= steps.toFix.length && steps.of > 0);
+  assert.equal(steps.follows, steps.of - steps.toFix.length);
+  const swaps = rules.find((r) => r.id === 'tokens-step-swap');
+  assert.ok(swaps.of >= 1);
 });
