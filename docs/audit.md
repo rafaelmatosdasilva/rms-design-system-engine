@@ -19,7 +19,7 @@ These read the Figma file for whoever keeps it, and never fail a run.
 
 ### The Figma file itself
 
-For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, an empty frame that draws nothing (a spacer is the auto layout's gap), a variant with no auto layout, a variant option named by its look (`Color=Blue` where a role belongs), a spacing or size token off the grid the library keeps (8px or 4px, mined from its own values), a mode spelled two ways across collections, a status colour family missing where the others are there, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
+For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, an empty frame that draws nothing (a spacer is the auto layout's gap), a variant with no auto layout, a variant option named by its look (`Color=Blue` where a role belongs), a spacing or size token off the grid the library keeps (8px or 4px, mined from its own values), a mode spelled two ways across collections, a status colour family missing where the others are there, a colour scale step that reaches 4.5:1 in one colour and not in another at the same number, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
 
 Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
 
@@ -350,6 +350,17 @@ Advice on the web features your code uses, against the browsers your team suppor
 #### A token in the right layer
 
 A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
+
+#### A colour scale step means the same in every colour
+
+A system with colour scales (blue 100 to 900, red 100 to 900) numbers its steps so a designer can swap one colour for another at a step and keep the look. That only holds when each step is about as light in every colour. A yellow is much lighter than a blue at the same number, so its 600 may fail as text where blue's 600 passes.
+
+- **The scales are read from the names.** A family, then a number: `blue/600`, `Neutral 600` or `red-600`. A family needs three steps or more.
+- **Each mode reads its own.** A dark mode whose scales run the other way is measured as it is.
+- **A step that splits is listed.** On the system's own page surface, in each mode, a step that reaches 4.5:1 in some colours and falls under it in others, with how light each one looks (OKLCH lightness).
+- **So is a swap that would break.** A text colour or a surface that points at a step today and passes, and would fall under its ratio at the same step of another colour, with the colours that break it.
+- **Both are to decide, never to fix.** Even out the steps, or say in the intent layer which colours may not stand in for each other.
+- A system with a single scale (a neutral grey) has nothing to compare, so the Rules page shows neither.
 
 #### Mode combinations
 
