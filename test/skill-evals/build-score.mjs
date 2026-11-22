@@ -120,7 +120,9 @@ function transpile(src, file, dir) {
 }
 
 // Serve the project: its CSS as is, its code transpiled, the stand-in for React, and a page that renders one case.
-function serve(dir) {
+// component: the file the page imports, served at one fixed address (/__component.js), so the code the page runs never
+// carries a path written into it.
+function serve(dir, { component = null } = {}) {
   const server = createServer((req, res) => {
     const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (url === '/__react.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(REACT_SHIM); }
@@ -129,7 +131,7 @@ function serve(dir) {
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end(`<!doctype html><html><head><meta charset="utf-8">${css}<style>body{margin:0;font-family:Inter,system-ui,sans-serif}*,*::before,*::after{transition:none!important;animation:none!important}</style></head><body><div id="root"></div></body></html>`);
     }
-    let p = join(dir, url);
+    let p = url === '/__component.js' && component ? component : join(dir, url);
     if (!existsSync(p)) { const hit = CODE_EXT.map((e) => p + e).concat(CODE_EXT.map((e) => join(p, 'index' + e))).find(existsSync); if (hit) p = hit; }
     if (!existsSync(p) || !p.startsWith(dir)) { res.writeHead(404); return res.end(); }
     if (CODE_EXT.includes(extname(p))) {
@@ -174,7 +176,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
   const cls = String(exportName).toLowerCase();   // the component's class, as the build sheet and Figma name it
   const chromePath = process.env.CHROME_PATH || findChrome({ playwright: true });
   if (!chromePath) throw new Error('no Chrome to render with');
-  const { server, port } = await serve(dir);
+  const { server, port } = await serve(dir, { component: file });
   const chrome = await launchChrome(chromePath, { tmpPrefix: 'build-score-' });
   const { send, close } = await connectCDP(chrome.wsUrl);
   const out = {};
@@ -188,7 +190,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
       return r.result.value;
     };
     // Load the module once; find the component: the named export, the default, or any function export.
-    const loaded = await ev(`import(${JSON.stringify(fromRoot(dir, file))}).then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
+    const loaded = await ev(`import('/__component.js').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
       window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };
