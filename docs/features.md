@@ -106,6 +106,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Finds classes your markup uses that nothing styles, and styles nothing uses, each with its file and line.
+- Gives each product its own health report, beside the system's, from its folder and its built pages.
+- Draws a product's screens from the system's components, each region marked the system's, the product's own or a stand-in, and says which screens drifted.
+- Reads dates, numbers and money as part of the system: format tokens complete in every market, and code that formats by hand.
 - Gives your code one health number from its own rules, by area, with the change since the last build.
 - Flags CSS variables and text casing the design never asked for.
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
@@ -134,6 +137,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
 | `/rms-design-system-engine how healthy is our design system?` | An answer to each of thirteen questions (is the data current, do Figma and the code agree, is each component explained, do agents build with it well and more), with its evidence, the command for any it could not answer, and what changed since the last report |
+| `/rms-design-system-engine how is shop doing?` | The shop product's own health: eight questions (built from the system, pages in order, other hosts, accessibility, tests, release, page weight, measuring), each with its evidence and what was not seen |
+| `/rms-design-system-engine draw shop's screens from the system` | Each of shop's built pages drawn from the system's components, each region's parts marked the system's, the product's own or a stand-in, and the screens that drifted since last time |
 | `/rms-design-system-engine make an adoption plan for shop` | What it takes to bring that product onto the system, in steps, each item with who acts, its size and its places, and the check that says each step is done |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 

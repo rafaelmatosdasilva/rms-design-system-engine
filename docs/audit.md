@@ -334,6 +334,34 @@ Ask how healthy your design system is and the engine answers from what it alread
 - Each report is kept, so the next one says which answers got better or worse.
 - The report is written to `.design-system-engine-out/system-health.md`. `--inspection` is the command's earlier name and still works.
 
+#### A product's own health report
+
+Ask how a product is doing and the engine answers for that product, beside the system's report (`rms-design-system-engine --health --product <name>`). It reads the product's folder and its built pages, and never runs or changes them.
+
+- Eight questions, in the same four layers:
+  - **Facts**: is it built from the system rather than beside it, do its pages read in order (one main heading, no level skipped), and which other hosts does its code load from or send to.
+  - **Contracts**: do its pages work for everyone (from an accessibility run on its pages), and does it test itself.
+  - **Intent**: is it on the system's latest release.
+  - **Evaluation**: how much a page of it loads from its own folder, and whether it measures how it is used.
+- Each answer has its evidence, what the engine did not see (a request built at run time, how long a page takes to open), the command that answers it, and what only the product's team can tell.
+- It is written to `.design-system-engine-out/product-health-<name>.md`, and kept, so the next report says what got better or worse.
+
+#### A product's screens, drawn from the system
+
+Ask to see a product's screens built from the system and the engine redraws each built page (`rms-design-system-engine --product-screens <product>`).
+
+- **Each region marked.** Every part of a header, a navigation or a section is the system's own component, the product's own built where the system has one, or a stand-in where the system has none.
+- **Drawn in the engine's workshop.** Each screen is written as a composition in `.design-system-engine-out/workshop/<product>/`, which `--prototype <file>` draws. Nothing is written into your Storybook or the product.
+- **What drifted.** Each run keeps the marks, so the next one says which screens moved: a part that was the system's and is now the product's own, a region added or gone.
+
+#### Dates, numbers and money
+
+When your system keeps its formats as tokens, in a collection whose modes are its markets (`en-GB`, `pt-BR`, or a Market collection), they are read like any other mode:
+
+- **In every market.** A format token with no value in one market is listed.
+- **Not by hand.** Code that writes a locale (`Intl.DateTimeFormat('en-US')`, `toLocaleDateString('pt-BR')`), gives a date library a pattern (`format('DD/MM/YYYY')`) or joins a currency symbol to a number is listed with the system's format tokens. The edit check says the same as an agent writes it.
+- A system with no format tokens is told nothing: there is nothing to hold the code to.
+
 #### A product's way onto the system
 
 Ask for an adoption plan and the engine turns what it found about a product into the steps that bring it onto the system (`rms-design-system-engine --adoption-plan <product>`). Run the full check first: it reads the product's copies, own components and version from it.
