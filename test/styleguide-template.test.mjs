@@ -227,11 +227,7 @@ test('in the browser: no script error, a control changes the real component, the
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);
     const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
-    // TEMPORARY (Windows diagnostic): what the page said in its console and what failed to load, shown if the keyboard
-    // rows never arrive.
-    const pageSaid = []; on('Runtime.consoleAPICalled', (p) => pageSaid.push(p.type + ': ' + (p.args || []).map((x) => x.value ?? x.description ?? '').join(' '))); on('Log.entryAdded', (p) => pageSaid.push('log ' + p.entry.level + ': ' + p.entry.text + (p.entry.url ? ' ' + p.entry.url : '')));
     const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}`);
-    await send('Log.enable', {}, sessionId).catch(() => {});
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     // Each state read once it is reached, never after a fixed time: the page keeps trying variants while it changes, and
@@ -411,19 +407,6 @@ test('in the browser: no script error, a control changes the real component, the
     for (let i = 0; i < 240 && !(/Tab reaches it once: "Filter"\..*In all \d+ variants\./.test(live) && /Given by the browser: Space flips aria-pressed/.test(live)); i++) {
       if (i) await new Promise((r) => setTimeout(r, 250));
       live = await a11yFull();
-    }
-    // TEMPORARY (Windows diagnostic): the page's state when the keyboard rows never arrived.
-    if (!/Tab reaches it once: "Filter"\..*In all \d+ variants\./.test(live)) {
-      const state = await run(`JSON.stringify((() => { const a = document.activeElement, c = self.SG_DATA.components.find((x) => x.name === 'chip');
-        const row = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((tr) => /2\\.1\\.1/.test(tr.textContent));
-        return { active: a && (a.tagName + '.' + a.className + ' #' + a.id + ' offstage=' + !!(a.closest && a.closest('.pg-offstage'))), trying: document.documentElement.getAttribute('data-sg-trying'), ready: document.readyState, hash: location.hash,
-          area: [...document.querySelectorAll('#c-chip .pg-areas [data-v]')].filter((b) => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-selected') === 'true').map((b) => b.dataset.v).join(),
-          a11y: c && c.__a11y ? { live: !!c.__a11y.live, baked: !!c.__a11y.baked, liveItems: (c.__a11y.liveItems || []).length } : null, missed: window.__sgSweepMissed ? window.__sgSweepMissed() : null,
-          row211: row ? { status: row.dataset.status, text: row.textContent.slice(0, 300) } : null, preview: (document.querySelector('#c-chip .pg-preview') || {}).innerHTML?.slice(0, 300) }; })())`).catch((e) => 'unreadable: ' + e.message);
-      console.log('WINDOWS DIAGNOSTIC state: ' + state);
-      console.log('WINDOWS DIAGNOSTIC build: ' + JSON.stringify((built.stdout + built.stderr).split('\n').filter((l) => /bake|browser|Chrome|accessib|tried|✗|⚠/i.test(l)).slice(-40)).slice(0, 4000));
-      console.log('WINDOWS DIAGNOSTIC errors: ' + JSON.stringify(errors).slice(0, 3000));
-      console.log('WINDOWS DIAGNOSTIC console: ' + JSON.stringify(pageSaid.slice(-80)).slice(0, 6000));
     }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
