@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Every exception says why and whose, approvers named per kind of change, and each finding's layer (continuous evaluation)
+
+What changed since the entry below (engine 200be32e): A handoff's part that people write and sign, and each version kept as it was given (#622); Requests: what teams ask the system for, decided with a reason, and the style guide's spacing the template's own (#624); A request about the engine itself goes to its own recipe, never to setup or an audit (#625); Windows: the engine runs there, proven by the full suite and a PowerShell install on every pull request (#626); Windows, all of it: every test runs there, WSL is proven, and the skill evaluation runs in Claude Code on a Windows runner (#627); Contrast over an image read from the pixels behind the text (#630); A colour scale step means the same in every colour: the steps that split, and the swaps that would break contrast (#629); A component's stories and examples are held to the values its props take (#631); Every exception says why and whose, approvers are named per kind of change, and each finding says its layer. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `7f2b67bc5378` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md f5d01a4d` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md b7c29659` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 2fcfad0d | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.059 | 0.056 |
+| Input a run | 92k | 85k |
+| Turns a run | 3.1 | 3.1 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 85k a run against 92k, in 3.1 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-22-every-exception-says-why-and`.
+
 ## 2026-11: The other agents' rule test reads the whole request (continuous evaluation)
 
 What changed since the entry below (engine 2af9b308): The router is given the whole request, its opening words included; the first evaluation and what it taught recorded; The other agents' rule test reads the whole request. The guide changed in `rms-design-system-engine.md`.
