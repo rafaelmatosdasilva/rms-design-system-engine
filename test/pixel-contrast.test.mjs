@@ -62,3 +62,34 @@ test('in a real browser: the text is hidden, its box captured, and the image beh
     assert.ok(f.ratio < 4.5, `#777 on near-black reads ${f.ratio}`);
   } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a focus ring around a photo is held against the worst stretch of the pixels around it, a warning read from the pixels', async () => {
+  const { focusRingRatio } = await import('../lib/a11y-check.mjs');
+  const { bandPixels } = await import('../lib/pixel-contrast.mjs');
+  // A 4 by 4 capture with a band of 1: the 12 pixels on its edge, not the 4 inside.
+  assert.equal(bandPixels(new Uint8ClampedArray(4 * 4 * 4), 4, 4, 1).length / 4, 12);
+  const ring = { colors: ['rgb(51, 51, 51)'], bgLayers: ['rgb(255, 255, 255)'] };
+  assert.ok(focusRingRatio(ring).ratio > 3, 'against the colour alone it passes');
+  const read = focusRingRatio({ ...ring, ringDark: 'rgb(10, 10, 10)', ringLight: 'rgb(40, 40, 40)' });
+  assert.equal(read.from, 'pixels');
+  assert.ok(read.ratio < 3, `against the photo it is ${read.ratio}`);
+  assert.equal(focusRingRatio({ colors: ['rgba(0, 0, 0, 0)'], bgLayers: [] }), null, 'no colour, nothing to measure');
+});
+
+test('in a real browser: the band around a control on an image is read with the control not focused', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  const { ringGrounds } = await import('../lib/pixel-contrast.mjs');
+  const dir = tempDir('ring-contrast-');
+  writeFileSync(join(dir, 'dark.png'), solidPng(60, 60, [17, 17, 17]));
+  const page = join(dir, 'p.html');
+  writeFileSync(page, '<!doctype html><html><body style="margin:0"><div style="background:#fff url(dark.png);padding:40px"><button data-dse-ring="0" style="outline:3px solid #333">Go</button></div></body></html>');
+  const chrome = await launchChrome(CHROME);
+  const { send, close } = await connectCDP(chrome.wsUrl);
+  try {
+    const { sessionId } = await openPage(send, pathToFileURL(page).href);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 200 });
+    const [f] = await ringGrounds(send, sessionId, [{ desc: 'button', colors: ['rgb(51, 51, 51)'], bgLayers: ['rgb(255, 255, 255)'], ring: 0 }]);
+    assert.equal(f.ringMedian, 'rgb(17, 17, 17)', 'the image around it, not the white behind the image');
+    const { focusRingRatio } = await import('../lib/a11y-check.mjs');
+    assert.ok(focusRingRatio(f).ratio < 3);
+  } finally { close(); chrome.kill(); rmSync(dir, { recursive: true, force: true }); }
+});
