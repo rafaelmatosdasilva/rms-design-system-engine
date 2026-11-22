@@ -36,14 +36,17 @@ test('findChrome: a Windows Chrome under Program Files or AppData is found witho
 
 test('playwrightChromium: picks the newest chromium-N build that has a binary', () => {
   const list = () => ['chromium-1100', 'chromium_headless_shell-1200', 'chromium-1200', 'ffmpeg-1'];
-  const exists = (p) => p.endsWith('chrome-linux/chrome');
-  assert.equal(playwrightChromium({ env: { PLAYWRIGHT_BROWSERS_PATH: '/pw' }, exists, list }), '/pw/chromium-1200/chrome-linux/chrome');
+  const exists = (p) => p.endsWith(join('chrome-linux', 'chrome'));
+  assert.equal(playwrightChromium({ env: { PLAYWRIGHT_BROWSERS_PATH: '/pw' }, exists, list }), join('/pw', 'chromium-1200', 'chrome-linux', 'chrome'));
+  // On Windows, where Playwright keeps them under LOCALAPPDATA.
+  const win = (p) => p.endsWith(join('chrome-win', 'chrome.exe')) && p.startsWith(join('/local', 'ms-playwright'));
+  assert.equal(playwrightChromium({ env: { LOCALAPPDATA: '/local' }, exists: win, list }), join('/local', 'ms-playwright', 'chromium-1200', 'chrome-win', 'chrome.exe'));
   assert.equal(playwrightChromium({ env: {}, exists: () => false, list: () => { throw new Error('none'); } }), null);
 });
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
-test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
+test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false, timeout: budget(60000) }, async () => {
   const dir = tempDir('cdp-test-');
   const page = join(dir, 'p.html');
   writeFileSync(page, '<!doctype html><style>:root{--gap-s:8px}</style><div id="x" style="padding:var(--gap-s)"></div>');
@@ -108,7 +111,8 @@ test('a browser never outlives the run that opened it, and never holds it open',
 test('a browser killed leaves neither its profile nor its socket folder behind', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false, timeout: budget(60000) }, async () => {
   const { readlinkSync, existsSync } = await import('node:fs');
   const browser = await launchChrome(CHROME, { tmpPrefix: 'cdp-kill-' });
-  const socketDir = dirname(readlinkSync(join(browser.userDataDir, 'SingletonSocket')));
+  // Chrome on Windows keeps no socket link, so there no socket folder can be left behind (existsSync(null) is false).
+  const socketDir = (() => { try { return dirname(readlinkSync(join(browser.userDataDir, 'SingletonSocket'))); } catch { return process.platform === 'win32' ? null : assert.fail('no SingletonSocket link'); } })();
   browser.kill();
   // Gone once Chrome and its helpers have exited: a busy machine takes longer than an idle one.
   for (let i = 0; i < 50 && (existsSync(browser.userDataDir) || existsSync(socketDir)); i++) await new Promise((r) => setTimeout(r, 100));
@@ -129,7 +133,7 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
     run.stdout.on('data', (d) => { out += d; if (out.includes('\n')) resolve(out.trim().split('\t')); });
     run.on('exit', () => reject(new Error('the run ended before its browser started')));
   });
-  const socketDir = dirname(readlinkSync(join(dir, 'SingletonSocket')));
+  const socketDir = (() => { try { return dirname(readlinkSync(join(dir, 'SingletonSocket'))); } catch { return process.platform === 'win32' ? null : assert.fail('no SingletonSocket link'); } })();   // none on Windows
   run.kill('SIGKILL');
   await new Promise((r) => run.on('exit', r));
   // Swept by this call, or already by another run's start on the same machine (every launch sweeps first): either way
@@ -145,7 +149,7 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
 
 // A busy machine can take longer than the limit to start a browser once: a start that timed out is tried once more,
 // and one that cannot work (no browser there) fails at once.
-test('a browser start that timed out is tried once more; one that cannot start is not', { timeout: budget(30000) }, async () => {
+test('a browser start that timed out is tried once more; one that cannot start is not', { skip: process.platform === 'win32' ? 'the stand-in browser is a shell script, which Windows does not run' : false, timeout: budget(30000) }, async () => {
   const { chmodSync } = await import('node:fs');
   const dir = tempDir('cdp-retry-');
   const fake = join(dir, 'chrome.sh'), count = join(dir, 'count');

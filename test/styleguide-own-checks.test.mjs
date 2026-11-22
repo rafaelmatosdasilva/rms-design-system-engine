@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { localFiles, pageWeight, pageFindings, checkLines, failures } from '../lib/styleguide-check.mjs';
@@ -82,7 +82,7 @@ test('in the browser: the same page twice is unchanged; a page whose layout move
   const moved = await guideShots(page, shots);
   assert.ok(moved.changed.some((c) => c.id === 'status'), JSON.stringify(moved.changed.map((c) => c.id)));
   assert.ok(moved.changed.every((c) => c.share > 0.002 && existsSync(c.diff)));
-  assert.deepEqual(readdirSync(join(shots, 'diff')).sort(), moved.changed.map((c) => c.diff.split('/').pop()).sort());
+  assert.deepEqual(readdirSync(join(shots, 'diff')).sort(), moved.changed.map((c) => basename(c.diff)).sort());
 });
 
 test('a build with the browser pictures the guide\'s own pages in a folder that keeps its builds, and says so; a first build and a CI build do not', { timeout: budget(300000) }, async (t) => {

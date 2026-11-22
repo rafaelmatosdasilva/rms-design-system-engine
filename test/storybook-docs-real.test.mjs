@@ -7,6 +7,7 @@
 // three of its lines disagree with the code on purpose. Badge's is tagged beta. Nothing here is a stand-in for
 // Storybook: what is read is what the preview's own store holds of each story file, as written.
 import { test, before } from 'node:test';
+import { binIn, runBin } from '../lib/project-bin.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, symlinkSync } from 'node:fs';
@@ -26,7 +27,7 @@ before(async () => {
   if (READY) return;
   dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'harbor-ds'), 'storybook-docs-real-', { overlay: join(ENGINE, 'test', 'fixtures', 'harbor-stories') });
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
-  const built = spawnSync(join(TOOLS, '.bin', 'storybook'), ['build', '-o', 'storybook-static', '--quiet'], {
+  const built = runBin(binIn(TOOLS, 'storybook'), ['build', '-o', 'storybook-static', '--quiet'], spawnSync, {
     cwd: dir, encoding: 'utf8', env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1', NO_COLOR: '1' }, timeout: budget(240000) });
   assert.equal(built.status, 0, `storybook build: ${built.stderr || built.stdout}`.slice(0, 1500));
   process.env.CHROME_PATH ??= CHROME;

@@ -10,6 +10,7 @@ import { SAY, shellPath } from '../lib/route.mjs';
 import { installHooks, hooksStatus, upgradeHooks } from '../lib/hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 import { PROJECT } from '../lib/names.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const cfg = { paths: { snapshotVars: 'src/tokens-snap.json', themeCSS: 'src/theme.css' } };
@@ -74,12 +75,12 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   const s = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
   assert.equal(s.hooks.PreToolUse.length, 2);
-  assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router
-  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit|mcp__.*use_figma', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check, and the way back from a Figma write
-  assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the final check
+  assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the router
+  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit|mcp__.*use_figma', hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the edit check, and the way back from a Figma write
+  assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"` }] }]);   // the final check
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
-  assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${join(ENGINE, 'guard.mjs')}"`, exists: true });
+  assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${slashed(join(ENGINE, 'guard.mjs'))}"`, exists: true });
   assert.equal(readFileSync(join(dir, '.gitignore'), 'utf8'), 'node_modules/\n.claude/settings.local.json\n');
   installHooks(dir, { remove: true });
   const after = JSON.parse(readFileSync(r.file, 'utf8'));
@@ -233,7 +234,7 @@ test('the router as a hook: a request made with the command arrives already rout
   const ctx = (prompt, cfg = {}) => routePrompt({ prompt }, { root: dir, engineDir: ENGINE, cfg, env });
   const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
-  assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(join(ENGINE, 'audit.mjs'))} --component chip\n`), chip);
+  assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(slashed(join(ENGINE, 'audit.mjs')))} --component chip\n`), chip);
   // A path the shell reads back as the path it was given. A backslash is never left to it: unquoted it escapes
   // whatever follows, and inside the quotes it would escape the closing quote, so a folder ending in one breaks the
   // command the hooks run.

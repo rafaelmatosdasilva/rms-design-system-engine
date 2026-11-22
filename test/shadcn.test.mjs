@@ -15,6 +15,7 @@ import { startReactHarness } from '../lib/react-harness.mjs';
 import { codeGrammarFor } from '../lib/code-grammar.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'acme-shadcn');
@@ -76,7 +77,7 @@ test('its kebab-case files are its components, by the name each exports', () => 
   assert.equal(componentName('src/components/ui/dropdown-menu.tsx'), 'DropdownMenu');
   assert.deepEqual(codeComponents(FIXTURE, {}).map((k) => k.name), ['Badge', 'Button', 'Card', 'Switch']);
   const files = componentSourceFiles(FIXTURE, {});
-  assert.match(resolveComponentFile('Button', { ROOT: FIXTURE, cfg: {}, files, read: textReader(), classFor: () => null }).file ?? '', /ui\/button\.tsx$/, 'Figma\'s Button is button.tsx');
+  assert.match(slashed(resolveComponentFile('Button', { ROOT: FIXTURE, cfg: {}, files, read: textReader(), classFor: () => null }).file ?? ''), /ui\/button\.tsx$/, 'Figma\'s Button is button.tsx');
 });
 
 // A registry: the library in its own folder, listed in registry.json, and components.json's ui folder holding the one

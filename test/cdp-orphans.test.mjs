@@ -4,7 +4,7 @@ import { legacyOrphans } from '../lib/cdp.mjs';
 
 // A browser on an old-style profile whose run is gone (its parent is pid 1) is swept with its helpers; one whose run is
 // alive is left, and a profile nothing uses is only deleted.
-test('old-style profiles: an orphaned browser is swept, a live run\'s is left, an unused folder is deleted', () => {
+test('old-style profiles: an orphaned browser is swept, a live run\'s is left, an unused folder is deleted', { skip: process.platform === 'win32' ? 'it reads ps, which macOS and Linux have and Windows does not' : false }, () => {
   const base = '/tmp/x';
   const ps = () => [
     '  101     1 /Applications/Chrome --headless=new --user-data-dir=/tmp/x/a11y-check-Ab12Cd about:blank',

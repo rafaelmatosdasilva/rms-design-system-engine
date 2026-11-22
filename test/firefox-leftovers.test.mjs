@@ -6,7 +6,7 @@ import { firefoxLeftovers } from '../lib/bidi.mjs';
 // that would not answer beside them. A profile carries its run's pid: a dead run's is swept with its browser and the
 // processes that browser started, a live run's is left. An old-style profile (no pid) is swept when nothing uses it or
 // its browser was adopted by the system (pid 1), and one a live parent still holds is left.
-test('Firefox profiles a dead run left are swept with their browser, a live run\'s are left', () => {
+test('Firefox profiles a dead run left are swept with their browser, a live run\'s are left', { skip: process.platform === 'win32' ? 'it reads ps, which macOS and Linux have and Windows does not' : false }, () => {
   const base = '/tmp/x';
   const ps = () => [
     '  101     1 /Applications/Firefox --headless --no-remote --remote-debugging-port=0 --profile /tmp/x/engine-firefox-700-Ab12Cd',

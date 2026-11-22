@@ -40,7 +40,7 @@ test('every answer the repository holds, wherever it keeps them', () => {
   writeFileSync(join(dir, 'node_modules', 'pkg', 'osv-scanner.toml'), TOML);
   const found = answers(dir);
   assert.equal(found.length, 3, 'what is installed is not this repository\'s answer');
-  assert.equal(found[0].folder, join('test', '.tools'));
+  assert.equal(found[0].folder, 'test/.tools');
 });
 
 // The date passing in silence is the whole failure: the answer stops applying without anyone deciding it should.

@@ -6,7 +6,7 @@
 // project's hooks installed), a fresh HOME holding only the variant's guide, the same engine for every
 // variant, a fixed tool list, a turn limit and a dollar budget. Only the guide differs between variants.
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
-import { join, dirname, basename, relative } from 'node:path';
+import { join, dirname, basename, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
@@ -109,7 +109,7 @@ export function againstOwnProject(tasks, source) {
 
 export function projectHash(source = DEMO) {
   const h = createHash('sha256');
-  for (const f of walk(source).filter((p) => !NOT_PROJECT.test(p)).map((p) => relative(source, p)).sort()) h.update(`${f}\n`).update(readFileSync(join(source, f)));
+  for (const f of walk(source).filter((p) => !NOT_PROJECT.test(p)).map((p) => relative(source, p).split(sep).join('/')).sort()) h.update(`${f}\n`).update(readFileSync(join(source, f)));
   return h.digest('hex').slice(0, 12);
 }
 

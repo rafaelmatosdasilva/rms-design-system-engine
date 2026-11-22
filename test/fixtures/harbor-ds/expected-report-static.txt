@@ -46,6 +46,14 @@
        ✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
+       ℹ️  5 hardcoded literal(s) match the Figma value - parity OK, not failed (per-component sweep):
+            [button+badge+iconButton] styles/tokens.css:28:  display: inline-flex; align-items: center; height: 36px; box-sizing: border-box;
+            [button+badge+iconButton] styles/tokens.css:31:  font-size: 14px; font-weight: 400; line-height: 20px;
+            [button+badge+iconButton] styles/tokens.css:37:  display: inline-flex; align-items: center; height: 20px; box-sizing: border-box;
+            [button+badge+iconButton] styles/tokens.css:39:  color: var(--hb-status-neutral); font-size: 12px; font-weight: 600; line-height: 16px;
+            [button+badge+iconButton] styles/tokens.css:45:  display: inline-flex; align-items: center; justify-content: center; height: 36px; width: 36px; box-sizing: border-box;
+       ℹ️  1 focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:
+            styles/tokens.css:34:.hb-button:focus-visible { outline: 2px solid var(--hb-action-primary); outline-offset: 2px; }
        ✅ 0 container-type declaration(s) safe (definite width or block-level); 0 exempt
 
 ✅  [12] Nested components keep their own styles  (no parent rule overrides a child component)

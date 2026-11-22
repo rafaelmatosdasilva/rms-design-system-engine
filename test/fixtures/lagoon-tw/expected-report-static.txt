@@ -47,6 +47,8 @@
        ✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
+       ℹ️  1 hardcoded literal(s) match the Figma value - parity OK, not failed (global snapshot values):
+            [global] src/pages/Settings.tsx:8:      <p className="bg-[#1f7a3a]/10 rounded-control">Saved</p>
        ✅ 0 container-type declaration(s) safe (definite width or block-level); 0 exempt
 
 ✅  [12] Nested components keep their own styles  (no parent rule overrides a child component)

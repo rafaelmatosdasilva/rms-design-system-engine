@@ -47,7 +47,7 @@ test('what a watch follows: the project, the engine\'s templates and code, never
   writeFileSync(join(outside, 'guide.html'), '<html></html>');
   const inPage = watchPaths(root, { styleguide: { out: 'public/guide/index.html', template: join(outside, 'guide.html') } }, engine);
   assert.deepEqual(inPage.map((w) => w.path), [root, join(engine, 'templates'), join(engine, 'lib'), outside]);
-  assert.equal(inPage[0].page, join('public', 'guide'), 'the page\'s folder inside the project is left out of its watch');
+  assert.equal(inPage[0].page, 'public/guide', 'the page\'s folder inside the project is left out of its watch');
   // A page written beside the project (../styleguide) is not watched at all.
   const beside = watchPaths(join(root), { styleguide: { out: '../styleguide/index.html' } }, engine);
   assert.deepEqual(beside.map((w) => w.path), [root, join(engine, 'templates'), join(engine, 'lib')]);

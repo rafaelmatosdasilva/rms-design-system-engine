@@ -14,6 +14,9 @@ import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
+// A file the test says is there, as the engine asks for it: resolved (C:\\proj on Windows) and said with slashes.
+const at = (p, want) => slashed(p).replace(/^[A-Za-z]:/, '') === want;
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
@@ -88,7 +91,7 @@ const approx = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
 
 // ── styleguideTarget: the generated-styleguide render target ──
 test('[styleguide] returns the target when the file exists (default path)', () => {
-  const t = styleguideTarget({}, '/proj', (p) => p === '/proj/apps/styleguide/index.html');
+  const t = styleguideTarget({}, '/proj', (p) => at(p, '/proj/apps/styleguide/index.html'));
   assert.equal(t.label, 'apps/styleguide/index.html');
   assert.equal(t.styleguide, true);
   assert.ok(t.url.startsWith('file://'));
@@ -97,7 +100,7 @@ test('[styleguide] null when the file is absent', () => {
   assert.equal(styleguideTarget({}, '/proj', () => false), null);
 });
 test('[styleguide] honours a custom styleguide.out', () => {
-  const t = styleguideTarget({ styleguide: { out: 'dist/sg.html' } }, '/proj', (p) => p === '/proj/dist/sg.html');
+  const t = styleguideTarget({ styleguide: { out: 'dist/sg.html' } }, '/proj', (p) => at(p, '/proj/dist/sg.html'));
   assert.equal(t.label, 'dist/sg.html');
 });
 test('[styleguide] opt-out via a11y.styleguide:false', () => {
@@ -261,9 +264,9 @@ test('a project whose packages are not installed is told so, not "auto-discovery
 test('a style guide that draws no component is not the page checked: the project\'s own pages are', () => {
   const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
   const page = (components) => `<script type="application/json" id="sg-data">${JSON.stringify({ components })}</script>`;
-  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([])), null);
-  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([{ name: 'chip' }])).styleguide, true);
-  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
+  assert.equal(styleguideTarget({}, '/proj', (p) => at(p, sgPath), () => page([])), null);
+  assert.equal(styleguideTarget({}, '/proj', (p) => at(p, sgPath), () => page([{ name: 'chip' }])).styleguide, true);
+  assert.equal(styleguideTarget({}, '/proj', (p) => at(p, sgPath), () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
 });
 
 test('on the style guide, the rules that a landmark sit at the top of the page are the page\'s, never the component\'s', async () => {
@@ -277,7 +280,7 @@ test('a style guide with many components is checked in parts of a few components
   const { styleguideShares, SHARE_COMPONENTS } = await import('../lib/a11y-check.mjs');
   const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
   const names = Array.from({ length: SHARE_COMPONENTS * 2 + 1 }, (_, i) => `c${i}`).concat('table/row');
-  const sg = styleguideTarget({}, '/proj', (p) => p === sgPath, () => `<script type="application/json" id="sg-data">${JSON.stringify({ components: names.map((name) => ({ name })) })}</script>`);
+  const sg = styleguideTarget({}, '/proj', (p) => at(p, sgPath), () => `<script type="application/json" id="sg-data">${JSON.stringify({ components: names.map((name) => ({ name })) })}</script>`);
   assert.deepEqual(sg.names, names);
   const parts = styleguideShares(sg);
   assert.equal(parts.length, 3);
@@ -343,7 +346,7 @@ test('a component looked for by a class the code never gives an element is said 
 test('[axe] the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
   const { axeCachePath, axeCached } = await import('../lib/a11y-check.mjs');
   const home = tempDir('axe-home-');
-  assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
+  assert.match(slashed(axeCachePath(home)), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
   assert.equal(axeCached(home), null, 'nothing kept yet');
   mkdirSync(dirname(axeCachePath(home)), { recursive: true });
   writeFileSync(axeCachePath(home), 'not axe');

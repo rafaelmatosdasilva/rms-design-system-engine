@@ -122,7 +122,7 @@ test('Figma prop types: tsc accepts matching props and rejects drifted ones', { 
   const dir = tempDir('figma-props-');
   writeFileSync(join(dir, 'figma-props.d.ts'), propTypesDts(JSON.parse(readFileSync(join(FIXTURE, 'src', 'figma-component-props.snapshot.json'), 'utf8')), { cfg: JSON.parse(readFileSync(join(FIXTURE, 'ds-config.json'), 'utf8')) }));
   const file = (name, sizes) => { writeFileSync(join(dir, name), `import type { ChipFigmaProps } from './figma-props';\ntype ChipProps = { label?: string; size?: ${sizes}; icon?: boolean };\nconst p: ChipProps = {};\nexport const check: ChipFigmaProps = p;\n`); return name; };
-  const tsc = (f) => spawnSync(TSC, ['--noEmit', '--strict', f, 'figma-props.d.ts'], { cwd: dir, encoding: 'utf8' });
+  const tsc = (f) => spawnSync(TSC[0], [...TSC.slice(1), '--noEmit', '--strict', f, 'figma-props.d.ts'], { cwd: dir, encoding: 'utf8' });
   assert.equal(tsc(file('ok.ts', "'M' | 'L'")).status, 0);
   const drift = tsc(file('drift.ts', "'m' | 'l'"));
   assert.notEqual(drift.status, 0);

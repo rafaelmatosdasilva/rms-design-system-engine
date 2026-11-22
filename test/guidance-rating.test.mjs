@@ -149,7 +149,7 @@ test('each component\'s Documentation area says what an agent can take from its 
   const of = (n) => (data.components ?? []).find((c) => c.name === n);
   // Only the engine's local contract: named, as a task to publish it; no copy beside the guide and no button, since the
   // Contract button opens the one everybody reads, in the intent layer (shared-contracts.test.mjs).
-  assert.deepEqual(of('button').contract, { file: join('contracts', 'button.contract.json'), props: ['variant', 'size', 'label'] });
+  assert.deepEqual(of('button').contract, { file: 'contracts/button.contract.json', props: ['variant', 'size', 'label'] });
   assert.match(page, /'props', 'Properties'/, 'its Properties row, the contract file named');
   assert.equal(of('button').links.find((l) => l.label === 'Contract'), undefined);
   assert.ok(!existsSync(join(dir, '.design-system-engine-out', 'styleguide', 'contracts')));

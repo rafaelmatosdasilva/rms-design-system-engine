@@ -342,7 +342,7 @@ test('a change of runner is said as itself, never as a version going backwards',
   assert.match(cliLine(cliChange(rows('sdk', '2.1.301'), rows(undefined, '2.1.318'))), /where the runs before went through a runner nothing recorded/);
 });
 
-test('the CLI that runs each task is found where it is installed, not only on the PATH', () => {
+test('the CLI that runs each task is found where it is installed, not only on the PATH', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
   const at = (...ok) => (p) => ok.includes(p);
   const none = () => null;
   // The PATH first: a CLI the person put there is the one they mean.
@@ -523,7 +523,7 @@ test('a run that failed in the harness is tried once more at once, never waited 
   assert.equal(afterPass(2), 'stop');
 });
 
-test('a run\'s shell finds the node the evaluation runs on, and still no engine installed elsewhere on the machine', () => {
+test('a run\'s shell finds the node the evaluation runs on, and still no engine installed elsewhere on the machine', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
   // A run's shell starts from the new HOME with no profile: only its PATH says where node is. A node kept in
   // ~/.local/bin went with the filter that hides an installed engine there, and every call to the engine failed.
   const { home, path } = makeHome({ install: () => {} });

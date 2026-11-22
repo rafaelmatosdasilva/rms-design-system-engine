@@ -69,7 +69,8 @@ test('the hook goes into the installed engine only, names node by its path, and 
   assert.equal(text, hookScript(e.dir, '/opt/node 22/bin/node'));
   assert.match(text, /^#!\/bin\/sh\n/);
   assert.match(text, /'\/opt\/node 22\/bin\/node' '.*known-pages\.mjs' --rebuild/, 'node and the module by their full paths, quoted');
-  assert.ok(statSync(hook).mode & 0o111, 'it runs');
+  // Git for Windows runs a hook by its name, and Windows keeps no executable bit to set.
+  assert.ok(process.platform === 'win32' || statSync(hook).mode & 0o111, 'it runs');
   assert.deepEqual(ensure(), { installed: true, why: 'already' });
   assert.deepEqual(ensure({ node: '/usr/local/bin/node' }), { installed: true, why: 'updated' }, 'node moved: the hook follows');
   assert.equal(ensure({ env: { CI: 'true' } }).installed, false);
@@ -116,8 +117,16 @@ test('after the pages, each of the person\'s own scripts is started, with the en
   writeFileSync(join(dir, '.hidden.sh'), '#!/bin/sh\n'); chmodSync(join(dir, '.hidden.sh'), 0o755);
   const started = [];
   const spawn = (f, a, o) => { started.push({ f, engine: o.env.RMS_ENGINE, detached: o.detached }); return { unref() {} }; };
-  assert.deepEqual(runAfterUpdate({ engineDir: '/the/engine', env: {}, dir, spawn }), ['b-build.sh']);
-  assert.deepEqual(started, [{ f: join(dir, 'b-build.sh'), engine: '/the/engine', detached: true }]);
+  // The executable bit is what makes a script on macOS and Linux: Windows keeps none to read.
+  if (process.platform !== 'win32') {
+    assert.deepEqual(runAfterUpdate({ engineDir: '/the/engine', env: {}, dir, spawn, win: false }), ['b-build.sh']);
+    assert.deepEqual(started, [{ f: join(dir, 'b-build.sh'), engine: '/the/engine', detached: true }]);
+  }
+  // On Windows a script is one by its kind: a .cmd through the shell, a .ps1 through PowerShell, a .mjs through node.
+  writeFileSync(join(dir, 'c-sync.cmd'), '@echo off\r\n'); writeFileSync(join(dir, 'd-sync.ps1'), ''); writeFileSync(join(dir, 'e-sync.mjs'), '');
+  started.length = 0;
+  assert.deepEqual(runAfterUpdate({ engineDir: '/the/engine', env: {}, dir, spawn, win: true }), ['c-sync.cmd', 'd-sync.ps1', 'e-sync.mjs']);
+  assert.deepEqual(started.map((s) => s.f), [join(dir, 'c-sync.cmd'), 'powershell', process.execPath]);
   assert.deepEqual(runAfterUpdate({ env: { CI: '1' }, dir, spawn }), [], 'never on CI');
   assert.deepEqual(runAfterUpdate({ env: {}, dir: join(dir, 'none'), spawn }), [], 'no folder, nothing');
 });

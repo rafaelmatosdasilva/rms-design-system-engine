@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { templateComposition, templatesSnapshot } from '../lib/template-composition.mjs';
 import { readPage } from '../lib/styleguide-files.mjs';
 import { budget, tempDir } from './helpers.mjs';
+import { slashed } from '../lib/shown-path.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -41,7 +42,7 @@ function project() {
 
 test('a template\'s parts: used, not in the code, kept out on purpose, in progress, and not compared when it has no code file', () => {
   const { dir, cfg } = project();
-  assert.match(templatesSnapshot(dir, cfg).file, /figma\/figma-templates\.snapshot\.json$/, 'found beside the structure snapshot');
+  assert.match(slashed(templatesSnapshot(dir, cfg).file), /figma\/figma-templates\.snapshot\.json$/, 'found beside the structure snapshot');
   const rows = templateComposition(dir, { ...cfg, componentSelectors: { badge: '.hb-badge', button: '.hb-button' } }, { inProgress: new Set(['iconButton']) });
   const settings = rows.find((t) => t.name === 'Settings');
   assert.equal(settings.file, 'views/SettingsPage.vue');

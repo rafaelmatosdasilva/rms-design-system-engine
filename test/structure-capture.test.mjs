@@ -3,7 +3,7 @@
 // (TS_FOR_TESTS=<dir with node_modules/typescript>, else the test tools' own in test/.ci-tools: typescriptRoot).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { makeFixture, typescriptRoot } from './helpers.mjs';
 import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../lib/component-source.mjs';
 import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../lib/component-api.mjs';
@@ -61,7 +61,7 @@ test('api: Custom Elements Manifest attributes, fields, defaults, unions and slo
     slots: [{ name: '' }, { name: 'icon' }],
   }] }] }, '/p');
   assert.deepEqual(c.names, ['DsChip', 'ds-chip']);
-  assert.equal(c.file, '/p/src/ds-chip.ts');
+  assert.equal(c.file, resolve('/p/src/ds-chip.ts'));
   assert.deepEqual(c.props.size, { options: ['sm', 'md'], default: 'md' });
   assert.deepEqual(c.props.disabled, { type: 'boolean', default: 'false' });
   assert.ok(!c.props._x);
@@ -73,7 +73,7 @@ test('api: react-docgen (CLI shape) and vue-docgen-api output', () => {
     size: { tsType: { name: 'union', elements: [{ name: 'literal', value: "'sm'" }, { name: 'literal', value: "'md'" }] }, defaultValue: { value: "'md'" } },
     onClick: { tsType: { name: 'signature' } },
   } }] }, '/p');
-  assert.equal(r.file, '/p/src/Chip.tsx');
+  assert.equal(r.file, resolve('/p/src/Chip.tsx'));
   assert.deepEqual(r.props.size, { options: ['sm', 'md'], default: 'md' });
   const [v] = docgenComponents([{ displayName: 'VChip', props: [{ name: 'tone', type: { name: 'string' }, values: ['info', 'warn'], defaultValue: { value: '"info"' } }], slots: [{ name: 'default' }, { name: 'icon' }] }]);
   assert.deepEqual(v.props.tone, { options: ['info', 'warn'], default: 'info' });
@@ -84,7 +84,7 @@ test('api: react-docgen (CLI shape) and vue-docgen-api output', () => {
 });
 
 test('api: Storybook index pairs a component with its file (v7 index.json and v6 stories.json)', () => {
-  assert.deepEqual(storybookFiles({ v: 4, entries: { 'c--a': { type: 'story', title: 'Components/Chip', componentPath: './src/Chip.tsx' } } }, '/p'), { Chip: '/p/src/Chip.tsx' });
+  assert.deepEqual(storybookFiles({ v: 4, entries: { 'c--a': { type: 'story', title: 'Components/Chip', componentPath: './src/Chip.tsx' } } }, '/p'), { Chip: resolve('/p/src/Chip.tsx') });
   assert.deepEqual(storybookFiles({ stories: { a: { kind: 'Chip', title: 'Chip' } } }, '/p'), {});   // no componentPath → no claim
 });
 

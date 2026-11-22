@@ -62,7 +62,7 @@ test('each turn: stream-json printed, commands allowed as a person approving the
   assert.deepEqual(next.slice(-3), ['--resume', S, 'yes']);
 });
 
-test('a run\'s Cursor holds only the person\'s login', () => {
+test('a run\'s Cursor holds only the person\'s login', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
   const src = tempDir('cursor-login-'), home = tempDir('cursor-home-');
   writeFileSync(join(src, 'cli-config.json'), '{"authInfo":{}}');
   writeFileSync(join(src, 'mcp.json'), '{"mcpServers":{}}');

@@ -2,7 +2,8 @@
 // assembles the DS var/class universe from the project files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { runEvals, loadContext, generateCandidate, judgeCandidate, summarize } from '../lib/eval-run.mjs';
 import { makeFixture, tempDir } from './helpers.mjs';
 
@@ -83,7 +84,7 @@ test('judgeCandidate passes the component guidance (the "why") into the payload'
 });
 
 // the same cases per kind of guidance, compared with bare.
-test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', async () => {
+test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
   const { runLevels, levelLines } = await import('../lib/eval-run.mjs');
   const out = { bare: '<div style="color:#ff0000">x</div>', steering: '<button class="buttonPrimary"><svg/></button>', parity: '<button class="buttonPrimary">Go</button>' };
   const by = runLevels([{ id: 'a' }, { id: 'b' }], ctx, ['bare', 'steering', 'parity'], (c, level) => out[level], 2);
@@ -97,7 +98,7 @@ test('guidance levels: each level scored by the same checks, accessibility inclu
   assert.equal(lines[3], '  extra     not run: nothing to give');
 });
 
-test('guidance levels: the context each level gets, and the whole run from ds-config', async () => {
+test('guidance levels: the context each level gets, and the whole run from ds-config', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
   const { levelContext } = await import('../lib/eval-run.mjs');
   const { spawnSync } = await import('node:child_process');
   const { join } = await import('node:path');
@@ -124,7 +125,13 @@ test('a generate command that ignores its stdin still produces its candidate', a
   const { generateCandidate } = await import('../lib/eval-run.mjs');
   // A long prompt and a command that exits at once: writing the prompt can fail with EPIPE, never the candidate.
   const c = { id: 'x', prompt: 'p'.repeat(1024 * 1024) };
-  for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, 'echo "<b>ok</b>"', ''), '<b>ok</b>\n');
+  // node, which every shell has: a POSIX echo of angle brackets is a redirection in Windows' cmd.
+  // A script of its own, run by node: no angle bracket or quote on the command line for Windows' cmd to read.
+  const { tempDir } = await import('./helpers.mjs');
+  const script = join(tempDir('generate-'), 'say.mjs');
+  writeFileSync(script, "process.stdout.write('<b>ok</b>\\n');\n");
+  const say = `node ${JSON.stringify(script)}`;
+  for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, say, ''), '<b>ok</b>\n');
   assert.equal(generateCandidate(c, 'exit 3', ''), null);   // a failing command is still no candidate
 });
 

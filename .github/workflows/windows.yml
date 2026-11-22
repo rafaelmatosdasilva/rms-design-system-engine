@@ -1,0 +1,166 @@
+name: Windows
+
+# The whole suite on Windows, beside the Ubuntu run (tests.yml): the engine is proven on a platform only by the full
+# suite passing there, none skipped. The same steps as Ubuntu's, through the bash Windows runners carry, so a
+# difference between the two runs is the platform's and never the workflow's.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: windows ${{ matrix.shard }}/4
+    runs-on: windows-latest
+    strategy:
+      # A failing quarter does not stop the others: the run then names every failing test, not just the first ones.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Every tool below comes from its folder's committed lockfile (npm ci), so each run installs exactly the versions
+      # last tested, with the runner's own npm (a lockfile needs no peer resolution, so npm 10 is enough for Nuxt). The
+      # build scorer and the component harness read JSX with TypeScript, found as a machine-wide one is (NODE_PATH, tsc
+      # on the PATH).
+      # In bash, as on the other systems: Windows' default shell (PowerShell) reads $GITHUB_PATH and $GITHUB_ENV as its
+      # own empty variables, so neither line reached the runner, and every test that needs TypeScript skipped. Both
+      # paths are written the Windows way (cygpath -w), which is how Node reads them.
+      - name: Install TypeScript
+        shell: bash
+        run: |
+          npm ci --prefix test/.ci-tools --no-audit --no-fund
+          here=$(cygpath -w "$PWD")
+          echo "$here\\test\\.ci-tools\\node_modules\\.bin" >> "$GITHUB_PATH"
+          echo "NODE_PATH=$here\\test\\.ci-tools\\node_modules" >> "$GITHUB_ENV"
+      # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
+      # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
+      # test/vue-builds.test.mjs).
+      # ESLint, which test/lint.test.mjs runs over the engine's own code (docs/development.md#coding-standards).
+      - name: Install ESLint
+        run: npm ci --prefix test/.lint-tools --no-audit --no-fund
+      - name: Install the Vue build tools the Vue tests use
+        run: |
+          npm ci --prefix test/.vue-tools --no-audit --no-fund
+          npm ci --prefix test/.vue-cli-tools --no-audit --no-fund
+          npm ci --prefix test/.nuxt-tools --no-audit --no-fund
+      # The React harness draws a React project's components with that project's own React and Vite
+      # (test/react-harness.test.mjs). Without these its browser tests skip, and a skipped browser test checked
+      # nothing - which is what the skip count below refuses to let pass quietly.
+      - name: Install the React build tools the React tests use
+        run: npm ci --prefix test/.react-tools --no-audit --no-fund
+      # Storybook, which builds a team's stories into the pages the browser checks run on (test/storybook-real.test.mjs):
+      # real Storybook, never a stand-in, so a story is read as Storybook itself draws it.
+      - name: Install the Storybook a team builds its stories with
+        run: npm ci --prefix test/.storybook-tools --no-audit --no-fund
+      # DSDS's published schema, suite and examples for the pinned version, which the DSDS tests check against. Fetched,
+      # never committed (lib/dsds-release.mjs says why); the runner's Ruby turns DSDS's YAML examples into JSON.
+      - name: Fetch the pinned DSDS release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node lib/dsds-release.mjs fetch
+      # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
+      # Each failing test is also written as an annotation, so its name and first error lines show on the check.
+      - name: Run the test suite
+        id: suite
+        shell: bash
+        # A shared runner has few cores and is often busy: the browser tests' time limits get the time it takes (a limit
+        # made longer only delays a real hang, it never lets a failing test pass).
+        # The temporary folders on the checkout's own drive: a test project on C: and its tools on D: cross two drives,
+        # where a path from one to the other has no relative form (Storybook then reads .\D:\… and stops).
+        env:
+          RMS_TEST_TIME_SCALE: '3'
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          # Git keeps line endings as the repository has them (.gitattributes), in the throwaway repositories the tests
+          # make too: the runner's default converts them on checkout, which no test project here asks for. A team's
+          # own CRLF files are read as git stores them (system-copy.mjs) and tested on their own.
+          git config --global core.autocrlf false
+          code=0
+          node --test --test-timeout=900000 $(node test/shard.mjs ${{ matrix.shard }} 4) 2>&1 | tee test.log || code=$?
+          if [ "$code" != 0 ]; then
+            grep -n '^not ok' test.log | while IFS= read -r line; do
+              n=${line%%:*}
+              echo "::error title=${line#*:}::$(sed -n "$((n+1)),$((n+40))p" test.log | grep -E "error|expected|actual|Error|message" | head -6 | tr '\n' ' ' | cut -c1-900)"
+            done
+          fi
+          # A browser test that skipped for want of Chrome checked nothing: the run fails, so a missing Chrome can never pass quietly.
+          skipped=$(grep -ciE '# SKIP .*chrome' test.log || true)
+          if [ "$skipped" != 0 ]; then
+            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
+            code=1
+          fi
+          # The number the badge shows, taken from the run's own summary rather than counted by hand: the README said
+          # "2,000+" for as long as somebody remembered to change it. Read before the exit, so a failed run still
+          # reports what it managed to count.
+          count=$(grep -m1 '^# tests ' test.log | awk '{print $3}')
+          echo "${count:-0}" > windows-count-${{ matrix.shard }}.txt
+          exit $code
+      # What this quarter counted, for the test job below to add up. Kept even when the quarter failed.
+      - name: Keep the count
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-count-${{ matrix.shard }}
+          path: windows-count-${{ matrix.shard }}.txt
+          retention-days: 1
+
+  # The install a person on Windows does, from PowerShell, of this very commit: install.ps1 clones it, writes the
+  # terminal command and puts it on the PATH. Then each way in is started the Windows way: the command found on that
+  # PATH routes a request, the MCP server answers its first message, and a hook reads a tool call.
+  install:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install from PowerShell
+        shell: pwsh
+        run: |
+          git branch ci-install
+          $env:RMS_DSE_REPO = "file:///$($PWD.Path -replace '\\','/')"
+          $env:RMS_DSE_REF = 'ci-install'
+          ./install.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $bin = Join-Path $HOME '.local\bin'
+          if (-not (Test-Path (Join-Path $bin 'rms-design-system-engine.cmd'))) { throw 'the terminal command was not written' }
+          if (-not ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' -contains $bin)) { throw 'its folder is not on the PATH' }
+          if (-not (Test-Path (Join-Path $HOME '.claude\commands\rms-design-system-engine.md'))) { throw 'the guide is not where Claude Code finds it' }
+          $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - name: The terminal command routes a request
+        shell: pwsh
+        run: |
+          $dir = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'a-project')
+          Push-Location $dir
+          $out = rms-design-system-engine --route "check the button" 2>&1 | Out-String
+          Pop-Location
+          Write-Host $out
+          if ($LASTEXITCODE -or $out -notmatch 'ROUTE: ') { throw 'the command did not route the request' }
+      - name: The MCP server answers, and a hook reads a tool call
+        shell: pwsh
+        run: |
+          $engine = Join-Path $HOME '.claude\skills\rms-design-system-engine'
+          $check = Join-Path $env:RUNNER_TEMP 'mcp-answers.cjs'
+          Set-Content -Encoding utf8 -Path $check -Value @'
+          const { spawn } = require('node:child_process');
+          const p = spawn(process.execPath, [process.argv[2]], { stdio: ['pipe', 'pipe', 'inherit'] });
+          let out = '';
+          p.stdout.on('data', (d) => { out += d; if (out.includes('\n')) { console.log(out.slice(0, 200)); p.kill(); process.exit(/"serverInfo"/.test(out) ? 0 : 1); } });
+          p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'ci', version: '0' } } }) + '\n');
+          setTimeout(() => { console.log('the MCP server gave no answer'); process.exit(1); }, 30000).unref();
+          '@
+          node $check (Join-Path $engine 'mcp.mjs')
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          '{"tool_name":"Read","tool_input":{"file_path":"x"}}' | node (Join-Path $engine 'guard.mjs')
+          if ($LASTEXITCODE) { throw "the hook failed (exit $LASTEXITCODE)" }

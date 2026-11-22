@@ -4,14 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tempDir } from './helpers.mjs';
 import { codePageFiles, codePages, pageShape } from '../lib/product-code-pages.mjs';
 import { pageFacts } from '../lib/product-conventions.mjs';
 import { parseMarkup } from '../lib/page-check.mjs';
 
 const dir = () => tempDir('code-pages-');
-const write = (root, rel, text) => { mkdirSync(join(root, rel, '..').replace(/\/\.\.$/, '').split('/').slice(0, -1).join('/') || root, { recursive: true }); mkdirSync(join(root, rel).split('/').slice(0, -1).join('/'), { recursive: true }); writeFileSync(join(root, rel), text); };
+const write = (root, rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
 
 test('a page is a file where a product keeps its pages, or the app\'s own root; a component never is', () => {
   const root = dir();
