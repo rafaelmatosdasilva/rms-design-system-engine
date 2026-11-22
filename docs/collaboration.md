@@ -152,6 +152,16 @@ Each row also shows its status (To fix, To check, New in the last audit), when i
 
 Accessibility is tried while the page is built and kept in it, so the page opens with the final results and nothing runs while you read. A component the build could not try is tried in your browser instead. A page whose own script fails is never published, so the last good page stays.
 
+### Requests
+
+What teams ask your system for, and what your team decided. Status is what the system owes itself. Requests is what others ask it for.
+
+- **One request a need.** When a prototype needs something your system lacks (a component, an option, a token, an icon, a layout, a pattern), the check records it. Asked by ten prototypes, it is one request with ten askers, the most asked first.
+- **Your team decides.** Each request is New until someone decides it: kept out of the system (with its reason), accepted in the product, accepted for now (with a day to look again), or brought into the system. `rms-design-system-engine --request "<key>" --decide out --why "…" --by "<who>"` records it in `design-system-engine-requests.json`, to commit.
+- **It closes by itself.** A request brought into the system is Built once no prototype lacks it any more. One accepted for now comes back on its day.
+- **Agents are told.** A need kept out of the system is a decision every agent reads before it asks, so nobody asks for it again.
+- **Your tracker stays yours.** The engine never talks to a tracker it does not know. `rms-design-system-engine --requests` writes the open requests, each with its key, to `.design-system-engine-out/requests/requests.json`. Your own tooling takes them to your tracker and writes its answers by key to `design-system-engine-requests.answers.json`: the state (open, closed, declined, or a duplicate of another key), the ticket's link and a reason. A request leaves the list when your tracker closes or declines it, or when no prototype lacks it, whichever comes first. A decline is kept as a decision, with its reason.
+
 ### Each component's page
 
 At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time. Parity, Accessibility and Documentation carry their Status dot on their tab (N/A none), from the same rules as the Status table, so a word or a rule changed once changes everywhere. Their chips and each row's status use the Status words too: Parity Differs, Unsure, Match; Accessibility Issues, Review, Met; Documentation Missing, Review, Done. An area with nothing to show is left out: Parity and Documentation when nothing is compared or written for it (always the case when the page is built from the code alone), History when no change names it, Used in until your products' pages are read. Motion says so when nothing moves, and Used in when no product uses it.
@@ -272,7 +282,7 @@ A token shows only when the token check finds it equal to Figma in every mode. A
 
 ### It looks like your system
 
-The template is only the layout. Every colour, weight and space on the page is one of your tokens. Its text sizes and its corners are the template's own, so its chips, counts and cards look the same in every brand.
+The template is only the layout. Every colour and weight on the page is one of your tokens. Its text sizes, its spacing and its corners are the template's own, so its chips, counts, rows and cards look the same in every brand, however few spacing tokens your system has.
 
 - The page's controls are its own, drawn with your tokens: a segmented control, buttons (solid, so nothing behind shows through), fields, a card, and one tooltip used everywhere (the Status page's i and a WCAG criterion's name alike). A chosen filter, an open dropdown and a field you type in share one look: the page's background, outlined.
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.

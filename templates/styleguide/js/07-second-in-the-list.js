@@ -350,6 +350,52 @@
     var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
     pageBar(sec, { said: 'decisions', chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
   })();
+  // Requests: what teams ask the system for (requests.mjs), one row a need however many prototypes ask for it, the
+  // most asked first. Status is what the system owes itself, this is what others ask it for. A row opens its panel:
+  // what to do, who asked, what it uses meanwhile, the team's decision and the tracker's ticket. The decision is the
+  // team's, made with the command the panel names, never a button here.
+  var REQ = DATA.requests || [];
+  var reqKey = function (x) { return 'req:' + x.key; };
+  if (REQ.length) (function () {
+    hr(); navLink('requests', 'requests');
+    var sec = section('requests', 'Requests', 'Requests', '');
+    var ST = { 'new': ['figma', 'New'], 'look again': ['differs', 'Look again'], decided: ['match', 'Decided'], built: ['match', 'Built'], merged: ['figma', 'Merged into another'], closed: ['figma', 'Closed'] };
+    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var KIND = { component: 'A component', option: 'An option', token: 'A token', icon: 'An icon', layout: 'A layout', pattern: 'A pattern' };
+    var rowHTML = function (x, i) {
+      return '<tr class="sg-row-open" tabindex="0" data-req-row="' + i + '" data-chip="' + esc(x.status === 'merged' ? 'closed' : x.status) + '"><td><strong>' + esc(x.need) + '</strong><span class="pg-par-val">' + esc(KIND[x.kind] || capital(x.kind)) + '</span></td><td>' + (x.count ? esc(x.count + ' prototype' + (x.count === 1 ? '' : 's')) : '<span class="pg-dim">Nobody now</span>') + '</td><td>' + (x.decisionSaid ? esc(capital(x.decisionSaid)) : '<span class="pg-dim">Not decided</span>') + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
+    };
+    var reqPanel = function (i, from) {
+      var x = REQ[i]; if (!x) return;
+      var m = panelShell('sg-req-panel', 'Requests'); m._key = reqKey(x);
+      var card = panelCard;
+      var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
+      var cmd = function (d) { return '<p class="sg-il-line"><code>' + esc('rms-design-system-engine --request "' + x.key + '" --decide ' + d) + '</code></p>'; };
+      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + cmd('out --why "<the reason>" --by "<who>"') + cmd('system --by "<who>"')
+        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + cmd('system --by "<who>"')
+        : x.status === 'decided' && x.decision === 'system' ? line('Build it in the system. It is Built by itself once no prototype lacks it.') : '';
+      var decided = x.decisionSaid ? line(capital(x.decisionSaid) + (x.why ? '. ' + x.why : '')) + (x.by || x.at ? line([x.by, x.at ? dayShort(x.at) : null].filter(Boolean).join(', ')) : '') + (x.lookAgain ? line('Look again on ' + dayShort(x.lookAgain)) : '') : '';
+      var ticket = x.ticket ? '<p class="sg-il-line"><a href="' + esc(x.ticket) + '" target="_blank" rel="noopener">' + esc(x.ticket) + '</a></p>' : '';
+      var status = '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.status === 'closed' ? line((x.closedBy === 'declined' ? 'Declined' : 'Closed') + ' in the team\'s tracker' + (x.reason ? '. ' + x.reason : '')) : '') + (x.status === 'merged' ? line('A duplicate of ' + x.of) : '');
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it changes and where, its status, the rest.
+      var body = card('What to do', todo)
+        + card('Who asked', x.asked && x.asked.length ? '<p class="sg-il-line">' + namePills(x.asked) + '</p>' : line('No prototype asks for it now'))
+        + card('Status', status)
+        + card('Nearest in the system', x.closest ? '<p class="sg-il-line">' + namePills([x.closest]) + '</p>' : '')
+        + card('Decided', decided)
+        + card('In the team\'s tracker', ticket)
+        + card('Its key', '<p class="sg-il-line"><code>' + esc(x.key) + '</code></p>');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Requests', KIND[x.kind] || capital(x.kind)], title: x.need, body: body });
+      panelShow(m, from);
+    };
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-req-table"><thead><tr><th>Need</th><th>Asked by</th><th>Decision</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + REQ.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var open = function (tr) { if (tr) reqPanel(+tr.getAttribute('data-req-row'), tr); };
+    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-req-row]')); });
+    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-req-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+    sec._openKey = function (key) { var i = REQ.findIndex(function (x) { return reqKey(x) === key; }); if (i >= 0) reqPanel(i, null); return i >= 0; };
+    var nOf = function (st) { return REQ.filter(function (x) { return x.status === st; }).length; };
+    pageBar(sec, { said: 'requests', chips: [{ key: 'new', label: 'New', n: nOf('new'), dot: 'figma' }, { key: 'look again', label: 'Look again', n: nOf('look again'), dot: 'differs' }, { key: 'decided', label: 'Decided', n: nOf('decided'), dot: 'match' }, { key: 'built', label: 'Built', n: nOf('built'), dot: 'match' }, { key: 'closed', label: 'Closed', n: nOf('closed') + nOf('merged'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+  })();
   // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
   // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a
   // component, the intent layer's commits, and what the team decided (a component, a pattern, a template, a foundation,
