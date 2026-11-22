@@ -170,7 +170,7 @@ Every run reads your system's own component files the way it reads Figma, and wr
 
 What it reads, as rules:
 
-- **The framework and the files.** What a component is written in (a Vue file, a React one), where its file sits (`src/components/<family>/`) and how the file is named.
+- **The framework and the files.** What a component is written in (a Vue file, a React one, a Lit or an Angular class), where its file sits (`src/components/<family>/`) and how the file is named.
 - **The props.** How each kind of prop is named (a yes/no, a choice of options, a text, a number), the word a yes/no begins or ends with (`is…`, `show…`), and how an option is written (`in-progress` or `inProgress`).
 - **What says what it is for.** A comment on each component and on each prop.
 - **The way to Figma.** Each component Figma has, joined to it by a Code Connect file, and each Figma property mapped to a prop or a slot.
@@ -527,6 +527,21 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 - **Radix's states are drawn too.** A component that renders a Radix primitive's `Root`, passes its props on (`{...props}`) and styles a Radix state (`data-[state=checked]:bg-primary`) takes the prop Radix sets that state from: `checked`, `pressed` (`data-state="on"`), `open`, and `disabled` for `data-[disabled]`. Each is drawn as a case of its own, so its look is compared with Figma's Checked or Pressed variant. In the default case it is left to Radix, so a switch still switches.
 - **On its style guide page too.** The page carries the Tailwind your build compiles, so each component looks as it ships there. Tailwind's reset (its preflight and your own base rules) applies only where components are drawn, never to the guide around them. A component is known by its `data-slot` (`data-slot="switch"`), since its classes are Tailwind's. Any Tailwind system whose theme file is Tailwind's entry (`@import "tailwindcss"`) gets the same.
 - **Drawn as it ships.** With React and Vite installed, the components are drawn by your own Vite config, so its alias and its Tailwind plugin compile the classes and Radix runs: a switch switches, and its `data-[state=checked]` classes follow.
+
+#### Lit and Angular
+
+A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
+
+- **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
+- **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`.
+- **What it takes.** Lit's reactive properties, decorated (`@property() tone = 'primary'`) or listed in `static properties`, with the defaults its constructor gives. Angular's inputs, decorated (`@Input()`, with an alias, `required` or a setter) or signals (`input()`, `input.required()`, `model()`). A union of strings (`'s' | 'm' | 'l'`) gives a prop's options.
+- **What it keeps to itself.** Lit's internal state (`@state()`, `state: true`) is no prop, as a Vue component's data is not.
+- **What it sends.** Lit's events (`new CustomEvent('acme-press')`). Angular's outputs (`@Output()`, `output()`), and a model's own `<name>Change`.
+- **What it holds.** Lit's `<slot>` and Angular's `<ng-content>`, named by what its `select` picks (`[icon]`, `.icon`, `[slot=icon]`). An Angular template in its own file (`templateUrl`) is read too.
+- **Its class.** An Angular component's `host` class, else the first class its template's first element carries. A class written with `${…}` is a modifier, never the component's name.
+- **Used by its tag.** A component another one puts in its template as a custom element (`<acme-icon-button>`) counts as used.
+- **A manifest first.** A Lit system that ships a Custom Elements Manifest is read from it, and from its files where it says nothing.
+- **Not drawn yet.** The browser checks do not draw Lit or Angular components yet, so they get the checks that read code, never the ones that measure it drawn.
 
 #### Values written by hand
 
