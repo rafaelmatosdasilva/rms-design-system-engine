@@ -47,7 +47,7 @@ const tokens = {
   spacing: [{ figma: 'gap/s', var: '--gap-s', value: '4px' }, { figma: 'gap/m', var: '--gap-m', value: '8px' }, { figma: 'padding/l', var: '--padding-l', value: '16px' }],
 };
 
-test('the page\'s look is the system\'s: its page colours, a shared token before a component\'s, its text styles, radii and spaces', () => {
+test('the page\'s look is the system\'s: its page colours, a shared token before a component\'s, its text styles and radii, its spacing the template\'s own', () => {
   const { roles, missing, css: out } = chromeRoles({ tokens, componentNames: ['badge'], themeCss: ':root { --font-family: Inter; } body { color: var(--text); background: var(--bg); }', icons: { size: 16 } });
   assert.equal(roles.bg, 'var(--bg)', 'the background the system\'s own page uses');
   assert.equal(roles.text, 'var(--text)');
@@ -63,7 +63,7 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
   assert.deepEqual([far.xs, far.s, far.m, far.l], [undefined, undefined, undefined, undefined], 'none near: the template\'s default sizes stay');
   assert.deepEqual([chromeRoles({}).roles.s, chromeRoles({ tokens: { typography: [] } }).roles.m], [undefined, undefined], 'nothing read yet: the defaults');
   assert.deepEqual([roles['radius-s'], roles.radius, roles['radius-l'], roles['radius-pill']], [undefined, undefined, undefined, undefined], 'corners are the template\'s own');
-  assert.equal(roles['space-s'], 'var(--gap-m)');
+  assert.equal(roles['space-s'], undefined, 'spacing is the template\'s own, whatever the system has');
   assert.equal(roles.icon, '16px', 'the size the system\'s icons are drawn at');
   assert.deepEqual(missing, []);
   assert.match(out, /^:root, \[data-color\], \[data-size\] \{ --sg-bg: var\(--bg\);/, 'declared again where a preview has its own mode');

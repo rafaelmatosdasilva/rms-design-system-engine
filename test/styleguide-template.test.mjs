@@ -1609,14 +1609,14 @@ test('room around the Playground\'s component, what follows each title as close 
   assert.doesNotMatch(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
 });
 
-test("the guide's spacing roles come from the system's spacing only, never an opacity that has the same number", async () => {
+test("the guide's spacing is the template's own, whatever spacing tokens the system has", async () => {
   const { chromeRoles } = await import('../lib/styleguide-data.mjs');
-  const tokens = { spacing: [
-    { figma: 'semantic/imagePlaceholder/border/appearance', var: '--semantic-imagePlaceholder-border-appearance', value: '12' },
-    { figma: 'spacing/gap/m', var: '--spacing-gap-m', value: '8px' }, { figma: 'spacing/gap/l', var: '--spacing-gap-l', value: '16px' } ] };
+  // Two spaces only, as a small system has: once all seven steps fell on them and every chip and row came out wrong.
+  const tokens = { spacing: [{ figma: 'spacing/gap/m', var: '--spacing-gap-m', value: '8px' }, { figma: 'spacing/gap/l', var: '--spacing-gap-l', value: '12px' }] };
   const r = chromeRoles({ tokens });
-  assert.notEqual(r.roles['space-m'], 'var(--semantic-imagePlaceholder-border-appearance)');
-  assert.match(r.roles['space-m'], /--spacing-gap-(m|l)/);
+  for (const step of ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl']) assert.equal(r.roles[`space-${step}`], undefined, step);
+  assert.ok(!r.missing.some((m) => /^space-/.test(m)), 'no space is owed by the system');
+  assert.match(templateText(), /--sg-space-xxs: 0\.125rem; --sg-space-xs: 0\.25rem; --sg-space-s: 0\.5rem;/, 'the template\'s own steps');
 });
 
 test('the Showroom lists its screens as a grid of cards, each opening on a page of its own (#showroom/<Screen>)', () => {

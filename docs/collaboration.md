@@ -282,7 +282,7 @@ A token shows only when the token check finds it equal to Figma in every mode. A
 
 ### It looks like your system
 
-The template is only the layout. Every colour, weight and space on the page is one of your tokens. Its text sizes and its corners are the template's own, so its chips, counts and cards look the same in every brand.
+The template is only the layout. Every colour and weight on the page is one of your tokens. Its text sizes, its spacing and its corners are the template's own, so its chips, counts, rows and cards look the same in every brand, however few spacing tokens your system has.
 
 - The page's controls are its own, drawn with your tokens: a segmented control, buttons (solid, so nothing behind shows through), fields, a card, and one tooltip used everywhere (the Status page's i and a WCAG criterion's name alike). A chosen filter, an open dropdown and a field you type in share one look: the page's background, outlined.
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.

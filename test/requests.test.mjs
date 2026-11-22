@@ -93,3 +93,14 @@ test('the command lists the requests, writes them out and records a decision by 
   assert.match(run('--requests').stdout, /Decided {2}component "a date picker".* · brought into the system/);
   assert.match(run('--request', 'component|nothing', '--decide', 'system', '--by', 'x').stdout, /❌ No request component\|nothing/);
 });
+
+test('the style guide has a Requests page beside Status: a row a need, its panel with what to do, who asked and the decision', async () => {
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const tpl = templateText();
+  assert.match(tpl, /navLink\('requests', 'requests'\)/);
+  assert.match(tpl, /section\('requests', 'Requests', 'Requests'/);
+  assert.match(tpl, /card\('What to do', todo\)[\s\S]*card\('Who asked'[\s\S]*card\('Status'[\s\S]*card\('Decided'/, 'the panels\' one order');
+  assert.match(tpl, /data-chip="' \+ esc\(x\.status === 'merged' \? 'closed' : x\.status\)/, 'a merged request is filtered with the closed');
+  assert.match(tpl, /NAV_MARK\.requests = /);
+  assert.match(readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.requests = rows\.map/);
+});
