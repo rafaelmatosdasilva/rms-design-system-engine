@@ -560,7 +560,8 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 
 - **The token for each one.** A colour no token holds is named with the nearest colour token by how it looks, with how far it is. Past a small difference, the system has no colour near it, and it says so. A semantic token is named before a primitive that holds the same value.
 - **A fix, when you ask.** `rms-design-system-engine --census --fix` writes a patch that puts each exact token where its value was. You apply it, and the engine changes nothing itself. A nearest one is named and left for you to choose.
-- **In Figma too.** The Figma file's hygiene report names the variable for each fill, stroke, radius, gap and border that has none, and writes the bindings for the exact ones. `--figma-change` takes them, behind its sign-off.
+- **In Figma too.** The Figma file's hygiene report names the variable for each fill, stroke, radius, gap and border that has none, and writes the bindings for the exact ones. Where two layers of a variant share a name, each binding names the node it was read on, so it never lands on the other. `--figma-change` takes them, behind its sign-off. Refresh Figma once for the capture to keep each node.
+- **The semantic token first.** Where a semantic token and a primitive hold the same value, the census, the edit check and the fixes all name the semantic one first.
 
 #### A commit warns, a push refuses
 
@@ -807,7 +808,7 @@ Three things stop a finding from failing a run: a difference kept on purpose, a 
 
 ### A rule that reached zero stays at zero
 
-A code or Figma rule most components follow is a warning until your team decides it. Once every component follows it, it is **held**: the next break fails `--construction-check`, as a rule your team decided does. The date it was first followed by all is kept in `contracts/construction.json`, so commit it. A rule your team answered no to is never held.
+A code or Figma rule most components follow is a warning until your team decides it. Once every component follows it, it is **held**: the next break fails `--construction-check`, as a rule your team decided does. The date it was first followed by all is kept in `contracts/construction.json`, so commit it. Where that file is not on disk (a pipeline that builds the contracts fresh), the check reads the version your repository last committed, and says when it found neither, so a run that holds nothing is seen to. A rule your team answered no to is never held.
 
 ### A deprecation has one release of grace
 

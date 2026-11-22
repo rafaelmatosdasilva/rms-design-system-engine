@@ -2415,7 +2415,7 @@ value, the semantic one is named. `--census --fix` writes `handback/hand-written
 where each value a token holds exactly was written; a nearest one is left for the person to choose, and the engine
 applies nothing. The edit check names the same nearest colour when an edit writes one. In Figma, the hygiene report
 names the variable for each fill, stroke, radius, gap and border with none (the one that holds it, else the nearest),
-and writes the bindings for the exact ones per component to `handback/figma-binds/<component>.ops.json`, which
+and writes the bindings for the exact ones per component to `handback/figma-binds/<component>.ops.json`, each with the node it was read on (`node`, once Figma is refreshed) where two layers of a variant share its path, so the other is never bound in its place, which
 `--figma-change <component> "<change>" --ops <file>` takes, behind the sign-off every change in Figma has.
 
 The first run writes the count as the baseline (`design-system-engine-census.json`, committed with the change); a run

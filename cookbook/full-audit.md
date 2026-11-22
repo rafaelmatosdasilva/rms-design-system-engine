@@ -388,7 +388,11 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const kids = (n) => { const c = get(n, 'children'); return Array.isArray(c) ? c : []; };
   const paintsOf = (n, list) => { const p = get(n, list); return Array.isArray(p) ? p : []; };
   const artwork = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON)$/;
-  const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) out.raw.push({ at, field, value }); };
+  // Each value with the node it is on, kept only where its path is not enough: another layer of the variant has the
+  // same path, so a binding by path could land on either. paths: how many layers walked each path.
+  let here = null;
+  const paths = {};
+  const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) { const id = get(here, 'id'); out.raw.push({ at, field, value, ...(typeof id === 'string' && id ? { node: id } : {}) }); } };
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
   // The scope Figma gives each property a variable can be bound to; a fill's depends on the layer.
   const SCOPE = { width: 'WIDTH_HEIGHT', height: 'WIDTH_HEIGHT', minWidth: 'WIDTH_HEIGHT', maxWidth: 'WIDTH_HEIGHT', minHeight: 'WIDTH_HEIGHT', maxHeight: 'WIDTH_HEIGHT',
@@ -409,6 +413,8 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const walk = (n, at, inner = false) => {
     if (!n || typeof n !== 'object' || budget.n <= 0) return;
     budget.n--;
+    here = n;
+    paths[at] = (paths[at] || 0) + 1;
     if (n.type === 'INSTANCE') {   // an instance, overrides included, reads as its own component's values
       const main = mainName(n);
       if (main && n.name !== main && key(n.name) === key(main)) { out.renamed = out.renamed || []; out.renamed.push({ at, layer: n.name, component: main }); }
@@ -500,6 +506,7 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     if (kids(v).length > 1 && (!mode || mode === 'NONE')) out.noAutoLayout.push(v.name);
     walk(v, v.name);
   }
+  for (const r of out.raw) if (r.node && paths[r.at] < 2) delete r.node;
   if (detached) out.detached = detached;
   return out;
 }
