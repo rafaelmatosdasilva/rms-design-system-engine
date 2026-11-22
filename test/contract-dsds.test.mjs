@@ -103,3 +103,10 @@ test('a name DSDS would refuse as an id is written in the form it allows, its wo
   assert.deepEqual(e.traits[1].values.map((v) => [v.id, v.name ?? null]), [['Primary-Brand', 'Primary Brand'], ['Neutral', null]], 'the name as Figma writes it kept beside the id');
   assert.deepEqual(errorsOf({ schemaVersion: DSDS_VERSION, name: 'x', entries: [e] }), []);
 });
+
+test('the contract\'s own guidance says how each rule is held: never together is the edit check\'s, when not to use it a person\'s', async () => {
+  const { dsdsEntry } = await import('../lib/contract-dsds.mjs');
+  const items = dsdsEntry({ name: 'card', whenNotToUse: 'For a table row.', relationships: { neverCombineWith: ['modal'] }, kept: [{ what: 'radius', truth: 'code', reason: 'the product asked' }] }).sections[0].items;
+  assert.deepEqual(items.map((i) => [i.level, i.checkedBy, i.checks?.[0]?.role ?? null]), [['should-not', 'manual', null], ['must-not', 'automated', 'lint'], ['should', 'automated', 'test']]);
+  for (const i of items) if (i.checkedBy === 'automated') assert.ok(i.checks?.[0]?.href, 'DSDS-03: automated points at its check');
+});

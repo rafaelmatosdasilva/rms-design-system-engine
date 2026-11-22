@@ -276,3 +276,34 @@ test('a rule that says what to do, or holds in some cases only, never becomes a 
   assert.equal(on('Never put a Button inside a Tile.', 'Tile', ctx).proposal.text, 'Tile never contains Button.');
   assert.equal(on('Never use `state="disabled"` on a Button.', 'Tile', ctx).proposal.text, 'Button never takes state="disabled".');
 });
+
+test('each rule says how it is verified in DSDS\'s words: automated pointing at its check, assisted where a model judges, else manual', async () => {
+  const { verifiedBy, CHECK_DOCS } = await import('../lib/rule-checks.mjs');
+  const auto = verifiedBy({ status: 'checked', by: 'edit', check: 'the edit check: a colour written by hand' });
+  assert.equal(auto.checkedBy, 'automated');
+  assert.equal(auto.checks[0].href, CHECK_DOCS.edit.href, 'DSDS-03: an automated rule points at the check that holds it');
+  assert.equal(auto.checks[0].note, 'the edit check: a colour written by hand');
+  assert.equal(verifiedBy({ status: 'checked', by: 'a11y' }).checks[0].href, CHECK_DOCS.a11y.href);
+  assert.deepEqual(verifiedBy({ status: 'judgment' }), { checkedBy: 'manual' }, 'no model has judged the screens');
+  assert.equal(verifiedBy({ status: 'judgment' }, { judged: true }).checkedBy, 'assisted', 'a model flags, a person decides');
+  assert.deepEqual(verifiedBy({ status: 'checkable' }, { judged: true }), { checkedBy: 'manual' }, 'a guard that is only proposed holds nothing yet');
+});
+
+test('the must and must-not rules nothing checks are named, and a checked one or a should is not', async () => {
+  const { uncheckedPromises, ruleReport } = await import('../lib/rule-checks.mjs');
+  const byPage = new Map([[{ name: 'card' }, { n: 3, checked: 1, checkable: 1, judgment: 1, vague: 0, rules: [
+    { text: 'Never nest a card in a card.', level: 'must-not', status: 'checked', check: 'the edit check' },
+    { text: 'Always give a card a title.', level: 'must', status: 'checkable', proposal: { text: 'card always has title' } },
+    { text: 'Keep the copy short.', level: 'should', status: 'judgment' },
+  ] }]]);
+  assert.deepEqual(uncheckedPromises(byPage), [{ page: 'card', text: 'Always give a card a title.', level: 'must', status: 'checkable' }]);
+  assert.match(ruleReport(byPage).join('\n'), /1 must or must-not rule has no check behind it[^]*card: "Always give a card a title\." \(must, a guard could hold it\)/);
+});
+
+test('the Documentation page\'s Rules card names a must or must-not rule with no check behind it, in its count and on the rule', async () => {
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const tpl = templateText();
+  assert.match(tpl, /var ilPromise = function \(x\) \{ return \/\^must\(-not\)\?\$\/\.test\(x\.level \|\| ''\) && x\.status !== 'checked'; \};/);
+  assert.match(tpl, /' must or must-not with no check behind ' \+ \(open === 1 \? 'it' : 'them'\)/);
+  assert.match(tpl, /\(x\.level === 'must-not' \? 'Must not' : 'Must'\) \+ ', no check behind it'/);
+});
