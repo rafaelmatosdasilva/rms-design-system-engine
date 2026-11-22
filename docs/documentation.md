@@ -385,6 +385,21 @@ Every decision somebody makes is recorded where it is made: a difference kept on
 
 Now they come together in one log, written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
 
+**Your decision records** are read too, one file each in `docs/decisions`, `docs/adr` or `adr` (or the folder set in
+`ds-config.json` → `decisionRecords.dir`), each with its status, context, decision and consequences.
+
+```bash
+rms-design-system-engine --decision-records
+```
+
+- **Kept as a chain.** A record that says "Superseded by" a later one, or a record that "Supersedes" an earlier one,
+  links the two. The old one is kept, said as overruled by the new one, and an agent is told it no longer holds.
+- **Superseded, never edited.** Once the system has a first release (its oldest git tag), an accepted record whose
+  decision was rewritten in place is a finding, with each commit that did it. Moving its status on, or adding the
+  link to the record that replaced it, is the lifecycle working and is not a finding. A record written after the
+  release is a new decision, not an edit.
+- **A record links its contracts, never holds them.** The contracts can change while the decision holds still.
+
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](features.md#maintain-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
 The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Contracts, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.

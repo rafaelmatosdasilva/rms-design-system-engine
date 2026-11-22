@@ -268,6 +268,23 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
   one ("Must, no check behind it") and counts them.
 - **English and Portuguese.** The same rule, written in either, is read the same way.
 
+### The questions your documentation leaves open
+
+What a component's role raises and nothing written about it answers is a question nobody answered yet: where the focus
+goes when a combobox's list closes, what a long label does, whether there is a loading state, what closes a dialog.
+An agent that builds or reviews fills such a gap with a guess, and two agents guess differently.
+
+```bash
+rms-design-system-engine --open-questions
+```
+
+- **Read from what is already written.** The component's page in the intent layer, its description, its notes, its
+  props and their options, and its states. A `loading` prop answers whether it has a loading state.
+- **Given to agents as questions.** Each contract lists its `openQuestions`: an agent asks the person before building
+  or reviewing what one touches, and never answers it itself.
+- **An answer is a decision with its owner.** `--intent-answer <key> "<answer>"` keeps the person's words with who
+  gave them and when, and the next contracts give agents the answer (`decided`) instead of the question.
+
 With no intent layer, every row can still be finished.
 
 - **Do and don't.** Write lines that start with `Do:` or `Don't:` in its Figma description, in the comment above its CSS rule, or in `contract.authored.json` under `guidance.doDont`. Agents get them with its pictures.
