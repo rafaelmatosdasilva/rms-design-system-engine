@@ -453,6 +453,7 @@
       var said = x.comments.length ? kvList(open.concat(done).map(function (k) { return [['Said', esc(k.says)], ['By', k.by ? esc(k.by) : ''], ['On', k.on && k.on.component ? namePills([k.on.component]) : ''], ['When', k.at ? esc(dayShort(k.at)) : ''], ['Answered', k.done ? esc(k.answer || 'Closed') : '']]; })) : '';
       // Every panel's one order (panelCard, 00-start.js): what to do, what it is about, its status, the rest.
       var body = panelCard('What to do', todo)
+        + panelCard('What was asked', x.asked ? '<p class="sg-il-line">' + esc(x.asked) + '</p>' : '')
         + panelCard('Its screens', screens)
         + panelCard('Status', status)
         + panelCard('What its last check found', found, { bare: true })

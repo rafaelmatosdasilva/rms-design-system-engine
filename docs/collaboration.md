@@ -169,6 +169,7 @@ What teams ask your system for, and what your team decided. Status is what the s
 Each prototype is a part of its own, with a page of its own. The Prototypes page lists every prototype in your prototypes folder, with when it was last checked, what the system lacks for it, its latest handoff and its status: Not checked, Has findings, Lacks in the system, or Holds. A row opens that prototype's page in the side panel.
 
 - **What to do.** The command to check it, what to fix, or the Requests page to decide what it lacks.
+- **What was asked.** The prompt it was made from, kept with its check (`--for "…"`, or what you asked in the hour before), and with each handoff.
 - **Its screens.** The pictures the last draw took of it, one width at a time (Phone, Tablet, Desktop).
 - **Where its last check stands.** When it ran, against which release of the system, and at which commit or tag.
 - **What its last check found,** each finding with its component, and what the system lacks for it, a line a need.

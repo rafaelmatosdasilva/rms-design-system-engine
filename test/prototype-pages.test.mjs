@@ -15,7 +15,7 @@ function project() {
   mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
   writeFileSync(join(root, 'prototypes', 'Orders.vue'), '<template><div/></template>');
   writeFileSync(join(root, 'prototypes', 'Home.json'), '{}');
-  writeFileSync(join(root, 'prototypes', 'Orders.check.json'), JSON.stringify({ name: 'Orders', file: 'prototypes/Orders.vue', at: '2026-11-20T10:00:00Z', ok: false, mistakes: 1, used: { chip: 3, button: 1 }, items: [{ component: 'chip', message: 'size L is not one of its sizes' }], lacked: [{ need: 'date picker' }, { need: 'date picker' }, { need: 'truck icon' }], owes: [], checkedAt: { system: '2.4.0', commit: 'abc1234def' } }));
+  writeFileSync(join(root, 'prototypes', 'Orders.check.json'), JSON.stringify({ name: 'Orders', file: 'prototypes/Orders.vue', at: '2026-11-20T10:00:00Z', ok: false, mistakes: 1, used: { chip: 3, button: 1 }, items: [{ component: 'chip', message: 'size L is not one of its sizes' }], lacked: [{ need: 'date picker' }, { need: 'date picker' }, { need: 'truck icon' }], owes: [], checkedAt: { system: '2.4.0', commit: 'abc1234def' }, request: 'a list of orders with their status' }));
   writeFileSync(join(root, 'prototypes', 'Orders.handoffs', 'v1.json'), JSON.stringify({ name: 'Orders', version: 'handoff/orders/v1', at: '2026-11-18T09:00:00Z', used: { chip: 2 } }));
   writeFileSync(join(root, 'prototypes', 'Orders.handoffs', 'v2.json'), JSON.stringify({ name: 'Orders', version: 'handoff/orders/v2', at: '2026-11-20T09:00:00Z', used: { chip: 3 }, since: { label: 'handoff/orders/v1', any: true, components: { added: ['button'], removed: [], moved: [] }, findings: { added: [], removed: [] }, gaps: { added: [], removed: [] }, dependencies: { added: [], removed: [] }, copy: { added: [], removed: [] } } }));
   writeFileSync(join(root, 'prototypes', 'Orders.handoff-notes.md'), '## Off the happy path\n\nOwner: QA · Date: 2026-11-19\n\nAn empty list says so.\n');
@@ -34,6 +34,7 @@ test('every prototype the project has gets a page, and none it no longer has', (
 test('a prototype\'s page: its screens at each width, its last check, what the system lacks once a need, its handoff, notes and comments', () => {
   const [home, orders] = prototypePages(project());
   assert.equal(orders.file, 'prototypes/Orders.vue');
+  assert.equal(orders.asked, 'a list of orders with their status', 'the prompt it was made from');
   assert.equal(orders.state, 'findings');
   assert.deepEqual(orders.screens.map((s) => [s.label, s.w, s.h]), [['phone', 375, 900], ['desktop', 1280, 900]], 'narrowest first, at the size taken');
   assert.match(orders.screens[0].src, /^data:image\/png;base64,/, 'carried as data, as every picture on the page');
@@ -51,6 +52,7 @@ test('a prototype\'s page: its screens at each width, its last check, what the s
   assert.equal(home.state, 'not checked');
   assert.deepEqual(home.lacked, [{ need: 'map', times: 1 }]);
   assert.deepEqual(home.screens, []);
+  assert.equal(home.asked, null);
 });
 
 test('the style guide has a Prototypes page: a row a prototype, its page in the side panel, linked from each component that uses it', async () => {
@@ -58,7 +60,7 @@ test('the style guide has a Prototypes page: a row a prototype, its page in the 
   const tpl = templateText();
   assert.match(tpl, /navLink\('prototypes', 'prototypes'\)/);
   assert.match(tpl, /section\('prototypes', 'Prototypes', 'Prototypes'/);
-  assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panels\' one order');
+  assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panels\' one order');
   assert.match(tpl, /#prototypes\?panel=' \+ esc\(encodeURIComponent\('proto:' \+ p\.name\)\)/, 'a component\'s page links each prototype to its own');
   assert.match(tpl, /: !!\(target\._openKey && target\._openKey\(panelWant\)\)/, 'a link opens any page\'s own panel by its key');
   assert.match(tpl, /NAV_MARK\.prototypes = /);
@@ -73,4 +75,14 @@ test('a request counts only the prototypes the project still has, never one a dr
   mkdirSync(join(bare, '.design-system-engine-out', 'prototypes'), { recursive: true });
   writeFileSync(join(bare, '.design-system-engine-out', 'prototypes', 'gaps.json'), JSON.stringify({ byPrototype: { A: [], B: [] } }));
   assert.deepEqual(Object.keys(await gapsNow(bare)), ['A', 'B']);
+});
+
+test('the prompt a prototype was made from is kept with its check, and a later check that does not know it keeps it', async () => {
+  const { checkRecord, writeCheck } = await import('../lib/prototype-record.mjs');
+  const root = tempDir('proto-asked-');
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', file: 'prototypes/Orders.vue', request: 'a list of orders' }));
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', file: 'prototypes/Orders.vue' }));
+  assert.equal(JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8')).request, 'a list of orders');
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', file: 'prototypes/Orders.vue', request: 'a list of orders, by status' }));
+  assert.equal(JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8')).request, 'a list of orders, by status', 'a new prompt replaces it');
 });
