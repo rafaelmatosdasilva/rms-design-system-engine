@@ -56,6 +56,9 @@ jobs:
       # nothing - which is what the skip count below refuses to let pass quietly.
       - name: Install the React build tools the React tests use
         run: npm ci --prefix test/.react-tools --no-audit --no-fund
+      # Lit and the Vite a Lit project builds with (test/lit-harness.test.mjs): without them its browser tests skip.
+      - name: Install the Lit build tools the Lit tests use
+        run: npm ci --prefix test/.lit-tools --no-audit --no-fund
       # Storybook, which builds a team's stories into the pages the browser checks run on (test/storybook-real.test.mjs):
       # real Storybook, never a stand-in, so a story is read as Storybook itself draws it.
       - name: Install the Storybook a team builds its stories with
