@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../lib/cdp.mjs';
+import { slashed } from '../../lib/shown-path.mjs';
 import { usableTypeScript, machineTypeScript, TYPESCRIPT_HINT } from '../../lib/project-typescript.mjs';
 
 // TypeScript, loaded when a build is first transpiled, so the scorer's other helpers (the prototype scorer imports
@@ -95,6 +96,9 @@ export default { createElement, Fragment, useState, useReducer, useEffect, useLa
 `;
 
 const CODE_EXT = ['.jsx', '.tsx', '.js', '.ts', '.mjs'];
+// A project file's path on the page: from the project's root, in a URL's slashes on every system (Windows' relative()
+// gives backslashes, which a URL drops).
+const fromRoot = (dir, f) => '/' + slashed(relative(dir, f));
 const walk = (dir, out = []) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (/^(node_modules|\.git|\.design-system-engine-out|\.claude|contracts|figma-mcp)$/.test(e.name)) continue;
@@ -121,7 +125,7 @@ function serve(dir) {
     const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (url === '/__react.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(REACT_SHIM); }
     if (url === '/__page.html') {
-      const css = walk(dir).filter((p) => /\.css$/.test(p)).map((p) => `<link rel="stylesheet" href="/${relative(dir, p)}">`).join('\n');
+      const css = walk(dir).filter((p) => /\.css$/.test(p)).map((p) => `<link rel="stylesheet" href="${fromRoot(dir, p)}">`).join('\n');
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end(`<!doctype html><html><head><meta charset="utf-8">${css}<style>body{margin:0;font-family:Inter,system-ui,sans-serif}*,*::before,*::after{transition:none!important;animation:none!important}</style></head><body><div id="root"></div></body></html>`);
     }
@@ -132,7 +136,7 @@ function serve(dir) {
       let js;
       try { js = transpile(readFileSync(p, 'utf8'), p, dir); } catch (e) { res.writeHead(500); return res.end(String(e)); }
       // Local imports resolve against this file's folder; bare ones other than react cannot load here.
-      js = js.replace(/(from\s+|import\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g, (m, a, spec) => `${a}'/${relative(dir, resolve(dirname(p), spec))}'`);
+      js = js.replace(/(from\s+|import\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g, (m, a, spec) => `${a}'${fromRoot(dir, resolve(dirname(p), spec))}'`);
       res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(js);
     }
     res.writeHead(200, { 'content-type': /\.css$/.test(p) ? 'text/css' : 'application/octet-stream' });
@@ -184,7 +188,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
       return r.result.value;
     };
     // Load the module once; find the component: the named export, the default, or any function export.
-    const loaded = await ev(`import('/${relative(dir, file)}').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
+    const loaded = await ev(`import('${fromRoot(dir, file)}').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
       window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };

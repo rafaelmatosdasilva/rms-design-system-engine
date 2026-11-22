@@ -533,7 +533,11 @@ test('a run\'s shell finds the node the evaluation runs on, and still no engine 
   // ~/.local/bin went with the filter that hides an installed engine there, and every call to the engine failed.
   // The shell is the one the agent's commands run in: /bin/sh, and on Windows Git Bash, which Claude Code runs there.
   const win = process.platform === 'win32';
-  const shell = win ? join(dirname(dirname(onPath('git'))), 'bin', 'bash.exe') : '/bin/sh';
+  // Git Bash is the bin\bash.exe of the Git install that holds the git on the path, found up from it: that git may be
+  // its cmd\git.exe or, in a Git Bash, its ucrt64\bin or mingw64\bin one.
+  const gitBash = () => { for (let d = dirname(onPath('git')); d !== dirname(d); d = dirname(d)) if (existsSync(join(d, 'bin', 'bash.exe'))) return join(d, 'bin', 'bash.exe'); return null; };
+  const shell = win ? gitBash() : '/bin/sh';
+  assert.ok(shell, 'Git Bash is found beside git');
   const sh = (h, cmd) => execFileSync(shell, ['-c', cmd], { env: { ...(win ? { SYSTEMROOT: process.env.SYSTEMROOT } : {}), PATH: h.path, HOME: h.home }, encoding: 'utf8' }).trim();
   const same = (a, b) => assert.equal(realpathSync(a), realpathSync(b));
   const h = makeHome({ install: () => {} });
