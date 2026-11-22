@@ -62,3 +62,10 @@ test('between two versions: a part written, emptied, changed or taken by another
   assert.deepEqual(notesDiff(v2, v2), []);
   assert.equal(notesDiff(null, v2), null);
 });
+
+test('a hint is never left half-taken: one built to survive a single pass is gone, and so is a stray marker', () => {
+  const text = '## Open questions\n\nOwner: QA · Date: 2026-11-22\n\n<!<!-- -->-- hidden -->Who decides? <!-- left open';
+  const body = readNotes(text).parts.find((p) => p.id === 'questions').body;
+  assert.ok(!body.includes('<!--') && !body.includes('-->'), body);
+  assert.match(body, /Who decides\?/);
+});
