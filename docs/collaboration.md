@@ -160,7 +160,30 @@ What teams ask your system for, and what your team decided. Status is what the s
 - **Your team decides.** Each request is New until someone decides it: kept out of the system (with its reason), accepted in the product, accepted for now (with a day to look again), or brought into the system. `rms-design-system-engine --request "<key>" --decide out --why "…" --by "<who>"` records it in `design-system-engine-requests.json`, to commit.
 - **It closes by itself.** A request brought into the system is Built once no prototype lacks it any more. One accepted for now comes back on its day.
 - **Agents are told.** A need kept out of the system is a decision every agent reads before it asks, so nobody asks for it again.
+- **On its component's page too.** A request that names a component, as the nearest thing your system has or the thing a prototype uses meanwhile, shows in that component's Requests area: the Requests page's own table, chips and panel.
+- **GitHub and GitLab need no tooling of yours.** Name the project in `ds-config.json` (`requests.issues`, else your `issues` project) and `--requests` opens one issue per open request there, with its key in the body. It looks for an open issue a person already wrote for the same need first, and takes that one instead of opening another. Each issue's state comes back as the answer: closed, or declined when it is closed as not planned (or labelled won't fix, on GitLab). An issue the engine opened for a request that is built, or that nobody asks for any more, is closed with the reason said. Issues are opened only where `writes.issues` lets the engine, never on CI. The token is `GITHUB_TOKEN` or `GITLAB_TOKEN` in your `.env`.
 - **Your tracker stays yours.** The engine never talks to a tracker it does not know. `rms-design-system-engine --requests` writes the open requests, each with its key, to `.design-system-engine-out/requests/requests.json`. Your own tooling takes them to your tracker and writes its answers by key to `design-system-engine-requests.answers.json`: the state (open, closed, declined, or a duplicate of another key), the ticket's link and a reason. A request leaves the list when your tracker closes or declines it, or when no prototype lacks it, whichever comes first. A decline is kept as a decision, with its reason.
+
+### Prototypes
+
+Each prototype is a part of its own, with a page of its own. The Prototypes page lists every prototype your team has made, as a grid (each one's screen in small) or a table, with a switch beside the title. With none yet, it says so, and copies the request that makes the first.
+
+- **Filters.** A chip for each status, in the page's own words: Fix (its check found something), Missing (the system lacks something it needs), Not checked, Done. A Product list chip beside them, as the Rules page's Area. They filter the grid and the table alike.
+- **The table.** Prototype, Product, System version, Asked by, Asked on and Status, each column sortable, what needs doing first by default.
+- **A folder per product.** Keep prototypes in `prototypes/<Product>/`: the folder names the product the page filters by. Everything about a prototype sits beside it: its check, comments, handoff notes and versions, and its screens (`<name>.screens/`).
+- **Who asked, and what.** The prompt a prototype was made from is kept with it, with who asked (the name Git has for them, never typed by hand) and when. A prototype with no recorded asker is named by the commit that added it.
+- **Checked at every build.** Each prototype is checked against the version its product builds on (its pin, else the latest). Only the ones whose page, pin or system moved are checked again. `styleguide.checkPrototypes: false` turns it off.
+- **Shared through a repository.** Name one once (`rms-design-system-engine --store prototypes=<GitLab or GitHub link>`) and every prototype travels whole through it, product folders included. Until then, each check says the prototypes are on this computer only and asks for one.
+
+A row or a card opens the prototype's page in the side panel.
+
+- **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in Claude Code, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
+- **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
+- **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one.
+- **Status,** with when it was checked, against which release of the system, and at which commit or tag.
+- **Its screens,** one width at a time (and each state it was pictured in), what the system lacks for it, the components it uses, its handoff's versions with what changed, its notes with their owners, and the comments on it.
+
+A component's page links each prototype that uses it to that prototype's own page. The page reads what is kept beside each prototype and changes none of it.
 
 ### Each component's page
 
@@ -179,6 +202,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
+| Requests | The Requests page's own table, filtered to what teams ask for that names this component, with the same chips, each row opening the same panel. Shown only when a request names it |
 | History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it, its changes in Figma and code not committed yet |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.

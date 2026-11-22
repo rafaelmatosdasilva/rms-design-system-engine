@@ -147,7 +147,9 @@
       var protos = c.prototypes, open = protos.filter(function (p) { return !p.ok; });
       rows.push(mk('protos', 'Prototypes built with it', '<p>' + protos.length + (protos.length === 1 ? ' prototype uses it' : ' prototypes use it') + (open.length ? ', ' + open.length + ' of them not ready' : ', all of them ready at their last check') + ':</p><ul>' +
         protos.slice(0, 8).map(function (p) {
-          return '<li>' + esc(p.name) + ' <span class="pg-dim">' + (p.times > 1 ? '×' + p.times + ' · ' : '') + (p.ok ? 'ready' : p.mistakes + (p.mistakes === 1 ? ' mistake' : ' mistakes')) + (p.at ? ' · ' + esc(String(p.at).slice(0, 10)) : '') + '</span></li>';
+          // Its own page, on the Prototypes page, when the project still has it.
+          var page = (DATA.prototypes || []).some(function (x) { return x.name === p.name; });
+          return '<li>' + (page ? '<a href="#prototypes?panel=' + esc(encodeURIComponent('proto:' + p.name)) + '">' + esc(p.name) + '</a>' : esc(p.name)) + ' <span class="pg-dim">' + (p.times > 1 ? '×' + p.times + ' · ' : '') + (p.ok ? 'ready' : p.mistakes + (p.mistakes === 1 ? ' mistake' : ' mistakes')) + (p.at ? ' · ' + esc(String(p.at).slice(0, 10)) : '') + '</span></li>';
         }).join('') + '</ul>', open.length ? 'check' : 'ok',
         open.length ? 'Open each prototype that is not ready: what it got wrong with this component is what its documentation does not say plainly enough.' : 'Nothing to do.'));
       rows[rows.length - 1].src = ['Each prototype\'s own record'];

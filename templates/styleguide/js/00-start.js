@@ -228,6 +228,7 @@
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   NAV_MARK.requests = '<path d="M2 9.5V13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.5"/><path d="M2 9.5 4 3h8l2 6.5h-3.5a2.5 2.5 0 0 1-5 0z"/>';   // an inbox tray: what others ask the system for
+  NAV_MARK.prototypes = '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 5.5h12M5 8.5h6M5 11h3.5"/>';   // a screen drawn with lines: a page somebody is building
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
   // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }

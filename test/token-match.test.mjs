@@ -39,3 +39,22 @@ test('the code\'s fix is a patch that writes each exact token where its value wa
   assert.match(patch, /-  color: #3366ff;\n\+  color: var\(--action-bg\);/);
   assert.doesNotMatch(patch, /\+  border-color/);
 });
+
+test('a value read on a node is bound by that node, so a layer that shares its name is never bound in its place', async () => {
+  const values = { chip: { hygiene: { raw: [{ at: 'Size=M/Label', field: 'fill', value: '#3366ff', node: '12:34' }] } } };
+  const m = figmaMatches(values, { color: { light: { 'action/bg': '#3366ff' } } });
+  assert.deepEqual(bindOps(m), { chip: [{ op: 'bind', layer: 'Label', field: 'fill', variable: 'action/bg', where: { Size: 'M' }, node: '12:34' }] });
+  const ops = await import('../lib/figma-ops.mjs');
+  const src = (await import('node:fs')).readFileSync(new URL('../lib/figma-ops.mjs', import.meta.url), 'utf8');
+  assert.match(src, /getNodeByIdAsync\(o\.node\)/, 'the script binds the node it names');
+  assert.ok(ops.OPS.includes('bind'));
+});
+
+test('the capture keeps a value\'s node only where its path is shared by another layer', async () => {
+  const { hygieneOf } = await import('../lib/figma-hygiene.mjs');
+  const dot = (id, r) => ({ type: 'RECTANGLE', id, name: 'Dot', visible: true, fills: [{ type: 'SOLID', visible: true, color: { r, g: 0, b: 0 } }], strokes: [], boundVariables: {} });
+  const root = { type: 'COMPONENT', id: '1:1', name: 'chip', visible: true, fills: [], strokes: [], boundVariables: {}, children: [dot('1:2', 1), dot('1:3', 0.5), { ...dot('1:4', 0.2), name: 'Ring' }] };
+  const h = hygieneOf(root, '');
+  const fills = h.raw.filter((r) => r.field === 'fill');
+  assert.deepEqual(fills.map((r) => [r.at, r.node ?? null]), [['chip/Dot', '1:2'], ['chip/Dot', '1:3'], ['chip/Ring', null]]);
+});

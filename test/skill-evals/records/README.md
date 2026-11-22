@@ -309,5 +309,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-22-a-product-s-health-asked` | The 25 guide tasks on Haiku (engine 8e3db454) | "A product's own health report, its screens drawn from the system, and formats read as part of the system" |
 | `2026-11-22-the-colour-scales-steps-on` | The 25 guide tasks on Haiku (engine 9259e348) | "The colour scales' steps on the colour page and in the health report" |
 | `windows-2026-11-22` | The 25 guide tasks on Haiku (engine 5515a0c) | "The guide on Windows" |
+| `2026-11-22-the-semantic-token-named-first` | The 25 guide tasks on Haiku (engine 308c49d2) | "The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
