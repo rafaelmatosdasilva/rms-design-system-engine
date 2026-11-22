@@ -207,12 +207,19 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 
 ### Beyond A and AA
 
-Two things the check looks at are not asked for by WCAG 2.2 at level A or AA. Each is a row of its own on a component's Accessibility area, named in words, listed after the criteria and always advisory — no criterion is marked as failing for them:
+Three things the check looks at are not asked for by WCAG 2.2 at level A or AA. Each is a row of its own on a component's Accessibility area, named in words, listed after the criteria and always advisory — no criterion is marked as failing for them:
 
-- **Forced colours.** In Windows high contrast mode the browser throws your colours away and paints with the reader's own. The check looks for an icon or a text the mode makes vanish, a state that then looks like the rest, a focus ring that was only a shadow, and the edge of a field, checkbox, radio or switch that read at rest and is gone there (a box-shadow, or a background colour standing in for a border). An edge already too faint at rest is 1.4.11's own finding and is not counted twice.
+- **Forced colours.** In Windows high contrast mode the browser throws your colours away and paints with the reader's own. The check looks for an icon or a text the mode makes vanish, a state that then looks like the rest (an error marked only by a red border included, unless a message says it in words), a focus ring that was only a shadow, and the edge of a field, checkbox, radio or switch that read at rest and is gone there (a box-shadow, or a background colour standing in for a border). An edge already too faint at rest is 1.4.11's own finding and is not counted twice.
 - **Reduced motion.** Under `prefers-reduced-motion: reduce`, anything that still transitions or animates.
+- **Zoom and magnification.** What someone zoomed in or using a screen magnifier meets:
+  - **Zoomed to 200% and 400%** (a page drawn 640px and 320px wide), a main action (Save, Submit, Continue) that a
+    bar staying on screen covers when it takes the focus, or bars that take half the screen or more. Run on pages.
+  - **With a magnifier** (a 4x lens shows about 320 by 200 pixels), a field's error message too far from the field
+    to be seen with it in one view.
 
-Both are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
+A run that finds none of these says none were found, never that the page is accessible.
+
+All three are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
 
 Why apart: an icon that disappears in high contrast mode used to be reported as WCAG 1.4.11 failing, and a focus ring as 2.4.7. That told a team an AA criterion was broken where the standard asks for nothing at all — and a conformance claim has to be true about the standard, not about everything worth fixing.
 
