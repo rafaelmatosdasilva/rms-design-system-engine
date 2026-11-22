@@ -188,3 +188,78 @@ test('the code grammar says a Lit or an Angular component is written as one', as
   assert.equal(textComponentApi('acme-button.ts', LIT_TS).syntax, 'lit');
   assert.equal(textComponentApi('badge.component.ts', NG_DECORATORS).syntax, 'angular');
 });
+
+test('what real libraries write: a wrapped union, classMap, a dynamic tag, nested templates, doc tags and this.emit', () => {
+  const src = `import { html } from 'lit';
+import { property } from 'lit/decorators.js';
+import AcmeElement from '../../internal/acme-element.js';
+
+/**
+ * @summary A menu that opens on a press.
+ * @event acme-show - Emitted when it opens.
+ * @slot - The menu's items.
+ * @slot trigger - What opens it.
+ */
+export default class AcmeMenu extends AcmeElement {
+  /** Where the panel opens. */
+  @property({ reflect: true }) placement:
+    | 'top'
+    | 'bottom'
+    | 'bottom-start' = 'bottom-start';
+  @property({ reflect: true }) variant: 'default' | 'primary' =
+    'default';
+  show() { this.emit('acme-after-show'); }
+  render() {
+    // the panel's own element: it isn't a slot
+    const tag = literal\`div\`;
+    return html\`
+      <\${tag}
+        part="base"
+        class=\${classMap({ acmeMenu: true, 'acmeMenu--open': this.open })}>
+        \${this.open ? html\`<span class="acmeMenu__dot"></span>\` : ''}
+        <slot name="trigger"></slot><slot></slot>
+      </\${tag}>\`;
+  }
+}`;
+  const api = classComponentApi('acme-menu.component.ts', src);
+  assert.deepEqual(api.props.placement.options, ['top', 'bottom', 'bottom-start']);
+  assert.equal(api.props.placement.default, 'bottom-start');
+  assert.equal(api.props.variant.default, 'default', 'a default the formatter moved to its own line');
+  assert.deepEqual(api.events.sort(), ['acme-after-show', 'acme-show']);
+  assert.deepEqual(api.slots, { named: ['trigger'], default: true });
+  assert.equal(classRootClass('acme-menu.component.ts', src), 'acmeMenu', 'a classMap\'s first class, on a tag chosen at render');
+});
+
+test('Angular as a large library writes it: getter inputs, inputs from a base class, select lists and a selector list', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ng-base-'));
+  try {
+    writeFileSync(join(dir, 'acme-base.ts'), `import { Directive, Input, input, booleanAttribute } from '@angular/core';
+@Directive()
+export class AcmeBase {
+  @Input() color?: string | null;
+  @Input({ transform: booleanAttribute })
+  get disabled(): boolean { return this._disabled; }
+  set disabled(v: boolean) { this._disabled = v; }
+  readonly busy = input(false, { transform: booleanAttribute });
+}`);
+    const src = `import { Component, Input } from '@angular/core';
+import { AcmeBase } from './acme-base';
+@Component({
+  selector: \`
+    button[acmeAction], a[acmeAction]
+  \`,
+  template: \`<ng-content select=".acme-icon:not([iconEnd]), [acmeIcon]:not([iconEnd])"></ng-content><ng-content></ng-content><ng-content select="[acmeIcon][iconEnd]"></ng-content>\`,
+})
+export class AcmeAction extends AcmeBase {
+  @Input() appearance: 'filled' | 'outlined' = 'filled';
+}`;
+    const file = join(dir, 'acme-action.ts');
+    writeFileSync(file, src);
+    const api = classComponentApi(file, src);
+    assert.deepEqual(Object.keys(api.props).sort(), ['appearance', 'busy', 'color', 'disabled'], 'a getter input is named by the getter, and the base class\'s inputs are its own');
+    assert.equal(api.props.disabled.type, 'boolean');
+    assert.equal(api.props.busy.default, false);
+    assert.deepEqual(api.slots, { named: ['acmeIcon', 'iconEnd'], default: true }, 'a select list is named by the attribute it asks for, never what it rules out');
+    assert.equal(api.tag, 'button[acmeAction]');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

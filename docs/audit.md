@@ -534,13 +534,15 @@ A component written as a class is read the way a Vue or React one is, into the s
 
 - **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
 - **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`.
-- **What it takes.** Lit's reactive properties, decorated (`@property() tone = 'primary'`) or listed in `static properties`, with the defaults its constructor gives. Angular's inputs, decorated (`@Input()`, with an alias, `required` or a setter) or signals (`input()`, `input.required()`, `model()`). A union of strings (`'s' | 'm' | 'l'`) gives a prop's options.
+- **What it takes.** Lit's reactive properties, decorated (`@property() tone = 'primary'`) or listed in `static properties`, with the defaults its constructor gives. Angular's inputs, decorated (`@Input()`, with an alias, `required`, a getter or a setter) or signals (`input()`, `input.required()`, `model()`). A union of strings (`'s' | 'm' | 'l'`) gives a prop's options, even one a formatter wrapped over several lines.
+- **What it inherits.** The props and events of the class it extends, when that class is your own (imported from `./…`), up to three classes up. A prop the component declares itself wins.
 - **What it keeps to itself.** Lit's internal state (`@state()`, `state: true`) is no prop, as a Vue component's data is not.
-- **What it sends.** Lit's events (`new CustomEvent('acme-press')`). Angular's outputs (`@Output()`, `output()`), and a model's own `<name>Change`.
-- **What it holds.** Lit's `<slot>` and Angular's `<ng-content>`, named by what its `select` picks (`[icon]`, `.icon`, `[slot=icon]`). An Angular template in its own file (`templateUrl`) is read too.
-- **Its class.** An Angular component's `host` class, else the first class its template's first element carries. A class written with `${…}` is a modifier, never the component's name.
+- **What it sends.** Lit's events (`new CustomEvent('acme-press')`, or a base class's `this.emit('acme-press')`), and those its doc comment names (`@event`, `@fires`). Angular's outputs (`@Output()`, `output()`), and a model's own `<name>Change`.
+- **What it holds.** Lit's `<slot>`, and those its doc comment names (`@slot`). Angular's `<ng-content>`, named by the attribute its `select` asks for (`[icon]`, `[slot=icon]`), else its class (`.icon`). What a select rules out (`:not(…)`) never names it. An Angular template in its own file (`templateUrl`) is read too.
+- **Its class.** An Angular component's `host` class, else the first class its template's first element carries, a `<slot>` aside. Lit's `classMap({ menu: true, … })` gives the class it always sets. A class written with `${…}` is a modifier, never the component's name.
 - **Used by its tag.** A component another one puts in its template as a custom element (`<acme-icon-button>`) counts as used.
 - **A manifest first.** A Lit system that ships a Custom Elements Manifest is read from it, and from its files where it says nothing.
+- **Proven on real code.** A public Lit library of 58 components and a public Angular library of 77 were read this way: 42 and 67 of them with their class (the rest draw no element of their own), with their options, defaults, descriptions, events and slots.
 - **Not drawn yet.** The browser checks do not draw Lit or Angular components yet, so they get the checks that read code, never the ones that measure it drawn.
 
 #### Values written by hand
