@@ -174,6 +174,7 @@ What it reads, as rules:
 - **The props.** How each kind of prop is named (a yes/no, a choice of options, a text, a number), the word a yes/no begins or ends with (`is…`, `show…`), and how an option is written (`in-progress` or `inProgress`).
 - **What says what it is for.** A comment on each component and on each prop.
 - **The way to Figma.** Each component Figma has, joined to it by a Code Connect file, and each Figma property mapped to a prop or a slot.
+- **Stories that still hold.** Each value a component's stories and examples set is one its prop still takes: a story's args (`args: { size: 'xs' }`) and each call of the component written in a story or examples file (`<Button size="xs" />`), its literal values only. A story builds whatever it sets, so a size the system dropped keeps showing in every story that used it, and everyone who copies the story copies it. This one is a rule from the first component with stories, not a habit most follow: every break is to fix, with its file, line and story, and `--construction-check` fails on it unless your team says no.
 - **States.** How each state is written, state by state: a pseudo-class (`:disabled`), a class (`.is-disabled`), a data attribute or an ARIA attribute.
 - **Class names.** How a part's class is named (`button__label`, `button-label` or `label`), and a variant's (`button--large`).
 - **Tokens.** Whether a component's styles use custom properties made for it (`--button-…`) or the shared tokens directly. Which way is your team's to say, so it waits for the answer.
