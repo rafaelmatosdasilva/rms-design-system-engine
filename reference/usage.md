@@ -145,7 +145,7 @@ rms-design-system-engine --refresh-snapshots             # send the snapshots th
 rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the style guide to the team's themes store, for everyone's Theme choice
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
-rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
+rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--owner <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
 rms-design-system-engine --keep                          # list the kept differences
 rms-design-system-engine --unkeep --match <words> [--component <name>]   # take kept differences back: open again on the next audit
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
@@ -2372,12 +2372,18 @@ line, and adds them to the file (nothing accepted before is dropped): `--compone
 --match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
 names the kind of difference (radius, height, width, padding, gap, colour, props).
 
+**Why, and whose.** `--baseline --reason "<why>" --owner "<who>"` keeps both on each line it accepts (a line accepted
+again takes them, and keeps who first accepted it and when). Every run lists the accepted debt with no reason or no
+owner, or with a reason that says nothing, so it can be accepted again in the person's words.
+
 #### Kept on purpose (`--keep`)
 
 A difference the team decided to keep is not debt: debt is what will be fixed. `--keep --match <words>` (with
 `--component <name>` when the person names one) records the open differences of the last full audit that match, in a
 committed `design-system-engine-kept.json`: the difference as the audit said it, `--reason` in the person's own words
-(required, never written for them), who decided (`--by`, else the git user) and when, `--truth figma|code` when one side
+(required, never written for them, and refused when it says nothing: too short, only words such as intentional or by
+design, another kept difference's words, or a short one that names nothing the difference is about), who decided (the git
+user) and when, who answers for it (`--owner`, else whoever kept it), `--truth figma|code` when one side
 is right, and `--review` (a date, or `90d`, `6m`, `1y`) when to look at it again. On every run a kept difference never
 fails its gate (a gate whose failing lines are all kept passes), its line is shown as `✋ kept on purpose` with the
 reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the style guide's

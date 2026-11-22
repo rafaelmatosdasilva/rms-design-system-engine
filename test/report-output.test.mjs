@@ -115,9 +115,9 @@ test('every finding as one record (rule, evidence, verdict, who acts), each gate
   const gates = [{ n: 1, label: 'Token values  (color · sizing)', pass: false }, { n: 2, label: 'Structure', pass: true }, { n: 3, label: 'Motion', pass: true, notRun: true }];
   const gr = gateRecords(gates, ['Token values match Figma', 'Structure matches', 'Motion matches']);
   assert.deepEqual(gr, [
-    { check: 'Token values', rule: 'Token values match Figma', verdict: 'fails' },
-    { check: 'Structure', rule: 'Structure matches', verdict: 'passes' },
-    { check: 'Motion', rule: 'Motion matches', verdict: 'not checked' },
+    { check: 'Token values', rule: 'Token values match Figma', verdict: 'fails', layer: 'rule', does: 'catches' },
+    { check: 'Structure', rule: 'Structure matches', verdict: 'passes', layer: 'rule', does: 'catches' },
+    { check: 'Motion', rule: 'Motion matches', verdict: 'not checked', layer: 'rule', does: 'catches' },
   ]);
   const rules = Object.fromEntries(gr.map((g) => [g.check, g.rule]));
   const r = findingRecords(findings, ['chip'], { rules, failing: ['Token values'], prev: [findings[1]] });
