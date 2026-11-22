@@ -86,7 +86,7 @@ rms-design-system-engine --figma-change chip "add xl to size like l"  # a change
 rms-design-system-engine --figma-undo                    # what the way back from the last Figma write puts back, shown before it runs; writes nothing
 rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --shared binds the shared variables; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
-rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
+rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line; --census --fix writes the patch for the values a token holds exactly (handback/hand-written-values.diff), for a person to apply
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
@@ -2406,6 +2406,15 @@ value, a warning when none does), a duration (a warning, with its token when one
 or 1 and a shadow written out (warnings). The theme files' custom properties are the tokens themselves and are not
 counted; their other rules are. 0, a 1px hairline, a pill's 999px radius, `calc()` and a value inside `var()` are left
 alone; the same value written twice on one line counts once. Files are listed with the ones that guess most first.
+
+A colour no token holds is named with the nearest colour token by how it looks (OKLab, the difference as ΔE), up to
+ΔE 4; past that the system has no colour near it, and says so. Where a semantic token and a primitive hold the same
+value, the semantic one is named. `--census --fix` writes `handback/hand-written-values.diff`, which puts `var(--token)`
+where each value a token holds exactly was written; a nearest one is left for the person to choose, and the engine
+applies nothing. The edit check names the same nearest colour when an edit writes one. In Figma, the hygiene report
+names the variable for each fill, stroke, radius, gap and border with none (the one that holds it, else the nearest),
+and writes the bindings for the exact ones per component to `handback/figma-binds/<component>.ops.json`, which
+`--figma-change <component> "<change>" --ops <file>` takes, behind the sign-off every change in Figma has.
 
 The first run writes the count as the baseline (`design-system-engine-census.json`, committed with the change); a run
 with fewer errors lowers it; a run where a file has more errors than the baseline names the file and exits 1, so the

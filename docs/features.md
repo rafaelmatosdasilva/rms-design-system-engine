@@ -100,6 +100,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Holds a rule once every component follows it, so the next break fails, and gives a deprecation one release before its uses fail.
 - Says which layer each finding belongs to (a rule, guidance a model read, or taste), and what is left for the reviewer.
 - Names who may sign off each kind of change, from your config or your `CODEOWNERS`, and refuses anyone else.
+- Holds every component to one name and one set of values for one idea, in Figma and in the code, and answers a guessed prop name with the system's.
+- Checks that each state uses the system's state token, in every mode, in Figma, in the code and as an agent edits.
+- Names the token for each value written by hand (the exact one, else the nearest), and writes the fix for you to apply, in the code and in Figma.
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Finds classes your markup uses that nothing styles, and styles nothing uses, each with its file and line.
