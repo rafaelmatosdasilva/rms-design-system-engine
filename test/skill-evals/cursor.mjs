@@ -18,6 +18,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { envVar } from '../../lib/names.mjs';
 import { AGENTS_VARIANT } from './codex.mjs';
 import { ENGINE } from './lib.mjs';
+import { onPath } from '../../lib/project-bin.mjs';
 
 // The CLI, where the person put it: DESIGN_SYSTEM_ENGINE_EVAL_CURSOR, else the PATH, else where Cursor's installer
 // puts it (~/.local/bin, which a run's own PATH leaves out). → an absolute path, or null.
@@ -29,7 +30,8 @@ export function findCursor({ env = process.env, exists = existsSync, which = whi
   const installed = join(homedir(), '.local', 'bin', 'cursor-agent');
   return exists(installed) ? installed : null;
 }
-function whichBin(name) { try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() || null; } catch { return null; } }
+// Found by the engine itself (project-bin.mjs onPath), since Windows has no `which`.
+const whichBin = (name) => onPath(name);
 export const CURSOR = findCursor();
 export function cursorVersion(cli = CURSOR, run = execFileSync) {
   if (!cli) return null;

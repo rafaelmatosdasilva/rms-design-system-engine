@@ -12,10 +12,10 @@
 //             has (run with --agent cursor, cursor.mjs)
 //   mcp       no skill and no engine at all: Claude with only what the Figma MCP returned (the build evaluation's
 //             baseline). The request goes in as written, with no command in front of it.
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ENGINE } from './lib.mjs';
+import { ENGINE, linkTo } from './lib.mjs';
 import { skillMd, guideAtRef } from '../../lib/skill-files.mjs';
 import { AGENTS_VARIANT, CODEX_SKILL_VARIANT } from './codex.mjs';
 import { CURSOR_VARIANT } from './cursor.mjs';
@@ -61,7 +61,7 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
     return { name, ref: 'working tree', text, install: (home) => {
       const dir = join(home, '.claude', 'skills', 'rms-design-system-engine');
       mkdirSync(dir, { recursive: true });
-      for (const f of readdirSync(ENGINE)) if (!['.git', 'test', GUIDE, 'SKILL.md'].includes(f)) symlinkSync(join(ENGINE, f), join(dir, f));
+      for (const f of readdirSync(ENGINE)) if (!['.git', 'test', GUIDE, 'SKILL.md'].includes(f)) linkTo(join(ENGINE, f), join(dir, f));
       writeFileSync(join(dir, 'SKILL.md'), text);
     } };
   }

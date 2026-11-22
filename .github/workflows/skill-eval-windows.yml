@@ -1,0 +1,70 @@
+name: Skill evaluation on Windows
+
+# The skill evaluation's guide tasks run on a Windows runner, the way the README's "it runs there" is proven: Claude Code
+# itself on Windows, its commands in Git Bash, the engine installed for it, each task scored as the evaluation on macOS
+# scores it (test/skill-evals/continuous.mjs). Started by hand, since each run uses the model: it signs in with the
+# owner's own login, kept as a repository secret (CLAUDE_CODE_OAUTH_TOKEN, from `claude setup-token`, or
+# ANTHROPIC_API_KEY), which nothing here reads but the run. The records it writes come back as an artifact, to be
+# committed through a pull request like every other evaluation's.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: The model each task runs on
+        default: claude-haiku-4-5-20251001
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: A login to run the model with
+        shell: bash
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=No login::Set the repository secret CLAUDE_CODE_OAUTH_TOKEN (claude setup-token) or ANTHROPIC_API_KEY, then start this again."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The records name the commits since the entry before: the whole history, not one commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Claude Code and the Agent SDK from their lockfiles, and TypeScript for the scorer, as the suite's run has it.
+      - name: Install the evaluation's tools
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          npm ci --prefix test/.claude-cli-tools --no-audit --no-fund
+          npm ci --prefix test/.eval-tools --no-audit --no-fund
+          npm ci --prefix test/.ci-tools --no-audit --no-fund
+          here=$(cygpath -w "$PWD")
+          echo "NODE_PATH=$here\\test\\.ci-tools\\node_modules" >> "$GITHUB_ENV"
+      - name: Run and record the guide tasks
+        shell: bash
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          node test/skill-evals/continuous.mjs --model "$MODEL" --name "windows-$(date -u +%Y-%m-%d)" \
+            --title "The guide on Windows" \
+            --what "The guide tasks run on a Windows runner, Claude Code on Windows and its commands in Git Bash."
+      # The records and the entry, to commit; the transcripts, to read a failed run by. Kept even when a run failed.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: skill-eval-windows
+          retention-days: 14
+          path: |
+            test/skill-evals/records
+            test/skill-evals/RESULTS.md
+            test/skill-evals/results

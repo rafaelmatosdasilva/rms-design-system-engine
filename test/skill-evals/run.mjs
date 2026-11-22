@@ -91,7 +91,7 @@ if (!cliVersion) {
     : '✗ no Agent SDK, and the runs go through it (an API key is set): npm ci --prefix test/.eval-tools. Unset ANTHROPIC_API_KEY to run on the plan\'s login through the command line instead.');
   process.exit(2);
 }
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(AGENT !== 'claude' ? { agent: AGENT } : {}), ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, runner, cliVersion, ...(AGENT !== 'claude' ? { agent: AGENT } : {}), ...(process.platform === 'win32' ? { os: 'windows' } : {}), ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 

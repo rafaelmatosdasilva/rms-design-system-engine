@@ -84,7 +84,7 @@ test('judgeCandidate passes the component guidance (the "why") into the payload'
 });
 
 // the same cases per kind of guidance, compared with bare.
-test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
+test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', async () => {
   const { runLevels, levelLines } = await import('../lib/eval-run.mjs');
   const out = { bare: '<div style="color:#ff0000">x</div>', steering: '<button class="buttonPrimary"><svg/></button>', parity: '<button class="buttonPrimary">Go</button>' };
   const by = runLevels([{ id: 'a' }, { id: 'b' }], ctx, ['bare', 'steering', 'parity'], (c, level) => out[level], 2);
@@ -98,13 +98,16 @@ test('guidance levels: each level scored by the same checks, accessibility inclu
   assert.equal(lines[3], '  extra     not run: nothing to give');
 });
 
-test('guidance levels: the context each level gets, and the whole run from ds-config', { skip: process.platform === 'win32' ? 'its generate command is a POSIX shell script' : false }, async () => {
+test('guidance levels: the context each level gets, and the whole run from ds-config', async () => {
   const { levelContext } = await import('../lib/eval-run.mjs');
   const { spawnSync } = await import('node:child_process');
   const { join } = await import('node:path');
   const dir = makeFixture({
     'ds-config.json': { paths: { themeCSS: 'theme.css' }, componentSelectors: { chip: '.chip' },
-      evals: { cases: [{ id: 'filter', prompt: 'a filter chip' }], generate: { cmd: 'if [ -n "$EVAL_CONTEXT" ]; then echo "<button class=\\"chip\\">Filter</button>"; else echo "<div style=\\"padding: 9px\\">Filter</div>"; fi' } } },
+      evals: { cases: [{ id: 'filter', prompt: 'a filter chip' }], generate: { cmd: 'node generate.cjs' } } },
+    // A command every shell runs alike, sh and the Windows command prompt: it answers with the component when the
+    // level hands it a context, and with a hand-made look-alike when it does not.
+    'generate.cjs': `process.stdout.write(process.env.EVAL_CONTEXT ? '<button class="chip">Filter</button>\\n' : '<div style="padding: 9px">Filter</div>\\n');\n`,
     'theme.css': ':root { --chip-bg: #fff; }',
     'AGENTS.md': '# Agents\nUse the chip component.\n',
   });

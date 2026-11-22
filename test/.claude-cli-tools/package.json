@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "The Claude Code CLI the skill evaluation runs each task with where none is installed on the machine (test/skill-evals/lib.mjs findClaude): CI's Windows runner installs it from this lockfile. Only the evaluation reads it; the engine itself has no dependencies.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.330"
+  }
+}

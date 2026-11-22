@@ -12,9 +12,8 @@ import { join, dirname, relative, resolve, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../lib/cdp.mjs';
-import { usableTypeScript, TYPESCRIPT_HINT } from '../../lib/project-typescript.mjs';
+import { usableTypeScript, machineTypeScript, TYPESCRIPT_HINT } from '../../lib/project-typescript.mjs';
 
 // TypeScript, loaded when a build is first transpiled, so the scorer's other helpers (the prototype scorer imports
 // them) work on a machine that has none. The build's own first, then the global npm folder's; one that cannot read JSX
@@ -25,7 +24,8 @@ function tsLib(dir = null) {
   if (tsModule) return tsModule;
   const loaders = [];
   if (dir) loaders.push(() => createRequire(join(dir, 'package.json'))('typescript'));
-  loaders.push(() => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
+  // Then the machine's, found the engine's one way (project-typescript.mjs), which Windows has too.
+  loaders.push(() => machineTypeScript());
   for (const load of loaders) {
     let got = null;
     try { got = load(); } catch { continue; }

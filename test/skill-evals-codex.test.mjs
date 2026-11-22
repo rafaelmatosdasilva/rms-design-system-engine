@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { tempDir } from './helpers.mjs';
+import { tempDir, standIn } from './helpers.mjs';
 import { toStreamJson, unwrap, codexArgs, codexHome, AGENTS_VARIANT } from './skill-evals/codex.mjs';
 import { context, cliOf } from './skill-evals/lib.mjs';
 import { variant } from './skill-evals/variants.mjs';
@@ -63,13 +63,14 @@ test('each turn: JSON events, the project and its HOME writable, the next turn o
   assert.ok(!next.includes('--approve-for-me') && !next.includes('--add-dir'), 'a later turn keeps the session\'s own options: Codex refuses them on resume');
 });
 
-test('a run\'s Codex holds only the person\'s login', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
+test('a run\'s Codex holds only the person\'s login', () => {
   const src = tempDir('codex-login-'), home = tempDir('codex-home-');
   writeFileSync(join(src, 'auth.json'), '{"tokens":{}}');
   writeFileSync(join(src, 'config.toml'), '[projects."/x"]\ntrust_level = "trusted"\n');
   const dir = codexHome(home, join(src, 'auth.json'));
   assert.equal(readFileSync(join(dir, 'auth.json'), 'utf8'), '{"tokens":{}}');
-  assert.equal(statSync(join(dir, 'auth.json')).mode & 0o777, 0o600);
+  // Windows keeps no Unix mode: there the file is its user's by its folder's permissions.
+  if (process.platform !== 'win32') assert.equal(statSync(join(dir, 'auth.json')).mode & 0o777, 0o600);
   assert.equal(existsSync(join(dir, 'config.toml')), false, 'no trusted projects, no settings of theirs');
   assert.throws(() => codexHome(tempDir('codex-home-'), join(src, 'none.json')), /codex login/);
 });
@@ -118,16 +119,13 @@ test('the skill variant runs the engine\'s hooks, as a person who trusted them h
   assert.ok(existsSync(join(d, '.codex')), 'a .codex folder, so --install-hooks writes the Codex hooks beside Claude Code\'s');
 });
 
-test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, async () => {
+test('a short answer with no command is an answer; only no command and next to no words is a run that never ran', async () => {
   const { runCodex } = await import('./skill-evals/codex.mjs');
-  const fake = (lines) => { const d = tempDir('codex-fake-'); const f = join(d, 'codex'); writeFileSync(f, `#!/bin/sh\ncat <<'X'\n${lines.map((l) => JSON.stringify(l)).join('\n')}\nX\n`); return f; };
-  const { chmodSync } = await import('node:fs');
+  const fake = (lines) => standIn(tempDir('codex-fake-'), 'codex', `process.stdout.write(${JSON.stringify(lines.map((l) => JSON.stringify(l)).join('\n') + '\n')});\n`);
   const answer = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'In Figma, select the chip and add an annotation in the Accessibility category.' } }, { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 40 } }]);
-  chmodSync(answer, 0o755);
   const home = tempDir('codex-fake-home-');
   const a = await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: answer });
   assert.equal(a.infra, null, 'scored, not thrown out');
   const empty = fake([{ type: 'thread.started', thread_id: 't' }, { type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'OK' } }, { type: 'turn.completed', usage: { input_tokens: 14154, output_tokens: 49 } }]);
-  chmodSync(empty, 0o755);
   assert.match((await runCodex({ cwd: home, home, env: process.env, prompt: 'p', cli: empty })).infra, /called nothing/);
 });

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { globalModuleDirs, machineTypeScript, machineTsc } from '../lib/project-typescript.mjs';
+import { globalModuleDirs, machineTypeScript, machineTsc, askNpm } from '../lib/project-typescript.mjs';
 
 const fakeTs = 'module.exports = { transpileModule() {}, createSourceFile() {}, JsxEmit: {}, ScriptTarget: {}, ModuleKind: {}, ScriptKind: {} };';
 function machine() {
@@ -42,4 +42,17 @@ test('no global folder with a usable TypeScript: none is found, nothing is guess
   assert.equal(machineTypeScript([m.lib]), null);
   assert.equal(machineTypeScript([]), null);
   assert.equal(machineTsc([]), null);
+});
+
+// npm on Windows is npm.cmd, which no program is started as: asking it by name there found no global folder, so a
+// machine's TypeScript was never found on Windows. There npm's own script is run with the node beside it.
+test('npm is asked for its global folder the way each system starts it', () => {
+  const calls = [];
+  const run = (cmd, args) => { calls.push([cmd, ...args]); return 'C:\\npm-global\\node_modules\n'; };
+  const node = join('C:', 'node', 'node.exe'), cli = join('C:', 'node', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  assert.equal(askNpm({ platform: 'win32', execPath: node, exists: (p) => p === cli, run }), 'C:\\npm-global\\node_modules');
+  assert.deepEqual(calls.at(-1), [node, cli, 'root', '-g']);
+  assert.equal(askNpm({ platform: 'win32', execPath: node, exists: () => false, run }), null, 'no npm beside node: none asked');
+  assert.equal(askNpm({ platform: 'linux', run }), 'C:\\npm-global\\node_modules');
+  assert.deepEqual(calls.at(-1), ['npm', 'root', '-g']);
 });

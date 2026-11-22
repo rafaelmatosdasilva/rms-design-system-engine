@@ -62,7 +62,7 @@ test('each turn: stream-json printed, commands allowed as a person approving the
   assert.deepEqual(next.slice(-3), ['--resume', S, 'yes']);
 });
 
-test('a run\'s Cursor holds only the person\'s login', { skip: process.platform === 'win32' ? 'the skill evaluation runs on macOS and Linux: its stand-ins are shell scripts' : false }, () => {
+test('a run\'s Cursor holds only the person\'s login', () => {
   const src = tempDir('cursor-login-'), home = tempDir('cursor-home-');
   writeFileSync(join(src, 'cli-config.json'), '{"authInfo":{}}');
   writeFileSync(join(src, 'mcp.json'), '{"mcpServers":{}}');
@@ -70,7 +70,8 @@ test('a run\'s Cursor holds only the person\'s login', { skip: process.platform 
   const dir = cursorHome(home, join(src, 'cli-config.json'), {}, keys);
   assert.equal(readlinkSync(join(home, 'Library', 'Keychains')), keys, 'the keychain Cursor keeps its token in, linked, never copied');
   assert.equal(readFileSync(join(dir, 'cli-config.json'), 'utf8'), '{"authInfo":{}}');
-  assert.equal(statSync(join(dir, 'cli-config.json')).mode & 0o777, 0o600);
+  // Windows keeps no Unix mode: there the file is its user's by its folder's permissions.
+  if (process.platform !== 'win32') assert.equal(statSync(join(dir, 'cli-config.json')).mode & 0o777, 0o600);
   assert.equal(existsSync(join(dir, 'mcp.json')), false, 'none of their MCP servers or settings');
   assert.throws(() => cursorHome(tempDir('cursor-home-'), join(src, 'none.json'), {}, keys), /cursor-agent login/);
 });

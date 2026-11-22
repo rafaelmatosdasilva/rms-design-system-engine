@@ -17,6 +17,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { envVar } from '../../lib/names.mjs';
 import { writeRules, rulesSection } from '../../lib/agent-rules.mjs';
 import { codexSkillText, SKILL_NAME } from '../../lib/codex-skill.mjs';
+import { onPath } from '../../lib/project-bin.mjs';
 
 // The CLI, where the person put it: DESIGN_SYSTEM_ENGINE_EVAL_CODEX, else the PATH. → an absolute path, or null.
 export function findCodex({ env = process.env, exists = existsSync, which = whichBin } = {}) {
@@ -24,7 +25,8 @@ export function findCodex({ env = process.env, exists = existsSync, which = whic
   if (named) return exists(named) ? named : null;
   return which('codex');
 }
-function whichBin(name) { try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() || null; } catch { return null; } }
+// Found by the engine itself (project-bin.mjs onPath), since Windows has no `which`.
+const whichBin = (name) => onPath(name);
 export const CODEX = findCodex();
 export function codexVersion(cli = CODEX, run = execFileSync) {
   if (!cli) return null;

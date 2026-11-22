@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
-import { tempDir } from './helpers.mjs';
+import { tempDir, standIn } from './helpers.mjs';
 import { join, dirname } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -80,7 +80,7 @@ test('the pass opens one browser a scheme, measures each group and closes everyt
 // Found on a test run: Firefox opened its WebDriver BiDi port and never answered session.new. The error was thrown,
 // but Firefox and its socket were left open, and the run waited on them for five hours. Here a stand-in Firefox does
 // the same: it says where it listens, takes the connection and answers nothing.
-test('a Firefox that never answers is given up on and closed, leaving nothing running', { skip: process.platform === 'win32' ? 'the stand-in is a shell script' : false, timeout: 120000 }, async () => {
+test('a Firefox that never answers is given up on and closed, leaving nothing running', { timeout: 120000 }, async () => {
   const { createHash } = await import('node:crypto');
   const server = createServer();
   const sockets = [], closing = [];
@@ -92,8 +92,11 @@ test('a Firefox that never answers is given up on and closed, leaving nothing ru
     sock.on('data', (d) => { if ((d[0] & 0x0f) === 8) closing.push(sock); });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const dir = tempDir('ff-silent-'), pidFile = join(dir, 'pid'), ff = join(dir, 'firefox');
-  writeFileSync(ff, `#!/bin/sh\necho $$ > "${pidFile}"\necho "WebDriver BiDi listening on ws://127.0.0.1:${server.address().port}" >&2\nexec sleep 600\n`, { mode: 0o755 });
+  const dir = tempDir('ff-silent-'), pidFile = join(dir, 'pid');
+  const ff = standIn(dir, 'firefox', `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+process.stderr.write('WebDriver BiDi listening on ws://127.0.0.1:${server.address().port}\\n');
+setTimeout(() => {}, 600000);
+`);
   const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   try {
     await assert.rejects(openBrowser('firefox', ff), /session\.new: no answer/);
@@ -160,18 +163,17 @@ test('Safari through its WebDriver: a session, the page drawn at the width asked
   assert.match(whySafariRefused('Could not create a session: The Safari instance is already paired with another WebDriver session.'), /already being driven/);
 });
 
-test('safaridriver is waited for until it answers, and given up on with a reason', { skip: process.platform === 'win32' ? 'Safari and its safaridriver are macOS only' : false }, async () => {
+test('safaridriver is waited for until it answers, and given up on with a reason', async () => {
+  // Safari is macOS only, but how a driver is waited for and given up on is the engine's own, measured on a stand-in.
   const fake = await fakeSafari();
   try {
-    const sh = join(tempDir('fake-sd-'), 'safaridriver');
-    writeFileSync(sh, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
+    const sh = standIn(tempDir('fake-sd-'), 'safaridriver', 'setTimeout(() => {}, 30000);\n');
     const port = Number(new URL(fake.base).port);
     const b = await launchSafari(sh, { port, timeoutMs: 3000 });
     assert.equal(b.base, fake.base);
     b.kill();
   } finally { await fake.close(); }
-  const sh = join(tempDir('fake-sd-'), 'safaridriver');
-  writeFileSync(sh, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
+  const sh = standIn(tempDir('fake-sd-'), 'safaridriver', 'setTimeout(() => {}, 30000);\n');
   await assert.rejects(launchSafari(sh, { timeoutMs: 600 }), /did not answer within/);
 });
 
@@ -236,18 +238,24 @@ test('the Safari a session started is quit when it closes, and a person\'s own S
 // Found on the suite's own runners: two runs that began in the same minute each waited 30s for Firefox and failed,
 // while the runs before and after passed on the same code. A slow start is tried once more after a pause, as Chrome's
 // is; a Firefox that cannot be started at all is not, since trying again only gives the same answer later.
-test('a Firefox slow to start is given a second try, and one that cannot start is not', { skip: process.platform === 'win32' ? 'the stand-in is a shell script' : false, timeout: 60000 }, async () => {
-  const dir = tempDir('ff-slow-'), ff = join(dir, 'firefox'), tries = join(dir, 'tries');
+test('a Firefox slow to start is given a second try, and one that cannot start is not', { timeout: 60000 }, async () => {
+  const dir = tempDir('ff-slow-'), tries = join(dir, 'tries');
   writeFileSync(tries, '');
   // The first start says nothing; the second says where it listens.
-  writeFileSync(ff, `#!/bin/sh\necho x >> "${tries}"\nif [ "$(wc -l < "${tries}")" -ge 2 ]; then echo "WebDriver BiDi listening on ws://127.0.0.1:9" >&2; fi\nexec sleep 30\n`, { mode: 0o755 });
+  const ff = standIn(dir, 'firefox', `const fs = require('node:fs');
+fs.appendFileSync(${JSON.stringify(tries)}, 'x\\n');
+if (fs.readFileSync(${JSON.stringify(tries)}, 'utf8').trim().split('\\n').length >= 2) process.stderr.write('WebDriver BiDi listening on ws://127.0.0.1:9\\n');
+setTimeout(() => {}, 30000);
+`);
   const b = await launchFirefox(ff, { timeoutMs: 1500, retryAfterMs: 50 });
   try {
     assert.equal(b.wsUrl, 'ws://127.0.0.1:9');
     assert.equal(readFileSync(tries, 'utf8').trim().split('\n').length, 2, 'tried twice');
   } finally { b.kill(); }
   writeFileSync(tries, '');
-  writeFileSync(ff, `#!/bin/sh\necho x >> "${tries}"\nexec sleep 30\n`, { mode: 0o755 });
+  standIn(dir, 'firefox', `require('node:fs').appendFileSync(${JSON.stringify(tries)}, 'x\\n');
+setTimeout(() => {}, 30000);
+`);
   await assert.rejects(launchFirefox(ff, { timeoutMs: 800, retryAfterMs: 50 }), /did not open WebDriver BiDi within/);
   assert.equal(readFileSync(tries, 'utf8').trim().split('\n').length, 2, 'two tries, then the answer');
   await assert.rejects(launchFirefox(join(dir, 'no-such-firefox'), { timeoutMs: 800, retryAfterMs: 50 }), /could not be started/);

@@ -4,7 +4,8 @@
 // working directory. runGate() builds a throwaway project from a { path: content } map and
 // runs the gate against it (cwd = fixture), returning { code, out, dir }. `content` is written
 // verbatim when it is a string, otherwise as pretty JSON.
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync, rmSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync, rmSync, realpathSync, renameSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { tmpdir, availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -192,4 +193,65 @@ export function golden(fixture, name, out) {
   let i = 0; while (i < a.length && a[i] === b[i]) i++;
   const near = (lines) => lines.slice(Math.max(0, i - 2), i + 6).join('\n');
   assert.fail(`the report differs from ${name} at line ${i + 1} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff\n--- expected\n${near(a)}\n--- this run\n${near(b)}`);
+}
+
+// A program that stands in for a browser (or any command the engine starts by its path), written as a Node script so
+// every system runs the same one. macOS and Linux start it through a shell script. Windows starts only a real program,
+// never a script, so there it is a small launcher, compiled once with the C# compiler every Windows has, that runs the
+// script with this Node, passes its arguments and exit code through, and takes the script down when it is stopped: the
+// launcher and the script share a job that ends with the launcher. → the path to start.
+const LAUNCHER_CS = String.raw`using System; using System.Diagnostics; using System.IO; using System.Runtime.InteropServices; using System.Text;
+class StandIn {
+  [StructLayout(LayoutKind.Sequential)] struct Basic { public long a, b; public uint Flags; public UIntPtr c, d; public uint e; public UIntPtr f; public uint g, h; }
+  [StructLayout(LayoutKind.Sequential)] struct Io { public ulong a, b, c, d, e, f; }
+  [StructLayout(LayoutKind.Sequential)] struct Extended { public Basic B; public Io I; public UIntPtr p, j, pp, jp; }
+  [DllImport("kernel32.dll")] static extern IntPtr CreateJobObject(IntPtr a, string n);
+  [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr j, int c, ref Extended i, int l);
+  [DllImport("kernel32.dll")] static extern bool AssignProcessToJobObject(IntPtr j, IntPtr p);
+  static string Q(string s) {
+    if (s.Length > 0 && s.IndexOfAny(new[] { ' ', '\t', '"' }) < 0) return s;
+    var b = new StringBuilder("\""); int n = 0;
+    foreach (char ch in s) { if (ch == '\\') { n++; continue; } if (ch == '"') { b.Append('\\', n * 2 + 1); b.Append('"'); } else { b.Append('\\', n); b.Append(ch); } n = 0; }
+    b.Append('\\', n * 2); b.Append('"'); return b.ToString();
+  }
+  static int Main(string[] args) {
+    var job = CreateJobObject(IntPtr.Zero, null);
+    var info = new Extended(); info.B.Flags = 0x2000;
+    SetInformationJobObject(job, 9, ref info, Marshal.SizeOf(typeof(Extended)));
+    AssignProcessToJobObject(job, Process.GetCurrentProcess().Handle);
+    var run = File.ReadAllLines(Path.ChangeExtension(Process.GetCurrentProcess().MainModule.FileName, ".run"));
+    var line = new StringBuilder(Q(run[1]));
+    foreach (var a in args) line.Append(' ').Append(Q(a));
+    var p = Process.Start(new ProcessStartInfo(run[0], line.ToString()) { UseShellExecute = false });
+    p.WaitForExit();
+    return p.ExitCode;
+  }
+}`;
+let launcherExe = null;
+function launcher() {
+  if (launcherExe && existsSync(launcherExe)) return launcherExe;
+  const dir = join(tmpdir(), `rms-stand-in-${createHash('sha256').update(LAUNCHER_CS).digest('hex').slice(0, 12)}`);
+  const exe = join(dir, 'stand-in.exe');
+  if (!existsSync(exe)) {
+    mkdirSync(dir, { recursive: true });
+    const src = join(dir, `stand-in-${process.pid}.cs`), out = join(dir, `stand-in-${process.pid}.exe`);
+    writeFileSync(src, LAUNCHER_CS);
+    const csc = join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+    execFileSync(csc, ['/nologo', '/optimize', `/out:${out}`, src], { stdio: 'pipe' });
+    try { renameSync(out, exe); } catch { if (!existsSync(exe)) throw new Error('the stand-in launcher was not built'); }
+  }
+  return (launcherExe = exe);
+}
+export function standIn(dir, name, script) {
+  const js = join(dir, `${name}.cjs`);
+  writeFileSync(js, script);
+  if (process.platform !== 'win32') {
+    const sh = join(dir, name);
+    writeFileSync(sh, `#!/bin/sh\nexec "${process.execPath}" "${js}" "$@"\n`, { mode: 0o755 });
+    return sh;
+  }
+  const exe = join(dir, `${name}.exe`);
+  cpSync(launcher(), exe);
+  writeFileSync(join(dir, `${name}.run`), `${process.execPath}\r\n${js}\r\n`);
+  return exe;
 }
