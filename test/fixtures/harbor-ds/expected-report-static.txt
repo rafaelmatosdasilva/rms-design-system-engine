@@ -235,6 +235,9 @@
      iconButton: Default/Glyph is detached from its instance
      iconButton: Default has no auto layout
      iconButton: no description
+   The variables for 1 value with none:
+   - badge: fill #b42318 on Tone=Danger/Label, the system's status/danger/color holds it
+   The bindings for the exact ones, per component, in .design-system-engine-out/handback/figma-binds: when the person says yes, rms-design-system-engine --figma-change <component> "bind its values to the system's variables" --ops .design-system-engine-out/handback/figma-binds/<component>.ops.json
 
 ♿ Accessibility in the Figma file: 4 things the design owes (for whoever keeps the Figma file; the parity never changes Figma):
    • button, iconButton have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)

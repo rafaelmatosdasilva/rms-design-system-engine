@@ -210,6 +210,21 @@ It reads the code capture when there is one (its props come from the compiler an
 
 **In CI.** Beside those errors, a rule nobody has decided yet that components already break is a **warning**: said, never a failure, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data for a job that posts it. The step to copy is in [the CI recipe](../cookbook/ci-and-hooks.md).
 
+### One prop vocabulary across the system
+
+The family rules hold a family to one name and one set of options. These hold every component to them, in Figma and in the code:
+
+- **One idea, one name.** A button's words come through `label`, a chip's through `text`: the name most components use is the one kept, and each other is listed.
+- **One set of values.** A size that runs S to L on most components and sm to lg on one is listed, said as another scale where it is one.
+- **The catalog answers with the system's name.** Each prop carries the names an agent would guess for it. A prototype that writes `text` on a button is told the system calls it `label`, and `--query text` says the same.
+
+### States use the system's state tokens
+
+- **In every mode.** A role's states (hover, pressed) are set in every mode its rest is: a hover with no dark value is listed.
+- **In Figma.** A variant for a state binds that state's own token. Keeping the rest token, or a step picked by hand (`blue/700`), is listed where the state token exists.
+- **In the code.** A component's `:hover`, `:active`, `:focus` or `:disabled` rule writes the system's state token where one exists. A primitive, a colour by hand or the rest token is listed with the token to write. It holds from the first component that has one, unless your team says no.
+- **As an agent edits.** The edit check says the same, with the token to write, on the line it added.
+
 ### Classes nothing styles, and styles nothing uses
 
 The checks above read what your styles *do* with the system's values, so they see a colour written by hand and miss the debt that has no styles at all. This reads your two lists of classes against each other, in both directions:
@@ -488,6 +503,10 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 #### Values written by hand
 
 The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
+
+- **The token for each one.** A colour no token holds is named with the nearest colour token by how it looks, with how far it is. Past a small difference, the system has no colour near it, and it says so. A semantic token is named before a primitive that holds the same value.
+- **A fix, when you ask.** `rms-design-system-engine --census --fix` writes a patch that puts each exact token where its value was. You apply it, and the engine changes nothing itself. A nearest one is named and left for you to choose.
+- **In Figma too.** The Figma file's hygiene report names the variable for each fill, stroke, radius, gap and border that has none, and writes the bindings for the exact ones. `--figma-change` takes them, behind its sign-off.
 
 #### A commit warns, a push refuses
 

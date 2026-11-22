@@ -18,7 +18,7 @@ const code = { api: { Card: { props: { elevated: {} } } }, nesting: { Card: { co
 const catalog = buildCatalog(built, { code, selectorFor: (n) => '.' + n.toLowerCase() });
 
 test('catalog: props with values and code names, children, status; interaction states left out', () => {
-  assert.deepEqual(catalog.components.Badge.props, { Tone: { type: 'enum', values: ['info', 'warn'], default: 'info', codeName: 'tone', rejected: { informative: 'info', information: 'info', warning: 'warn', caution: 'warn' } }, Text: { type: 'text' } });
+  assert.deepEqual(catalog.components.Badge.props, { Tone: { type: 'enum', values: ['info', 'warn'], default: 'info', codeName: 'tone', rejected: { informative: 'info', information: 'info', warning: 'warn', caution: 'warn' }, otherNames: ['intent', 'status', 'severity', 'sentiment'] }, Text: { type: 'text', otherNames: ['label', 'labeltext', 'content', 'caption'] } });
   assert.deepEqual(catalog.components.Card.props.Elevated, { type: 'boolean', default: false, codeName: 'elevated' });
   assert.deepEqual(catalog.components.Card.children, ['Badge']);   // Button is not a catalog component
   assert.equal(catalog.components.Card.selector, '.card');
