@@ -250,8 +250,11 @@ export function standIn(dir, name, script) {
     writeFileSync(sh, `#!/bin/sh\nexec "${process.execPath}" "${js}" "$@"\n`, { mode: 0o755 });
     return sh;
   }
+  // The launcher is the same for every stand-in, so one already in place stays: a script swapped in later goes in the
+  // .cjs and the .run, read at each start. Copying over it again failed, since Windows keeps the image of a launcher
+  // just stopped locked for a moment.
   const exe = join(dir, `${name}.exe`);
-  cpSync(launcher(), exe);
+  if (!existsSync(exe)) cpSync(launcher(), exe);
   writeFileSync(join(dir, `${name}.run`), `${process.execPath}\r\n${js}\r\n`);
   return exe;
 }

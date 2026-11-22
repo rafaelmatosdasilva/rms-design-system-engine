@@ -6,8 +6,8 @@ import { route } from '../lib/route.mjs';
 
 const at = (rows, id) => rows.find((r) => r.id === id);
 
-test('thirteen questions, each under one of the engine\'s four layers, with the command that answers it and what only the team can tell', () => {
-  assert.equal(QUESTIONS.length, 13);
+test('fourteen questions, each under one of the engine\'s four layers, with the command that answers it and what only the team can tell', () => {
+  assert.equal(QUESTIONS.length, 14);
   assert.deepEqual(LAYERS.map((l) => l.name), ['Facts', 'Contracts', 'Intent', 'Evaluation']);
   for (const q of QUESTIONS) {
     assert.ok(LAYERS.some((l) => l.id === q.layer), q.id);
@@ -19,7 +19,7 @@ test('thirteen questions, each under one of the engine\'s four layers, with the 
 
 test('with nothing read, every question is unanswered and says what it could not see, never a guess', () => {
   const rows = health({});
-  assert.equal(rows.length, 13);
+  assert.equal(rows.length, 14);
   for (const r of rows) { assert.equal(r.rating, null, r.id); assert.ok(r.unseen.length, r.id); }
 });
 
@@ -89,14 +89,25 @@ test('the report groups the questions by layer, names the command for each unans
   const md = healthMarkdown(rows);
   for (const L of LAYERS) assert.ok(md.includes(`## ${L.name}: ${L.asks}`), L.id);
   for (const qn of QUESTIONS) assert.ok(md.includes(`### ${qn.question}`), qn.id);
-  assert.equal((md.match(/Only the team can tell/g) ?? []).length, 13);
-  assert.equal((md.match(/To answer it: `/g) ?? []).length, 12);
+  assert.equal((md.match(/Only the team can tell/g) ?? []).length, 14);
+  assert.equal((md.match(/To answer it: `/g) ?? []).length, 13);
   assert.doesNotMatch(md, /;/);
-  assert.match(healthLines(rows)[0], /1 of 13 questions answered .*1 poor/);
+  assert.match(healthLines(rows)[0], /1 of 14 questions answered .*1 poor/);
 });
 
 test('health requests, and the earlier inspection words, reach --health', () => {
   for (const req of ['how healthy is our design system?', 'run a health check on the system', 'inspect our design system', 'faz uma inspeção do design system', 'como está a saúde do design system?']) {
     assert.deepEqual(route(req).run, ['rms-design-system-engine --health'], req);
   }
+});
+
+test('can one colour stand in for another at the same step: from the steps that split and the swaps that would break', async () => {
+  const { health } = await import('../lib/system-health.mjs');
+  const row = (ev) => health(ev).find((r) => r.id === 'steps');
+  assert.equal(row({}).rating, null);
+  assert.equal(row({ steps: { steps: 9, split: [], swaps: 0, checked: 4 } }).rating, 'good');
+  const bad = row({ steps: { steps: 9, split: [{ step: '600', short: ['yellow'] }, { step: '500', short: ['yellow', 'orange'] }, { step: '400', short: ['yellow'] }], swaps: 2, checked: 4 } });
+  assert.equal(bad.rating, 'poor');
+  assert.match(bad.evidence[1], /^3 steps split: 600, under 4\.5:1 in yellow · 500, under 4\.5:1 in yellow and orange/);
+  assert.match(bad.evidence[2], /2 semantic colours would fall under its ratio/);
 });

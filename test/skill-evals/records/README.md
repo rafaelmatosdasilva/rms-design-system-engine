@@ -304,5 +304,9 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `codex-agents-md` | The 18 guide tasks on gpt-6-luna (engine 4cfcd2f7) | "The guide in Codex: the 18 guide tasks with the AGENTS.md a Codex user has" |
 | `2026-11-22-a-request-about-the-engine` | The 25 guide tasks on Haiku (engine 2af9b308) | "A request about the engine itself is routed to its own recipe, never to setup or an audit" |
 | `2026-11-22-the-other-agents-rule-test` | The 25 guide tasks on Haiku (engine 200be32e) | "The other agents' rule test reads the whole request" |
+| `2026-11-22-every-exception-says-why-and` | The 25 guide tasks on Haiku (engine 2fcfad0d) | "Every exception says why and whose, approvers named per kind of change, and each finding's layer" |
+| `2026-11-22-the-shard-weights-refreshed-50` | The 25 guide tasks on Haiku (engine 637a7a76) | "One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token" |
+| `2026-11-22-a-product-s-health-asked` | The 25 guide tasks on Haiku (engine 8e3db454) | "A product's own health report, its screens drawn from the system, and formats read as part of the system" |
+| `2026-11-22-the-colour-scales-steps-on` | The 25 guide tasks on Haiku (engine 9259e348) | "The colour scales' steps on the colour page and in the health report" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

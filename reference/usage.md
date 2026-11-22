@@ -86,7 +86,7 @@ rms-design-system-engine --figma-change chip "add xl to size like l"  # a change
 rms-design-system-engine --figma-undo                    # what the way back from the last Figma write puts back, shown before it runs; writes nothing
 rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --shared binds the shared variables; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
-rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
+rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line; --census --fix writes the patch for the values a token holds exactly (handback/hand-written-values.diff), for a person to apply
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
@@ -94,7 +94,9 @@ rms-design-system-engine --code-connect-draft [--form=classic|template]  # a dra
 rms-design-system-engine --contract-changes [--record] [--base <folder>] [--fail-on=unaccounted|breaking|never]  # on a merge request: what it changes in each component's contract against the base (--record keeps it on the base branch), with the products that use each; fails only on a breaking change no sign-off, release or new major accounts for. A renamed prop or value is handed back in handback/renames.md, with a patch for each product.
 rms-design-system-engine --proposals                     # the same override or detach in two or more products, drafted as a proposal with where it was seen and what it would reach (handback/proposals.md)
 rms-design-system-engine --proposal <id> --accept|--reject "<why>"|--research --by "<who>"   # a person's decision on one, kept in design-system-engine-proposals.json
-rms-design-system-engine --health                        # how healthy the system is: thirteen questions under Facts, Contracts, Intent and Evaluation, each good, mixed or poor with its evidence, what it did not see, the command to answer it and what only the team can tell, and what changed since the last report (system-health.md; --inspection is its earlier name)
+rms-design-system-engine --health                        # how healthy the system is: fourteen questions under Facts, Contracts, Intent and Evaluation, each good, mixed or poor with its evidence, what it did not see, the command to answer it and what only the team can tell, and what changed since the last report (system-health.md; --inspection is its earlier name)
+rms-design-system-engine --health --product <name>        # the product's own health: eight questions in the same four layers (built from the system, pages in order, other hosts, accessibility, tests, release, page weight, measuring), each with its evidence; writes product-health-<name>.md
+rms-design-system-engine --product-screens <product>      # the product's built pages drawn from the system's components, each region's parts marked the system's, the product's own or a stand-in; written to workshop/<product>/, and the screens that drifted since the last run
 rms-design-system-engine --adoption-plan [<product>]     # what it takes to bring a product onto the system: each value typed by hand, copy or own version of a component and the version it runs, answered use the system's, ask the system, keep with a reason or move up a version, with who acts, a size, and steps that each end on the check that says done (handback/adoption-<product>.md)
 rms-design-system-engine --mistakes                      # for each component, the mistakes its kind is known for that its page does not say, and each written one without why or what instead
 rms-design-system-engine --guidance-rating [--extract]   # how much an agent can take from the guidance: ready, partial or thin per component; --extract asks a model (your tokens)
@@ -145,7 +147,7 @@ rms-design-system-engine --refresh-snapshots             # send the snapshots th
 rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the style guide to the team's themes store, for everyone's Theme choice
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
-rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
+rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--owner <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
 rms-design-system-engine --keep                          # list the kept differences
 rms-design-system-engine --unkeep --match <words> [--component <name>]   # take kept differences back: open again on the next audit
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
@@ -2372,12 +2374,18 @@ line, and adds them to the file (nothing accepted before is dropped): `--compone
 --match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
 names the kind of difference (radius, height, width, padding, gap, colour, props).
 
+**Why, and whose.** `--baseline --reason "<why>" --owner "<who>"` keeps both on each line it accepts (a line accepted
+again takes them, and keeps who first accepted it and when). Every run lists the accepted debt with no reason or no
+owner, or with a reason that says nothing, so it can be accepted again in the person's words.
+
 #### Kept on purpose (`--keep`)
 
 A difference the team decided to keep is not debt: debt is what will be fixed. `--keep --match <words>` (with
 `--component <name>` when the person names one) records the open differences of the last full audit that match, in a
 committed `design-system-engine-kept.json`: the difference as the audit said it, `--reason` in the person's own words
-(required, never written for them), who decided (`--by`, else the git user) and when, `--truth figma|code` when one side
+(required, never written for them, and refused when it says nothing: too short, only words such as intentional or by
+design, another kept difference's words, or a short one that names nothing the difference is about), who decided (the git
+user) and when, who answers for it (`--owner`, else whoever kept it), `--truth figma|code` when one side
 is right, and `--review` (a date, or `90d`, `6m`, `1y`) when to look at it again. On every run a kept difference never
 fails its gate (a gate whose failing lines are all kept passes), its line is shown as `✋ kept on purpose` with the
 reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the style guide's
@@ -2400,6 +2408,15 @@ value, a warning when none does), a duration (a warning, with its token when one
 or 1 and a shadow written out (warnings). The theme files' custom properties are the tokens themselves and are not
 counted; their other rules are. 0, a 1px hairline, a pill's 999px radius, `calc()` and a value inside `var()` are left
 alone; the same value written twice on one line counts once. Files are listed with the ones that guess most first.
+
+A colour no token holds is named with the nearest colour token by how it looks (OKLab, the difference as ΔE), up to
+ΔE 4; past that the system has no colour near it, and says so. Where a semantic token and a primitive hold the same
+value, the semantic one is named. `--census --fix` writes `handback/hand-written-values.diff`, which puts `var(--token)`
+where each value a token holds exactly was written; a nearest one is left for the person to choose, and the engine
+applies nothing. The edit check names the same nearest colour when an edit writes one. In Figma, the hygiene report
+names the variable for each fill, stroke, radius, gap and border with none (the one that holds it, else the nearest),
+and writes the bindings for the exact ones per component to `handback/figma-binds/<component>.ops.json`, which
+`--figma-change <component> "<change>" --ops <file>` takes, behind the sign-off every change in Figma has.
 
 The first run writes the count as the baseline (`design-system-engine-census.json`, committed with the change); a run
 with fewer errors lowers it; a run where a file has more errors than the baseline names the file and exits 1, so the

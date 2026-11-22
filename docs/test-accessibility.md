@@ -139,6 +139,19 @@ The style guide has a page of its own for accessibility, under Documentation in 
 ### Contrast
 
 - Measured against what is really painted behind each text, the layers at its centre in paint order, so text over a sibling or a `::before` is measured on that.
+- **Over a gradient, a shadow or with opacity.** A gradient is measured where the text sits, a text shadow is read as
+  what the letters are read against, and opacity fades the colour as it is drawn.
+- **Over an image, read from the pixels.** Text on a photo or a pattern has no one colour behind it. The engine hides
+  only that text, captures the box its letters sit in as the browser draws it, and measures against the worst stretch
+  of those pixels (the 10th or 90th percentile of brightness, whichever reads worse). A dark corner counts, and a stray
+  sparkle does not.
+  - **Said as a measurement.** The finding says it was read from the pixels, with the median colour and the worst.
+  - **A warning, never a blocker on its own.** WCAG asks for 4.5:1 and says nothing of how a photo is read, so this is
+    the engine's measurement rather than a standard's.
+  - **Not measured when it cannot be captured.** Text that cannot be drawn on screen is said as not measured, never as passing.
+  - **A focus ring around an image too.** A ring is measured against what is around the control. Where that is a
+    photo or a pattern, a band just outside the control is captured with it not focused, and the ring has to reach
+    3:1 (WCAG 1.4.11) against the worst stretch of those pixels, said the same way.
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
@@ -197,12 +210,19 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 
 ### Beyond A and AA
 
-Two things the check looks at are not asked for by WCAG 2.2 at level A or AA. Each is a row of its own on a component's Accessibility area, named in words, listed after the criteria and always advisory — no criterion is marked as failing for them:
+Three things the check looks at are not asked for by WCAG 2.2 at level A or AA. Each is a row of its own on a component's Accessibility area, named in words, listed after the criteria and always advisory — no criterion is marked as failing for them:
 
-- **Forced colours.** In Windows high contrast mode the browser throws your colours away and paints with the reader's own. The check looks for an icon or a text the mode makes vanish, a state that then looks like the rest, a focus ring that was only a shadow, and the edge of a field, checkbox, radio or switch that read at rest and is gone there (a box-shadow, or a background colour standing in for a border). An edge already too faint at rest is 1.4.11's own finding and is not counted twice.
+- **Forced colours.** In Windows high contrast mode the browser throws your colours away and paints with the reader's own. The check looks for an icon or a text the mode makes vanish, a state that then looks like the rest (an error marked only by a red border included, unless a message says it in words), a focus ring that was only a shadow, and the edge of a field, checkbox, radio or switch that read at rest and is gone there (a box-shadow, or a background colour standing in for a border). An edge already too faint at rest is 1.4.11's own finding and is not counted twice.
 - **Reduced motion.** Under `prefers-reduced-motion: reduce`, anything that still transitions or animates.
+- **Zoom and magnification.** What someone zoomed in or using a screen magnifier meets:
+  - **Zoomed to 200% and 400%** (a page drawn 640px and 320px wide), a main action (Save, Submit, Continue) that a
+    bar staying on screen covers when it takes the focus, or bars that take half the screen or more. Run on pages.
+  - **With a magnifier** (a 4x lens shows about 320 by 200 pixels), a field's error message too far from the field
+    to be seen with it in one view.
 
-Both are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
+A run that finds none of these says none were found, never that the page is accessible.
+
+All three are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
 
 Why apart: an icon that disappears in high contrast mode used to be reported as WCAG 1.4.11 failing, and a focus ring as 2.4.7. That told a team an AA criterion was broken where the standard asks for nothing at all — and a conformance claim has to be true about the standard, not about everything worth fixing.
 

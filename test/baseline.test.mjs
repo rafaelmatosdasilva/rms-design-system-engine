@@ -121,6 +121,18 @@ test('each line accepted as debt keeps who accepted it and when; one accepted be
   writeBaseline(path, [G('B', false)], { by: 'Acme Designer', now: '2026-01-01T00:00:00Z' });
   writeBaseline(path, [G('B', false), G('D', false)], { merge: true, by: 'Acme Developer', now: '2026-02-01T00:00:00Z' });
   const doc = JSON.parse(readFileSync(path, 'utf8'));
-  assert.deepEqual(doc.accepted.B, { by: 'Acme Designer', at: '2026-01-01T00:00:00Z' });
-  assert.deepEqual(doc.accepted.D, { by: 'Acme Developer', at: '2026-02-01T00:00:00Z' });
+  assert.deepEqual(doc.accepted.B, { by: 'Acme Designer', at: '2026-01-01T00:00:00Z', owner: 'Acme Designer' });
+  assert.deepEqual(doc.accepted.D, { by: 'Acme Developer', at: '2026-02-01T00:00:00Z', owner: 'Acme Developer' });
+});
+
+test('debt accepted with a reason and an owner keeps them, accepted again it takes them, and debt with none is said', async () => {
+  const { unexplainedDebt } = await import('../lib/baseline.mjs');
+  const dir = tempDir('baseline-');
+  const path = join(dir, 'design-system-engine-baseline.json');
+  writeBaseline(path, [G('B', false), G('D', false)], { by: 'Acme Designer', now: '2026-01-01T00:00:00Z' });
+  assert.deepEqual((await unexplainedDebt(path)).map((g) => [g.label, g.missing]), [['B', ['reason']], ['D', ['reason']]]);
+  writeBaseline(path, [G('B', false)], { merge: true, by: 'Acme Developer', reason: 'B waits for the new grid of the checkout pages', owner: 'Checkout lead', now: '2026-02-01T00:00:00Z' });
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  assert.deepEqual(doc.accepted.B, { by: 'Acme Designer', at: '2026-01-01T00:00:00Z', owner: 'Checkout lead', reason: 'B waits for the new grid of the checkout pages' }, 'who accepted it first and when stay');
+  assert.deepEqual((await unexplainedDebt(path)).map((g) => g.label), ['D']);
 });

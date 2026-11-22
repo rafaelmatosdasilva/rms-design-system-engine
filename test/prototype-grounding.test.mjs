@@ -85,7 +85,7 @@ test('the catalog lists the code\'s own props Figma has no property for, and the
   const code = { api: { tabStrip: { props: { showArrows: { type: 'boolean' }, variant: { type: 'string', options: ['main', 'quiet'], default: 'main' }, fullSpan: { type: 'boolean' }, tabs: { type: 'array' } } } } };
   const cat = buildCatalog(built, { code });
   assert.equal(cat.components.tabStrip.props.showArrows.codeName, 'showArrows');
-  assert.deepEqual(cat.components.tabStrip.props.variant, { type: 'enum', codeName: 'variant', codeOnly: true, values: ['main', 'quiet'], default: 'main' });
+  assert.deepEqual(cat.components.tabStrip.props.variant, { type: 'enum', codeName: 'variant', codeOnly: true, values: ['main', 'quiet'], default: 'main', otherNames: ['kind', 'appearance', 'look', 'emphasis', 'hierarchy'] });
   assert.equal(cat.components.tabStrip.props.fullSpan.codeOnly, true);
   assert.equal(cat.components.tabStrip.props.tabs, undefined, 'data a composition cannot write is left out');
   const ok = checkUi({ component: 'tabStrip', props: { variant: 'quiet', fullSpan: true } }, cat);

@@ -20,8 +20,8 @@ const CHROME = findChrome({ playwright: true });
 const HAS_CHROME = !!CHROME && typeof WebSocket === 'function';
 const FORCED = ['forcedcontrast', 'forcedborder', 'forcedstate', 'forcedfocus'];
 
-test('the two rows beyond A and AA name their findings, and no criterion claims one of them', () => {
-  assert.deepEqual(BEYOND_AA.map((b) => b.sc), ['Forced colours', 'Reduced motion']);
+test('the rows beyond A and AA name their findings, and no criterion claims one of them', () => {
+  assert.deepEqual(BEYOND_AA.map((b) => b.sc), ['Forced colours', 'Zoom and magnification', 'Reduced motion']);
   for (const b of BEYOND_AA) {
     assert.ok(b.kinds.length && b.says && b.name, b.sc);
     assert.ok(!/^\d/.test(b.sc), `${b.sc} carries no number: it is not a criterion`);

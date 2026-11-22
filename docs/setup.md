@@ -250,6 +250,8 @@ The agent that made a change to the system never signs it off. Someone else revi
 | `"person"` (the default) | A person. A second review still runs, and its findings wait for them. |
 | `"agent-or-person"` | A person, or a second agent review that finds nothing. |
 
+**Who may sign each kind of change.** `review.approvers` names them per kind: a new token, a component's new option, a new value for a shared token, an exception, a new reference picture, or any change an agent made. Without it, your repository's `CODEOWNERS` decides for the file that changed. Anyone else is refused, and the run's summary lists each change still waiting with who may sign it. The full list is in [the configuration reference](../reference/config.md).
+
 The sign-offs keep who made each change and who reviewed it (`design-system-engine-signoffs.json`). `--sign-off` alone lists them, and the style guide's History shows both names on each one, and on each change in Figma.
 
 ### Every UI edit is checked as it is made

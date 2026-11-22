@@ -26,10 +26,12 @@ test('a decision names the difference by its check and its words, whatever its i
 
 test('recorded with its reason, who, when, which side is right and when to look again; a reason is required; taken back by name', () => {
   const root = dir();
-  assert.throws(() => recordKept(root, [{ check: 'Structure', what: 'x', component: 'chip' }], { reason: ' ' }), /needs its reason/);
+  assert.throws(() => recordKept(root, [{ check: 'Structure', what: 'x', component: 'chip' }], { reason: ' ' }), /there is no reason/);
   const [d] = recordKept(root, [{ check: 'Structure', what: 'chip height: Figma 32px, rendered 36px', component: 'chip' }], { reason: 'The product needs a larger tap target', by: 'QA', at: '2026-10-13T10:00:00Z', truth: 'code', review: '2027-01-31' });
-  assert.deepEqual(d, { key: 'Structure :: chip height: Figma 32px, rendered 36px', check: 'Structure', what: 'chip height: Figma 32px, rendered 36px', component: 'chip', reason: 'The product needs a larger tap target', by: 'QA', at: '2026-10-13T10:00:00Z', truth: 'code', review: '2027-01-31' });
-  recordKept(root, [{ check: 'Token values', what: '[sizing/-] radii/tag → --radii-tag', component: 'tag' }], { reason: 'Brand asked for it', by: 'Dev' });
+  assert.deepEqual(d, { key: 'Structure :: chip height: Figma 32px, rendered 36px', check: 'Structure', what: 'chip height: Figma 32px, rendered 36px', component: 'chip', reason: 'The product needs a larger tap target', by: 'QA', owner: 'QA', at: '2026-10-13T10:00:00Z', truth: 'code', review: '2027-01-31' });
+  assert.throws(() => recordKept(root, [{ check: 'Token values', what: '[sizing/-] radii/tag → --radii-tag', component: 'tag' }], { reason: 'Brand asked for it', by: 'Dev' }), /too short to say why/, 'a reason that says nothing is refused');
+  recordKept(root, [{ check: 'Token values', what: '[sizing/-] radii/tag → --radii-tag', component: 'tag' }], { reason: 'The tag keeps its own radius for the marketing pages', by: 'Dev', owner: 'Brand lead' });
+  assert.equal(readKept(root).find((x) => x.component === 'tag').owner, 'Brand lead', 'the owner named, not the person who ran it');
   assert.equal(readKept(root).length, 2);
   assert.match(JSON.parse(readFileSync(keptPath(root), 'utf8')).$description, /decided to keep/);
   assert.deepEqual(pick(readKept(root), { component: ['CHIP'] }).map((x) => x.component), ['chip'], 'a component in any case');

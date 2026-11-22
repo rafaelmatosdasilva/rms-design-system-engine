@@ -10,7 +10,7 @@ import { join, dirname, basename, relative, sep, delimiter } from 'node:path';
 import { createHash } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findChrome } from '../../lib/cdp.mjs';
 import { envVar } from '../../lib/names.mjs';
 import { onPath } from '../../lib/project-bin.mjs';
@@ -328,7 +328,7 @@ export function afterPass(status, harnessRetried = false) {
 // The SDK's messages are the CLI's stream-json events, so everything that reads a run reads them unchanged.
 async function viaSdk(prompt, options, timeoutMs) {
   if (!existsSync(SDK)) throw new Error('An API key is set (ANTHROPIC_API_KEY or the key file), so runs go through the Agent SDK, which is not installed: npm ci --prefix test/.eval-tools');
-  const { query } = await import(SDK);
+  const { query } = await import(pathToFileURL(SDK).href);
   const abortController = new AbortController();
   const events = [];
   let err = '', timedOut = false;

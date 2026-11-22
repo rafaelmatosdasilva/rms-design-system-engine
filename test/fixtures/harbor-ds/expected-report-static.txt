@@ -235,6 +235,9 @@
      iconButton: Default/Glyph is detached from its instance
      iconButton: Default has no auto layout
      iconButton: no description
+   The variables for 1 value with none:
+   - badge: fill #b42318 on Tone=Danger/Label, the system's status/danger/color holds it
+   The bindings for the exact ones, per component, in .design-system-engine-out/handback/figma-binds: when the person says yes, rms-design-system-engine --figma-change <component> "bind its values to the system's variables" --ops .design-system-engine-out/handback/figma-binds/<component>.ops.json
 
 ♿ Accessibility in the Figma file: 4 things the design owes (for whoever keeps the Figma file; the parity never changes Figma):
    • button, iconButton have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
@@ -302,6 +305,11 @@ Burndown, open findings per component: badge 5 · iconButton 3 · 8 not tied to 
 Fix first: badge. Run with --component badge, fix, run again.
 
 Every difference between Figma and the code, 15 open, in one list: .design-system-engine-out/differences.md
+
+**What each layer answered.**
+- Rules, answered by the engine: 6 failing, 20 advice.
+- Guidance, read by a model: none asked this run (--judge-a11y reads the words of each component).
+- Taste, for a person in the review: how the change looks and reads. No check answers it, and it is worth a look once the rules pass.
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix (a request to fix it is that ask: make the change, do not ask again), then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

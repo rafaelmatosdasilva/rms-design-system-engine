@@ -1157,18 +1157,21 @@
     };
     // Its rules, each said as what holds it (rule-checks.mjs): checked, with the check that enforces it; checkable, with
     // the guard it becomes (its yes or no is under Proposal and What to do); judgment; a vague one with the sentence
-    // proposed in its place. The count first.
+    // proposed in its place. The count first. A must or must-not rule nothing checks says so on its own line and in the
+    // count: it reads exactly like one a check enforces, to a person and to an agent (rule-checks.mjs uncheckedPromises).
     var IL_RULE = { checked: 'Checked', checkable: 'Checkable', judgment: 'Judgment' };
+    var ilPromise = function (x) { return /^must(-not)?$/.test(x.level || '') && x.status !== 'checked'; };
     var ilRules = function (p) {
       var r = p.ruleCheck; if (!r || !r.n) return '';
-      var head = '<p class="sg-il-line"><strong>' + esc(r.n + ' rule' + (r.n === 1 ? '' : 's') + ': ' + r.checked + ' checked, ' + r.checkable + ' checkable, ' + r.judgment + ' judgment' + (r.vague ? ' (' + r.vague + ' vague)' : '')) + '</strong></p>';
+      var open = r.rules.filter(ilPromise).length;
+      var head = '<p class="sg-il-line"><strong>' + esc(r.n + ' rule' + (r.n === 1 ? '' : 's') + ': ' + r.checked + ' checked, ' + r.checkable + ' checkable, ' + r.judgment + ' judgment' + (r.vague ? ' (' + r.vague + ' vague)' : '') + (open ? ', and ' + open + ' must or must-not with no check behind ' + (open === 1 ? 'it' : 'them') : '')) + '</strong></p>';
       return head + r.rules.map(function (x) {
         var no = x.answer === 'no' ? ' Declined.' : '';
         var said = x.status === 'checked' ? 'Held by ' + x.check + '.'
           : x.status === 'checkable' ? (x.proposal ? 'A check could hold it: ' + x.proposal.text + no : capital(x.check || '') + '.')
           : x.vague ? (x.rewrite ? 'Too vague to check. Proposed instead: ' + x.rewrite + no : 'Too vague to check: say the component, prop, token or count it means.')
           : 'A person judges it, or a model judging the page.';
-        return '<div class="sg-il-group"><p class="sg-il-head">' + esc(IL_RULE[x.status] + (x.vague ? ' · Vague' : '')) + '</p><p class="sg-il-item">' + esc(x.text) + '<span class="pg-par-val">' + esc(said) + '</span></p></div>';
+        return '<div class="sg-il-group"><p class="sg-il-head">' + esc(IL_RULE[x.status] + (x.vague ? ' · Vague' : '') + (ilPromise(x) ? ' · ' + (x.level === 'must-not' ? 'Must not' : 'Must') + ', no check behind it' : '')) + '</p><p class="sg-il-item">' + esc(x.text) + '<span class="pg-par-val">' + esc(said) + '</span></p></div>';
       }).join('');
     };
     // A component with no intent layer: what the agents read about it is its own documentation, as written, grouped by

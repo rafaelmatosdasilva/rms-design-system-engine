@@ -19,7 +19,7 @@ These read the Figma file for whoever keeps it, and never fail a run.
 
 ### The Figma file itself
 
-For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, an empty frame that draws nothing (a spacer is the auto layout's gap), a variant with no auto layout, a variant option named by its look (`Color=Blue` where a role belongs), a spacing or size token off the grid the library keeps (8px or 4px, mined from its own values), a mode spelled two ways across collections, a status colour family missing where the others are there, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
+For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no token or style, an instance detached from its component, an empty frame that draws nothing (a spacer is the auto layout's gap), a variant with no auto layout, a variant option named by its look (`Color=Blue` where a role belongs), a spacing or size token off the grid the library keeps (8px or 4px, mined from its own values), a mode spelled two ways across collections, a status colour family missing where the others are there, a colour scale step that reaches 4.5:1 in one colour and not in another at the same number, a component with no description, an instance whose layer spells its component's name another way, a property bound to a token meant for other properties, and tokens left on all scopes. Only what is drawn counts: the shapes a boolean operation merges are painted with the operation's own fill, a layer hidden with no property to show it is never seen, a mask's own colour never shows, and padding does nothing outside auto layout, so their values are left out.
 
 Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
 
@@ -170,10 +170,11 @@ Every run reads your system's own component files the way it reads Figma, and wr
 
 What it reads, as rules:
 
-- **The framework and the files.** What a component is written in (a Vue file, a React one), where its file sits (`src/components/<family>/`) and how the file is named.
+- **The framework and the files.** What a component is written in (a Vue file, a React one, a Lit or an Angular class), where its file sits (`src/components/<family>/`) and how the file is named.
 - **The props.** How each kind of prop is named (a yes/no, a choice of options, a text, a number), the word a yes/no begins or ends with (`is…`, `show…`), and how an option is written (`in-progress` or `inProgress`).
 - **What says what it is for.** A comment on each component and on each prop.
 - **The way to Figma.** Each component Figma has, joined to it by a Code Connect file, and each Figma property mapped to a prop or a slot.
+- **Stories that still hold.** Each value a component's stories and examples set is one its prop still takes: a story's args (`args: { size: 'xs' }`) and each call of the component written in a story or examples file (`<Button size="xs" />`), its literal values only. A story builds whatever it sets, so a size the system dropped keeps showing in every story that used it, and everyone who copies the story copies it. This one is a rule from the first component with stories, not a habit most follow: every break is to fix, with its file, line and story, and `--construction-check` fails on it unless your team says no.
 - **States.** How each state is written, state by state: a pseudo-class (`:disabled`), a class (`.is-disabled`), a data attribute or an ARIA attribute.
 - **Class names.** How a part's class is named (`button__label`, `button-label` or `label`), and a variant's (`button--large`).
 - **Tokens.** Whether a component's styles use custom properties made for it (`--button-…`) or the shared tokens directly. Which way is your team's to say, so it waits for the answer.
@@ -208,6 +209,21 @@ Beside the rules, each component's anatomy, read as deeply as Figma's:
 It reads the code capture when there is one (its props come from the compiler and the Code Connect files), else the component files themselves, with each Vue or Svelte file's own styles and the stylesheets a React file imports. The engine changes no code: a component to fix is handed back as a patch to apply. Your team decides a rule the same way as Figma's ([how to ask](features.md#lint-your-codebase-rules)), and `--construction-check` fails on a decided rule a component breaks.
 
 **In CI.** Beside those errors, a rule nobody has decided yet that components already break is a **warning**: said, never a failure, so a pipeline shows the work ahead without blocking on it. `--warnings-as-errors` fails on both, and `--json` writes the same as data for a job that posts it. The step to copy is in [the CI recipe](../cookbook/ci-and-hooks.md).
+
+### One prop vocabulary across the system
+
+The family rules hold a family to one name and one set of options. These hold every component to them, in Figma and in the code:
+
+- **One idea, one name.** A button's words come through `label`, a chip's through `text`: the name most components use is the one kept, and each other is listed.
+- **One set of values.** A size that runs S to L on most components and sm to lg on one is listed, said as another scale where it is one.
+- **The catalog answers with the system's name.** Each prop carries the names an agent would guess for it. A prototype that writes `text` on a button is told the system calls it `label`, and `--query text` says the same.
+
+### States use the system's state tokens
+
+- **In every mode.** A role's states (hover, pressed) are set in every mode its rest is: a hover with no dark value is listed.
+- **In Figma.** A variant for a state binds that state's own token. Keeping the rest token, or a step picked by hand (`blue/700`), is listed where the state token exists.
+- **In the code.** A component's `:hover`, `:active`, `:focus` or `:disabled` rule writes the system's state token where one exists. A primitive, a colour by hand or the rest token is listed with the token to write. It holds from the first component that has one, unless your team says no.
+- **As an agent edits.** The edit check says the same, with the token to write, on the line it added.
 
 ### Classes nothing styles, and styles nothing uses
 
@@ -306,8 +322,8 @@ What two or more products work around is the system asking for a change (`rms-de
 
 Ask how healthy your design system is and the engine answers from what it already found (`rms-design-system-engine --health`). Run the full check first: the report reads its results.
 
-- Thirteen questions, grouped by the engine's four layers:
-  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens.
+- Fourteen questions, grouped by the engine's four layers:
+  - **Facts**, is the picture right: is what the engine read current, do Figma and the code agree, does each part have one name, do the styles use tokens, can one colour stand in for another at the same step.
   - **Contracts**, does the code hold: the team's own rules, accessibility in every theme, tests and stories.
   - **Intent**, is it whole and explained: the parts nearly every product builds with, each component's purpose and when to use it, releases against the team's own documents.
   - **Evaluation**, is it used: products on the system and keeping up, whether an agent can learn it, and whether what agents build with it passes.
@@ -317,6 +333,34 @@ Ask how healthy your design system is and the engine answers from what it alread
 - Each names what only the team can tell, such as who decides what goes into the system.
 - Each report is kept, so the next one says which answers got better or worse.
 - The report is written to `.design-system-engine-out/system-health.md`. `--inspection` is the command's earlier name and still works.
+
+#### A product's own health report
+
+Ask how a product is doing and the engine answers for that product, beside the system's report (`rms-design-system-engine --health --product <name>`). It reads the product's folder and its built pages, and never runs or changes them.
+
+- Eight questions, in the same four layers:
+  - **Facts**: is it built from the system rather than beside it, do its pages read in order (one main heading, no level skipped), and which other hosts does its code load from or send to.
+  - **Contracts**: do its pages work for everyone (from an accessibility run on its pages), and does it test itself.
+  - **Intent**: is it on the system's latest release.
+  - **Evaluation**: how much a page of it loads from its own folder, and whether it measures how it is used.
+- Each answer has its evidence, what the engine did not see (a request built at run time, how long a page takes to open), the command that answers it, and what only the product's team can tell.
+- It is written to `.design-system-engine-out/product-health-<name>.md`, and kept, so the next report says what got better or worse.
+
+#### A product's screens, drawn from the system
+
+Ask to see a product's screens built from the system and the engine redraws each built page (`rms-design-system-engine --product-screens <product>`).
+
+- **Each region marked.** Every part of a header, a navigation or a section is the system's own component, the product's own built where the system has one, or a stand-in where the system has none.
+- **Drawn in the engine's workshop.** Each screen is written as a composition in `.design-system-engine-out/workshop/<product>/`, which `--prototype <file>` draws. Nothing is written into your Storybook or the product.
+- **What drifted.** Each run keeps the marks, so the next one says which screens moved: a part that was the system's and is now the product's own, a region added or gone.
+
+#### Dates, numbers and money
+
+When your system keeps its formats as tokens, in a collection whose modes are its markets (`en-GB`, `pt-BR`, or a Market collection), they are read like any other mode:
+
+- **In every market.** A format token with no value in one market is listed.
+- **Not by hand.** Code that writes a locale (`Intl.DateTimeFormat('en-US')`, `toLocaleDateString('pt-BR')`), gives a date library a pattern (`format('DD/MM/YYYY')`) or joins a currency symbol to a number is listed with the system's format tokens. The edit check says the same as an agent writes it.
+- A system with no format tokens is told nothing: there is nothing to hold the code to.
 
 #### A product's way onto the system
 
@@ -350,6 +394,19 @@ Advice on the web features your code uses, against the browsers your team suppor
 #### A token in the right layer
 
 A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
+
+#### A colour scale step means the same in every colour
+
+A system with colour scales (blue 100 to 900, red 100 to 900) numbers its steps so a designer can swap one colour for another at a step and keep the look. That only holds when each step is about as light in every colour. A yellow is much lighter than a blue at the same number, so its 600 may fail as text where blue's 600 passes.
+
+- **The scales are read from the names.** A family, then a number: `blue/600`, `Neutral 600` or `red-600`. A family needs three steps or more.
+- **Each mode reads its own.** A dark mode whose scales run the other way is measured as it is.
+- **A step that splits is listed.** On the system's own page surface, in each mode, a step that reaches 4.5:1 in some colours and falls under it in others, with how light each one looks (OKLCH lightness).
+- **So is a swap that would break.** A text colour or a surface that points at a step today and passes, and would fall under its ratio at the same step of another colour, with the colours that break it.
+- **Both are to decide, never to fix.** Even out the steps, or say in the intent layer which colours may not stand in for each other.
+- **Where a colour is picked.** The style guide's colour page shows each step the scales share, every colour's token at it with its contrast on the page in each mode, and each step's card says whether it reads in every colour, in none, or splits, with the colours that fall short.
+- **In the health report.** "Can one colour stand in for another at the same step?" is answered from the same lists.
+- A system with a single scale (a neutral grey) has nothing to compare, so the Rules page, the colour page and the health report show none of it.
 
 #### Mode combinations
 
@@ -473,9 +530,33 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 - **On its style guide page too.** The page carries the Tailwind your build compiles, so each component looks as it ships there. Tailwind's reset (its preflight and your own base rules) applies only where components are drawn, never to the guide around them. A component is known by its `data-slot` (`data-slot="switch"`), since its classes are Tailwind's. Any Tailwind system whose theme file is Tailwind's entry (`@import "tailwindcss"`) gets the same.
 - **Drawn as it ships.** With React and Vite installed, the components are drawn by your own Vite config, so its alias and its Tailwind plugin compile the classes and Radix runs: a switch switches, and its `data-[state=checked]` classes follow.
 
+#### Lit and Angular
+
+A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
+
+- **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
+- **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`.
+- **What it takes.** Lit's reactive properties, decorated (`@property() tone = 'primary'`) or listed in `static properties`, with the defaults its constructor gives. Angular's inputs, decorated (`@Input()`, with an alias, `required`, a getter or a setter) or signals (`input()`, `input.required()`, `model()`). A union of strings (`'s' | 'm' | 'l'`) gives a prop's options, even one a formatter wrapped over several lines.
+- **What it inherits.** The props and events of the class it extends, when that class is your own (imported from `./…`), up to three classes up. A prop the component declares itself wins.
+- **What it keeps to itself.** Lit's internal state (`@state()`, `state: true`) is no prop, as a Vue component's data is not.
+- **What it sends.** Lit's events (`new CustomEvent('acme-press')`, or a base class's `this.emit('acme-press')`), and those its doc comment names (`@event`, `@fires`). Angular's outputs (`@Output()`, `output()`), and a model's own `<name>Change`.
+- **What it holds.** Lit's `<slot>`, and those its doc comment names (`@slot`). Angular's `<ng-content>`, named by the attribute its `select` asks for (`[icon]`, `[slot=icon]`), else its class (`.icon`). What a select rules out (`:not(…)`) never names it. An Angular template in its own file (`templateUrl`) is read too.
+- **Its class.** An Angular component's `host` class, else the first class its template's first element carries, a `<slot>` aside. Lit's `classMap({ menu: true, … })` gives the class it always sets. A class written with `${…}` is a modifier, never the component's name.
+- **Used by its tag.** A component another one puts in its template as a custom element (`<acme-icon-button>`) counts as used.
+- **A manifest first.** A Lit system that ships a Custom Elements Manifest is read from it, and from its files where it says nothing.
+- **Proven on real code.** A public Lit library of 58 components and a public Angular library of 77 were read this way: 42 and 67 of them with their class (the rest draw no element of their own), with their options, defaults, descriptions, events and slots.
+- **Lit drawn as it ships.** With Lit and Vite installed, each Lit component is drawn by your own Vite in a real browser, in each of its cases, each value set as a property as Lit reads it. Its tag is the one it defines, or the one a file beside it registers. The accessibility check and the browser measurements read through its shadow root.
+- **On the style guide too.** Each case is kept as a declarative shadow root, with the styles Lit adopted inside it, so the page shows it as Lit drew it without running Lit. `styleguide.renderLit: false` leaves them undrawn.
+- **Your own build only.** A Lit library built without Vite (with Rollup or the web dev server alone) is said so, and its components get the checks that read code.
+- **Angular not drawn yet.** Drawing an Angular component needs Angular's own compiler, so Angular components get the checks that read code, never the ones that measure them drawn.
+
 #### Values written by hand
 
 The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
+
+- **The token for each one.** A colour no token holds is named with the nearest colour token by how it looks, with how far it is. Past a small difference, the system has no colour near it, and it says so. A semantic token is named before a primitive that holds the same value.
+- **A fix, when you ask.** `rms-design-system-engine --census --fix` writes a patch that puts each exact token where its value was. You apply it, and the engine changes nothing itself. A nearest one is named and left for you to choose.
+- **In Figma too.** The Figma file's hygiene report names the variable for each fill, stroke, radius, gap and border that has none, and writes the bindings for the exact ones. `--figma-change` takes them, behind its sign-off.
 
 #### A commit warns, a push refuses
 
@@ -701,7 +782,8 @@ what failed, what is open, where to read the whole of it, and a link to the job.
 
 Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](features.md#measure-figma-code-parity) and give the reason.
 
-- It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
+- It is recorded in `design-system-engine-kept.json` with the reason, who decided and when, and who owns it (`--owner`, else you). Commit it.
+- The reason has to say something. One that is too short, only says it is on purpose (intentional, by design), repeats another kept difference's words, or is short and names nothing the difference is about is refused, and you write it again.
 - Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
 - A kept difference never fails a check. It is listed under Kept on purpose, in the differences list and on the component's Parity area, with its reason.
 - It is that exact difference that is kept. If Figma or the code changes its value, the difference is open again.
@@ -709,6 +791,33 @@ Some differences are decisions, not mistakes. When your team decides to keep one
 - `--keep` alone lists what is kept. `--unkeep --match <words>` takes one back.
 
 This is not debt. Debt (`--baseline`) is a difference you will fix later. A kept difference is one you decided to keep.
+
+### Every exception says why, and whose
+
+Three things stop a finding from failing a run: a difference kept on purpose, a value `ds-config.json` excuses (`knownHardcodedExceptions`), and debt accepted with `--baseline`. Each is a decision, so each says why it exists, who answers for it and since when.
+
+- **Kept differences** need a reason that says something, and record an owner (`--owner`, else whoever kept it).
+- **Excused values** are written `{ "file", "pattern", "reason", "owner", "since" }`. Each run lists the ones with no reason, owner or date, or with a reason that says nothing.
+- **Accepted debt** keeps `--reason` and `--owner` on each line it accepts. Each run lists the lines with neither.
+- **Adding to any of these waits for you.** The AI asks first, and it never writes a reason for you.
+
+### A rule that reached zero stays at zero
+
+A code or Figma rule most components follow is a warning until your team decides it. Once every component follows it, it is **held**: the next break fails `--construction-check`, as a rule your team decided does. The date it was first followed by all is kept in `contracts/construction.json`, so commit it. A rule your team answered no to is never held.
+
+### A deprecation has one release of grace
+
+A component or token marked deprecated with a date (`@since 2026-11-01`) or a version (`@since 2.4.0`) warns while products move off it. Once two releases of the system (its git tags) have shipped since then, every place that still uses it fails the run, each one named with what replaces it. A deprecation with no date only warns.
+
+### Which layer each finding belongs to
+
+A change is checked three ways, and the report keeps them apart:
+
+- **Rules.** The engine answers yes or no, the same every time. Every gate is one.
+- **Guidance.** A model reads the change against what your team wrote (`--judge-a11y`), for a person to confirm.
+- **Taste.** How it looks and reads. Only a person in a review can call it.
+
+Each finding in `findings.json` says its `layer`, and what its check did with it (`does`): **prevents** (the hook held the edit), **catches** (it fails the run) or **advises** (it is said, and stops nothing). The end of each run's summary says what each layer answered and what is left for the reviewer.
 
 ### Nothing passes by accident
 

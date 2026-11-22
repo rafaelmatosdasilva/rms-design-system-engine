@@ -533,7 +533,11 @@ test('a run\'s shell finds the node the evaluation runs on, and still no engine 
   // ~/.local/bin went with the filter that hides an installed engine there, and every call to the engine failed.
   // The shell is the one the agent's commands run in: /bin/sh, and on Windows Git Bash, which Claude Code runs there.
   const win = process.platform === 'win32';
-  const shell = win ? join(dirname(dirname(onPath('git'))), 'bin', 'bash.exe') : '/bin/sh';
+  // Git Bash is the bin\bash.exe of the Git install that holds the git on the path, found up from it: that git may be
+  // its cmd\git.exe or, in a Git Bash, its ucrt64\bin or mingw64\bin one.
+  const gitBash = () => { for (let d = dirname(onPath('git')); d !== dirname(d); d = dirname(d)) if (existsSync(join(d, 'bin', 'bash.exe'))) return join(d, 'bin', 'bash.exe'); return null; };
+  const shell = win ? gitBash() : '/bin/sh';
+  assert.ok(shell, 'Git Bash is found beside git');
   const sh = (h, cmd) => execFileSync(shell, ['-c', cmd], { env: { ...(win ? { SYSTEMROOT: process.env.SYSTEMROOT } : {}), PATH: h.path, HOME: h.home }, encoding: 'utf8' }).trim();
   const same = (a, b) => assert.equal(realpathSync(a), realpathSync(b));
   const h = makeHome({ install: () => {} });
@@ -627,4 +631,23 @@ test('an engine run started in the background counts as run: its answer is a tas
   ])), true, 'started in the background, then read: the same work, and it counts');
   assert.equal(passes('no-cli-on-path', withCalls([['echo "the button looks fine"', '']])), false, 'never running it is still never running it');
   assert.equal(passes('no-cli-on-path', withCalls([['node /engine/audit.mjs --component chip', 'PARITY AUDIT']])), false, 'a run about another component is not this one');
+});
+
+// Every browser check of an evaluation on Windows came back "Chrome did not start within 30s", while the suite starts
+// Chrome there on every run: what a run is given (its own HOME and USERPROFILE, its own PATH, runClaude's environment)
+// kept Chrome from starting. Started here as a run starts it.
+test('a run of the evaluation starts Chrome as a person\'s own run does, its own home and PATH notwithstanding', async () => {
+  const { childEnv } = await import('./skill-evals/lib.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
+  const { pathToFileURL } = await import('node:url');
+  const chrome = process.env.CHROME_PATH || findChrome({ playwright: true });
+  assert.ok(chrome, 'a Chrome to start');
+  const h = makeHome({ install: () => {} });
+  try {
+    const env = childEnv(process.env, { HOME: h.home, PATH: h.path, ...(process.platform === 'win32' ? { USERPROFILE: h.home } : {}), CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+    const run = 'const [u, c] = process.argv.slice(1); import(u).then(async (m) => { const b = await m.launchChrome(c, { timeoutMs: 30000 }); b.kill(); console.log("started"); }).catch((e) => { console.log("ERR " + e.message); process.exit(1); })';
+    let out = '';
+    try { out = execFileSync(process.execPath, ['-e', run, pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'cdp.mjs')).href, chrome], { env, encoding: 'utf8', timeout: 120000 }); } catch (e) { out = String(e.stdout ?? '') + String(e.stderr ?? ''); }
+    assert.match(out, /started/, out);
+  } finally { cleanup(h.home); }
 });

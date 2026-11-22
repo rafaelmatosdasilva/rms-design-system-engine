@@ -80,7 +80,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 **Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
 
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, a push whose change uses something with a finding, a story that sets a value its component no longer takes, a rule every component once followed, and a deprecation past its one release of grace.*
 
 **In your tokens and themes**
 
@@ -95,9 +95,20 @@ Name a component the way your system does (button primary, Button Primary and pr
 **In your apps' code**
 
 - Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
+- Lists each story and example that still sets a value its component no longer takes, such as a size the system dropped.
+- Keeps every exception honest: a reason that says something, an owner and a date, for kept differences, excused values and accepted debt.
+- Holds a rule once every component follows it, so the next break fails, and gives a deprecation one release before its uses fail.
+- Says which layer each finding belongs to (a rule, guidance a model read, or taste), and what is left for the reviewer.
+- Names who may sign off each kind of change, from your config or your `CODEOWNERS`, and refuses anyone else.
+- Holds every component to one name and one set of values for one idea, in Figma and in the code, and answers a guessed prop name with the system's.
+- Checks that each state uses the system's state token, in every mode, in Figma, in the code and as an agent edits.
+- Names the token for each value written by hand (the exact one, else the nearest), and writes the fix for you to apply, in the code and in Figma.
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Finds classes your markup uses that nothing styles, and styles nothing uses, each with its file and line.
+- Gives each product its own health report, beside the system's, from its folder and its built pages.
+- Draws a product's screens from the system's components, each region marked the system's, the product's own or a stand-in, and says which screens drifted.
+- Reads dates, numbers and money as part of the system: format tokens complete in every market, and code that formats by hand.
 - Gives your code one health number from its own rules, by area, with the change since the last build.
 - Flags CSS variables and text casing the design never asked for.
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
@@ -117,7 +128,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Hands a renamed prop or value back with its way across: the old name kept as a deprecated alias, a patch for each product and the version that removes it.
 - Finds the same job built differently across products, such as a create flow, and asks whether each difference is earned.
 - Drafts a proposal when two or more products work around the same thing, such as overriding a component's padding or detaching it in Figma, and keeps each rejected one with its reason.
-- Says how healthy your system is in thirteen questions, from Facts to Evaluation, each answered from its evidence with what changed since last time.
+- Says how healthy your system is in fourteen questions, from Facts to Evaluation, each answered from its evidence with what changed since last time.
 
 ### What to ask
 
@@ -125,7 +136,9 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 | `/rms-design-system-engine what do our products keep working around?` | Each override or detach that repeats in two or more products, drafted as a proposal with where it was seen and what it would reach, for a person to accept, reject or send to research |
-| `/rms-design-system-engine how healthy is our design system?` | An answer to each of thirteen questions (is the data current, do Figma and the code agree, is each component explained, do agents build with it well and more), with its evidence, the command for any it could not answer, and what changed since the last report |
+| `/rms-design-system-engine how healthy is our design system?` | An answer to each of fourteen questions (is the data current, do Figma and the code agree, is each component explained, do agents build with it well and more), with its evidence, the command for any it could not answer, and what changed since the last report |
+| `/rms-design-system-engine how is shop doing?` | The shop product's own health: eight questions (built from the system, pages in order, other hosts, accessibility, tests, release, page weight, measuring), each with its evidence and what was not seen |
+| `/rms-design-system-engine draw shop's screens from the system` | Each of shop's built pages drawn from the system's components, each region's parts marked the system's, the product's own or a stand-in, and the screens that drifted since last time |
 | `/rms-design-system-engine make an adoption plan for shop` | What it takes to bring that product onto the system, in steps, each item with who acts, its size and its places, and the check that says each step is done |
 | `/rms-design-system-engine how does our code build a component?` | Its construction rules in the code (files, props, states, class names, tokens, shadows and corners), each with how many components follow it and which do not |
 
@@ -299,7 +312,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: each prop is a control read from Figma and the code. The controls are still being tuned, so some props are missing or not shown well.*
 
 - Draws each component from your own markup and CSS, with Figma's props as its controls.
-- A Vue or React component is drawn by your project's own build, every variant as it renders: its hooks, context and portals run (`styleguide.renderVue` or `styleguide.renderReact: false` reads the source instead).
+- A Vue, React or Lit component is drawn by your project's own build, every variant as it renders: its hooks, context, portals and shadow roots run (`styleguide.renderVue`, `styleguide.renderReact` or `styleguide.renderLit: false` reads the source instead).
 - Every state, every theme and every breakpoint your Figma file gives.
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.
