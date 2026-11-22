@@ -22,6 +22,7 @@ Newest first.
 **What changed.**
 - The main guide says to pass the whole request, its opening words included, and the rule other agents read says the whole request too.
 - The router's not-on-PATH line moved into the one rule that covers every command in the guide.
+- Measured again on the new guide: `engine-idea` 3 of 3, and the whole set with no failed check.
 
 ---
 

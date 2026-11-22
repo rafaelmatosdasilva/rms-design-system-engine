@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The other agents' rule test reads the whole request (continuous evaluation)
+
+What changed since the entry below (engine 2af9b308): The router is given the whole request, its opening words included; the first evaluation and what it taught recorded; The other agents' rule test reads the whole request. The guide changed in `rms-design-system-engine.md`.
+
+Guide set measured: `1a6512817c92` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 40c4e23a` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md d3ee4f50` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 200be32e | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 81/82 | 82/82 |
+| Mean cost a run | 0.055 | 0.059 |
+| Input a run | 89k | 92k |
+| Turns a run | 3.2 | 3.1 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 89k, in 3.1 turns against 3.2. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-11-22-the-other-agents-rule-test`.
+
 ## 2026-11: A request about the engine itself is routed to its own recipe, never to setup or an audit (continuous evaluation)
 
 What changed since the entry below (engine 521b0652): The agent reads Figma the way the person chose, a runner's read is never cut, and the report is read whole (#611); The skill evaluation runs in Codex, and the engine works inside Codex's sandbox (#612); Codex gets the whole guide as a skill, and a prototype that names its heading is a prototype (#613); The skill evaluation runs in Cursor too, with what a Cursor user has (#614); A product beside the system that imports it by its package name is held to the system (#615); A prototype is handed over at a fixed point, with the copy of the system it holds, its demonstration code and what it added (#616); A prototype across releases: the release each check was held to, a handoff in versions, and what another release would break (#617); A copy of the system: a change a later release already has, the patch to its release, and a check that reads only what changed (#618); A request in plain words from a terminal: routed, asked about, run and followed by the engine itself (#619); The terminal measured as an agent: patches and Figma on a yes, code handed to your agent, colours in the query (#620); The terminal's hand-over measured through Claude Code: builds and prototypes handed on their own request, a missing file written before its check, and the guard and UI check fixed for every agent (#621); A request about the engine itself is routed to its own recipe, never to setup or an audit. The guide changed in `cookbook/engine-ideas.md`, `rms-design-system-engine.md`.
