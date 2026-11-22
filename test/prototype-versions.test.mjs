@@ -53,7 +53,12 @@ test('a handoff at a tag is kept as a version, and the next says what changed si
   git(shop, 'add', '-A'); git(shop, 'commit', '-qm', 'pin'); git(shop, 'tag', 'handoff/home/v1');
   let r = engine(ds, '--prototype', '../shop/prototypes/Home.vue', '--at', 'handoff/home/v1', '--handoff');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.deepEqual(readdirSync(join(shop, 'prototypes', 'Home.handoffs')), ['handoff__home__v1.json']);
+  // The facts it was written from, and the page it was, the record of what was given.
+  assert.deepEqual(readdirSync(join(shop, 'prototypes', 'Home.handoffs')).sort(), ['handoff__home__v1.json', 'handoff__home__v1.md']);
+  assert.match(r.stdout, /📌 handoff\/home\/v1 recorded as given/);
+  const given = readFileSync(join(shop, 'prototypes', 'Home.handoffs', 'handoff__home__v1.md'), 'utf8');
+  assert.match(given, /## What the people who made it say/);
+  assert.match(given, /Given with these parts empty: Off the happy path/, 'no notes were in the tag');
   // The record kept beside the page says which release it was held to.
   const record = JSON.parse(readFileSync(join(shop, 'prototypes', 'Home.check.json'), 'utf8'));
   assert.equal(record.checkedAt.system, 'v1.0.0');
@@ -68,7 +73,40 @@ test('a handoff at a tag is kept as a version, and the next says what changed si
   assert.match(handoff, /## What changed since handoff\/home\/v1/);
   assert.match(handoff, /HbButton: used 3× \(was 1×\)/);
   assert.match(handoff, /- New: HbButton variant="Ghost" is not one of Primary, Secondary/);
-  assert.equal(readdirSync(join(shop, 'prototypes', 'Home.handoffs')).length, 2);
+  assert.equal(readdirSync(join(shop, 'prototypes', 'Home.handoffs')).length, 4, 'two versions, each its facts and its page');
+  // Checking v1 again leaves its page as it was given.
+  r = engine(ds, '--prototype', '../shop/prototypes/Home.vue', '--at', 'handoff/home/v1', '--handoff');
+  assert.match(r.stdout, /handoff\/home\/v1 was given before: its page stays as it was/);
+  assert.equal(readFileSync(join(shop, 'prototypes', 'Home.handoffs', 'handoff__home__v1.md'), 'utf8'), given);
+});
+
+test('the people\'s part is written once beside the prototype, carried into the handoff, and read as the tag holds it', { timeout: budget(600000) }, () => {
+  const { ds, shop } = setUp();
+  engine(ds, '--prototype', '--pin');
+  // A draft handoff writes the notes file for the people, once.
+  let r = engine(ds, '--prototype', '../shop/prototypes/Home.vue', '--handoff');
+  const notes = join(shop, 'prototypes', 'Home.handoff-notes.md');
+  assert.match(r.stdout, /📝 .*Home\.handoff-notes\.md is the people's part of the handoff/);
+  assert.match(readFileSync(notes, 'utf8'), /## Open questions\n\nOwner: not assigned · Date: —/);
+  assert.match(readFileSync(join(shop, 'prototypes', 'Home.handoff.md'), 'utf8'), /Still to write before it is given: .*Open questions/);
+  // QA writes two parts and signs one, commits, and gives v1.
+  writeFileSync(notes, readFileSync(notes, 'utf8')
+    .replace('## Data that shows each state\n\nOwner: not assigned · Date: —', '## Data that shows each state\n\nOwner: QA · Date: 2026-11-22\n\nA new account with no orders shows the empty list.')
+    .replace('## Open questions\n\nOwner: not assigned · Date: —', '## Open questions\n\nOwner: not assigned · Date: —\n\nWho decides the refund rule?'));
+  r = engine(ds, '--prototype', '../shop/prototypes/Home.vue', '--handoff');
+  assert.doesNotMatch(r.stdout, /📝/, 'never written again');
+  assert.match(readFileSync(notes, 'utf8'), /A new account with no orders/, 'the people\'s words are left as they are');
+  git(shop, 'add', '-A'); git(shop, 'commit', '-qm', 'notes'); git(shop, 'tag', 'handoff/home/v1');
+  // Written after the tag: the version says what the tag holds.
+  writeFileSync(notes, readFileSync(notes, 'utf8').replace('Who decides the refund rule?', 'Decided: the service does.'));
+  r = engine(ds, '--prototype', '../shop/prototypes/Home.vue', '--at', 'handoff/home/v1', '--handoff');
+  const given = readFileSync(join(shop, 'prototypes', 'Home.handoffs', 'handoff__home__v1.md'), 'utf8');
+  assert.match(given, /### Data that shows each state\n\n\*QA, 2026-11-22\*\n\nA new account with no orders shows the empty list\./);
+  assert.match(given, /### Open questions\n\n\*No owner yet\*\n\nWho decides the refund rule\?/);
+  assert.doesNotMatch(given, /Decided: the service does/, 'what was written after the tag is not in it');
+  assert.match(given, /Given with these parts empty: Off the happy path · Where each rule is decided · Decided on purpose · Before it ships/);
+  assert.match(given, /Written with no owner: Open questions/);
+  assert.match(r.stdout, /given with 4 parts of .*Home\.handoff-notes\.md empty/);
 });
 
 test('what changed between two handoffs, and nothing when nothing did', () => {

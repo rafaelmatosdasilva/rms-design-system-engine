@@ -50,3 +50,13 @@ test('a part keeps the shape it had: where it is never reads as a prop it does n
   assert.deepEqual(findings.filter((f) => /no prop "(path|at)"/.test(f.message)), []);
   assert.deepEqual(findings.filter((f) => f.level === 'error'), []);
 });
+
+test('a yes-or-no option Figma writes as False | True takes a JSON true or false, and nothing else', () => {
+  const cat = { components: { chip: { props: { icon: { type: 'enum', values: ['False', 'True'] }, size: { type: 'enum', values: ['M', 'L'] } } } } };
+  const errors = (props) => checkUi({ component: 'chip', props }, cat).findings.filter((f) => f.level === 'error').map((f) => f.message);
+  assert.deepEqual(errors({ icon: true }), [], 'a JSON true is True');
+  assert.deepEqual(errors({ icon: false, size: 'L' }), []);
+  assert.deepEqual(errors({ icon: 'True' }), []);
+  assert.equal(errors({ icon: 'yes' }).length, 1, 'only true or false');
+  assert.equal(errors({ size: true }).length, 1, 'an option that is not yes-or-no takes none');
+});

@@ -328,3 +328,32 @@ test('the engine\'s report is read whole: a run piped into head or tail is refus
   for (const c of ['rms-design-system-engine', 'rms-design-system-engine 2>&1', 'ls | head -5', 'rms-design-system-engine --route "x"; git log | head -3'])
     assert.equal(judge(bash(c), { userText: 'audit everything' })?.decision === 'deny' && /read whole/.test(judge(bash(c), { userText: 'audit everything' }).reason), false, c);
 });
+
+test('a prototype is written in the prototypes folder as a page in the system\'s code or a composition, and asked about anywhere else', async () => {
+  const { judge } = await import('../lib/guard.mjs');
+  const asked = 'make a prototype of the settings page';
+  const write = (file_path, cfg = {}) => judge({ tool_name: 'Write', tool_input: { file_path, content: 'x' } }, { cfg, userText: asked });
+  for (const f of ['prototypes/Settings.jsx', 'prototypes/Settings.vue', 'prototypes/settings.json', 'prototypes/Settings.html', 'C:\\work\\shop\\prototypes\\Settings.tsx']) assert.equal(write(f), null, f);
+  assert.equal(write('pages/Settings.jsx', { prototype: { dir: 'pages' } }), null, 'the folder ds-config names');
+  for (const f of ['src/Settings.jsx', 'prototypes/deep/Settings.jsx', 'myprototypes/Settings.jsx']) assert.equal(write(f)?.decision, 'ask', f);
+});
+
+test('a prototype asked for is never held as a change the person did not ask for', async () => {
+  const { judge } = await import('../lib/guard.mjs');
+  const r = judge({ tool_name: 'Write', tool_input: { file_path: 'prototypes/SignUpAccount.jsx', content: 'x' } }, { cfg: {}, userText: 'prototype a sign-up flow: account, plan and payment pages' });
+  assert.equal(r, null);
+  assert.equal(judge({ tool_name: 'Write', tool_input: { file_path: 'src/SignUp.jsx', content: 'x' } }, { cfg: {}, userText: 'prototype a sign-up flow' })?.decision, 'ask', 'the product\'s own code is still asked about');
+});
+
+test('a hook\'s feedback and a reminder in the transcript are never read as the person\'s last message', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const dir = makeFixture({});
+  const t = join(dir, 't.jsonl');
+  const user = (content) => JSON.stringify({ type: 'user', message: { role: 'user', content } });
+  writeFileSync(t, [
+    user('<command-message>rms-design-system-engine</command-message>\n<command-name>/rms-design-system-engine</command-name>\n<command-args>prototype our sign-up</command-args>'),
+    user('Stop hook feedback:\nThe reply says the page is drawn but no check ran: run it first.'),
+    user('<system-reminder>a file changed on disk</system-reminder>'),
+  ].join('\n') + '\n');
+  assert.equal(lastUserText(t), 'prototype our sign-up');
+});

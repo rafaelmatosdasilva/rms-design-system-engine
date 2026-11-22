@@ -8,6 +8,54 @@ Newest first.
 
 ---
 
+## Handed to Claude Code from a terminal, the guard held what a prototype is
+
+**Found** 21 November 2026, the terminal's hand-over measured end to end (`run.mjs --agent terminal --model claude`): the request typed at `rms-design-system-engine`, the code it asks for handed to Claude Code (`claude -p`, the person's `claude setup-token` login, the engine as install.sh leaves it), and the engine's own check after.
+
+**Evidence.**
+- *First run:* build 7 of 9, prototype 0 of 12, `route-ui` failed. Every prototype stopped at "Hand this to Claude Code to write? [no]": a request for a prototype is not one the guard's `asksForChange` reads as a change, and with nobody at the terminal the default was taken. `build-settings` ran the audit and stopped at a decision, the screen never written. `route-ui` checked `ui/filter.json` before anything had written it.
+- *Then 8 of 12:* the agents that were handed a prototype wrote it as the catalog said, `prototypes/<Name>.jsx`, and two things stopped them. `--prototype` on a path that was not there printed a usage that named only `<composition.json>`, read as "a code page is refused". The guard asked about any prototype file that was not a `.json`, and its next rule asked about any code file the last message did not ask to change.
+- *Then 10 of 12:* `proto-flow` was still held, though the same write replayed through the guard passed. The inner session's transcript showed why it could be: a hook's sent-back reason is written as a user entry, and the guard read it as the person's last message.
+- `route-ui` then wrote `"icon": true` for a `False | True` option and the UI check refused it.
+
+**Guesses ruled out.**
+- That the hand-over lost the request: the agent's reply quoted it each time.
+- That the engine refuses a code page: `--prototype prototypes/X.jsx` checks it when the file is there.
+
+**What changed.**
+- A build or a prototype is its own yes to hand the code over; a build left unwritten by the engine's steps is handed over and checked again; a file the request asks to have written is written before the step that checks it.
+- `--prototype` says when a named file is not there, and its usage names a page in the system's code first.
+- The guard takes a page in the system's code or a composition in the prototypes folder (`prototype.dir`, else `prototypes`), on a request for a prototype, and reads neither a hook's feedback nor a reminder as the person's words.
+- The UI check takes a JSON `true` or `false` for an option Figma writes as `False | True`.
+- The evaluation's terminal has the engine's command installed for Claude Code, as install.sh gives it.
+- Measured after: build 9 of 9, prototype 10 of 12, `route-ui` passed. `proto-flow` stopped to ask whether to add the Payment page the guidelines require and the request left out, a real question with nobody to answer it in one run; `proto-phone`'s page did not wrap its chips on a phone, the agent's own work.
+
+---
+
+## In a terminal, with no agent, the engine answered most tasks and stopped short where a person decides or code is written
+
+**Found** 21 November 2026, the first evaluation of the terminal (`run.mjs --agent terminal`): the request typed at `rms-design-system-engine` in the task's project, no guide and no model, each step it ran read as a shell call and everything it printed as the reply.
+
+**Evidence.**
+- *First run, dev set:* 14 of 18. `fix-chip-height`: the audit found the exact fix (`theme.css:60`, 36px to 32px) and wrote it as a patch, and the session stopped at "Your call". `disabled-hover`: the finding said the hover changes the background, not the `:not(:disabled)` guard that stops it. `figma-roles`: the session said what to connect to reach Figma, and never asked before a change. `new-ui-saved`: `--query green` said "no component or token of that name", a name match only.
+- *Heldout, after the patch step:* `change-figma` and `pasted-steps` changed `src/theme.css`. The request counted as a yes to the patch because it asked for a change, though the change it asked for was in Figma, or a list of steps that never named the code. `first-setup` did the same: "the tokens are in src/theme.css" read as naming the code.
+- *Route:* `route-token` asked `--query chip`, which listed the chip's props and not its tokens, so the radius variable and Figma's 16px were never said.
+- *Build and prototype:* 0 of 21. Every one asks for code written from words: a component from Figma, a screen from a sentence.
+
+**Guesses ruled out.**
+- That the terminal read the steps' output wrongly: the commands and their output read the same by hand.
+- That the request is the yes whenever the guard's `asksForChange` says so: it is the agent's rule for an edit the agent itself chose, and a patch the engine wrote may cover another change. A terminal applies one only when the request asks for a change in the code and the patch holds one change.
+
+**What changed.**
+- The terminal shows a patch a step wrote and applies it with `git apply` on a yes. The request is that yes only when it asks for the change in the code ("fix it in the code", "no código") and the patch holds one change.
+- A change to Figma is asked about first, applied through Figma Console MCP where the project set it up, with the way back written as the guard writes it, and Figma read again.
+- The hover-while-disabled finding names its guard (`.tp-button:not(:disabled):hover`), for every agent.
+- `--query` reads a colour by its look or meaning from the tokens' values (`--query green`: the system has none), a request for new UI asks for the colour it names, and a component's answer lists its own tokens with Figma's values.
+- Measured after: dev 18 of 18, heldout 6 of 6, route 3 of 4. What is left, `route-ui` and the build and prototype sets, is code written from words, which needs a model.
+- So the terminal hands that step to the agent set up with the engine (Claude Code, then Codex, then Cursor), on the person's yes or a request that asked for the code, and the engine checks what it wrote. `run.mjs --agent terminal --model codex` measures it through Codex. Its first run, `build-button`, wrote nothing: Codex had hit its plan's usage limit, and the terminal said nothing of it, so a stopped agent is now said as stopped. The hand-over is not measured yet. Codex's plan resets on 20 December 2026, and a run through Claude Code needs its command line and a login a fresh HOME can use (`claude setup-token`).
+
+---
+
 ## In Cursor's agent, no hook ran, and a stopped run read as an empty answer
 
 **Found** 21 November 2026, the first evaluation in Cursor's command-line agent (`run.mjs --agent cursor`, cursor-agent 2026.11.19-f005e9d, model Auto). **Not measured in full yet:** the free plan's usage limit stopped it after 23 of the 54 runs of the 18 guide tasks, all 23 passed.
