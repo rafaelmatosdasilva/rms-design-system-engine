@@ -209,7 +209,8 @@ test('in Firefox and Chrome alike: one page opened, measured in each scheme, and
     // Gone with nothing to compare.
     const off = spawnSync(process.execPath, [join(ENGINE, 'lib', 'rendered-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CHROME_PATH: CHROME, DESIGN_SYSTEM_ENGINE_FIREFOX: 'none' }, timeout: 170000 });
     assert.doesNotMatch(off.stdout, /BROWSERS/);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+    // Windows holds a page's files for a moment after the browser that opened them has ended.
+  } finally { rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); }
 });
 
 test('the Safari a session started is quit when it closes, and a person\'s own Safari is never touched', async () => {
