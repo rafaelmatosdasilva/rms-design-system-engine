@@ -2,6 +2,25 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The colour scales' steps on the colour page and in the health report (continuous evaluation)
+
+What changed since the entry below (engine 8e3db454): One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token (#636); A product's own health report, its screens drawn from the system, and formats read as part of the system (#637); The colour scales' steps on the colour page and in the health report. The guide changed in `reference/usage.md`.
+
+Guide set measured: `76f4f7caf1cd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md f5d01a4d` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 843b4bc7` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 9259e348 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 79/82 |
+| Mean cost a run | 0.058 | 0.059 |
+| Input a run | 98k | 102k |
+| Turns a run | 3.4 | 3.4 |
+| Rule violations | 0 | 3 |
+| Runs stopped at a limit | 0 | 3 |
+
+**Reading.** Haiku: 3 of 82 runs failed, fewer passes than the entry below, 3 rule violations, and 3 of them never finished: fix-chip-height #2: timed out; fix-chip-height #0: timed out; fix-chip-height #1: timed out — read those as the ceiling, not the guide. Failed: fix-chip-height #2: the run was given room to finish (timed out); fix-chip-height #2: reports in the chat, not in a file (no reply); fix-chip-height #0: the run was given room to finish (timed out); fix-chip-height #0: reports in the chat, not in a file (no reply); fix-chip-height #1: the run was given room to finish (timed out); fix-chip-height #1: reports in the chat, not in a file (no reply). 1 task went from passing every run to failing every run (fix-chip-height), 1 of them a regression that must never come back. Records: `records/2026-11-22-the-colour-scales-steps-on`.
+
 ## 2026-11: A product's own health report, its screens drawn from the system, and formats read as part of the system (continuous evaluation)
 
 What changed since the entry below (engine 637a7a76): A focus ring around a photo or a pattern measured against its pixels (#633); Every exception says why and whose, approvers named per kind of change, and each finding says its layer (#635); One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token; A name the loop never read, and the catalog test that now sees each prop's other names; The shard weights refreshed: 50 test files were missing from the table; OKLab credited generically; A product's own health report, its screens drawn from the system with each region marked, and formats read as part of the system; A product's health asked as an app routes too. The guide changed in `reference/usage.md`.
