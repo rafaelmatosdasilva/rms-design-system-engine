@@ -149,6 +149,9 @@ The style guide has a page of its own for accessibility, under Documentation in 
   - **A warning, never a blocker on its own.** WCAG asks for 4.5:1 and says nothing of how a photo is read, so this is
     the engine's measurement rather than a standard's.
   - **Not measured when it cannot be captured.** Text that cannot be drawn on screen is said as not measured, never as passing.
+  - **A focus ring around an image too.** A ring is measured against what is around the control. Where that is a
+    photo or a pattern, a band just outside the control is captured with it not focused, and the ring has to reach
+    3:1 (WCAG 1.4.11) against the worst stretch of those pixels, said the same way.
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
