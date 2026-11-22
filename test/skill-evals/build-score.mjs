@@ -188,7 +188,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
       return r.result.value;
     };
     // Load the module once; find the component: the named export, the default, or any function export.
-    const loaded = await ev(`import('${fromRoot(dir, file)}').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
+    const loaded = await ev(`import(${JSON.stringify(fromRoot(dir, file))}).then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
       window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };
