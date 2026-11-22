@@ -10,6 +10,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { tempDir } from './helpers.mjs';
 
+// The build runs in a process of its own, its paths passed as arguments and never written into the code it runs.
+const RUN_BUILD = 'const [u, d, c, o] = process.argv.slice(1); import(u).then((m) => m.generateStyleguide(d, JSON.parse(c), JSON.parse(o)))';
+
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const HOSTED = 'https://files.acme.test/kit/light_desktop.css';
@@ -128,7 +131,7 @@ test('the style guide is never built without the tokens it bakes into the page',
   const sg = await import('../lib/styleguide-gen.mjs');
   const engine = join(ENGINE, 'lib', 'styleguide-gen.mjs');
   // Run it in a process of its own, since a build with nothing to measure against stops the run.
-  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(pathToFileURL(engine).href)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(cfg)}, { partsOnly: true }))`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['-e', RUN_BUILD, pathToFileURL(engine).href, d, JSON.stringify(cfg), JSON.stringify({ partsOnly: true })], { encoding: 'utf8' });
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /❌ The design tokens are read from/);
   assert.match(r.stderr, /NEXT: tell the person which file is missing/);
