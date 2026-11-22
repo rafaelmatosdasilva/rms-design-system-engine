@@ -1,0 +1,3 @@
+$pad: 16px;
+.acmeButton { height: var(--acme-height-m); border-radius: var(--acme-radius); background: var(--acme-accent); color: var(--acme-on-accent); border: 0; padding: 0 $pad; }
+.acmeButton--quiet { background: transparent; color: var(--acme-accent); }
