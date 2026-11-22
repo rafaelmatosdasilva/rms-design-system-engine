@@ -10,6 +10,7 @@
 // failures, because their checks read what the engine wrote and no row keeps that (reading.mjs, `unanswerable`).
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { context, decisionPoints } from './lib.mjs';
 import { unanswerable } from './reading.mjs';
 import { globalChecks } from './rules.mjs';
@@ -19,7 +20,7 @@ import { envVar } from '../../lib/names.mjs';
 
 let privateTasks = [];
 const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
-if (PRIVATE_TASKS) privateTasks = (await import(PRIVATE_TASKS)).PRIVATE;
+if (PRIVATE_TASKS) privateTasks = (await import(pathToFileURL(PRIVATE_TASKS).href)).PRIVATE;
 const byId = new Map([...DEV, ...HELDOUT, ...privateTasks].map((t) => [t.id, t]));
 for (const file of process.argv.slice(2)) {
   const rows = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));

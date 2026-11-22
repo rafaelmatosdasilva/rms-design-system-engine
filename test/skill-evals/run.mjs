@@ -28,7 +28,7 @@ import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } fr
 import { join, dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, againstOwnProject, agentOf, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
 import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
@@ -73,7 +73,7 @@ if (SOURCE && !relative(ENGINE, resolve(PRIVATE_OUT)).startsWith('..')) { consol
 let privateTasks = [];
 const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
 if (PRIVATE_TASKS && (SET === 'heldout' || SET === 'all' || SET === 'private')) {
-  privateTasks = (await import(PRIVATE_TASKS)).PRIVATE.map((t) => ({ ...t, private: true }));
+  privateTasks = (await import(pathToFileURL(PRIVATE_TASKS).href)).PRIVATE.map((t) => ({ ...t, private: true }));
 }
 const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO, 'prototype-figma': PROTO_FIGMA, route: ROUTE_TASKS };
 const tasks = againstOwnProject((sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : PROTO_FIGMA.includes(t) ? 'prototype-figma' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) || PROTO_FIGMA.includes(t) ? TIDEPOOL : t.source })), SOURCE);

@@ -152,15 +152,15 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
 test('a browser start that timed out is tried once more; one that cannot start is not', { timeout: budget(30000) }, async () => {
   const dir = tempDir('cdp-retry-');
   const count = join(dir, 'count');
-  // The first start says nothing (it times out); the second announces its socket. Three seconds to announce it: a busy
-  // machine (a full run, a browser check beside it) can take more than half a second only to start a shell, and the
-  // first start still times out, since it says nothing for five.
+  // The first start says nothing (it times out); the second announces its socket. Three seconds to announce it, scaled
+  // as every timed test is (budget): a machine running several suites at once took more than three only to start Node,
+  // and the first start still times out, since it says nothing for longer than that.
   const fake = standIn(dir, 'chrome', `const fs = require('node:fs');
 if (fs.existsSync(${JSON.stringify(count)})) process.stderr.write('DevTools listening on ws://127.0.0.1:1/devtools/browser/x\\n');
 else fs.writeFileSync(${JSON.stringify(count)}, '');
-setTimeout(() => {}, 5000);
+setTimeout(() => {}, ${budget(5000)});
 `);
-  const b = await launchChrome(fake, { timeoutMs: 3000, retryAfterMs: 10 });
+  const b = await launchChrome(fake, { timeoutMs: budget(3000), retryAfterMs: 10 });
   assert.match(b.wsUrl, /^ws:\/\/127\.0\.0\.1:1\//);
   b.kill();
   await assert.rejects(launchChrome(join(dir, 'no-such-browser'), { timeoutMs: 500, retryAfterMs: 10 }), /could not start|exited/);

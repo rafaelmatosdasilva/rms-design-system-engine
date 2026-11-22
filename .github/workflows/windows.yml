@@ -98,7 +98,8 @@ jobs:
           fi
           # A test that skipped checked nothing on Windows, whatever its reason: a missing tool, or a stand-in only another
           # system runs. The run fails on any, so "proven on Windows" never hides a test that did not run there.
-          grep -E '# SKIP' test.log | while IFS= read -r line; do echo "::error title=Skipped on Windows::${line#*- }"; done
+          # grep finds nothing in a clean run, and with pipefail on that would end the step: a run with no skip is not a failure.
+          { grep -E '# SKIP' test.log || true; } | while IFS= read -r line; do echo "::error title=Skipped on Windows::${line#*- }"; done
           skipped=$(grep -cE '# SKIP' test.log || true)
           if [ "$skipped" != 0 ]; then
             echo "::error title=Tests skipped::$skipped test(s) skipped on Windows; every one must run."
