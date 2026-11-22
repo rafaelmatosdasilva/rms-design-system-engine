@@ -80,7 +80,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 **Ready to use** · **Why it matters:** The token layer is where a system ages badly, and shortcuts in products pile up. Both are cheapest to put right early.
 
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, a push whose change uses something with a finding, and a story that sets a value its component no longer takes.*
 
 **In your tokens and themes**
 
@@ -95,6 +95,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 **In your apps' code**
 
 - Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
+- Lists each story and example that still sets a value its component no longer takes, such as a size the system dropped.
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Finds classes your markup uses that nothing styles, and styles nothing uses, each with its file and line.
