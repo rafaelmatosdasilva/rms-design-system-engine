@@ -302,5 +302,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `own-kits` | The 24 guide tasks on Haiku (engine 18584c2d) | "The engine's own health report, prototypes as text, pages rebuilt from the system, and adoption plans" |
 | `2026-11-21-findings-a-run-the-api` | The 24 guide tasks on Haiku (engine 521b0652) | "Findings: a run the API dropped fails as if the agent never answered" |
 | `codex-agents-md` | The 18 guide tasks on gpt-6-luna (engine 4cfcd2f7) | "The guide in Codex: the 18 guide tasks with the AGENTS.md a Codex user has" |
+| `2026-11-22-a-request-about-the-engine` | The 25 guide tasks on Haiku (engine 2af9b308) | "A request about the engine itself is routed to its own recipe, never to setup or an audit" |
+| `2026-11-22-the-other-agents-rule-test` | The 25 guide tasks on Haiku (engine 200be32e) | "The other agents' rule test reads the whole request" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

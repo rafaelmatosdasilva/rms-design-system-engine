@@ -348,3 +348,15 @@ test('new UI that names a colour asks the system for that colour too', async () 
   assert.deepEqual(colourWords('um aviso vermelho de erro'), ['warning', 'red', 'error']);
   assert.deepEqual(colourWords('add a card'), []);
 });
+
+test('a request about the engine itself goes to its recipe, never to setup or an audit', () => {
+  const none = { hasConfig: false, components: [] };
+  for (const q of ['new ideas for the engine: picking a token by its job or by its step number', 'I found a bug in the engine', 'an idea for this engine, from an article', 'ideias novas para o motor', 'change the engine\'s own code so the router reads this']) {
+    for (const p of [P, none]) assert.deepEqual([r(q, p).recipe, r(q, p).run], ['engine-ideas', []], q);
+  }
+  assert.match(routeText(r('new ideas for the engine', none), '', 'rms-design-system-engine'), /\nNEXT: answer from the recipe below/);
+  // The engine named as the tool that runs is no request about the engine.
+  assert.equal(r('run the engine on the chip').recipe, 'audit-component');
+  assert.equal(r('run the engine on the chip', none).recipe, 'first-setup');
+  assert.equal(r('the engine says the chip fails, fix it').recipe, 'fix-a-difference');
+});

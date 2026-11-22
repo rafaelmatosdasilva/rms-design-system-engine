@@ -59,9 +59,8 @@ for that fix.
 ## Recipes and reference (read the one that fits before acting)
 
 **Start every request with the router.** When the request already came with a `ROUTE:` block (the project's
-hook routed it), follow that block. Otherwise run the router, passing the request exactly as the person wrote it:
-`rms-design-system-engine --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-design-system-engine/audit.mjs
---route "<the request>"`). It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
+hook routed it), follow that block. Otherwise run the router, passing the whole request exactly as the person wrote it, its opening words included:
+`rms-design-system-engine --route "<the request>"`. It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
 (`NOTE:`), the sentences to say (`SAY:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:`
 command and relay its SUMMARY, or, when it says to run nothing, answer from the recipe it printed. Put each `SAY:`
 line in your final reply word for word (when it names a condition, only when that condition holds). Do not pick a
@@ -69,7 +68,7 @@ recipe or a command yourself. A request that names no system: say which you took
 
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
 the one that fits with `rms-design-system-engine --recipe <name>` (or read
-`~/.claude/skills/rms-design-system-engine/cookbook/<name>.md`, the skill's install folder). Follow it, relay the
+`~/.claude/skills/rms-design-system-engine/cookbook/<name>.md`). Follow it, relay the
 engine's SUMMARY, and take its NEXT line. If no recipe fits, read the reference. **A question is a task too**
 ("how do I…", "what does … mean", "why does …"): print its recipe first and answer from what the recipe and the
 reference it points to say, never from memory or from this table alone.
@@ -95,6 +94,7 @@ reference it points to say, never from memory or from this table alone.
 | a component's props and values, where a component is used, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 | the style guide published for the team, one link rebuilt on every push (GitHub Pages or GitLab Pages) | `publish-styleguide` |
+| an idea, an article or a fix for the engine itself, not for a design system | `engine-ideas` |
 
 Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
@@ -144,9 +144,9 @@ comment that switches a check off: fix it in that file before going on. A reques
 the answer: do not work around it (no other tool, no shell edit); tell the person what it said.
 
 **If the `rms-design-system-engine` command is not on PATH** (a plain `command not found`),
-do not stop and do not hand-simulate setup: run `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>`
-(the install folder), that exact path, never searched for (a search can miss a linked install). Every
-`rms-design-system-engine …` below works the same way.
+do not stop and do not hand-simulate setup: run `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>`,
+that exact path, never searched for (a search can miss a linked install). Every
+`rms-design-system-engine …` in this guide works the same way.
 
 **First-time setup is interactive in the engine - let it run, don't re-ask the questions
 yourself.** When `ds-config.json` is missing, running the audit drops into the engine's own
@@ -222,7 +222,7 @@ Route by intent:
   > component's variants/variables: a version stamped over a partial capture reads "fresh" while
   > hiding exactly the change you were asked to check.
 - **The whole design system:** run `rms-design-system-engine` in the terminal (or `/rms-design-system-engine` in Claude Code),
-  then follow the `full-audit` recipe (`rms-design-system-engine --recipe full-audit`).
+  then follow the `full-audit` recipe.
 - **The style guide:** a request that names it gets it, accessibility named or not ("show the
   accessibility of buttonPrimary in the style guide"): `--styleguide`, with `--component <name>` when
   it names one. That page holds the component and the ones it nests only, written beside the whole

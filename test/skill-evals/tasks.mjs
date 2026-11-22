@@ -148,6 +148,11 @@ export const DEV = [
   { id: 'first-setup', setup: (dir) => rmSync(join(dir, 'ds-config.json')), createsConfig: true, mayChange: ['design-system-engine-map.mjs', 'structure-contract.mjs'],   // --init scaffolds them
     prompt: 'set up the parity for this project. Our Figma file is https://www.figma.com/design/AbCdEf123456XyZ/Tidepool and the tokens are in src/theme.css',
     score: (ctx) => [check('uses --init with the Figma link', hasEngineRun(ctx, (c) => /--init/.test(c) && /figma/.test(c))), check('ds-config.json exists after', ctx.read('ds-config.json') != null), check('did not write the config by hand', !ctx.calls.some((c) => /Edit|Write/.test(c.name) && /ds-config\.json$/.test(String(c.input.file_path ?? ''))))] },
+  // An idea for the engine itself, in a folder with no setup: no setup runs and nothing is written, and the reply
+  // says what the engine already has for it.
+  { id: 'engine-idea', setup: (dir) => rmSync(join(dir, 'ds-config.json')),
+    prompt: 'a new idea for the engine: check that a colour scale\'s steps keep the same contrast in every colour family',
+    score: (ctx) => [check('runs no setup', !hasEngineRun(ctx, (c) => /--init\b/.test(c))), check('no files changed', !ctx.changed.length, ctx.changed.join(', ')), check('says what the engine has for it', has(ctx.final, /\b(already|built|exists?|new|not yet|missing)\b/i))] },
   { id: 'guidelines-link', prompt: 'here are our usage guidelines for the components: https://gitlab.com/tidepool-demo/design/-/wikis/Buttons',
     score: (ctx) => [check('runs --guidelines with the link', hasEngineRun(ctx, (c) => /--guidelines/.test(c) && /gitlab\.com\/tidepool-demo/.test(c))), check('did not edit the config by hand', !ctx.calls.some((c) => /Edit|Write/.test(c.name) && /ds-config\.json$/.test(String(c.input.file_path ?? ''))))] },
   { id: 'fix-chip-height', mayChange: ['src/theme.css'], prompt: 'the chip is 36px high when it is large with an icon, but Figma says 32px. Fix it in the code.',
