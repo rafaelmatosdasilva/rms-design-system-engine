@@ -2,6 +2,30 @@
   // How wide the window's scroll bar is (none where it floats over the page): a panel gives that room back while open.
   var gutter = function () { var de = document.documentElement; if (de.classList.contains('sg-panel-open')) return; de.style.setProperty('--sg-gutter', Math.max(0, window.innerWidth - de.clientWidth) + 'px'); };
   gutter(); window.addEventListener('resize', gutter);
+  // A component that draws into its shadow root (a Lit one) comes as a declarative one, <template shadowrootmode>,
+  // which a browser attaches only while it parses a page: markup put in later (a case, a thumbnail, a drawing in a
+  // panel) keeps it inert, and the component shows its bare text. Each is attached as it arrives, wherever the page
+  // puts it, so every place a component is shown draws it as it ships.
+  function attachShadows(root) {
+    var ts = root && root.querySelectorAll ? root.querySelectorAll('template[shadowrootmode]') : [];
+    for (var i = 0; i < ts.length; i++) {
+      var t = ts[i], host = t.parentElement;
+      if (!host || host.shadowRoot) continue;
+      try {
+        var sr = host.attachShadow({ mode: t.getAttribute('shadowrootmode') === 'closed' ? 'closed' : 'open' });
+        sr.appendChild(t.content.cloneNode(true));
+        t.remove();
+        attachShadows(sr);
+      } catch (e) { /* the element takes no shadow root */ }
+    }
+  }
+  attachShadows(document);
+  if (typeof MutationObserver !== 'undefined') new MutationObserver(function (ms) {
+    for (var i = 0; i < ms.length; i++) for (var j = 0; j < ms[i].addedNodes.length; j++) {
+      var n = ms[i].addedNodes[j];
+      if (n.nodeType === 1) attachShadows(n.parentNode || n);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
   // The page's data: set by its data file beside it (styleguide-files.mjs), or written in the page itself.
   var DATA_TAG = document.getElementById('sg-data');
   var DATA = self.SG_DATA || JSON.parse(self.SG_DATA_JSON || (DATA_TAG && DATA_TAG.type === 'application/json' && DATA_TAG.textContent) || '{}');

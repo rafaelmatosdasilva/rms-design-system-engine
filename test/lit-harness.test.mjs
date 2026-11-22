@@ -85,3 +85,29 @@ test('the style guide gets each case as Lit drew it: a declarative shadow root w
   assert.match(button, /<style data-dse-adopted="">[^<]*\.acmeButton/, 'the styles Lit adopted are inside it');
   assert.ok((r.cases['acme-button'] ?? []).length >= 2, 'each case is kept');
 });
+
+test('the style guide attaches a declarative shadow root wherever it puts one, which innerHTML alone leaves inert', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome', timeout: budget(120000) }, async () => {
+  const { readFileSync } = await import('node:fs');
+  const start = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '00-start.js'), 'utf8');
+  const fn = /function attachShadows\(root\) \{[\s\S]*?\n {2}\}\n/.exec(start)?.[0];
+  assert.ok(fn, 'the page attaches them itself');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-lit-dsd-' });
+  try {
+    const { send } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, 'about:blank');
+    const r = (await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+      ${fn}
+      const box = document.createElement('div'); document.body.append(box);
+      box.innerHTML = '<acme-chip><template shadowrootmode="open"><style>span{color:rgb(1, 2, 3)}</style><span>in</span></template>out</acme-chip>';
+      const before = !!box.firstChild.shadowRoot;
+      attachShadows(box);
+      const host = box.firstChild;
+      return JSON.stringify({ before, after: !!host.shadowRoot, color: host.shadowRoot && getComputedStyle(host.shadowRoot.querySelector('span')).color, light: host.textContent });
+    })()` }, sessionId)).result.value;
+    const v = JSON.parse(r);
+    assert.equal(v.before, false, 'innerHTML leaves it inert');
+    assert.equal(v.after, true);
+    assert.equal(v.color, 'rgb(1, 2, 3)', 'its styles apply inside it');
+    assert.equal(v.light, 'out', 'and what a person put in stays in its light');
+  } finally { browser.kill(); }
+});
