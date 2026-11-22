@@ -8,6 +8,23 @@ Newest first.
 
 ---
 
+## A request about the engine reached the router without the words that said so
+
+**Found** 22 November 2026. A person asked, in a folder with no setup, for new ideas for the engine, and the router sent the request to first-time setup: nothing in it said the engine itself was the subject, so the no-setup rule won. The router now has a recipe for a request about the engine (`engine-ideas`) and takes it before setup, with or without a config. The new `engine-idea` task measured it: 2 of 3 runs passed on Haiku, and the third still asked for setup.
+
+**Evidence.**
+- *The failed run's transcript:* the agent ran `--route` with only the second half of the request ("check that a colour scale's steps keep the same contrast in every colour family") and left out "a new idea for the engine:". The router routed what it was given correctly: a check on a design system, in a folder with no setup.
+- *The two that passed* passed the request whole and answered from the recipe, with no setup run and no file changed.
+
+**Guesses ruled out.**
+- That the router missed the words: the request it was given held none of them.
+
+**What changed.**
+- The main guide says to pass the whole request, its opening words included, and the rule other agents read says the whole request too.
+- The router's not-on-PATH line moved into the one rule that covers every command in the guide.
+
+---
+
 ## Handed to Claude Code from a terminal, the guard held what a prototype is
 
 **Found** 21 November 2026, the terminal's hand-over measured end to end (`run.mjs --agent terminal --model claude`): the request typed at `rms-design-system-engine`, the code it asks for handed to Claude Code (`claude -p`, the person's `claude setup-token` login, the engine as install.sh leaves it), and the engine's own check after.

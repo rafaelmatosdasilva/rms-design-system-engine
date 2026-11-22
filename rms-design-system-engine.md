@@ -59,9 +59,8 @@ for that fix.
 ## Recipes and reference (read the one that fits before acting)
 
 **Start every request with the router.** When the request already came with a `ROUTE:` block (the project's
-hook routed it), follow that block. Otherwise run the router, passing the request exactly as the person wrote it:
-`rms-design-system-engine --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-design-system-engine/audit.mjs
---route "<the request>"`). It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
+hook routed it), follow that block. Otherwise run the router, passing the whole request exactly as the person wrote it, its opening words included:
+`rms-design-system-engine --route "<the request>"`. It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
 (`NOTE:`), the sentences to say (`SAY:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:`
 command and relay its SUMMARY, or, when it says to run nothing, answer from the recipe it printed. Put each `SAY:`
 line in your final reply word for word (when it names a condition, only when that condition holds). Do not pick a
@@ -147,7 +146,7 @@ the answer: do not work around it (no other tool, no shell edit); tell the perso
 **If the `rms-design-system-engine` command is not on PATH** (a plain `command not found`),
 do not stop and do not hand-simulate setup: run `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>`,
 that exact path, never searched for (a search can miss a linked install). Every
-`rms-design-system-engine …` below works the same way.
+`rms-design-system-engine …` in this guide works the same way.
 
 **First-time setup is interactive in the engine - let it run, don't re-ask the questions
 yourself.** When `ds-config.json` is missing, running the audit drops into the engine's own
