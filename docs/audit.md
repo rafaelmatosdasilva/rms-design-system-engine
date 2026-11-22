@@ -543,7 +543,10 @@ A component written as a class is read the way a Vue or React one is, into the s
 - **Used by its tag.** A component another one puts in its template as a custom element (`<acme-icon-button>`) counts as used.
 - **A manifest first.** A Lit system that ships a Custom Elements Manifest is read from it, and from its files where it says nothing.
 - **Proven on real code.** A public Lit library of 58 components and a public Angular library of 77 were read this way: 42 and 67 of them with their class (the rest draw no element of their own), with their options, defaults, descriptions, events and slots.
-- **Not drawn yet.** The browser checks do not draw Lit or Angular components yet, so they get the checks that read code, never the ones that measure it drawn.
+- **Lit drawn as it ships.** With Lit and Vite installed, each Lit component is drawn by your own Vite in a real browser, in each of its cases, each value set as a property as Lit reads it. Its tag is the one it defines, or the one a file beside it registers. The accessibility check and the browser measurements read through its shadow root.
+- **On the style guide too.** Each case is kept as a declarative shadow root, with the styles Lit adopted inside it, so the page shows it as Lit drew it without running Lit. `styleguide.renderLit: false` leaves them undrawn.
+- **Your own build only.** A Lit library built without Vite (with Rollup or the web dev server alone) is said so, and its components get the checks that read code.
+- **Angular not drawn yet.** Drawing an Angular component needs Angular's own compiler, so Angular components get the checks that read code, never the ones that measure them drawn.
 
 #### Values written by hand
 
