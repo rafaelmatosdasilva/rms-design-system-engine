@@ -166,15 +166,22 @@ What teams ask your system for, and what your team decided. Status is what the s
 
 ### Prototypes
 
-Each prototype is a part of its own, with a page of its own. The Prototypes page lists every prototype in your prototypes folder, with when it was last checked, what the system lacks for it, its latest handoff and its status: Not checked, Has findings, Lacks in the system, or Holds. A row opens that prototype's page in the side panel.
+Each prototype is a part of its own, with a page of its own. The Prototypes page lists every prototype your team has made, as a grid (each one's screen in small) or a table, with a switch beside the title. With none yet, it says so, and copies the request that makes the first.
 
-- **What to do.** The command to check it, what to fix, or the Requests page to decide what it lacks.
-- **What was asked.** The prompt it was made from, kept with its check (`--for "…"`, or what you asked in the hour before), and with each handoff.
-- **Its screens.** The pictures the last draw took of it, one width at a time (Phone, Tablet, Desktop).
-- **Where its last check stands.** When it ran, against which release of the system, and at which commit or tag.
-- **What its last check found,** each finding with its component, and what the system lacks for it, a line a need.
-- **Its handoff.** Each version given at a tag, its day and what changed since the one before.
-- **What people wrote and said.** Each part of its handoff notes with its owner, and every comment on it, open ones first, with the answer each closed one got.
+- **Filters.** A chip for each status, in the page's own words: Fix (its check found something), Missing (the system lacks something it needs), Not checked, Done. A Product list chip beside them, as the Rules page's Area. They filter the grid and the table alike.
+- **The table.** Prototype, Product, System version, Asked by, Asked on and Status, each column sortable, what needs doing first by default.
+- **A folder per product.** Keep prototypes in `prototypes/<Product>/`: the folder names the product the page filters by. Everything about a prototype sits beside it: its check, comments, handoff notes and versions, and its screens (`<name>.screens/`).
+- **Who asked, and what.** The prompt a prototype was made from is kept with it, with who asked (the name Git has for them, never typed by hand) and when. A prototype with no recorded asker is named by the commit that added it.
+- **Checked at every build.** Each prototype is checked against the version its product builds on (its pin, else the latest). Only the ones whose page, pin or system moved are checked again. `styleguide.checkPrototypes: false` turns it off.
+- **Shared through a repository.** Name one once (`rms-design-system-engine --store prototypes=<GitLab or GitHub link>`) and every prototype travels whole through it, product folders included. Until then, each check says the prototypes are on this computer only and asks for one.
+
+A row or a card opens the prototype's page in the side panel.
+
+- **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in Claude Code, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
+- **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
+- **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one.
+- **Status,** with when it was checked, against which release of the system, and at which commit or tag.
+- **Its screens,** one width at a time (and each state it was pictured in), what the system lacks for it, the components it uses, its handoff's versions with what changed, its notes with their owners, and the comments on it.
 
 A component's page links each prototype that uses it to that prototype's own page. The page reads what is kept beside each prototype and changes none of it.
 

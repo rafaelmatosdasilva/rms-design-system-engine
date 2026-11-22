@@ -130,3 +130,52 @@ test('every ask is kept in order: the one that made it, then each that changed i
   assert.deepEqual(r.asks.map((a) => [a.request, a.by]), [['a list of orders', 'Design'], ['add an empty state', 'Product']]);
   assert.deepEqual([r.request, r.by], ['a list of orders', 'Design'], 'who asked for it is who made it');
 });
+
+test('with no repository named for them, a check says the prototypes are on this computer only, and to ask once', async () => {
+  const { storeLines } = await import('../lib/prototype-record.mjs');
+  const root = tempDir('proto-store-');
+  writeFileSync(join(root, 'ds-config.json'), '{}');
+  assert.match(storeLines(root).join('\n'), /on this computer only[\s\S]*NEXT: ask the person once[\s\S]*--store prototypes=<that link>/);
+  writeFileSync(join(root, 'ds-config.json'), JSON.stringify({ stores: { prototypes: { read: 'https://gitlab.example.com/acme/prototypes' } } }));
+  assert.deepEqual(storeLines(root), [], 'said no more once it is named');
+});
+
+test('Continue and Copy fix hand the agent the prototype they name, with what it needs to change it, and keep the change as its next ask', async () => {
+  const { continueContext } = await import('../lib/prototype-pages.mjs');
+  const root = project();
+  const c = continueContext(root, 'change the Orders prototype: add an empty state');
+  assert.equal(c.file, 'prototypes/Orders.vue');
+  assert.equal(c.ask, 'add an empty state');
+  const said = c.lines.join('\n');
+  assert.match(said, /This changes the Orders prototype: prototypes\/Orders\.vue/);
+  assert.match(said, /First: a list of orders with their status/, 'what was asked so far');
+  assert.match(said, /chip: size L is not one of its sizes/, 'what its last check found');
+  assert.match(said, /c2: Add an empty state/, 'what is still open');
+  assert.match(said, /--prototype prototypes\/Orders\.vue/, 'and how to check it again');
+  assert.equal(continueContext(root, 'change the Nowhere prototype: x'), null, 'a prototype the project does not have is no context');
+  // The prompt hook says it, and keeps the change as the next ask.
+  const { routePrompt } = await import('../lib/guard.mjs');
+  writeFileSync(join(root, 'ds-config.json'), '{}');
+  const out = routePrompt({ prompt: '/rms-design-system-engine fix the Orders prototype: chip, size L is not one of its sizes' }, { root });
+  assert.match(out, /This changes the Orders prototype/);
+  assert.equal(JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8')).text, 'chip, size L is not one of its sizes');
+});
+
+test('every build checks every prototype, and checks again only what moved: its page, its pin or the system', async () => {
+  const { checkAll } = await import('../lib/prototype-pages.mjs');
+  const root = project();
+  const ran = [];
+  const run = async (file) => { ran.push(file); return { ok: true }; };
+  const first = await checkAll(root, { version: '1.0.0', run });
+  assert.deepEqual(first.checked.sort(), ['Home', 'Orders']);
+  ran.length = 0;
+  const same = await checkAll(root, { version: '1.0.0', run });
+  assert.deepEqual([ran, same.kept.sort()], [['prototypes/Home.json'], ['Orders']], 'nothing moved: Orders kept, and Home, which has no check kept, checked again');
+  writeFileSync(join(root, 'prototypes', 'Orders.vue'), '<template><section/></template>');
+  ran.length = 0;
+  await checkAll(root, { version: '1.0.0', run });
+  assert.ok(ran.includes('prototypes/Orders.vue'), 'its page changed');
+  ran.length = 0;
+  await checkAll(root, { version: '1.1.0', run });
+  assert.ok(ran.includes('prototypes/Orders.vue'), 'the system moved');
+});
