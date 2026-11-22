@@ -34,8 +34,8 @@ test('every prototype the project has gets a page, and none it no longer has', (
 test('a prototype\'s page: its screens at each width, its last check, what the system lacks once a need, its handoff, notes and comments', () => {
   const [home, orders] = prototypePages(project());
   assert.equal(orders.file, 'prototypes/Orders.vue');
-  assert.equal(orders.asked, 'a list of orders with their status', 'the prompt it was made from');
-  assert.equal(orders.state, 'findings');
+  assert.equal(orders.asked.request, 'a list of orders with their status', 'the prompt it was made from');
+  assert.equal(orders.state, 'fix', 'in the page\'s own word');
   assert.deepEqual(orders.screens.map((s) => [s.label, s.w, s.h]), [['phone', 375, 900], ['desktop', 1280, 900]], 'narrowest first, at the size taken');
   assert.match(orders.screens[0].src, /^data:image\/png;base64,/, 'carried as data, as every picture on the page');
   assert.equal(orders.check.system, '2.4.0');
@@ -52,15 +52,27 @@ test('a prototype\'s page: its screens at each width, its last check, what the s
   assert.equal(home.state, 'not checked');
   assert.deepEqual(home.lacked, [{ need: 'map', times: 1 }]);
   assert.deepEqual(home.screens, []);
-  assert.equal(home.asked, null);
+  assert.equal(home.asked.request, null);
 });
 
-test('the style guide has a Prototypes page: a row a prototype, its page in the side panel, linked from each component that uses it', async () => {
+test('the style guide has a Prototypes page: a grid or a table, filtered by status and product, each prototype\'s page in the side panel', async () => {
   const { templateText } = await import('../lib/styleguide-template.mjs');
   const tpl = templateText();
   assert.match(tpl, /navLink\('prototypes', 'prototypes'\)/);
   assert.match(tpl, /section\('prototypes', 'Prototypes', 'Prototypes'/);
-  assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panels\' one order');
+  // Shown with none yet, saying so and copying the request that makes the first.
+  assert.match(tpl, /No prototype yet[\s\S]*copyBtn\('Copy', ASK\)/);
+  // A grid or a table, switched beside the title, the grid following the table's filters and order.
+  assert.match(tpl, /segHTML\(\[\{ v: 'grid', label: 'Grid' \}, \{ v: 'table', label: 'Table' \}\], 'View'\)/);
+  assert.match(tpl, /<th>Prototype<\/th><th>Product<\/th><th>System version<\/th><th>Asked by<\/th><th>Asked on<\/th><th>Status<\/th>/);
+  assert.match(tpl, /new MutationObserver\(follow\)/, 'the grid follows the table');
+  // The statuses in the page's own words, and Product as a list chip, as the Rules page's Area.
+  assert.match(tpl, /fix: \['differs', 'Fix', 0\], missing: \['differs', 'Missing', 1\], 'not checked': \['figma', 'Not checked', 2\], done: \['match', 'Done', 3\]/);
+  assert.match(tpl, /filterBar\(sec, \{ total: PROTO.length, said: 'prototypes', chips: chips, cols: \[\{ key: 'status' \}, \{ key: 'product', label: 'Product' \}\] \}\)/);
+  // Its panel: what to do (Continue), what was asked, what its check found (Copy fix), its status, the rest.
+  assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panel\'s one order');
+  assert.match(tpl, /copyBtn\('Continue this prototype', cont\)/);
+  assert.match(tpl, /copyBtn\('Copy fix', fix\)/);
   assert.match(tpl, /#prototypes\?panel=' \+ esc\(encodeURIComponent\('proto:' \+ p\.name\)\)/, 'a component\'s page links each prototype to its own');
   assert.match(tpl, /: !!\(target\._openKey && target\._openKey\(panelWant\)\)/, 'a link opens any page\'s own panel by its key');
   assert.match(tpl, /NAV_MARK\.prototypes = /);
@@ -84,5 +96,37 @@ test('the prompt a prototype was made from is kept with its check, and a later c
   writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', file: 'prototypes/Orders.vue' }));
   assert.equal(JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8')).request, 'a list of orders');
   writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', file: 'prototypes/Orders.vue', request: 'a list of orders, by status' }));
-  assert.equal(JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8')).request, 'a list of orders, by status', 'a new prompt replaces it');
+  assert.deepEqual(JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8')).asks.map((a) => a.request), ['a list of orders', 'a list of orders, by status'], 'a new prompt is the next ask');
+});
+
+test('the prompt, who asked it and when are kept together, and a later check by someone else keeps the asker', async () => {
+  const { checkRecord, writeCheck } = await import('../lib/prototype-record.mjs');
+  const root = tempDir('proto-who-');
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', request: 'a list of orders', by: 'Design', askedAt: '2026-11-22T10:00:00Z' }));
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', by: 'Product' }));
+  const r = JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8'));
+  assert.deepEqual([r.request, r.by, r.askedAt], ['a list of orders', 'Design', '2026-11-22T10:00:00Z']);
+});
+
+test('the prompt hook keeps who is asking with what they asked, by itself', async () => {
+  const { routePrompt } = await import('../lib/guard.mjs');
+  const root = tempDir('proto-hook-');
+  writeFileSync(join(root, 'ds-config.json'), '{}');
+  routePrompt({ prompt: '/rms-design-system-engine prototype a page listing orders with their status' }, { root });
+  let kept = null; try { kept = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8')); } catch { /* not routed to a prototype */ }
+  assert.ok(kept, 'a prototype request is kept');
+  assert.match(kept.text, /orders/);
+  const { decidedBy } = await import('../lib/decided-by.mjs');
+  assert.equal(kept.by ?? null, decidedBy(root, []), 'with who asked: the name Git has for them, as every decision names its person');
+});
+
+test('every ask is kept in order: the one that made it, then each that changed it, with who and when', async () => {
+  const { checkRecord, writeCheck } = await import('../lib/prototype-record.mjs');
+  const root = tempDir('proto-asks-');
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', request: 'a list of orders', by: 'Design', askedAt: '2026-11-20T10:00:00Z' }));
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders' }));
+  writeCheck(root, 'prototypes', checkRecord({ name: 'Orders', request: 'add an empty state', by: 'Product', askedAt: '2026-11-21T10:00:00Z' }));
+  const r = JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8'));
+  assert.deepEqual(r.asks.map((a) => [a.request, a.by]), [['a list of orders', 'Design'], ['add an empty state', 'Product']]);
+  assert.deepEqual([r.request, r.by], ['a list of orders', 'Design'], 'who asked for it is who made it');
 });
