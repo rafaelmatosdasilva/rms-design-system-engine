@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: A product's own health report, its screens drawn from the system, and formats read as part of the system (continuous evaluation)
+
+What changed since the entry below (engine 637a7a76): A focus ring around a photo or a pattern measured against its pixels (#633); Every exception says why and whose, approvers named per kind of change, and each finding says its layer (#635); One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token; A name the loop never read, and the catalog test that now sees each prop's other names; The shard weights refreshed: 50 test files were missing from the table; OKLab credited generically; A product's own health report, its screens drawn from the system with each region marked, and formats read as part of the system; A product's health asked as an app routes too. The guide changed in `reference/usage.md`.
+
+Guide set measured: `430dbada5b86` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md f5d01a4d` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 2739ac39` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 8e3db454 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 91k | 98k |
+| Turns a run | 3.2 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 91k, in 3.4 turns against 3.2. no task changed state, and no run moved: the same result. Records: `records/2026-11-22-a-product-s-health-asked`.
+
 ## 2026-11: One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token (continuous evaluation)
 
 What changed since the entry below (engine 2fcfad0d): Accessibility under the settings people use: zoomed in, with a magnifier, and errors in forced colours (#632); Every exception says why and whose, approvers are named per kind of change, and each finding says its layer; Two initial values the code never read, which ESLint flags; One prop vocabulary across the system, states on the system's state tokens, and each hand-written value matched to its token; A name the loop never read, and the catalog test that now sees each prop's other names; The shard weights refreshed: 50 test files were missing from the table. The guide changed in `reference/usage.md`.
