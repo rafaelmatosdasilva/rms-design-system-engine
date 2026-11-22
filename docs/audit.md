@@ -535,7 +535,7 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
 
 - **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
-- **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`.
+- **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`. An Angular app's root component (`app.ts`, `app.component.ts`) is the app, never one of its system's components.
 - **What it takes.** Lit's reactive properties, decorated (`@property() tone = 'primary'`) or listed in `static properties`, with the defaults its constructor gives. Angular's inputs, decorated (`@Input()`, with an alias, `required`, a getter or a setter) or signals (`input()`, `input.required()`, `model()`). A union of strings (`'s' | 'm' | 'l'`) gives a prop's options, even one a formatter wrapped over several lines.
 - **What it inherits.** The props and events of the class it extends, when that class is your own (imported from `./…`), up to three classes up. A prop the component declares itself wins.
 - **What it keeps to itself.** Lit's internal state (`@state()`, `state: true`) is no prop, as a Vue component's data is not.
@@ -548,7 +548,11 @@ A component written as a class is read the way a Vue or React one is, into the s
 - **Lit drawn as it ships.** With Lit and Vite installed, each Lit component is drawn by your own Vite in a real browser, in each of its cases, each value set as a property as Lit reads it. Its tag is the one it defines, or the one a file beside it registers. The accessibility check and the browser measurements read through its shadow root.
 - **On the style guide too.** Each case is kept as a declarative shadow root, with the styles Lit adopted inside it, so the page shows it as Lit drew it without running Lit. `styleguide.renderLit: false` leaves them undrawn.
 - **Your own build only.** A Lit library built without Vite (with Rollup or the web dev server alone) is said so, and its components get the checks that read code.
-- **Angular not drawn yet.** Drawing an Angular component needs Angular's own compiler, so Angular components get the checks that read code, never the ones that measure them drawn.
+- **Angular compiled by your own compiler.** With Angular installed, its compiler (`@angular/compiler-cli`, the one `ng build` runs) compiles each Angular component ahead of time, with your own tsconfig, its template and its stylesheets inside it. A stylesheet in Sass is compiled by your own Sass, as your builder does. What the compiler refuses (a template naming what the component lacks) is said with its own error.
+- **Angular drawn as it ships.** Your own Vite (yours, or the one `@angular/build` installs) serves the compiled components, and your own Angular draws each in each of its cases, on the element its selector names. Each value is set as an input by the name a template uses (an alias among them), what a person puts in it is projected into its `<ng-content>`, and a library that ships partly compiled (Angular Material) is finished by your own `@angular/compiler`. No zone.js is needed from Angular 18 on, and before that your own zone.js runs. The accessibility check and the browser measurements read it drawn.
+- **On the style guide too.** Each case is kept as Angular drew it, with the styles Angular scoped to it and a library's own styles beside it. `styleguide.renderAngular: false` leaves them undrawn.
+- **Proven on a real app.** An app the Angular CLI made (Angular 22, SCSS, no zone.js) with Angular Material had all three of its components drawn in all ten of their cases: Material's buttons and slide toggle among them, its theme and its styles kept.
+- **Every case can draw.** A prop a component requires (`input.required()`) is given in every case, never only in its own, since without it the component refuses to draw. This holds for every framework.
 
 #### Values written by hand
 
