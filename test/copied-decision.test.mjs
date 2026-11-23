@@ -90,15 +90,15 @@ test('--draft writes each line under its section, marked with its task, on the S
   assert.match(draftLinesPlan({ system: null, entities: [] }, 'Nothing', 'Rules', ['x'], new Map()).error, /no page in the intent layer is about "Nothing"/);
 });
 
-test('the command a copied decision starts with is the company\'s own, else the engine with the profile, else the engine', () => {
+test('the command a copied decision starts with is the company\'s own, else the engine, never with the profile\'s link', () => {
   const home = tempDir('home-');
   const src = 'https://git.example.com/ux/acme-profile/-/blob/main/profile.json';
   assert.equal(engineCommand({}, { home }), 'rms-design-system-engine');
-  assert.equal(engineCommand({ profile: { source: src } }, { home }), `rms-design-system-engine --profile '${src}'`);
+  assert.equal(engineCommand({ profile: { source: src } }, { home }), 'rms-design-system-engine', 'no company command here: the engine, its settings already in ds-config.json');
   mkdirSync(join(home, '.claude', 'skills', 'rms-design-system-engine-acme'), { recursive: true });
   writeFileSync(join(home, '.claude', 'skills', 'rms-design-system-engine-acme', 'SKILL.md'), commandSkill('acme', src, { name: 'Acme' }));
-  assert.equal(engineCommand({ profile: { source: src } }, { home }), '/rms-design-system-engine-acme', 'found by the profile its command runs');
-  assert.equal(engineCommand(applyProfile({}, { command: '/rms-design-system-engine-acme-ds' }, { source: src }), { home }), '/rms-design-system-engine-acme-ds', 'named by the profile first');
+  assert.equal(engineCommand({ profile: { source: src } }, { home }), 'rms-design-system-engine-acme', 'found by the profile its command runs, with no agent\'s prefix');
+  assert.equal(engineCommand(applyProfile({}, { command: '/rms-design-system-engine-acme-ds' }, { source: src }), { home }), 'rms-design-system-engine-acme-ds', 'named by the profile first, its prefix dropped');
 });
 
 test('the company\'s command routes the request first, and says whose system it is', () => {

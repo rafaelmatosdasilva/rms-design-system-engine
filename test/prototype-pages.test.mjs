@@ -60,8 +60,17 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   const tpl = templateText();
   assert.match(tpl, /navLink\('prototypes', 'prototypes'\)/);
   assert.match(tpl, /section\('prototypes', 'Prototypes', 'Prototypes'/);
-  // Shown with none yet, saying so and copying the request that makes the first.
-  assert.match(tpl, /No prototype yet[\s\S]*copyBtn\('Copy', ASK\)/);
+  // Shown with none yet as the page that has nothing yet (pageNone): its mark large and what it will hold. Asking for one
+  // is coming soon: a label in place of the button, and no request to copy (soonLabel).
+  assert.match(tpl, /pageNone\('prototypes', 'No prototypes yet', 'Describe a screen to your AI agent\. It\\'s built from the system\\'s own components, and what the system lacks becomes a request\.', soonLabel\(\)\)/);
+  // Requests always in the menu, below Prototypes since a prototype's check is where a request comes from, with its own
+  // empty state while there is none.
+  assert.ok(tpl.indexOf("navLink('prototypes', 'prototypes')") < tpl.indexOf("navLink('requests', 'requests')"), 'Prototypes, then Requests');
+  assert.doesNotMatch(tpl, /if \(REQ\.length\) \(function/, 'Requests is never left out of the menu');
+  // Deciding a request from its panel is coming soon too: the label, never its command written out.
+  assert.match(tpl, /var soon = '<p class="sg-il-line">' \+ soonLabel\(\) \+ '<\/p>';/);
+  assert.doesNotMatch(tpl, /--request "' \+ x\.key \+ '" --decide/);
+  assert.match(tpl, /pageNone\('requests', 'No requests yet', 'What prototypes need and the system doesn\\'t have, the most asked first, for your team to decide\.', soonLabel\(\)\)/);
   // A grid or a table, switched beside the title, the grid following the table's filters and order.
   assert.match(tpl, /segHTML\(\[\{ v: 'grid', label: 'Grid' \}, \{ v: 'table', label: 'Table' \}\], 'View'\)/);
   assert.match(tpl, /<th>Prototype<\/th><th>Product<\/th><th>System version<\/th><th>Asked by<\/th><th>Asked on<\/th><th>Status<\/th>/);
@@ -71,8 +80,10 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   assert.match(tpl, /filterBar\(sec, \{ total: PROTO.length, said: 'prototypes', chips: chips, cols: \[\{ key: 'status' \}, \{ key: 'product', label: 'Product' \}\] \}\)/);
   // Its panel: what to do (Continue), what was asked, what its check found (Copy fix), its status, the rest.
   assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panel\'s one order');
-  assert.match(tpl, /copyBtn\('Continue this prototype', cont\)/);
-  assert.match(tpl, /copyBtn\('Copy fix', fix\)/);
+  // Continue and Copy fix are coming soon too: the label, never a request to copy.
+  assert.doesNotMatch(tpl, /'Continue this prototype'|'Copy fix'| prototype: '/);
+  assert.match(tpl, /\['', soonLabel\(\)\]\]/);
+  assert.doesNotMatch(tpl, /'\/rms-design-system-engine /, 'no request in one agent\'s form');
   assert.match(tpl, /#prototypes\?panel=' \+ esc\(encodeURIComponent\('proto:' \+ p\.name\)\)/, 'a component\'s page links each prototype to its own');
   assert.match(tpl, /: !!\(target\._openKey && target\._openKey\(panelWant\)\)/, 'a link opens any page\'s own panel by its key');
   assert.match(tpl, /NAV_MARK\.prototypes = /);
