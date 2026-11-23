@@ -281,6 +281,7 @@
     // The health above the filters: it says where the system stands; the filters, under it, stay as the table scrolls.
     doneCards(sec, cards);
   })();
+  if (!document.getElementById('rules')) emptyPage('rules', 'rules', 'System', 'Rules', 'No rules yet', 'The rules every component follows show here once the engine has read Figma and the code together.', null);
   // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
   // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
   // not as said). A row opens its before and after in the side panel: what the change said it would do (the read before
@@ -346,6 +347,7 @@
     var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
     pageBar(sec, { said: 'decisions', chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
   })();
+  if (!document.getElementById('changes-in-Figma')) emptyPage('changes-in-Figma', 'changes in Figma', 'Changes', 'Changes in Figma', 'No changes in Figma', 'Nothing changed in the Figma file since it was last read. Read it again to see what designers changed.', askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>'));
   // Requests: what teams ask the system for (requests.mjs), one row a need however many prototypes ask for it, the
   // most asked first. Status is what the system owes itself, this is what others ask it for. A row opens its panel:
   // what to do, who asked, what it uses meanwhile, the team's decision and the tracker's ticket. The decision is the
@@ -574,6 +576,7 @@
     hr(); navLink('history', 'history');
     historyTable(section('history', 'Changes', 'History', ''));
   }
+  if (!document.getElementById('history')) emptyPage('history', 'history', 'Changes', 'History', 'No changes yet', 'Who changed what in the system, and when. The first change to Figma or the code shows here.', null);
   // Every change in the order History reads them: the code's releases, the decisions of each day, each read of Figma
   // and each change of the intent layer, a group each.
   function historyOrder() {
@@ -1667,11 +1670,13 @@
     doneCards(ilSec, srcWords.map(function (w) { return doneCard(w, rows.filter(function (p) { return (!p._part || p._part === p._parts[0]) && ilSourceWords(p).indexOf(w) >= 0; }).map(function (p) { return { area: ilArea(p), state: srcState(p, w) }; }), 'The pages documented in ' + (w === 'Figma' ? w : 'the ' + w.toLowerCase()) + ' with nothing left to write there, out of all of them. The bars split them by area.'); }).join(''));
     };
   }
+  if (!document.getElementById('documentation')) emptyPage('documentation', 'documentation', 'System', 'Documentation', 'No documentation yet', 'How to use each component, read from Figma and the code, shows here once a component is in both.', null);
   // Accessibility: every criterion of every component in one table, as Rules and Documentation gather theirs, each row the
   // same row a component's own Accessibility area shows and opening the same panel. Built here, under Documentation in
   // the menu, and filled once every component is tried in this browser (fillA11yPage, 30-its-accessibility.js).
   var a11ySec = null;
   if (DATA.wcag21 && DATA.wcag21.criteria && COMPONENTS.some(function (c) { return c.a11y; })) { hr(); navLink('accessibility', 'accessibility'); a11ySec = section('accessibility', 'System', 'Accessibility', ''); }
+  if (!document.getElementById('accessibility')) emptyPage('accessibility', 'accessibility', 'System', 'Accessibility', 'Not tried yet', 'Each component is tried in a browser against WCAG when the guide is built. None has been tried yet.', null);
   // The notes no agent is given (once the For agents page) are on the Documentation page, flagged Remove, each with
   // why, how to keep it instead and whether to remove it.
   // Documentation: what the team has written about each component. What it is, how to use it, pictures of it used well

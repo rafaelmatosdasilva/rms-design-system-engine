@@ -256,6 +256,12 @@
     return '<div class="sg-page-none" role="note">' + navMark(id).replace('class="sg-nav-mark"', 'class="sg-page-none-mark"')
       + '<p class="sg-page-none-head">' + esc(head) + '</p><p class="sg-page-none-say">' + esc(say) + '</p>' + (action ? '<div class="sg-page-none-act">' + action + '</div>' : '') + '</div>';
   }
+  // A page with nothing to show still has its place in the menu and its title, and says so with pageNone (the owner's,
+  // 23 November 2026): no page is left out of the menu for being empty. A foundation under the Foundations label.
+  function emptyPage(id, label, badge, title, head, say, action, foundation) {
+    hr(); (foundation ? foundationLink : navLink)(id, label);
+    var s = section(id, badge, title, null); s.insertAdjacentHTML('beforeend', pageNone(id, head, say, action)); return s;
+  }
   // In place of a request's copy button while what it asks for is coming soon (the owner's, 23 November 2026): a label
   // that copies nothing, so nobody pastes a request the engine cannot answer yet. Its request is not shown either.
   function soonLabel() { return '<span class="sg-soon" role="note"><span class="sg-soon-dot" aria-hidden="true"></span>Coming soon</span>'; }

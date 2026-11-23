@@ -101,4 +101,5 @@
       });
     });
   }
+  if (!document.getElementById('motion')) emptyPage('motion', 'motion', 'Foundations', 'Motion', 'No motion yet', 'The system\'s durations and easings, played on demand, show here once Figma or the code has them.', null, true);
 
