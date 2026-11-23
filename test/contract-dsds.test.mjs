@@ -37,7 +37,10 @@ test('a contract as a DSDS component entry: the engine\'s facts, and links for w
   assert.equal(e.kind, 'component');
   assert.equal(e.description, 'The one main action of a view.');
   // Deprecated, as DSDS requires it: why (deprecationNotice), and what replaces it, on the status itself (replacedBy).
-  assert.deepEqual(e.metadata, { status: { status: 'deprecated', deprecationNotice: 'one button with a variant', replacedBy: [{ to: 'button' }] } });
+  assert.deepEqual(e.metadata.status, { status: 'deprecated', deprecationNotice: 'one button with a variant', replacedBy: [{ to: 'button' }] });
+  // How the entry came to exist, as DSDS says it: read by a script, and the team's own words said apart.
+  assert.deepEqual([e.metadata.origin.method, e.metadata.origin.author], ['extracted', 'generated']);
+  assert.match(e.metadata.origin.note, /^Written by rms-design-system-engine, from Figma and the code\. Its guidelines From the contract are the team's own, from contract\.authored\.json\.$/);
   assert.deepEqual(e.uses, [{ to: 'icon-base' }]);
   assert.deepEqual(e.alternatives, [{ to: 'link-inline' }], 'what to use instead; the replacement is written once, on the status');
   assert.deepEqual(e.sourceFiles, [{ platform: 'vue', file: 'src/components/ButtonPrimary.vue' }]);
@@ -61,7 +64,9 @@ test('a contract as a DSDS component entry: the engine\'s facts, and links for w
 
 test('a contract that says little gives an entry with only what DSDS requires', () => {
   const e = dsdsEntry({ id: 'acme.avatar', name: 'avatar', description: 'avatar — captured from Figma by rms-design-system-engine.', props: [], states: [] });
-  assert.deepEqual(Object.keys(e).sort(), ['$extensions', 'description', 'id', 'kind', 'name', 'uuid']);
+  assert.deepEqual(Object.keys(e).sort(), ['$extensions', 'description', 'id', 'kind', 'metadata', 'name', 'uuid']);
+  assert.deepEqual(Object.keys(e.metadata), ['origin'], 'no status said, only where it came from');
+  assert.doesNotMatch(e.metadata.origin.note, /team's own/, 'no words of the team\'s in it');
   assert.equal(e.description, '', 'the placeholder is not a description');
   // A Figma variant of False and True is a boolean.
   const t = dsdsEntry({ name: 'chip', props: [{ name: 'Icon', type: 'enum', default: 'False', options: ['False', 'True'] }] }).traits[0];
@@ -217,10 +222,10 @@ test('the status on each platform: what Figma has and no code has yet is planned
     { name: 'sheet', file: 'S.contract.json', contract: { name: 'sheet', status: { state: 'experimental' }, source: { figma: { nodeId: '1:2' } } } },
     { name: 'oldSheet', file: 'O.contract.json', contract: { name: 'oldSheet', status: { state: 'deprecated', supersededBy: 'sheet' }, source: { figma: { nodeId: '1:3' } } } },
   ]);
-  assert.deepEqual(docs[0].doc.entries[0].metadata, { platforms: ['react'] }, 'the platforms each status names');
+  assert.deepEqual(docs[0].doc.entries[0].metadata.platforms, ['react'], 'the platforms each status names');
   assert.deepEqual(docs[2].doc.entries[0].metadata.status, [{ status: 'experimental' }, { platform: 'react', status: 'planned' }]);
   assert.equal(docs[3].doc.entries[0].metadata.status.status, 'deprecated', 'a deprecated one is never planned');
-  assert.equal(docs[1].doc.entries[0].metadata, undefined, 'built, with no status: nothing to say');
+  assert.equal(docs[1].doc.entries[0].metadata.status, undefined, 'built, with no status: nothing to say');
   for (const { doc } of docs) assert.deepEqual(errorsOf(doc), []);
 });
 

@@ -260,6 +260,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Shows each draft beside where it comes from: the code's prop, the line it says again, or a name only Figma has, flagged so it is not taken for a prop.
 - Offers a rewrite for a draft that names a property only Figma has, saying what carries it in the code.
 - Flags lists copied into the layer that will go stale, and names the generated file to link instead.
+- Reads who each DSDS section is for, where each page came from and the links inside it: what is for agents alone stays off your pages, a page a tool wrote and nobody reviewed counts for less, and a link to something renamed or deleted is flagged.
 - Rates how ready your guidance is for AI agents, component by component.
 - Gives agents the mistakes that look right, each with why it fails and what to use instead, and suggests the ones your pages leave out, such as a status shown by colour alone.
 - Reads how much damage each destructive action does, and checks your screens against it: undo for what can be undone, how long when it is only for a while, and a confirmation with the safe option selected for what is permanent.
