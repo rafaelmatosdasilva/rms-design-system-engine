@@ -19,7 +19,7 @@ test('the pass answers only criteria a browser decides, each by its own kind of 
     assert.equal(WCAG22.find((c) => c.sc === sc)?.browser, 'each', sc);
     for (const k of p.kinds) assert.equal(WCAG_KIND[k], sc, k);
   }
-  assert.deepEqual(Object.keys(PASS), ['1.4.4', '1.4.10', '1.4.12', '2.1.1', '2.4.7', '2.5.8', '2.1.2', '2.4.3', '2.4.11']);
+  assert.deepEqual(Object.keys(PASS), ['1.4.4', '1.4.10', '1.4.12', '2.1.1', '2.4.7', '2.5.8', '2.1.2', '2.4.3', '2.4.11', '1.4.13', '2.5.2', '2.5.7', '3.2.1', '3.2.2', '3.3.8']);
 });
 
 test('a key press is a real one, with its modifiers held around it', () => {
@@ -125,5 +125,40 @@ test('in Chrome and Firefox: a focus held, a positive tabindex and a control hid
       assert.ok(!of('order').includes('tabtrap'), `${l}: nothing holds the focus there`);
     }
     assert.equal(browserLine(browserRows(run, 'trap')['2.1.2']), 'Chrome ✕ · Firefox ✕');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// What a component does when used, by the in-page checks Chrome's own run uses, now in every browser: a control that
+// acts on press (2.5.2), a thing moved only by dragging, with no other control beside it (2.5.7), a password field that turns autofill off (3.3.8). A
+// criterion is said only where it had something to try: the plain component has no password field.
+const USED_PAGE = `<!doctype html><html><head><meta charset="utf-8"></head><body><section id="c-used"><div class="pg-preview">
+  <button id="press" aria-pressed="false">Press</button>
+  <label>Password <input type="password" autocomplete="off"></label>
+</div></section><section id="c-drag"><div class="pg-preview"><div draggable="true" class="card">Drag me</div></div></section>
+<section id="c-plain"><div class="pg-preview"><button>Plain</button></div></section>
+<script>document.getElementById('press').addEventListener('pointerdown', (e) => { e.currentTarget.setAttribute('aria-pressed', 'true'); });</script>
+</body></html>`;
+
+test('in each browser here: what a component does when used, said only where it had something to try', { skip: !(HERE.chrome && HERE.firefox) && 'Chrome and Firefox are both needed', timeout: budget(240000) }, async () => {
+  const dir = makeFixture({});
+  const page = join(dir, 'used.html');
+  writeFileSync(page, USED_PAGE);
+  const browsers = [{ name: 'chrome', path: HERE.chrome }, { name: 'firefox', path: HERE.firefox }, ...(HERE.webkit ? [{ name: 'webkit', path: HERE.webkit }] : [])];
+  try {
+    const run = await a11yBrowsers({ url: () => pathToFileURL(page).href, components: ['used', 'drag', 'plain'], browsers, open: openBrowser, rootOf: (n) => `#c-${n} .pg-preview` });
+    assert.deepEqual(run.refused, []);
+    for (const b of run.browsers) {
+      const of = run.components.used[b.label].map((f) => f.kind);
+      for (const k of ['pointerdown', 'authfill']) assert.ok(of.includes(k), `${b.label}: ${of}`);
+      assert.ok(run.components.drag[b.label].some((f) => f.kind === 'dragging'), `${b.label}: ${run.components.drag[b.label].map((f) => f.kind)}`);
+      assert.ok(run.ran.used[b.label].includes('auth'), `${b.label}: ${run.ran.used[b.label]}`);
+    }
+    const labels = run.browsers.map((b) => b.label);
+    const used = browserRows(run, 'used'), drag = browserRows(run, 'drag'), plain = browserRows(run, 'plain');
+    const fails = labels.map((l) => `${l} ✕`).join(' · ');
+    for (const sc of ['2.5.2', '3.3.8']) assert.equal(browserLine(used[sc]), fails, sc);
+    assert.equal(browserLine(drag['2.5.7']), fails);
+    assert.equal(plain['3.3.8'], undefined, 'no password field, so 3.3.8 was not tried');
+    assert.equal(plain['2.5.7'], undefined, 'nothing to drag, so 2.5.7 was not tried');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
