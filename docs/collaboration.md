@@ -262,7 +262,8 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
 - **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
 - **Each says how it is verified, in DSDS's words.** Every rule in a contract and in the DSDS view carries `checkedBy`:
   `automated` when a check holds it (with `checks` pointing at that check), `assisted` for a judgment rule once a model
-  has judged your screens (`--judge-pages`), since a person still makes the call, and `manual` otherwise.
+  has judged your screens (`--judge-pages`), since a person still makes the call, and `manual` otherwise. What never
+  goes together is a `combo` in the view, which DSDS gives no `checkedBy`, so its note names the check that holds it.
 - **Each rule kept as a decision.** A rule without the decision behind it is argued again by every agent. So each
   says how strongly it binds (its level), the wrong move it exists to stop (its example, which for a must-not shows
   what not to do, or words such as "instead of" or "never"), and the decision that settled it (a link to a decision
