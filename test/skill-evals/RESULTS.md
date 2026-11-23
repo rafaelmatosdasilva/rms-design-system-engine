@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The changes made in Figma are read in History, not on a page of their own (continuous evaluation)
+
+What changed since the entry below (engine ca14b005): One copy button for every request, requests that work in every agent, and Prototypes and Requests coming soon (#672); Motion and effects comparison is ready: run on a real Figma file (engine #669) (#671); A token's uuid survives a rename (#673); One Prototypes page: the Showroom's screens as prototypes from Figma, each prototype with its source (#675); Update README.md (#674); Each difference says its cause, motion sequences compared, and three more criteria in every browser (#676); Who each DSDS section is for, where a page came from, and the links in it (#677); A product's screens as stories the team opens in its own Storybook (#678); Each prototype's panel shows its UX grades: each problem at the reviewer's grade, else the one proposed with why (#679); Every page says when it has nothing; Prototypes and Requests under Accessibility; no page repeats another (#680); Svelte components drawn in the browser by the project's own Svelte (#682); The changes made in Figma are read in History, not on a page of their own. The guide changed in `reference/usage.md`.
+
+Guide set measured: `4a830b1e44b6` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md aef052f2` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 26d046d7` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 5ac703c2 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.057 | 0.058 |
+| Input a run | 90k | 86k |
+| Turns a run | 3.2 | 3.0 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 90k, in 3.0 turns against 3.2. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-test-borderless-nested-table-attributes`.
+
 ## 2026-11: Tasks routed by each difference's cause, motion sequences, and three more criteria in every browser (continuous evaluation)
 
 What changed since the entry below (engine 9e2d83b2): Each difference sorted by its cause, where the engine can read it (#667); Web Components with no library read and drawn, and the codebase rules read Lit and Angular (#668); Each Showroom screen drawn at its own width, and motion differences at their own line (#669); A layer named as its component is compared once, on the component's own rule; Each difference's task goes to whoever its cause says acts, and says why; A motion of several parts kept as tokens, held to the code part by part, with its reduced form; Three more criteria a browser decides, tried in Firefox and WebKit: a focus held, a positive tabindex, a control hidden when focused; The DSDS view holds the whole system, in the version the team uses (#670). The guide changed in `reference/usage.md`.
