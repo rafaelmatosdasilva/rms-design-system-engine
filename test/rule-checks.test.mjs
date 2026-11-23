@@ -307,3 +307,25 @@ test('the Documentation page\'s Rules card names a must or must-not rule with no
   assert.match(tpl, /' must or must-not with no check behind ' \+ \(open === 1 \? 'it' : 'them'\)/);
   assert.match(tpl, /\(x\.level === 'must-not' \? 'Must not' : 'Must'\) \+ ', no check behind it'/);
 });
+
+test('each rule is kept as a decision: its level, the wrong move it stops and the decision behind it, listed when missing', async () => {
+  const { ruleMissing, undecidedRules, ruleReport } = await import('../lib/rule-checks.mjs');
+  assert.deepEqual(ruleMissing({ text: 'Use the primary button once per screen.' }), ['level', 'mistake', 'decision']);
+  assert.deepEqual(ruleMissing({ text: 'Never nest a card in a card.', level: 'must-not' }), ['decision'], 'a must-not names its own wrong move');
+  assert.deepEqual(ruleMissing({ text: 'Use one primary button (see [ADR 4](docs/decisions/0004-one-primary.md)).', level: 'must', example: 'Two primary buttons side by side.' }), []);
+  assert.deepEqual(ruleMissing({ text: 'Put Cancel before Save, instead of after it.', level: 'should', decidedBy: 'docs/adr/0007-order.md' }), [], 'a DSDS ref to a decision record');
+  const byPage = new Map([[{ name: 'button' }, { rules: [{ text: 'Keep labels short.', missing: ['level', 'mistake', 'decision'] }] }]]);
+  assert.deepEqual(undecidedRules(byPage), [{ page: 'button', text: 'Keep labels short.', missing: ['level', 'mistake', 'decision'] }]);
+  assert.match(ruleReport(new Map([[{ name: 'button' }, { n: 1, checked: 0, checkable: 0, judgment: 1, vague: 0, rules: [{ text: 'Keep labels short.', status: 'judgment', missing: ['level', 'decision'] }] }]])).join('\n'), /1 rule is not yet kept as a decision[^]*button: "Keep labels short\." \(no level, no decision behind it\)/);
+});
+
+test('a rule the team turned down is kept as a decision about its own page, so no one proposes it again', async () => {
+  const { decisionsFrom, decisionView } = await import('../lib/decisions.mjs');
+  const answered = { 'guard:card:1a2b3c4d': { answer: 'no', proposal: 'card never contains card', by: 'QA', at: '2026-11-22T10:00:00Z' }, 'question:chip:loading': { answer: 'There is none.', said: 'There is none.', by: 'QA', at: '2026-11-22T10:00:00Z' } };
+  const view = decisionView(decisionsFrom({ answered }));
+  const guard = view.all.find((d) => /card never contains card/.test(d.what));
+  assert.equal(guard.component, null, 'never filed under a component called "guard"');
+  assert.equal(guard.page, 'card');
+  assert.deepEqual(guard.ruledOut, ['card never contains card']);
+  assert.equal(view.all.find((d) => /There is none/.test(d.what) || /loading/.test(d.what))?.component, 'chip');
+});

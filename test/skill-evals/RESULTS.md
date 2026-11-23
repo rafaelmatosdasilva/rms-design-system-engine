@@ -20,6 +20,24 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 87k, in 3.0 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-playwright-drives-the-browsers-when`.
 
+## 2026-11: The guide on Windows (continuous evaluation)
+
+What changed since the entry below (engine 9259e348): The guide tasks run on a Windows runner, Claude Code on Windows and its commands in Git Bash.
+
+Guide set measured: `c8a35860a832` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 120f4b75` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md f5d01a4d` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 843b4bc7` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 5515a0c | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 79/82 | 82/82 |
+| Mean cost a run | 0.059 | 0.055 |
+| Input a run | 102k | 81k |
+| Turns a run | 3.4 | 3.0 |
+| Rule violations | 3 | 0 |
+| Runs stopped at a limit | 3 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 81k a run against 102k, in 3.0 turns against 3.4. 1 task went the other way (fix-chip-height). Records: `records/windows-2026-11-22`.
 ## 2026-11: The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node (continuous evaluation)
 
 What changed since the entry below (engine 9259e348): Each rule says how it is verified, in DSDS's words, and the must rules nothing checks are named (#638); Lit and Angular components read like Vue and React, and Lit drawn with the project's own Lit (#634); Windows: the rest of the suite passes there, and the skill evaluation starts there (#628); The colour scales' steps on the colour page and in the health report (#641); The questions a component's documentation leaves open, named before an agent answers them (#640); The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node where a path is shared. The guide changed in `cookbook/full-audit.md`, `reference/usage.md`.
