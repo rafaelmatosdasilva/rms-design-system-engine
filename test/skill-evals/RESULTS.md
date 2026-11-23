@@ -20,6 +20,24 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 87k, in 3.0 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-playwright-drives-the-browsers-when`.
 
+## 2026-11: A product's pages opened in a browser for its health (continuous evaluation)
+
+What changed since the entry below (engine 308c49d2): An evaluation run on Windows gets a whole home of its own, so Chrome starts in it, and a Firefox tab whose context was dropped is opened again (#642); Decision records kept as a chain, superseded and never edited (#644); Prototypes: a page for each, in a grid or a table, by product, with who asked, Continue and Copy fix (#643); Angular components compiled by the project's own Angular compiler and drawn by its own Angular (#645); The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node (#647); A product's pages opened in a browser for its health: what they load from other hosts and how long they take. The guide changed in `reference/usage.md`.
+
+Guide set measured: `afe59e4d27c6` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md aef052f2` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md f5d01a4d` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 879f2727` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 01c08c12 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.056 | 0.059 |
+| Input a run | 87k | 103k |
+| Turns a run | 3.1 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 87k, in 3.6 turns against 3.1. no task changed state, and no run moved: the same result. Input moved but input a turn held (28k to 29k): the turns moved, 3.1 to 3.6, and nothing a run reads grew - most in `new-ui-saved` 5.5 to 8.8, `engine-idea` 3.0 to 6.0, `forbidden-green` 3.0 to 4.7. Records: `records/2026-11-23-a-product-s-pages-opened`.
+
 ## 2026-11: The guide on Windows (continuous evaluation)
 
 What changed since the entry below (engine 9259e348): The guide tasks run on a Windows runner, Claude Code on Windows and its commands in Git Bash.

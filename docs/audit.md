@@ -343,7 +343,8 @@ Ask how a product is doing and the engine answers for that product, beside the s
   - **Contracts**: do its pages work for everyone (from an accessibility run on its pages), and does it test itself.
   - **Intent**: is it on the system's latest release.
   - **Evaluation**: how much a page of it loads from its own folder, and whether it measures how it is used.
-- Each answer has its evidence, what the engine did not see (a request built at run time, how long a page takes to open), the command that answers it, and what only the product's team can tell.
+- **Its pages opened in a browser.** With Chrome on the computer, each built page is opened in it too: every request to another host, and the time to the first thing drawn and to everything loaded, once on a normal network and once on a slow one (400 ms, 400 kbit/s). `--no-browser` reads the files only.
+- Each answer has its evidence, what the engine did not see (what a page sends once a person signs in, how it opens in Firefox or Safari), the command that answers it, and what only the product's team can tell.
 - It is written to `.design-system-engine-out/product-health-<name>.md`, and kept, so the next report says what got better or worse.
 
 #### A product's screens, drawn from the system
