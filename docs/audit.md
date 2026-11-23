@@ -354,6 +354,10 @@ Ask to see a product's screens built from the system and the engine redraws each
 - **Each region marked.** Every part of a header, a navigation or a section is the system's own component, the product's own built where the system has one, or a stand-in where the system has none.
 - **Drawn in the engine's workshop.** Each screen is written as a composition in `.design-system-engine-out/workshop/<product>/`, which `--prototype <file>` draws. Nothing is written into your Storybook or the product.
 - **What drifted.** Each run keeps the marks, so the next one says which screens moved: a part that was the system's and is now the product's own, a region added or gone.
+- **In your own Storybook too.** Add `--stories` and each screen is also written as a story, drawn exactly as the workshop draws it, in `.design-system-engine-out/workshop/<product>/stories/`. The engine never writes into your Storybook: it says the one line to add to `stories` in `.storybook/main`, and the screens show under Product screens, beside your components.
+  - Each story shows the drawn page in a frame of its own, so it imports nothing and your Storybook's styles never reach into it.
+  - Written for the framework your Storybook names: Vue, React, or HTML and web components. Another framework is said plainly, and no story is written.
+  - Each run writes them again, and a screen the product no longer has loses its story. Files of your own in that folder are left alone.
 
 #### Dates, numbers and money
 
