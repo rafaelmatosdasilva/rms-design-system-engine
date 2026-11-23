@@ -33,7 +33,7 @@ The guide Claude reads is `rms-design-system-engine.md`, with `cookbook/` and `r
 
 ## Run the tests
 
-The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the pinned DSDS release once, then run the suite and the docs check:
+The full suite needs Chrome on your `PATH`, or `CHROME_PATH` set. Install the test tools and fetch the DSDS releases once (the pinned one and each older one the view is written in), then run the suite and the docs check:
 
 ```bash
 for d in .ci-tools .lint-tools .vue-tools .vue-cli-tools .nuxt-tools .react-tools .lit-tools .angular-tools .storybook-tools; do npm ci --prefix test/$d; done
@@ -133,15 +133,15 @@ node lib/merge-stalled.mjs
 
 ## Keeping up with DSDS
 
-The engine writes and reads [DSDS](https://designsystemdocspec.org), pinned to one version (`DSDS_VERSION` in `lib/contract-dsds.mjs`). DSDS is before 1.0, and a minor release may break, so the pin never moves by itself.
+The engine writes and reads [DSDS](https://designsystemdocspec.org), pinned to one version (`DSDS_VERSION` in `lib/contract-dsds.mjs`). DSDS is before 1.0, and a minor release may break, so the pin never moves by itself. The view is also written in the older releases it has been tried against (`DSDS_TRIED_OLDER`), for a team whose intent layer declares one, and the tests hold it to each one's own schema. Add the version a pin moved from there once its tests pass.
 
 - **Every Monday**, the DSDS release workflow (`.github/workflows/dsds-release.yml`) asks DSDS's repository for its newest release.
-- **When it is newer than the pin**, a read-only job fetches that release's schema, conformance suite and examples. It moves the pin in its own copy, runs the DSDS tests, and runs DSDS's own reference validator over the view of a sample system.
+- **When it is newer than the pin**, a read-only job fetches that release's schema, conformance suite and examples. It moves the pin in its own copy, runs the DSDS tests, and runs DSDS's own reference validator over the view of a sample system, every file in one run so a pointer into another file is checked too.
 - **Then a second job opens a pull request** (`dsds/v<version>`) that moves the pin, with what passed and what did not. It is a draft when something failed. That job runs none of DSDS's code.
-- **DSDS's files are fetched, never committed.** Its licence and its comments name people and companies, and this repository names none. They go in `test/.dsds/`, which git ignores, and the Tests workflow fetches the pinned release before the suite runs.
+- **DSDS's files are fetched, never committed.** Its licence and its comments name people and companies, and this repository names none. They go in `test/.dsds/`, which git ignores, and the Tests workflow fetches each release the view is written in before the suite runs.
 - **It starts the test suite on the branch**, since a pull request a workflow opens starts no other workflow by itself.
 
-Before running the DSDS tests on your computer, fetch the pinned release once. A DSDS test with nothing fetched fails and says this command:
+Before running the DSDS tests on your computer, fetch the releases once: the pinned one and each older one the view is written in. A DSDS test with nothing fetched fails and says this command:
 
 ```bash
 node lib/dsds-release.mjs fetch
