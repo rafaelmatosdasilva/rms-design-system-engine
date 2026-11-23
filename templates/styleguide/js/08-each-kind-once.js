@@ -376,7 +376,9 @@
       tl.appendChild(a);
     });
   }
-  if (!document.getElementById('templates')) emptyPage('templates', 'templates', 'System', 'Templates', 'No templates yet', 'The page frames Figma builds from the system\'s components, and whether the code uses each part, show here.', null);
+  // Templates is the one page left out of the menu while it has nothing (the owner's, 23 November 2026): it fills only
+  // once somebody names the frames the system's pages are built from, so an empty one asks a reader for work the guide
+  // cannot start. Every other page keeps its place in the menu and says it has nothing.
   // Prototypes, then the Requests they lead to, under Accessibility (the owner's, 23 November 2026): the system's own
   // pages first, then what is made with it. Under Documentation where there is no Accessibility page, else under Status.
   (function () { var at = nav.querySelector('a[href="#accessibility"]') || nav.querySelector('a[href="#documentation"]') || nav.querySelector('a[href="#status"]'); if (!at) return; ['prototypes', 'requests'].forEach(function (id) { var a = nav.querySelector('a[href="#' + id + '"]'); if (a && a !== at) { at.insertAdjacentElement('afterend', a); at = a; } }); })();
