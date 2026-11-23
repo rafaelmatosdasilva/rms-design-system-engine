@@ -38,7 +38,7 @@ const COMMANDS = [
   // The command with no flag at all: the whole audit, which is what most people run and what every other command
   // hangs off. It was not here when a name that is not in scope printed itself as a note instead of a list.
   '',
-  '--version', '--census', '--doctor', '--status', '--summary', '--trend', '--writes', '--findings', '--hygiene',
+  '--version', '--census', '--doctor', '--harness', '--status', '--summary', '--trend', '--writes', '--findings', '--hygiene',
   '--duplication', '--agent-rules', '--annotation-categories', '--check-intent', '--code-drift',
   '--contract-completeness', '--exemption-debt', '--guidance-rating', '--guide-status', '--readmes', '--route',
   '--stores', '--styleguide-check', '--tailwind', '--unchecked', '--prune', '--figma-edits', '--figma-edits spec-pages', '--figma-undo', '--query chip',

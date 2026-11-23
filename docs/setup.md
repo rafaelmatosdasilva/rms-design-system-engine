@@ -80,7 +80,7 @@ The skill updates itself. Once a day, before an audit, it pulls the latest versi
 - `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off.
 - `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind.
 - A new version is published on GitHub every 15 merged changes, listing everything that went into it, so each version is a comparable piece of work rather than whatever happened to land in a given week. A security fix, or a fix for a problem that stops people, comes out at once. Your install does not wait for either: it follows the latest code once a day, so a change reaches you the day after it is merged. Watch the repository (**Watch → Custom → Releases**) to hear about each version.
-- `rms-design-system-engine --doctor` checks the install, axe-core included. The install fetches axe-core, so the first accessibility check needs no network.
+- `rms-design-system-engine --doctor` checks the install, axe-core included, and in a project says how many [layers of the agent harness](#which-layers-keep-an-agent-inside-your-system) are on. The install fetches axe-core, so the first accessibility check needs no network.
 
 Keep a single copy. Link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.
 
@@ -103,6 +103,18 @@ Setup ends with a first result, so you see what the engine is for before learnin
 - **Its three main findings.** What fails first, one per check, each with what to do and who does it.
 - **What to ask next.** Three requests to try, such as showing that component in the style guide.
 - With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
+
+### Which layers keep an agent inside your system
+
+Access alone does not keep an agent inside your system. Five layers do, and each has to be switched on in the project. `rms-design-system-engine --harness` reads the project and lists them in the order they run, each on or off, with the one command or line that turns on what is missing.
+
+1. **It looks before it builds.** The contracts and the component catalog an agent reads first, and each request routed to its recipe by the Claude Code hook.
+2. **A way to ask.** `--query` and `--catalog` from a terminal, or the MCP server for a tool without one. Either is enough.
+3. **Each edit checked.** The hooks in each agent tool the project uses (Claude Code, Cursor, Codex), and the git hooks at each commit and push.
+4. **A second judge.** A model, apart from the agent that wrote the work, reads a change or a screen when you ask. It needs a model's command on your machine.
+5. **A gate a person approves.** The engine's job on each pull request, and a change to the system held until someone else signs it off.
+
+It only reads: nothing is installed or changed. `--harness --json` gives the same list as data, and `--doctor` says how many layers are on.
 
 ### A shadcn/ui project
 
