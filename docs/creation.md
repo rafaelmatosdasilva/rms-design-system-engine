@@ -268,6 +268,8 @@ The picture is taken on a fresh draw, before anything clicks the page: a control
 
 Each width is drawn at the browser's own width, never in a box inside a wider window. A media query reads the window, so a box alone would leave every width drawn as the widest, and every check passing.
 
+The style guide's Showroom does the same: each screen is drawn in a frame of its own, as wide as the screen, so its media rules, its `vw` and its fixed parts read the screen's width, never the style guide's window. Its pins, its full browser view and the build's measurements of it all work inside that frame.
+
 At each width the engine also reads which of your CSS's media rules hold, and how the page is laid out. Two neighbouring widths drawn the same, though a rule holds at one and not the other, are listed:
 
 ```
