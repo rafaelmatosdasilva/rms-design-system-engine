@@ -222,7 +222,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Writes a contract for each component: its props, variants, states, tokens and the components it nests, from Figma and the code.
 - Writes the one file AI tools read, with what to use, what each token is for and what was already decided against.
 - Pairs each text colour with the surface it was made for, so nobody picks a different grey on every card.
-- Publishes the contracts to a shared repository, and in the DSDS format for teams that document their system that way.
+- Publishes the contracts to a shared repository.
+- Writes the whole system in the DSDS format for teams that document their system that way: components, tokens and themes, the patterns and foundations of your pages, and the rules they share, in the DSDS version your pages use.
 - Writes the contracts in the open component specs format too: each component's parts, props, slots and the tokens each part uses.
 - Records each breaking change as a release of the system, so products know what moved.
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.

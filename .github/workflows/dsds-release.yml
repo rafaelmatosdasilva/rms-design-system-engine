@@ -86,12 +86,10 @@ jobs:
           git clone --quiet --depth 1 --branch "v$LATEST" "https://github.com/somerandomdude/design-system-documentation-schema.git" "$RUNNER_TEMP/dsds"
           npm ci --prefix "$RUNNER_TEMP/dsds" --ignore-scripts --no-audit --no-fund
           node lib/dsds-release.mjs emit "$RUNNER_TEMP/view/dsds"
-          code=0
           cd "$RUNNER_TEMP/view/dsds"
-          for f in system.dsds.json components/*.dsds.json; do
-            node "$RUNNER_TEMP/dsds/scripts/validate/validate.js" --strict "$f" 2>&1 | tee -a "$RUNNER_TEMP/reference.log" || code=1
-          done
-          exit $code
+          # Every file of the view in one run: a pointer into another file (a component's token, a pattern's components)
+          # resolves only when the validator is given that file too.
+          node "$RUNNER_TEMP/dsds/scripts/validate/validate.js" --strict $(find . -name '*.dsds.json' | sort) 2>&1 | tee -a "$RUNNER_TEMP/reference.log"
       - name: The report
         id: report
         if: steps.check.outputs.newer == 'true' && steps.open.outputs.open != 'true'

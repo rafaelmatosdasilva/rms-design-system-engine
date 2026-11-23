@@ -113,19 +113,38 @@ A Figma property that no code prop is paired with may still have a near name in 
 - **A yes.** `--prop-pair <component> "<Figma property>" yes` writes the pair into `contract.authored.json` (the component's `bindings`). The next contract pairs them, with the code prop's type, description and default, and its values mapped where both sides write them with the same letters (`Large` and `large`).
 - **A no.** `--prop-pair <component> "<Figma property>" no` keeps the answer there too (`declinedPairs`), so the same pair is never asked again, in the contract or by the props check.
 
-### The contracts in DSDS too
+### The whole system in DSDS too
 
-Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23.1, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.
+Beside the contracts, `contracts/dsds/` holds your system in [DSDS](https://designsystemdocspec.org), for a team that documents its system in that format. It says what the engine knows and links the rest, as DSDS asks: the contract as each component's spec, the code file as its source, the Figma component, and your own pages, whose guidance is never copied back.
 
-Every file it writes passes DSDS's own schema for that version:
+What it holds:
 
-- **A deprecated component** says why (`deprecationNotice`) and names what replaces it (`replacedBy`).
+| File | What is in it |
+|---|---|
+| `system.dsds.json` | The index: your system, the platforms it ships on, where its code is (`sourceRoot`), the shared rules, and a link to every other file. |
+| `components/<id>.dsds.json` | One file per component: its variants and states, what it nests and the tokens it paints with, what to use instead, what never goes with it, and its status. |
+| `tokens.dsds.json` | One entry per token, pointing at its place in `tokens.json` (its value is never copied), and one theme per mode. |
+| `patterns/`, `flows/`, `foundations/` | One file per page of your intent layer, linking the page and naming the components it uses. |
+
+Each part, in DSDS's own terms:
+
+- **Tokens.** Each points at its place in the DTCG file with a JSON Pointer (`../tokens.json#/text/primary`). A text colour lists the surfaces it reads on at 4.5:1 or more as a `combo`, and the one it was made for.
+- **Themes.** One per mode, when your system has two or more. The first holds each token's own value, and each other one `extends` it. Light and dark say their `colorScheme`.
+- **What never goes together** is a `combo` on the component, at `must-not`, where the other component has an entry. One the view has none for stays a sentence in its guidelines.
+- **Shared rules.** How your system builds a component in Figma and in the code (`contracts/construction.json`) is written once, in the index's `shared` list. A rule every component follows is a `must`, one most follow or your team decided is a `should`, and one still to decide is left out.
+- **The status on each platform.** A component Figma has and your code does not yet is `planned` on each platform the system ships on, beside its own status.
+- **A uuid that survives a rename.** Each component, page and theme gets one, made from what stays when a name changes: the Figma node, the code file, the page's file. When one of those changes too, the uuid the last build wrote is kept while any other still matches.
+
+Every file it writes passes DSDS's own schema for the version it is written in, and DSDS's own reference validator over the whole view:
+
+- **A deprecated component or token** says why (`deprecationNotice`), and a component names what replaces it (`replacedBy`).
 - **Each link** uses a `rel` DSDS names: `design` for the Figma component, `relates-to` for your page, `file` from the index.
+- **Each pointer resolves.** A component's `uses`, a combo and a pattern's components name only entries the view has.
 - **Each value of a variant** is an object of its own, with a description.
 - **An id** is in the form DSDS allows. A Figma name with a space keeps its words, joined by a dash (`Show icon` becomes `Show-icon`).
 - **The engine's own fields** sit under one namespaced key in `$extensions`.
 
-**Your intent layer keeps its own version.** It is read in the DSDS version its files declare, never asked to move. When that differs from the engine's, the run says so in one line.
+**Written in your version.** Your intent layer is read in the DSDS version its files declare, never asked to move. The view is written in that version too when the engine has been tried against it: 0.23.1 (the version it is pinned to), 0.23.0 and 0.22.0. A version before 0.23.1 has no `uuid` field, so the uuid is kept under the engine's key there. Any other version gets 0.23.1, and the run says so in one line, since tools made for it may not read the view.
 
 **A new DSDS release is tried before the engine moves to it.** DSDS is before 1.0, so a minor release may break. Once a week a job looks for a new release, tests the engine against it and opens a pull request. Until a person merges it, nothing changes. See [Keeping up with DSDS](development.md#keeping-up-with-dsds).
 

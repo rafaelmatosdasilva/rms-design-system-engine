@@ -68,9 +68,10 @@ jobs:
       # real Storybook, never a stand-in, so a story is read as Storybook itself draws it.
       - name: Install the Storybook a team builds its stories with
         run: npm ci --prefix test/.storybook-tools --no-audit --no-fund
-      # DSDS's published schema, suite and examples for the pinned version, which the DSDS tests check against. Fetched,
-      # never committed (lib/dsds-release.mjs says why); the runner's Ruby turns DSDS's YAML examples into JSON.
-      - name: Fetch the pinned DSDS release
+      # DSDS's published schema, suite and examples for the pinned version, and for each older one the engine writes its
+      # view in, which the DSDS tests check against. Fetched, never committed (lib/dsds-release.mjs says why); the
+      # runner's Ruby turns DSDS's YAML examples into JSON.
+      - name: Fetch the DSDS releases the engine writes
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node lib/dsds-release.mjs fetch

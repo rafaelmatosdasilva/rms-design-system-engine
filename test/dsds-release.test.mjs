@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { newestTag, mayBreak, compareVersions, check, movePin, goldenReports, exampleName, emit, SAMPLE, fixtureDir } from '../lib/dsds-release.mjs';
+import { newestTag, mayBreak, compareVersions, check, movePin, goldenReports, exampleName, emit, SAMPLE, SAMPLE_SYSTEM, fixtureDir } from '../lib/dsds-release.mjs';
 import { DSDS_VERSION } from '../lib/contract-dsds.mjs';
 
 test('the newest plain release among the tags, never a candidate', () => {
@@ -56,11 +56,22 @@ test('the sample the reference validator reads: every part of the view, and the 
   const out = join(root, 'dsds');
   const rels = emit(out);
   assert.equal(rels[0], 'system.dsds.json');
-  assert.equal(rels.length, SAMPLE.length + 1);
+  // The index, a file a component, the tokens and themes, and the intent layer's pattern page.
+  assert.deepEqual(rels.slice(1).map((r) => r.split('/')[0]).filter((x, i, a) => a.indexOf(x) === i), ['components', 'tokens.dsds.json', 'patterns']);
+  assert.equal(rels.filter((r) => r.startsWith('components/')).length, SAMPLE.length);
   for (const r of rels) assert.ok(existsSync(join(out, r)), r);
   for (const { file } of SAMPLE) assert.ok(existsSync(join(root, file)), `${file}, which a spec points at`);
+  // What the rest points at is there too, so DSDS's validator finds each file (DSDS-11): the code under the
+  // system's sourceRoot, the DTCG tokens, the pattern contract.
+  assert.ok(existsSync(join(root, 'src', 'Button.vue')), 'the code file, under the sourceRoot');
+  assert.ok(existsSync(join(root, 'tokens.json')), 'the DTCG tokens');
+  assert.ok(existsSync(join(root, SAMPLE_SYSTEM.pages[0].contract)), 'the pattern contract');
   const button = JSON.parse(readFileSync(join(out, 'components', 'button.dsds.json'), 'utf8')).entries[0];
-  assert.ok(button.traits.length >= 3 && button.sections && button.refs && button.uses, 'the sample exercises traits, guidance, links and composition');
+  assert.ok(button.traits.length >= 3 && button.sections && button.refs && button.uses && button.combos, 'the sample exercises traits, guidance, links, composition and what never goes together');
+  const index = JSON.parse(readFileSync(join(out, 'system.dsds.json'), 'utf8'));
+  assert.ok(index.shared?.length && index.entries[0].metadata.sourceRoot, 'shared rules, and where the code is');
+  const kinds = JSON.parse(readFileSync(join(out, 'tokens.dsds.json'), 'utf8')).entries.map((e) => e.kind);
+  assert.ok(kinds.includes('token') && kinds.includes('theme'));
   const old = JSON.parse(readFileSync(join(out, 'components', 'link-button.dsds.json'), 'utf8')).entries[0];
   assert.equal(old.metadata.status.status, 'deprecated');
   assert.ok(readdirSync(out).length >= 2);
@@ -70,7 +81,8 @@ test('a layer written in another DSDS version is read as it is, and the person t
   const { versionNote } = await import('../lib/doc-source-dsds.mjs');
   assert.equal(versionNote('0.23.1', '0.23.1'), null);
   assert.equal(versionNote(null, '0.23.1'), null, 'a layer that says no version is not asked to');
-  assert.match(versionNote('0.22.0', '0.23.1'), /written in DSDS 0\.22\.0\. The engine reads it as it is, and writes its own view in DSDS 0\.23\.1/);
+  assert.match(versionNote('0.22.0', '0.23.1'), /written in DSDS 0\.22\.0\. The engine reads it as it is, and writes its own view in DSDS 0\.22\.0 too/, 'a version the view has been tried in is the one it is written in');
+  assert.match(versionNote('0.20.1', '0.23.1'), /writes its own view in DSDS 0\.23\.1, since it has not been tried against 0\.20\.1/);
   assert.match(versionNote('0.24.0', '0.23.1'), /newer than the 0\.23\.1 .* never guessed/);
   assert.match(versionNote('draft', '0.23.1'), /not a version/);
   assert.doesNotMatch(versionNote('0.24.0', '0.23.1'), /;/, 'two sentences, never a semicolon');
