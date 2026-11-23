@@ -64,6 +64,16 @@ node --test --test-reporter=./test/shard.mjs test/*.test.mjs > test/shard-weight
 
 A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `reference/`) also needs a fresh skill evaluation, recorded in `test/skill-evals/RESULTS.md`. The evaluation (`node test/skill-evals/continuous.mjs`) runs on your Claude plan's login, billed against its usage limits. With `ANTHROPIC_API_KEY` set, it runs through the Agent SDK instead (`npm ci --prefix test/.eval-tools` first), billed to that key's API credits, which include the monthly credits a Max or Team plan comes with. Those credits don't cover Claude Code.
 
+
+Each run also says what following the guide cost it before it did anything (`test/skill-evals/procedure.mjs`), and `report.mjs` prints it per model beside the pass rates, never as part of the rule:
+
+- **What it was handed:** the input tokens of its first message, which hold the guide a skill loads with it.
+- **How far in the first write came:** the call it was, and the input tokens spent by then. A transcript has no clock, so this is counted in calls and tokens, never in seconds.
+- **What it read before that:** the files and the guide pages, and their size.
+- **What it read twice:** each file read more than once in the run.
+
+A row recorded before this has none of it, and is left out of the summary rather than read as zero.
+
 Main takes no direct push. A pull request merges when the privacy check, the test suite and CodeQL pass.
 
 The tests badge in the README is not written by hand: the Tests workflow puts what the run counted into `tests.json` on the `badges` branch, and the badge reads that file. So the number on the README is the number the last run on `main` really reported.
