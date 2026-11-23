@@ -175,6 +175,60 @@
       var v = BP_AXIS.values.filter(function (x) { return String(x.label).toLowerCase() === bp; })[0];
       if (v && v.value) screen.setAttribute(BP_AXIS.attr, v.value); else screen.removeAttribute(BP_AXIS.attr);
     };
+    // Each screen in a frame of its own, as wide as the screen: its @media rules, its vw and its fixed parts read the
+    // screen's width, never the style guide's window. The frame carries the page's stylesheets and the page's own
+    // attributes (its colour mode, its brand), kept in step as the page switches them; the screen is drawn inside it.
+    var SR_FRAMES = [], SR_WAITING = [];
+    var srMirror = function (d) {
+      var html = d.documentElement;
+      Array.prototype.forEach.call(html.attributes, function (a) { if (a.name !== 'class' && a.name !== 'style' && !document.documentElement.hasAttribute(a.name)) html.removeAttribute(a.name); });
+      Array.prototype.forEach.call(document.documentElement.attributes, function (a) { if (a.name !== 'class' && a.name !== 'style') html.setAttribute(a.name, a.value); });
+    };
+    // A frame has a document only once it is in the page, and one moved loads again, empty: each is filled (or filled
+    // again, with the same screen) whenever it is in the page with a document that does not hold its screen.
+    var srFill = function (fr) {
+      var d = fr.contentDocument; if (!d || fr._sgDoc === d) return;
+      d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); d.close();
+      srMirror(d);
+      Array.prototype.forEach.call(document.querySelectorAll('style, link[rel="stylesheet"]'), function (n) { d.head.appendChild(d.importNode(n, true)); });
+      d.documentElement.style.background = 'transparent'; d.body.style.margin = '0'; d.body.style.background = 'transparent'; d.body.style.overflow = 'hidden';
+      d.body.appendChild(d.adoptNode(fr._sgScreen));
+      fr._sgDoc = d; SR_FRAMES.push(d);
+    };
+    var srCheck = function () {
+      SR_WAITING.forEach(function (fr) { if (fr.isConnected) srFill(fr); });
+      SR_WAITING = SR_WAITING.filter(function (fr) { return fr.isConnected || !fr._sgDoc; });   // a drawn frame taken off the page is let go
+      SR_FRAMES = SR_FRAMES.filter(function (d) { var fr = d.defaultView && d.defaultView.frameElement; return fr && fr.isConnected && fr._sgDoc === d; });
+    };
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(function () { srCheck(); SR_FRAMES.forEach(srMirror); }).observe(document.documentElement, { attributes: true });
+      new MutationObserver(srCheck).observe(document.documentElement, { childList: true, subtree: true });
+    }
+    // Put in its place before it is drawn when it can be: the screen is its own element from the start, so the page can
+    // size it, find its parts and run it, and it is moved into the frame the moment the frame has a document.
+    var screenFrame = function (box, markup, key, before) {
+      var fr = document.createElement('iframe'); fr.className = 'sg-showroom-frame'; fr.setAttribute('title', 'Screen' + (key ? ': ' + key : ''));
+      if (key) fr.dataset.screen = key;
+      var screen = document.createElement('div'); screen.className = 'sg-showroom sg-showroom-screen'; if (key) screen.dataset.screen = key;
+      screen.innerHTML = markup || '';
+      fr._sgScreen = screen; SR_WAITING.push(fr);
+      box.insertBefore(fr, before || null);
+      if (fr.isConnected) srFill(fr);
+      return screen;
+    };
+    // The frame a screen is drawn in, from the screen (in the frame, or still waiting for it).
+    var srOuter = function (screen) {
+      var w = screen.ownerDocument.defaultView; if (w && w !== window && w.frameElement) return w.frameElement;
+      return SR_WAITING.filter(function (fr) { return fr._sgScreen === screen; })[0] || screen;
+    };
+    // A box inside a screen in the page's own coordinates: its frame's place, and the frame's scale.
+    var srRect = function (el) {
+      var r = el.getBoundingClientRect(), w = el.ownerDocument.defaultView, fr = w && w !== window && w.frameElement;
+      if (!fr) return r;
+      var f = fr.getBoundingClientRect(), k = fr.offsetWidth ? f.width / fr.offsetWidth : 1;
+      var left = f.left + r.left * k, top = f.top + r.top * k;
+      return { left: left, top: top, width: r.width * k, height: r.height * k, right: left + r.width * k, bottom: top + r.height * k };
+    };
     // A screen in its box: its frame (pick, from the room the box has; else Figma's own size), its breakpoint, scaled
     // down only when the frame is wider than the box.
     var drawAt = function (s, screen, box, pick) {
@@ -185,17 +239,18 @@
       AXES.forEach(function (a) { if (a.colour || !a.attr) return; var v = a.values.filter(function (x) { return named.indexOf(String(x.label).toLowerCase()) >= 0; })[0]; if (v && v.value) screen.setAttribute(a.attr, v.value); });
       // Its frame from the start, before the system's components measure the room they have (a table drops its
       // fixed column widths when it thinks it overflows).
-      var first = pick ? pick(room() || 1280) : frameOf(s, 'laptop', 0);
-      screen.style.width = first.w + 'px'; screen.style.height = first.h + 'px';
+      var first = pick ? pick(room() || 1280) : frameOf(s, 'laptop', 0), outer = srOuter(screen);
+      var size = function (f) { screen.style.width = f.w + 'px'; screen.style.height = f.h + 'px'; if (outer !== screen) { outer.style.width = f.w + 'px'; outer.style.height = f.h + 'px'; } };
+      size(first);
       if (pick) setBreakpoint(screen, first.bp);
       return function () {
         if (box.hasAttribute('data-measuring')) return;   // held still while the build measures it at Figma's size
         if (screen.closest('.sg-showroom-full')) return;   // full browser: the window sizes it, not its place on the page
         var r = room(); if (!r) return;
         var f = pick ? pick(r) : frameOf(s, 'laptop', 0);
-        screen.style.width = f.w + 'px'; screen.style.height = f.h + 'px';
+        size(f);
         if (pick) setBreakpoint(screen, f.bp);
-        var k = Math.min(1, r / f.w); screen.style.transform = 'scale(' + k + ')'; box.style.height = Math.ceil(f.h * k) + 'px';
+        var k = Math.min(1, r / f.w); outer.style.transform = 'scale(' + k + ')'; box.style.height = Math.ceil(f.h * k) + 'px';
         if (pick) box.style.width = Math.floor(f.w * k) + 'px';
         screen.dataset.frame = f.bp;
       };
@@ -222,10 +277,10 @@
       var thumb = document.createElement('div'); thumb.className = 'sg-thumb sg-showroom-thumb'; thumb.setAttribute('aria-hidden', 'true');
       var draw = function () {
         if (!s.markup) return;
-        var small = document.createElement('div'); small.className = 'sg-showroom sg-showroom-screen'; small.setAttribute('inert', ''); small.innerHTML = s.markup;
+        var small = screenFrame(thumb, s.markup); small.setAttribute('inert', ''); srOuter(small).setAttribute('inert', ''); srOuter(small).setAttribute('tabindex', '-1');
         Array.prototype.forEach.call(small.querySelectorAll('[id]'), function (e) { e.removeAttribute('id'); });
         Array.prototype.forEach.call(small.querySelectorAll('a, button, input, select, textarea, [tabindex]'), function (e) { e.setAttribute('tabindex', '-1'); });
-        thumb.appendChild(small); a._draw = drawAt(s, small, thumb); a._draw();
+        a._draw = drawAt(s, small, thumb); a._draw();
       };
       // Its fit, whenever its screen is drawn: until then, nothing to size.
       if (s.markup || srPending(s)) a._fit = function () { if (a._draw) a._draw(); };
@@ -388,7 +443,7 @@
       var dBtn = srSwitch.querySelector('[data-differences]'); if (dBtn) dBtn.insertAdjacentHTML('beforeend', countHTML(notes.length));
       srActions.innerHTML = (s.figma ? sysButton('a', 'Figma', ' href="' + esc(s.figma) + '" target="_blank" rel="noopener"', '', null, FIGMA_SVG) : '');
       srDetail.innerHTML = '<div class="sg-showroom-body">' +
-          '<div class="sg-showroom-room">' + (s.markup ? '<div class="sg-showroom-stage"><div class="sg-showroom sg-showroom-screen" data-screen="' + esc(s.key) + '">' + s.markup + '</div><div class="sg-pins" aria-hidden="true" hidden></div></div>' : '<p class="sg-info"><span class="sg-mx-why">' + esc('It could not be drawn: ' + plainWhy(s.why) + '.') + whyTip(s.why) + '</span></p>') + reviewHTML(s) + '</div>' +
+          '<div class="sg-showroom-room">' + (s.markup ? '<div class="sg-showroom-stage"><div class="sg-pins" aria-hidden="true" hidden></div></div>' : '<p class="sg-info"><span class="sg-mx-why">' + esc('It could not be drawn: ' + plainWhy(s.why) + '.') + whyTip(s.why) + '</span></p>') + reviewHTML(s) + '</div>' +
           '<div class="sg-showroom-notes" id="sg-notes-' + esc(s.key) + '" hidden>' +
             '<section class="sg-showroom-gaps" aria-label="Where this screen differs from Figma">' +
               (notes.length ? '<div class="sg-notes-top"><div class="sg-showroom-filter"><span class="sg-chips" role="group" aria-label="Show">' + kinds.map(function (k) {
@@ -399,7 +454,8 @@
             '</section>' +
           '</div>' +
         '</div>';
-      var stage = srDetail.querySelector('.sg-showroom-stage'), screen = srDetail.querySelector('.sg-showroom-screen');
+      var stage = srDetail.querySelector('.sg-showroom-stage'), screen = null;
+      if (stage) screen = screenFrame(stage, s.markup, s.key, stage.firstChild);
       // The breakpoint chosen; while its differences are shown, Figma's own frame (Laptop) fitted to the room left, so the
       // pins sit where Figma drew those parts, and the switch is off.
       var choice = frameChoice(), diffOn = false;
@@ -409,21 +465,23 @@
       var fullBtn = srSwitch.querySelector('[data-full]');
       if (fullBtn && screen) fullBtn.addEventListener('click', function () {
         var ov = document.createElement('div'); ov.className = 'sg-showroom-full sg-showroom'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', (s.title || s.key) + ', full browser');
-        var place = document.createComment('screen'), keep = [screen.style.width, screen.style.height, screen.style.transform];
-        screen.parentNode.insertBefore(place, screen);
-        ov.appendChild(screen);
         ov.insertAdjacentHTML('beforeend', '<div class="sg-showroom-full-exit">' + sysButton('button', 'Exit full browser', ' data-exit') + '</div>');
         document.body.appendChild(ov);
-        var size = function () { screen.style.width = innerWidth + 'px'; screen.style.height = innerHeight + 'px'; screen.style.transform = 'none'; setBreakpoint(screen, innerWidth >= 1440 ? 'desktop' : 'laptop'); };
+        // The screen drawn again in a frame of the window's size (a frame moved would load again, empty), in the modes
+        // its page draws it in, and run by the system's own code as there.
+        var full = screenFrame(ov, s.markup, s.key, ov.firstChild), outer = srOuter(full);
+        Array.prototype.forEach.call(screen.attributes, function (a) { if (!/^(class|style|data-screen)$/.test(a.name)) full.setAttribute(a.name, a.value); });
+        if (window.__dseShowroom) { try { window.__dseShowroom.mount(full, s.key); } catch (e) { /* the drawing stays */ } }
+        var size = function () { full.style.width = outer.style.width = innerWidth + 'px'; full.style.height = outer.style.height = innerHeight + 'px'; setBreakpoint(full, innerWidth >= 1440 ? 'desktop' : 'laptop'); };
         var done = false, back = function () {
           if (done) return; done = true;
           removeEventListener('resize', size); document.removeEventListener('keydown', esc);
-          place.parentNode.insertBefore(screen, place); place.remove(); ov.remove();
-          screen.style.width = keep[0]; screen.style.height = keep[1]; screen.style.transform = keep[2];
+          ov.remove();
           refit(); fullBtn.focus();
         };
         var esc = function (e) { if (e.key === 'Escape') back(); };
         size(); addEventListener('resize', size); document.addEventListener('keydown', esc);
+        full.ownerDocument.addEventListener('keydown', esc);
         ov.querySelector('[data-exit]').addEventListener('click', back);
         ov.querySelector('[data-exit]').focus({ preventScroll: true });
       });
@@ -438,7 +496,7 @@
           var el = partOf(screen, x.n), li = item(x.no);
           if (li) li.classList.toggle('sg-note--away', !el);
           if (!el || (shown !== 'all' && shown !== x.kind)) return;
-          var r = el.getBoundingClientRect(), key = Math.round(r.left) + ',' + Math.round(r.top), k = taken[key] = (taken[key] || 0) + 1;
+          var r = srRect(el), key = Math.round(r.left) + ',' + Math.round(r.top), k = taken[key] = (taken[key] || 0) + 1;
           var pin = document.createElement('span'); pin.className = 'sg-pin sg-pin--' + x.kind; pin.textContent = x.no; pin.dataset.note = x.no;
           pin.style.left = Math.min(o.width - 12, Math.max(12, r.left - o.left + 12 + (k - 1) * 24)) + 'px';
           pin.style.top = Math.min(o.height - 12, Math.max(12, r.top - o.top + 12)) + 'px';
@@ -452,7 +510,7 @@
         var old = pins && pins.querySelector('.sg-pin-box'); if (old) old.remove();
         var x = notes[no - 1], el = x && partOf(screen, x.n);
         if (!el || !pins) return;
-        var o = stage.getBoundingClientRect(), r = el.getBoundingClientRect(), box = document.createElement('span');
+        var o = stage.getBoundingClientRect(), r = srRect(el), box = document.createElement('span');
         box.className = 'sg-pin-box sg-pin-box--' + x.kind;
         box.style.left = (r.left - o.left) + 'px'; box.style.top = (r.top - o.top) + 'px'; box.style.width = r.width + 'px'; box.style.height = r.height + 'px';
         pins.insertBefore(box, pins.firstChild);

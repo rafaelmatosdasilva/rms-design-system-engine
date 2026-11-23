@@ -558,9 +558,9 @@
     screens: DATA.showroom || [],
     drawScreen: function (s, box) {
       if (!s || !s.markup || typeof drawAt !== 'function') return null;
-      var el = document.createElement('div'); el.className = 'sg-showroom sg-showroom-screen'; el.setAttribute('inert', ''); el.innerHTML = s.markup;
+      box.innerHTML = '';
+      var el = screenFrame(box, s.markup); el.setAttribute('inert', ''); srOuter(el).setAttribute('inert', ''); srOuter(el).setAttribute('tabindex', '-1');
       Array.prototype.forEach.call(el.querySelectorAll('[id]'), function (e) { e.removeAttribute('id'); });
-      box.innerHTML = ''; box.appendChild(el);
       var fit = drawAt(s, el, box); fit();
       return { el: el, fit: fit };
     },

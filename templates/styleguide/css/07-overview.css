@@ -63,7 +63,7 @@ a.sg-card > h3, a.sg-card > h3 + p { padding-right: calc(var(--sg-space-l) * 2 +
 @media (max-width: 1100px) { .sg-card-grid.sg-showroom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .sg-card-grid.sg-showroom-grid { grid-template-columns: minmax(0, 1fr); } }
 .sg-showroom-thumb { display: block; padding: 0; }   /* the screen from its top left corner, its whole width in the card */
-.sg-showroom-thumb > .sg-showroom-screen { pointer-events: none; }
+.sg-showroom-thumb > .sg-showroom-screen, .sg-showroom-thumb > .sg-showroom-frame { pointer-events: none; }
 .sg-card > h3 + .sg-showroom-meta { margin: 0; }
 .sg-crumb { margin-left: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-muted); text-decoration: none; }   /* the tag's page beside it, back to the grid */
 .sg-crumb::before { content: '›'; margin-right: var(--sg-space-s); }
@@ -87,7 +87,7 @@ a.sg-card > h3, a.sg-card > h3 + p { padding-right: calc(var(--sg-space-l) * 2 +
 .sg-showroom-tools { display: inline-flex; align-items: center; gap: var(--sg-space-s); }   /* a screen's page only: never on the grid */
 /* A screen full browser: the product alone over the whole window, the way out at its bottom left corner. */
 .sg-showroom-full { position: fixed; inset: 0; z-index: 1000; background: var(--sg-bg); overflow: hidden; }
-.sg-showroom-full > .sg-showroom-screen { position: absolute; top: 0; left: 0; z-index: 0; isolation: isolate; }   /* its own layer: nothing in the product (its menu, a panel) ever covers the way out */
+.sg-showroom-full > .sg-showroom-screen, .sg-showroom-full > .sg-showroom-frame { position: absolute; top: 0; left: 0; z-index: 0; isolation: isolate; }   /* its own layer: nothing in the product (its menu, a panel) ever covers the way out */
 .sg-showroom-full-exit { position: absolute; left: var(--sg-space-l); bottom: var(--sg-space-l); z-index: 2; line-height: var(--sg-lh); font-weight: var(--sg-text-weight); }   /* the page's buttons' own weight and height, not the screen's */
 .sg-showroom-full-exit > .sg-btn { box-shadow: var(--sg-shadow-lift); }   /* the button is solid already: lifted over the product */
 html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never scrolls, nor shows its scroll bar */
@@ -103,7 +103,8 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 @media (max-width: 900px) { .sg-showroom-body.is-open { grid-template-columns: minmax(0, 1fr); } }   /* a narrow window: the notes under the screen, never over it */
 .sg-showroom-room { min-width: 0; }   /* the column a screen is drawn in */
 .sg-showroom-stage { position: relative; overflow: hidden; border: var(--sg-line); border-radius: var(--sg-radius); box-sizing: content-box; max-width: 100%; }
-.sg-showroom-screen { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.sg-showroom-screen, .sg-showroom-frame { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.sg-showroom-frame { display: block; border: 0; margin: 0; padding: 0; background: transparent; }   /* a screen's own window, as wide as the screen (06-overview.js screenFrame) */
 .sg-showroom-gaps { font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-tint); padding: var(--sg-space-m); }
 .sg-showroom-notes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .sg-showroom-gaps > h4 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }   /* two steps over its notes */
