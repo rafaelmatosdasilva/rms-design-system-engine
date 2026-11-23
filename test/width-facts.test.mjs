@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { WIDTH_FACTS_JS, sameDrawn, sameDrawnLines } from '../lib/width-facts.mjs';
 import { findChrome } from '../lib/cdp.mjs';
 import { openBrowser } from '../lib/page-driver.mjs';
+import { tempDir } from './helpers.mjs';
 
 const CHROME = findChrome();
 
@@ -26,7 +26,7 @@ test('two neighbouring widths drawn the same though different rules hold are lis
 });
 
 test('in the browser: a rule that changes the page keeps two widths apart, one a stronger rule overrides is said, one for a part not here is not', { skip: !CHROME && 'Chrome not found', timeout: 60000 }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'width-facts-'));
+  const dir = tempDir('width-facts-');
   const page = (css, body) => { const f = join(dir, `${Math.random().toString(36).slice(2)}.html`); writeFileSync(f, `<!doctype html><style>${css}</style><main id="p">${body}</main>`); return pathToFileURL(f).href; };
   const b = await openBrowser('chrome', CHROME, { driver: 'engine' });
   const at = async (url) => {
