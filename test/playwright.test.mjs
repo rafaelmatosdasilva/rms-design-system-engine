@@ -168,7 +168,7 @@ async function measured(name, path, driver, url) {
     try {
       assert.equal(b.driver, driver);
       const p = await b.page(url, { width: 768, height: 600 });
-      assert.deepEqual(Object.keys(p).sort(), ['close', 'evaluate', 'press', 'setViewport'], 'one page API on both paths');
+      assert.deepEqual(Object.keys(p).sort(), ['close', 'evaluate', 'press', 'setViewport', 'shot'], 'one page API on both paths');
       out.push(await p.evaluate(MEASURE));
       await p.setViewport(360, 600);
       out.push(await p.evaluate(MEASURE));

@@ -2128,7 +2128,10 @@ The rules are `--check-ui`'s, plus:
   each with the widths and states it happens at; the ones that happen with the words as written are owed in the reply.
   A system component that is under 24px at its own size is one line for the audit. A page that gives itself a width
   (`Page.width`) is tried at it too ("Its own"). A picture is saved for each width (`<name>@<width>.png`) and each state
-  (`<name>.<state>.png`, at the page's own width when it has one). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
+  (`<name>.<state>.png`, at the page's own width when it has one). The same widths, states and longer words are tried
+  in Firefox, and WebKit when Playwright drives it (`prototype-browsers.mjs`, `prototype.browsers` in
+  `reference/config.md`), each width's picture kept in a folder of its own (`prototypes/firefox/<name>@<width>.png`),
+  and only what differs from Chrome is said under 📱 ("wraps onto two lines at tablet, in WebKit only"). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
   narrow screen.
 - **Flows.** A part that leads to another page carries `"goesTo": "<prototype name>"` (`"<name>#<state>"` for one of
   its states); a click on the drawn page opens it, and a link to a page not drawn yet is a ⚠️ line the reply owes.
@@ -2725,10 +2728,12 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **Which browser answered it** — each criterion says what it depends on (`wcag21.mjs` `browser`): `same`, decided
   by the code, the markup or the system's own values and true in every browser; `each`, decided by the browser (what
   Tab reaches, where the focus shows, reflow, zoom, text spacing, what an input does, dragging, target size); `chrome`,
-  what a screen reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. Nine of the
-  `each` criteria (1.4.4, 1.4.10, 1.4.12, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11, 2.5.8) are tried again in Firefox and WebKit on each component
-  the style guide draws (`a11y-browsers.mjs`, through `page-driver.mjs`: plain scripts in the page and real Tab
-  presses, Option+Tab in Safari), Chrome measured by the same code in the same pass. Only what differs from Chrome is
+  what a screen reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. Fifteen
+  `each` criteria (1.4.4, 1.4.10, 1.4.12, 1.4.13, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11, 2.5.2, 2.5.7, 2.5.8, 3.2.1, 3.2.2,
+  3.3.8) are tried again in Firefox and WebKit on each component the style guide draws (`a11y-browsers.mjs`, through
+  `page-driver.mjs`: plain scripts in the page and real Tab presses, Option+Tab in Safari; what a component does when
+  used by the in-page checks of `wcag-page.js`, each said only where it had something to try), Chrome measured by the
+  same code in the same pass. Whether hover content also shows on a tap stays Chrome's (it needs touch emulation). Only what differs from Chrome is
   said, as a finding of its own ("Fails in WebKit only: ..."), the row keeps the worst status across browsers and shows
   each browser's result ("Chrome ✓ · Firefox ✓ · WebKit ✕"). The result is `.design-system-engine-out/a11y-browsers.json`;
   the run names a browser that is not installed (`browsers.mjs`), and the result records which were here (`browsers`

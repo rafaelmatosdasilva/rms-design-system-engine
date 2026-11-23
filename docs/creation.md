@@ -264,6 +264,20 @@ It is kept now: one picture a width, beside the page.
 
 The picture is taken on a fresh draw, before anything clicks the page: a control that leads somewhere takes the page with it, and a picture taken afterwards is of wherever it went.
 
+### In Firefox and WebKit too
+
+The same widths, states and longer words are tried in Firefox, and in WebKit when Playwright is here. Fonts, form controls and line breaks differ between browsers, so a label that fits in Chrome can wrap in WebKit.
+
+- **Only what differs is said.** A problem Chrome has is said once, above. One only another browser has gets a line of its own, with the browsers it happens in.
+- **A picture of each width.** Each browser keeps its own, in a folder named for it, so the style guide's pictures stay Chrome's.
+- **Which browsers.** `prototype.browsers` in `ds-config.json` names them, and `false` turns it off ([config](../reference/config.md)).
+
+```
+📱 EVERY SIZE  Phone (375px), Tablet (768px), Desktop (1280px) · the words as written and 40% longer, all fit
+   In Firefox and WebKit too: 1 problem(s) Chrome does not have
+   ⚠️  "Send the report" in button wraps onto two lines at tablet, in WebKit only
+```
+
 ### Each width really drawn
 
 Each width is drawn at the browser's own width, never in a box inside a wider window. A media query reads the window, so a box alone would leave every width drawn as the widest, and every check passing.
