@@ -30,6 +30,7 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(asksForToken('Put the token in .env as GITLAB_TOKEN=..., and never paste it into the chat.'), false);
   // A design token named in a question is not a secret asked for (found in the 2026-10 evaluation).
   assert.equal(asksForToken('**Give me a hex/token to use** (or confirm a green is fine)'), false);
+  assert.equal(asksForToken('Please provide:\n- **Height** (in pixels or as a token reference)'), false);   // a design token
   assert.equal(asksForToken("However, since you asked for green and the system doesn't provide that token, I have two options:"), false);   // a fact about a design token
   assert.equal(asksForToken("Please provide these using your system's token names (e.g., if L uses `size-lg`, what does XL use like `size-xl` or similar?)."), false);   // the system's design tokens, asked for by name
   assert.equal(asksForToken("Please give me the actual values or token/variable names the system uses for these, and I'll write the operations file to apply the change."), false);
@@ -606,6 +607,9 @@ test('graders that had no case: each passes a right answer and fails the wrong o
   // A step on a scale: the engine asks what XL changes, and nothing is built on a guess.
   const asked = JSON.stringify({ questions: [{ ask: 'What does XL change, against L?' }], ops: [] });
   assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'What does XL change against L — its height, its padding, its text size?', files: { [`${OUT}/changes/chip.change.json`]: asked } })), true);
+  // Asked as a request, with no question mark: still the question put to the person (a run once failed for it).
+  assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'For the XL variant, tell me which of these should change compared to L: height, padding, text size.', files: { [`${OUT}/changes/chip.change.json`]: asked } })), true, 'asked as a request');
+  assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'XL will be larger than L, with more height and padding.', files: { [`${OUT}/changes/chip.change.json`]: asked } })), false, 'said, never asked');
   const guessed = JSON.stringify({ questions: [], ops: [{ op: 'addOption', axis: 'Size', option: 'XL', height: '40px' }] });
   assert.equal(passes('figma-add-option', fakeCtx({ calls: [run('rms-design-system-engine --figma-change chip --add-option Size=XL')], final: 'Added XL at 40px.', files: { [`${OUT}/changes/chip.change.json`]: guessed } })), false, 'built on a guess');
 

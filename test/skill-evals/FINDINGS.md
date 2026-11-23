@@ -183,6 +183,10 @@ Newest first.
 
 **Seen again** 15 November 2026, the evaluation of rendered parity in Firefox and Safari: `figma-add-option` #1 and #2 failed the secret check on "using your system's token names" and on "token/variable names". The first was read as a design token already, the second was not, so the check now reads "token/variable names" as one too. Run #1 also offered three sizes of its own (40px with L's padding, 40px with more, 40px with larger text) and asked the person to pick, the open half of this case seen a second time.
 
+**Seen again** 22 November 2026, the evaluation of Playwright driving the browsers: `figma-add-option` #0 asked for XL's height and padding "in pixels or as a token reference". The check read it as a secret asked for, and so did the engine's own Stop hook (`guard.mjs` `asksForSecret`, the same pattern): it sent the reply back, and the agent then told the person the hook had stopped it and offered to loosen the hook. So this time the false positive reached a person, not only a score. Both now read "token reference" and "token names" as a design token, unless "your", "Figma", "API", "access", "personal", "auth", "GitHub" or "GitLab" comes before it (`test/adoption-fixes.test.mjs`). The saved row keeps no reply, so the rescore left it as scored. The task was run again on the fixed engine, 3 of 3 on Haiku.
+
+**Seen again** 22 November 2026, the evaluation of Option-Tab in WebKit on macOS alone: `figma-add-option` #1 failed `puts the question to the person`. Its transcript shows it did put the question: the engine asked what XL changes, and the agent wrote "For the XL variant, tell me which of these properties should change compared to L", listing height, padding and text size. The check wanted a question mark and the request had none. It now takes a request ("tell me", "let me know", "could you" and the like) as the question it is, and still fails a reply that only says what XL will be (`test/skill-evals.test.mjs`). The saved row keeps no reply, so it stays as scored, and the task was run again on the fixed check, 3 of 3 on Haiku.
+
 ---
 
 ## Four runs that did their task and failed "the run finished"

@@ -725,10 +725,11 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 - **With your own React.** A React system with React and Vite installed has its components drawn by them, every Figma variant on one page, with their state, context and portals run: a component drawn nowhere else is measured as React draws it, in every mode, rather than from its JSX read as text. Without React or Vite the JSX is read as before. `codeReading.harness: false` turns it off.
 - **With or without a structure contract.** What the browser measured is compared with Figma whenever there is a fresh code capture and Figma's structure snapshot. A hand-written structure contract adds its own checks on top, and a system read straight from Figma and its code gets the measured comparison without one.
 - **Each mode on what was drawn.** A colour is compared in every mode with Figma's value in that mode. A rule that names Figma's variable counts as a match only where that variable is what draws the colour: a dark theme's own rule that paints over it is named, with the rule that should carry the variable.
-- **The same in Firefox and Safari.** Each value is drawn again in Firefox whenever it is installed, and in Safari when you ask for it (`rendered.browsers` in `ds-config.json`). Only what differs from Chrome is said: *in Firefox, `.toolbar` → `height` is `54px` (Chrome draws `56px`)*.
+- **The same in Firefox and Safari.** Each value is drawn again in Firefox whenever it is installed, and in WebKit, Safari's engine, when Playwright drives it ([Playwright, when it is here](setup.md#playwright-when-it-is-here)) or when you ask for Safari (`rendered.browsers` in `ds-config.json`). Only what differs from Chrome is said: *in Firefox, `.toolbar` → `height` is `54px` (Chrome draws `56px`)*.
   - Chrome stays the browser the contract is held to. A difference in another browser is advisory: yours to decide, never a failure.
   - Nothing is installed for it but the browser. Firefox is driven headless through WebDriver BiDi, and Safari through the WebDriver macOS ships.
   - Safari opens a window while it runs and draws in your Mac's own appearance, so it is off unless you turn it on. Turn on its remote automation once with `safaridriver --enable`.
+  - Playwright's WebKit runs headless on any computer and draws in light and dark alike, so it is on by default when it is here.
   - The full list of options is in [`reference/config.md`](../reference/config.md).
 - **What this audit covered.** So you can see nothing slipped through.
 

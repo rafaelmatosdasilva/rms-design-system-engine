@@ -310,6 +310,11 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-22-the-colour-scales-steps-on` | The 25 guide tasks on Haiku (engine 9259e348) | "The colour scales' steps on the colour page and in the health report" |
 | `windows-2026-11-22` | The 25 guide tasks on Haiku (engine 5515a0c) | "The guide on Windows" |
 | `2026-11-22-the-semantic-token-named-first` | The 25 guide tasks on Haiku (engine 308c49d2) | "The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node" |
+| `2026-11-22-the-driver-line-is-said` | The 25 guide tasks on Haiku (engine 173c07df) | "Playwright drives the browsers when it is here" |
+| `2026-11-22-playwright-s-browsers-are-handed` | The 25 guide tasks on Haiku (engine 3ada1a33) | "Playwright's browsers are handed over as the computer's other finds are, and the required check waits on its runs" |
+| `2026-11-22-option-tab-in-webkit-on` | The 25 guide tasks on Haiku (engine e62ca645) | "Option-Tab in WebKit on macOS alone: Tab alone reaches links in WebKit on Linux and Windows" |
+| `2026-11-23-playwright-drives-the-browsers-when` | The 25 guide tasks on Haiku (engine ab15a9eb) | "Playwright drives the browsers when it is here, the engine's own drivers when it is not" |
 | `2026-11-23-a-product-s-pages-opened` | The 25 guide tasks on Haiku (engine 01c08c12) | "A product's pages opened in a browser for its health" |
+| `2026-11-23-playwright-drives-the-browsers-merged` | The 25 guide tasks on Haiku (engine bbc0ab79) | "Playwright drives the browsers, measured with main's page loads in a product's health" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

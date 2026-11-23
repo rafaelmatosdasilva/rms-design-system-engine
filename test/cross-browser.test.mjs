@@ -208,8 +208,8 @@ test('in Firefox and Chrome alike: one page opened, measured in each scheme, and
     assert.match(r.stdout, /✅ PASS {2}3\/3 rendered assertions/);
     assert.match(r.stdout, /⚠️ {2}BROWSERS 1 .*tried in Firefox/);
     assert.match(r.stdout, /in Firefox, app \.x → width is 12px \(Chrome draws 10px\)/);
-    // Gone with nothing to compare.
-    const off = spawnSync(process.execPath, [join(ENGINE, 'lib', 'rendered-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CHROME_PATH: CHROME, DESIGN_SYSTEM_ENGINE_FIREFOX: 'none' }, timeout: 170000 });
+    // Gone with nothing to compare (Playwright's WebKit is tried by default too, so both are turned off).
+    const off = spawnSync(process.execPath, [join(ENGINE, 'lib', 'rendered-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CHROME_PATH: CHROME, DESIGN_SYSTEM_ENGINE_FIREFOX: 'none', DESIGN_SYSTEM_ENGINE_WEBKIT: 'none' }, timeout: 170000 });
     assert.doesNotMatch(off.stdout, /BROWSERS/);
     // Windows holds a page's files for a moment after the browser that opened them has ended.
   } finally { rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); }

@@ -45,7 +45,8 @@ test('what a run says about the browsers is the same on every machine, with no p
 test('a browser that is not here is named as missing, never passed over', () => {
   const found = { chrome: '/somewhere/chrome', firefox: null, webkit: null };
   const lines = browserLines(found);
-  assert.equal(lines.length, 3);
+  assert.equal(lines.length, 4);
+  assert.match(lines[3], /^Playwright/, 'the driver is said last');
   assert.match(lines[1], new RegExp(WHY_MISSING.firefox));
   assert.match(lines[2], new RegExp(WHY_MISSING.webkit.replace(/[()']/g, '.')));
   // With none at all, the first line says the whole browser check cannot run.

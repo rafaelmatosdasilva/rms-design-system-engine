@@ -2732,7 +2732,8 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   said, as a finding of its own ("Fails in WebKit only: ..."), the row keeps the worst status across browsers and shows
   each browser's result ("Chrome ✓ · Firefox ✓ · WebKit ✕"). The result is `.design-system-engine-out/a11y-browsers.json`;
   the run names a browser that is not installed (`browsers.mjs`), and the result records which were here (`browsers`
-  in `a11y.json`, names only). Firefox by default, WebKit when `a11y.browsers` names it, none with `a11y.browsers: false`.
+  in `a11y.json`, names only). Firefox by default, WebKit when `a11y.browsers` names it or Playwright drives it (`playwright.mjs`, the project's
+  Playwright or the engine's pinned copy, `node lib/playwright.mjs --fetch --browsers`), none with `a11y.browsers: false`.
   Rendered parity is drawn in the same browsers (`cross-browser.mjs`, `rendered.browsers` in `reference/config.md`).
 - **Judgement calls, pre-sorted** (`--judge-a11y`) — a model reads the words a component's own code shows and marks
   the ones a person should look at first for 2.4.6, 3.3.3 and 2.4.4, each likely, unclear or fine with one short

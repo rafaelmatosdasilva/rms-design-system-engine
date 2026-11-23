@@ -27,6 +27,6 @@ test('a package\'s own script is run through node, whatever node_modules/.bin ho
 test('Firefox is found where Windows installs it, as Chrome is, with nothing on the PATH', async () => {
   const { findFirefox } = await import('../lib/browsers.mjs');
   const at = join('C:\\Program Files', 'Mozilla Firefox', 'firefox.exe');
-  assert.equal(findFirefox({ env: { ProgramFiles: 'C:\\Program Files' }, exists: (f) => f === at, which: () => null }), at);
+  assert.equal(findFirefox({ env: { ProgramFiles: 'C:\\Program Files' }, exists: (f) => f === at, which: () => null, here: null }), at);
   assert.equal(findFirefox({ env: { DESIGN_SYSTEM_ENGINE_FIREFOX: 'none', ProgramFiles: 'C:\\Program Files' }, exists: () => true, which: () => null }), null, 'switched off is off');
 });

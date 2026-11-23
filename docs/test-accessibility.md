@@ -316,8 +316,13 @@ each component the style guide draws:
 - **Firefox by default, Safari when asked.** Firefox runs whenever it is installed. Safari opens a window of its own,
   so it runs when `a11y.browsers` names `webkit`, and `a11y.browsers: false` turns the pass off
   ([config](../reference/config.md)).
+- **WebKit by default with Playwright.** When [Playwright](setup.md#playwright-when-it-is-here) is here with its
+  WebKit, WebKit runs headless beside Firefox on macOS, Linux and Windows, so nobody sees a window and nothing has to
+  be turned on in Safari.
 - **Option+Tab in Safari.** Safari moves Tab between text fields only, unless a person turns on "Press Tab to
-  highlight each item". The pass presses Option+Tab there, which reaches every control, and the row says so.
+  highlight each item". The pass presses Option+Tab in WebKit, which reaches every control, and the row says so.
+  Playwright's WebKit on Windows reaches no link from the keyboard at all, so there what Tab reaches and whether the
+  focus shows (2.1.1, 2.4.7) are left to the other browsers, and the run says so.
 - **The Safari it opens is closed again.** Safari keeps the copy a session started running after the session ends,
   one more for every session. The engine quits exactly the copies it started, when it is done or stopped. Your own
   Safari is never touched.
