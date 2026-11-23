@@ -334,6 +334,11 @@ A page an AI tool or a person made with styles of its own is rebuilt from your c
 - **What the system lacks stays visible.** It becomes a Missing box or a marked stand-in and goes on the gaps list, never a part styled for the occasion.
 - **Before and after, in numbers.** Values typed by hand, style rules, inline styles, classes and fonts of its own, against what the rebuild holds.
 - **The page itself is never changed.** The rebuild is a starting point in `prototypes/`, checked and drawn like any prototype.
+- **The page keeps its wiring.** Each link, form, field name, event handler and test id stays on the part that does it. So does each element the page's own scripts look up by id, class or attribute.
+  - A part taken out later, or a script left looking for a part that is gone, fails the prototype check.
+  - A loss you mean goes in the prototype's `wiringDropped`, with its reason, and passes.
+  - A heading or a figure that went missing is said, never failed.
+  - Scripts the page loads from elsewhere are named, not read, so what they look up is not kept.
 
 ### A prototype as text
 

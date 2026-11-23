@@ -426,7 +426,7 @@ What it makes:
 - Each state (empty, error, loading) at each screen size.
 - Pages linked, so you can click through a flow.
 - A hand-over page, and review comments kept with the prototype.
-- A page made outside the system (an AI tool's page, a file or a link) rebuilt from your components: what each part is for read from its markup, the counts of hand-typed values and styles of its own before and after, and every part the system lacks on the gaps list. The page itself is never changed.
+- A page made outside the system (an AI tool's page, a file or a link) rebuilt from your components: what each part is for read from its markup, the counts of hand-typed values and styles of its own before and after, and every part the system lacks on the gaps list. Its links, fields, handlers, test ids and the elements its scripts look up stay with it, and the check fails when one is lost. The page itself is never changed.
 - A catalog for A2UI agents written from your contracts, for the A2UI version you declare, and A2UI's own messages checked against it.
 - Any prototype drawn as plain text to paste into code review, a ticket or a thread, every box one of your components with its options, and a numbered mark on anything the check found wrong or the system lacks.
 
