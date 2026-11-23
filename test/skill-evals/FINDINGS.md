@@ -8,6 +8,40 @@ Newest first.
 
 ---
 
+## Every request paid for the whole guide and, for a full audit, for an 80 KB recipe
+
+**Found** 23 November 2026, reading what each guide task was handed before its first write (`procedure.mjs`) over 82 Haiku runs. Every run started at about 24.7k input tokens before its first call, and paid them again on every turn: runs averaged 90k input in 3.2 turns.
+
+**Evidence.**
+- *The main guide* was 30.6 KB, and about half of it served one kind of request only: first-time setup, a scoped audit, when to refresh Figma before a full audit with its confidence table, and the rules a fix must keep. Each had a recipe already, which the router hands with that request.
+- *What the router printed:* a recipe's own part (when to use it, its steps, what to read more) is 7.4 KB at most, but the route printed the whole file. For a full audit that was 82 KB, the phase reference after its steps. For a Figma refresh it was 144 KB.
+- *The project's hook did the opposite:* a recipe over 6 KB became a pointer with none of its steps, so a prototype request (7.4 KB, the costliest task at 6 calls and 200k a run) read the recipe in a call of its own.
+
+**Guesses ruled out.**
+- That the router's own lines cost much: about 1.5k tokens a route, small next to the 24.7k start.
+- That `figma-add-option` got heavier (2.7 to 7.3 turns over 3 runs): measured 10 more times it took 2.4 turns and 53k input, under the 69k before. Three runs of a task that sometimes explores can swing that far.
+
+**What changed.**
+- The route hands a recipe's own part, in the hook and on the command line alike, and says that `--recipe <name>` prints the rest. A test keeps each recipe's own part under 8 KB.
+- The main guide keeps one line for each of those four blocks, and each block moved into its recipe: 30.6 KB to 16.4 KB.
+- Measured: 82 of 82, no rule broken, 81k input a run against 90k, $0.048 a run against $0.057, the start 21.3k against 24.7k.
+
+---
+
+## An idea for the engine was searched for with `find`, which sees nothing through a linked install
+
+**Found** 23 November 2026. `engine-idea` swings from 3 to 17 turns in every record, this one and the ones before (10 and 16 in two earlier ones).
+
+**Evidence.**
+- *The 17-turn transcript:* the recipe said to look in `lib/` in the install folder, the agent ran `find ~/.claude/skills/rms-design-system-engine … | xargs grep`, got nothing, and spent the next twelve calls hunting for the engine's files. The install is a link (the evaluation's, and a person's who installed with a link), and `find` does not follow one it is given.
+- *By hand:* `find` through a link to a folder with one matching file found none, and `grep -r` on the same link found it.
+
+**What changed.**
+- The recipe gives the search to run, `grep -rli '<word>' ~/.claude/skills/rms-design-system-engine/lib/`, and says not to use `find` there.
+- Measured again: 82 of 82, 80k input a run. Each `engine-idea` run now finds the module on its first search (`colour-steps.mjs`, the check the idea asks for) and says it is built. Its turns still vary (5 to 12), now spent reading the module it found to say what it covers, not hunting for the engine's files.
+
+---
+
 ## On Windows every browser check failed because a run's home was half moved
 
 **Found** 22 November 2026. The guide tasks' first run on a Windows runner passed 57 of 75. `audit-chip`, `audit-all` and `two-turns-pt` failed 3 of 3 and `disabled-hover` 2 of 3, each for a measured difference the run never named.
