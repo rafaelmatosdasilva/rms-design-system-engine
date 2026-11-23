@@ -550,3 +550,26 @@ An agent that reads only the Figma file never sees your intent layer. So the eng
 ### Lists your intent layer copies
 
 A prop table copied from the code, a whole token family listed by name, or a catalog of components written out on a page is flagged, right today or not, because it goes stale and agents take it for the whole list. Each says which generated file to link to instead: the component's contract, the file its tokens come from, or the contracts. A table that says what each token is for, an order of components, or a few picked out with a rule is guidance and left alone.
+
+### Who each section is for
+
+A DSDS page says who each section is written for: everyone, people or agents (`for`).
+
+- **For agents alone.** Agents get it: in the contracts, the design intent and the checks. The style guide's pages leave it out, since it is written for a machine.
+- **For people alone.** It shows on the style guide's pages, and agents get it too. DSDS says an agent reads everything.
+- **For everyone.** Both, as any page without the mark.
+
+### Links inside your pages
+
+A DSDS page can link to another entry inside its text: `[focus visible](dsds:shared-a11y#focus-visible)`, or `<dsds:button>`.
+
+- **Written as words.** Agents and the style guide read the link's own words, or the name of what it points at for `<dsds:…>`. Nothing reaches them as a link that leads nowhere outside the layer.
+- **Checked like any other reference.** A link to an entry the layer no longer has, or to a part it no longer has (an item, a trait or one of its values), is a finding with its page and where it is: Links to nothing. A rename never leaves your guidance pointing at nothing without anyone noticing. `--check-intent` lists it, and the style guide shows it on the page.
+
+### Where each page came from
+
+A DSDS page can say how it was written (`metadata.origin`: by a person, with help, or generated) and who reviewed it and when (`metadata.reviewed`).
+
+- **Agents weigh it.** A page a tool or model wrote that no person has reviewed reaches agents with a note: where Figma, the code or a page a person wrote says otherwise, follow them.
+- **Your approvals are kept.** When you approve or rewrite drafts on a DSDS page (`--review-drafts`), the page says it was written with help and records your review: who (`human:<your git name>`, or `--by`) and the day. A page a tool wrote stays marked generated, reviewed. A dropped draft is no review.
+- **The engine's own view says it too.** Every entry of the DSDS view under `contracts/dsds/` says the engine wrote it from Figma, the code and your pages, and a component's says which of its guidelines are your own words.
