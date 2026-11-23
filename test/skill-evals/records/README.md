@@ -315,5 +315,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-22-option-tab-in-webkit-on` | The 25 guide tasks on Haiku (engine e62ca645) | "Option-Tab in WebKit on macOS alone: Tab alone reaches links in WebKit on Linux and Windows" |
 | `2026-11-23-playwright-drives-the-browsers-when` | The 25 guide tasks on Haiku (engine ab15a9eb) | "Playwright drives the browsers when it is here, the engine's own drivers when it is not" |
 | `2026-11-23-a-product-s-pages-opened` | The 25 guide tasks on Haiku (engine 01c08c12) | "A product's pages opened in a browser for its health" |
+| `2026-11-23-playwright-drives-the-browsers-merged` | The 25 guide tasks on Haiku (engine bbc0ab79) | "Playwright drives the browsers, measured with main's page loads in a product's health" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
