@@ -12,7 +12,9 @@
     var whereOf = function (x) { var m = /\(([^()]*:\d+[^()]*)\)/.exec(String(x.what || '')); return m ? m[1] : ''; };
     // A mismatch is a difference, flagged as one (Differs), whoever decides which side is right: knowing it differs is
     // never unsure. Unsure is kept for what is not known yet (a pairing to confirm, a kept difference to look at again).
-    var diffRow = function (x) { return { st: 'todo', who: (WHO[x.who] || WHO.both) + teamNote(c.name), todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
+    // Who acts follows the difference's cause when the audit could read it (a product on an older version: its own
+    // team), and its Why says the cause, or the question that would sort it.
+    var diffRow = function (x) { return { st: 'todo', who: (x.causeWho ? capital(x.causeWho) : WHO[x.who] || WHO.both) + teamNote(c.name), todo: esc(doWhat(x.todo)), fresh: !!x.new, why: x.causeSays ? '<p>' + esc(x.causeSays) + '</p>' : '' }; };
     // A difference the team decided to keep: its reason, who decided and when; once its review date has come it is to check.
     var kept = c.kept || [], keptUsed = {};
     var keptRow = function (k) {
@@ -44,7 +46,7 @@
       var kx = ki >= 0 ? kept[ki] : null; if (kx) keptUsed[ki] = 1;
       var row = { key: c.name + '\u0000' + (x ? x.what : 'p:' + r.type + ':' + name + ':' + i), area: 'Parity', kind: r.type, type: r.type, figma: side(r.figma, r.figma && r.figma.where), code: side(r.code, (x && whereOf(x)) || (r.code && r.code.where) || ''), rel: PAR_REL[r.status] || r.status, at: r.at || (r.status !== 'match' ? at0 : null) };
       var nb = r.status === 'figma' && r.type === 'Prop' && notBuilt[String(name).toLowerCase()];
-      if (x) { var d = diffRow(x); row.st = d.st; row.who = d.who; row.todo = d.todo; row.fresh = d.fresh; }
+      if (x) { var d = diffRow(x); row.st = d.st; row.who = d.who; row.todo = d.todo; row.fresh = d.fresh; if (d.why) row.why = d.why; }
       else if (kx) { var kr = keptRow(kx); row.st = kr.st; row.who = kr.who; row.todo = kr.todo; row.why = kr.why; row.rel = kr.rel; row.at = kr.at || row.at; }
       else if (r.status === 'match') row.st = 'done';
       else if (r.renamed || r.defaultDiffers || r.holdsDiffers) {
@@ -82,7 +84,7 @@
       if (used[j]) return;
       var d = diffRow(x);
       var sd = sidesOf(x.what), full = onWhat(c, x.plain || x.what);
-      out.push({ key: c.name + '\u0000' + x.what, area: 'Parity', kind: x.check || 'Difference', type: 'Other', figma: sd ? sd.figma : '', code: sd ? sd.code + '<span class="pg-par-val sg-panel-only">' + full + '</span>' : full, todo: d.todo, who: d.who, st: d.st, rel: PAR_REL.differs, fresh: d.fresh, at: at0 });
+      out.push({ key: c.name + '\u0000' + x.what, area: 'Parity', kind: x.check || 'Difference', type: 'Other', figma: sd ? sd.figma : '', code: sd ? sd.code + '<span class="pg-par-val sg-panel-only">' + full + '</span>' : full, todo: d.todo, who: d.who, st: d.st, rel: PAR_REL.differs, fresh: d.fresh, at: at0, why: d.why || undefined });
     });
     // A kept difference that is not one of the rows above: a row of its own, under the check that found it.
     kept.forEach(function (k, j) {
