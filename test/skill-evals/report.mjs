@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { envVar } from '../../lib/names.mjs';
+import { procedureSummary, procedureLines } from './procedure.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -89,12 +90,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dirs = [join(HERE, 'results'), ...(envVar(process.env, 'EVAL_PRIVATE_OUT') ? [envVar(process.env, 'EVAL_PRIVATE_OUT')] : [])];
   let all = true;
   for (const [i, model] of get('model').entries()) {
-    const A = byTask(load(nameA, model, dirs)), B = byTask(load(nameB, model, dirs));
+    const rowsA = load(nameA, model, dirs), rowsB = load(nameB, model, dirs);
+    const A = byTask(rowsA), B = byTask(rowsB);
     const need = minRuns[i] ?? minRuns[0] ?? 1;
     const privateIds = Object.keys(A).filter((id) => !ids.includes(id));
     const gaps = incomplete(A, B, [...ids, ...privateIds], need);
     console.log(`\n## ${model}: ${nameA} vs ${nameB}\n\n${table(A, B, nameA, nameB)}\n`);
     for (const set of ['dev', 'heldout']) { const a = total(A, set), b = total(B, set); console.log(`${set}: ${nameA} ${pct(a.rate)} of ${a.runs} runs, ${nameB} ${pct(b.rate)} of ${b.runs}; violations ${a.violations} vs ${b.violations}`); }
+    // What following the guide cost each side before it did anything (procedure.mjs): said, never part of the rule.
+    for (const [name, rows] of [[nameA, rowsA], [nameB, rowsB]]) for (const l of procedureLines(procedureSummary(rows))) console.log(`${name}, ${l}`);
     if (gaps.length) { console.log(`\n⏸ not decided for ${model}: the measurement is incomplete\n${gaps.map((g) => `   - ${g}`).join('\n')}`); all = false; continue; }
     const d = decide(A, B);
     console.log(d.adopt ? `\n✅ adopt ${nameB} for ${model}` : `\n❌ do not adopt ${nameB} for ${model}:\n${d.reasons.map((r) => `   - ${r}`).join('\n')}`);

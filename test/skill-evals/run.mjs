@@ -34,6 +34,7 @@ import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { engineFell, engineNeverStarted, kindOf } from './reading.mjs';
+import { procedureCost } from './procedure.mjs';
 import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO, PROTO_FIGMA } from './proto-tasks.mjs';
@@ -163,7 +164,7 @@ async function one({ t, run }) {
   // `files` that is listed here was not there when the run was scored, and one listed nowhere is evidence this row
   // never held. Scoring the run again reads both (reading.mjs, `unanswerable`).
   const files = keepFiles(ctx, t.keep ?? []);
-  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, mcpCalls: ctx.mcp.map((m) => m.tool), decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files, readPaths: [...ctx.readPaths].filter((p) => !ctx.tooBig.has(p)), error, limit, at: new Date().toISOString() };
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, mcpCalls: ctx.mcp.map((m) => m.tool), decisionPoints: decisionPoints(ctx), procedure: procedureCost(events), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files, readPaths: [...ctx.readPaths].filter((p) => !ctx.tooBig.has(p)), error, limit, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${SIDE}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
