@@ -36,7 +36,8 @@
     }
     drawIcons();
   }
+  if (!document.getElementById('icons')) emptyPage('icons', 'icons', 'Foundations', 'Icons', 'No icons yet', 'The system\'s icons, at the size Figma gives each, show here once Figma has them.', null, true);
 
-  // Pages built and reachable by their address, kept off the menu: Identity and Tokens show what they hold.
-  ['colors', 'typography', 'spacing', 'radii', 'motion'].forEach(function (id) { var a = nav.querySelector('a[href="#' + id + '"]'); if (a) a.hidden = true; });
+  // Motion is built and reachable by its address, kept off the menu: Identity plays it, and Tokens lists its values.
+  (function () { var a = nav.querySelector('a[href="#motion"]'); if (a) a.hidden = true; })();
 

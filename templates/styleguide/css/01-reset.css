@@ -8,7 +8,7 @@
    It weighs one class, so a rule of the page's that gives a button its height still wins. */
 :where(button)[class*="sg-"], :where(button)[class*="pg-"] { height: auto; }
 /* Only the page's own headings and paragraphs: a rule that reached into a preview would restyle the component. */
-:where(.sg-sidebar-header, .sg-hero, .sg-section, .sg-subsection, .sg-card, .pg-header, .pg-head, .sg-screens) > :where(h1, h2, h3, p, figure) { margin: 0; }
+:where(.sg-sidebar-header, .sg-hero, .sg-section, .sg-subsection, .sg-card, .pg-header, .pg-head) > :where(h1, h2, h3, p, figure) { margin: 0; }
 /* The page's text (font, size, weight, line height, colour) is the system's own: its body rule, which the components
    inherit in the product too. The template sets only the background. */
 html, body.sg-page { background: var(--sg-bg); }
