@@ -8,6 +8,26 @@ Newest first.
 
 ---
 
+## On Windows every browser check failed because a run's home was half moved
+
+**Found** 22 November 2026. The guide tasks' first run on a Windows runner passed 57 of 75. `audit-chip`, `audit-all` and `two-turns-pt` failed 3 of 3 and `disabled-hover` 2 of 3, each for a measured difference the run never named.
+
+**Evidence.**
+- *Every transcript that ran the audit:* "Renders correctly in a browser: Not run (Chrome did not start within 30s)". The difference those tasks ask about is one the browser measures, so no run could name it.
+- *The suite on the same runner* started Chrome in every test that needs it, so Chrome itself was not the cause.
+- *A test that starts Chrome in a run's own environment* (`runEnv`), once the engine said what Chrome last printed: "DevTools remote debugging requires a non-default data directory".
+
+**Guesses ruled out.**
+- A slow runner: Chrome failed in every run, at any load, and started in the suite beside it.
+- Git Bash, the shell Claude Code runs its commands in on Windows: the test started Chrome from Node, with no shell, and failed the same way.
+
+**What changed.**
+- A run on Windows gets a whole home: `USERPROFILE` and its own `AppData\Local` and `AppData\Roaming` (`LOCALAPPDATA`, `APPDATA`). Before, `USERPROFILE` was moved and those two were left on the real profile, so Chrome could not tell its default folder apart and refused every start.
+- When Chrome does not start, the engine says what Chrome last printed.
+- Measured again: 82 of 82, the four tasks 3 of 3 each.
+
+---
+
 ## A request about the engine reached the router without the words that said so
 
 **Found** 22 November 2026. A person asked, in a folder with no setup, for new ideas for the engine, and the router sent the request to first-time setup: nothing in it said the engine itself was the subject, so the no-setup rule won. The router now has a recipe for a request about the engine (`engine-ideas`) and takes it before setup, with or without a config. The new `engine-idea` task measured it: 2 of 3 runs passed on Haiku, and the third still asked for setup.
