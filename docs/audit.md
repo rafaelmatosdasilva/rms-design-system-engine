@@ -717,6 +717,10 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 - **Transitions.** The durations and easings from the design.
 - **Motion.** Movement values match Figma, when your design defines them.
 - **Shadows.** They match Figma, when your design defines them.
+- **A motion of several parts.** A sequence your motion variables keep, such as a modal's backdrop fading in and then its card rising, is held to the code part by part: each part's duration, curve and delay.
+  - **Named by the component, the motion and the part.** For example `modal/open/backdrop/duration` and `modal/open/card/delay`, with `motion/` or any other prefix before them. The motion is `open` or `close`.
+  - **Its reduced form.** The same names under `reduced` (`modal/open/reduced/card/duration`). A part the reduced form leaves out, or gives `0ms`, must stop under `prefers-reduced-motion`, and one it still moves must not.
+  - **Matched to the code by name.** A part is the component's class with the part's name (`.modal-card`). The part that starts first is the component's own element, when no class names it.
 
 ### In the browser
 

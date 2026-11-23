@@ -2725,8 +2725,8 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **Which browser answered it** — each criterion says what it depends on (`wcag21.mjs` `browser`): `same`, decided
   by the code, the markup or the system's own values and true in every browser; `each`, decided by the browser (what
   Tab reaches, where the focus shows, reflow, zoom, text spacing, what an input does, dragging, target size); `chrome`,
-  what a screen reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. Six of the
-  `each` criteria (1.4.4, 1.4.10, 1.4.12, 2.1.1, 2.4.7, 2.5.8) are tried again in Firefox and WebKit on each component
+  what a screen reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. Nine of the
+  `each` criteria (1.4.4, 1.4.10, 1.4.12, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11, 2.5.8) are tried again in Firefox and WebKit on each component
   the style guide draws (`a11y-browsers.mjs`, through `page-driver.mjs`: plain scripts in the page and real Tab
   presses, Option+Tab in Safari), Chrome measured by the same code in the same pass. Only what differs from Chrome is
   said, as a finding of its own ("Fails in WebKit only: ..."), the row keeps the worst status across browsers and shows
