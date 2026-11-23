@@ -109,6 +109,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Gives each product its own health report, beside the system's, from its folder and its built pages.
 - Draws a product's screens from the system's components, each region marked the system's, the product's own or a stand-in, and says which screens drifted.
 - Reads dates, numbers and money as part of the system: format tokens complete in every market, and code that formats by hand.
+- Reads Lit, Angular and plain Web Components as it reads Vue and React: their styles, `:host` as their root, their template's parts.
 - Gives your code one health number from its own rules, by area, with the change since the last build.
 - Flags CSS variables and text casing the design never asked for.
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
