@@ -111,3 +111,39 @@ test('the style guide attaches a declarative shadow root wherever it puts one, w
     assert.equal(v.light, 'out', 'and what a person put in stays in its light');
   } finally { browser.kill(); }
 });
+
+// A Web Component written with no library: watched attributes set by their own name, a class found by its tag.
+test('a plain Web Component\'s watched attributes are set as attributes, under their own names', () => {
+  const mod = harnessModule([{ name: 'tag', slug: 'tag', kind: 'web component', file: '/src/tag.js', exportName: 'Tag', tag: 'acme-tag', attrs: { tone: 'tone', closeLabel: 'close-label' }, cases: [{ label: 'loud', props: { tone: 'loud', closeLabel: 'Close' } }] }]);
+  assert.match(mod, /const k = \(g\.attrs && g\.attrs\[k0\]\) \|\| k0/);
+  assert.match(mod, /customElements\.get\(g\.tag\)/, 'a class it exports nothing of is found by its tag');
+});
+
+test('a Web Component written with no library is drawn by the project\'s own Vite, with no Lit needed', { skip: READY, timeout: budget(300000) }, async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const dir = tempDir('wc-real-');
+  mkdirSync(join(dir, 'src', 'components'), { recursive: true });
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme-wc', private: true, type: 'module' }));
+  writeFileSync(join(dir, 'src', 'components', 'acme-tag.js'), `class AcmeTag extends HTMLElement {
+  static get observedAttributes() { return ['tone']; }
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  connectedCallback() { this.render(); }
+  attributeChangedCallback() { this.render(); }
+  render() { this.shadowRoot.innerHTML = \`<style>:host { display: inline-block } .tag { padding: 4px 8px }</style><span class="tag" data-tone="\${this.getAttribute('tone') ?? 'quiet'}"><slot></slot></span>\`; }
+}
+customElements.define('acme-tag', AcmeTag);`);
+  const names = codeComponents(dir, {}).map((c) => c.name);
+  assert.deepEqual(names, ['acme-tag'], 'read as a component, though nothing imports a library');
+  const h = await startLitHarness(dir, {}, names, { locate: (n) => (n === 'acme-tag' ? join(dir, 'src', 'components', 'acme-tag.js') : null) });
+  assert.ok(h.url, h.why);
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'dse-wc-' });
+  try {
+    const { send } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, h.url);
+    assert.ok(await waitForTrue(send, sessionId, 'window.__dseHarnessReady === true', { attempts: 1200, intervalMs: 50, tolerateErrors: true }), 'the page settled');
+    const inPage = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    assert.deepEqual(JSON.parse(await inPage('JSON.stringify(window.__dseHarnessFailed)')), [], 'it drew');
+    assert.equal(await inPage(`document.querySelector('acme-tag').shadowRoot.querySelector('.tag') ? 'drawn' : 'empty'`), 'drawn');
+  } finally { browser.kill(); await h.close(); }
+});
