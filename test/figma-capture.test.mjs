@@ -101,6 +101,10 @@ test('the snapshot is the one the recipe gives through the Figma tool; a chunk c
   assert.match(snap.effects['shadow/m'], /0px 2px 8px rgba\(0, 0, 0, 0\.2\)/);
   assert.deepEqual(snap.variableScopes.s1, { name: 'gap/m', scopes: ['GAP'] });
   assert.deepEqual(snap.tokenMeta['group0/token3/color'], { description: 'Body text. @deprecated use text/primary', deprecated: true });
+  // Figma's own id for each variable and text style, by name: what a rename keeps (the DSDS view's token uuid).
+  assert.equal(snap.tokenIds['gap/m'], 's1');
+  assert.ok(Object.values(snap.tokenIds).every((id) => typeof id === 'string' && id));
+  assert.deepEqual(Object.keys(snap.textStyleIds).sort(), Object.keys(snap.typography).sort(), 'every text style has its id');
   assert.deepEqual(snap.brokenAliases, []);
   assert.match(snap._source, /read in \d+ checked chunks$/);
   assert.ok(snap._built?.at && 'figmaRead' in snap._built, 'stamped with what it was built from');
