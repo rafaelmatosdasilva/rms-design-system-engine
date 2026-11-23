@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { newestTag, mayBreak, compareVersions, check, movePin, goldenReports, exampleName, emit, SAMPLE, SAMPLE_SYSTEM, fixtureDir } from '../lib/dsds-release.mjs';
+import { fetchRelease, newestTag, mayBreak, compareVersions, check, movePin, goldenReports, exampleName, emit, SAMPLE, SAMPLE_SYSTEM, fixtureDir } from '../lib/dsds-release.mjs';
 import { DSDS_VERSION } from '../lib/contract-dsds.mjs';
 
 test('the newest plain release among the tags, never a candidate', () => {
@@ -90,4 +90,20 @@ test('a layer written in another DSDS version is read as it is, and the person t
 
 test('a DSDS test with nothing fetched fails and says the command, never skips', () => {
   assert.throws(() => fixtureDir('0.23.1', { into: tempDir('dsds-none-') }), /not fetched: run node lib\/dsds-release\.mjs fetch/);
+});
+
+test('a release is fetched beside the copy there is: one that fails half way leaves that copy whole, one that arrives takes its place', async () => {
+  const into = tempDir('dsds-fetch-');
+  const files = { 'schema/dsds.bundled.schema.json': '{"$id":"s"}', LICENSE: 'Apache-2.0', 'schema/conformance-suite.json': '[]', 'examples/entries/button.yaml': 'kind: component\nname: button\n' };
+  const answer = (failTree) => async (url) => {
+    if (url.includes('/git/trees/')) return failTree ? { ok: false, status: 503, json: async () => ({}) } : { ok: true, json: async () => ({ tree: [{ type: 'blob', path: 'examples/entries/button.yaml' }] }) };
+    const path = Object.keys(files).find((f) => url.endsWith(`/${f}`));
+    return path ? { ok: true, text: async () => files[path] } : { ok: false, status: 404, text: async () => '' };
+  };
+  const got = await fetchRelease('0.23.1', { fetchImpl: answer(false), into });
+  assert.equal(got.examples, 1);
+  assert.deepEqual(readdirSync(join(into, 'v0.23.1', 'examples')), ['examples_entries_button.json']);
+  await assert.rejects(fetchRelease('0.23.1', { fetchImpl: answer(true), into }), /answered 503/);
+  assert.deepEqual(readdirSync(join(into, 'v0.23.1', 'examples')), ['examples_entries_button.json'], 'the copy it had is whole');
+  assert.deepEqual(readdirSync(into), ['v0.23.1'], 'nothing half fetched left beside it');
 });
