@@ -298,6 +298,14 @@ It reads the files of your system and of each product listed beside it (`pluginD
 
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 
+**What each generated change cost.** Each request that makes a UI edit is kept, on this computer only (`.design-system-engine-out/generations.jsonl`):
+
+- the rounds it took (each UI edit checked is one) and the time from the request to the end of the turn;
+- the tokens the conversation's transcript reports, when it reports them;
+- whether its first check passed, and whether its last one did.
+
+`rms-design-system-engine --generations` gives each week's total beside the share that passed, first time and by the end. A request that took five rounds or more, or never passed, is listed: it says the system lacks something, not only that the request was expensive. It works the same in Cursor and Codex.
+
 ### A short guide, recipes on demand
 
 The AI reads a short guide, then only the recipe the task needs (`rms-design-system-engine --recipe` lists them). Measured on 20 real requests, every one was done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
