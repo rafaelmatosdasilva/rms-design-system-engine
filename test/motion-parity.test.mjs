@@ -37,6 +37,9 @@ test('the code\'s transition into a state: the state\'s own rule, else the compo
   assert.deepEqual(codeMotion(CSS, '.button', 'hover'), { ms: 300, easing: 'ease', selector: '.button:hover:not(:disabled)', file: 'theme.css', line: 2 });
   assert.deepEqual(codeMotion(CSS, '.button', 'active'), { ms: 150, easing: 'ease', selector: '.button', file: 'theme.css', line: 1 });
   assert.equal(codeMotion(CSS, '.chip', 'hover'), null);
+  // Found on a real file: a rule of twenty lines was cited by its first, and its transition was on the nineteenth.
+  const LONG = [{ file: 'theme.css', text: '.row {\n  display: flex;\n  padding: 8px;\n  transition: background 0.1s ease;\n}\n' }];
+  assert.equal(codeMotion(LONG, '.row', 'hover').line, 4, 'the line the transition is written on');
 });
 
 test('each transition Figma animates against the code\'s: none, another duration, another curve; an instant change is not compared', () => {

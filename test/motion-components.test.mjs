@@ -159,6 +159,10 @@ test('a Vue component\'s scoped rules are its own by their mark: a loader with n
   const loader = componentTransitions(sources, 'loaderSpin', { scope: { own: 'dfd388cb', known } });
   assert.deepEqual(loader.map((t) => [t.via, t.ms, t.infinite]), [['animation', 1840, true]]);
   assert.equal(codeMotions(sources, 'loaderSpin', { scope: 'dfd388cb' })[0]?.motion, 'loop');
+  // The line the animation or the transition is written on, not the rule's first (found on a real file).
+  const LONG = [{ file: 'theme.css', text: '@keyframes spin { to { transform: rotate(360deg); } }\n.spinner {\n  width: 16px;\n  animation: spin 0.8s linear infinite;\n}\n.drawer {\n  width: 240px;\n  transition: width 0.2s ease;\n}\n' }];
+  assert.equal(codeMotions(LONG, 'spinner')[0]?.line, 4);
+  assert.equal(codeMotions(LONG, 'drawer')[0]?.line, 8);
   assert.deepEqual(componentTransitions(sources, 'text', { scope: { own: null, known } }), [], 'the text component, its own mark unknown, leaves the loader\'s .text-wrapper alone');
   assert.equal(componentTransitions(sources, 'text').length, 1, 'with no marks known, the classes still decide');
 });
