@@ -51,7 +51,7 @@ Each setting reaches the tokens named for it and every token that follows them, 
 
 ### The preview
 
-The preview opens on the **specimen**, a screen the engine builds from your own system, so every system has something to preview. Your Showroom's screens follow it in the same list.
+The preview opens on the **specimen**, a screen the engine builds from your own system, so every system has something to preview. Your prototypes from Figma follow it in the same list.
 
 - **One grid of components.** Every tile is a component as your code renders it, never a drawing. Buttons come first, primary leading, each with up to four of the variants its code renders. Then fields, choices, status, messages, navigation, surfaces, data and the rest.
 - **Nothing invented.** The build plans the specimen (`lib/specimen.mjs`) and checks every component it places against the component catalog, with the same check prototypes, `--check-ui` and the MCP `check_ui` tool use. A component the check refuses, or one the code does not render, is left off. With no catalog yet (no audit has run), there is no specimen.
@@ -70,7 +70,7 @@ The preview opens on the **specimen**, a screen the engine builds from your own 
 
 ### One component's tokens
 
-Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a Showroom screen marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
+Click a component on the screen. The innermost one under the pointer is picked (a button in a card is the button); clicked again, it goes a layer deeper toward where you clicked (a table, its rows, a row, a cell, its text). A component is found by the Figma name a prototype from Figma marks it with (`data-figma`), else by its classes; a component the system gives only semantic tokens (`semantic/avatar/…`) is found by that name too.
 
 - **What you edit is named.** A label with its name sits above the part picked, in the guide's own tooltip colours, and nothing outlines it, so nothing sits on what you are judging. Hovering shows what the next click picks. The head of the card starts at the component clicked, even one inside another (a tag in a table is the tag), and goes down through the layers picked in it, each step a click back to that level.
 - **Text of its own.** A text in no component is picked by its text style, named on hover.
@@ -764,7 +764,7 @@ Answer with `--lesson-answer <id> yes` or `no`. `--rule "<sentence>"` gives a st
 - **A line you changed.** The hook remembers the lines an AI writes. A line that is gone without an AI edit taking it was changed by a person. `--lessons` lists it, with what it reads now, and `--lesson --edit <n> --why "<reason>"` makes it a lesson. It is never one until you give why, and `--unlesson --edit <n>` takes it off the list when it was no correction. A file rewritten or reformatted as a whole is not read as corrections.
 - **A finding marked wrong.** A [finding you mark wrong](audit.md#when-a-check-is-wrong), a page review's among them, is a correction of the engine. Its guard is already written: the case its check must pass.
 
-**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, the same decision [a model judged](#a-model-judges-each-screen-when-you-ask) broken on three screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-judge-primary`, `R-edit-colour`):
+**Findings that repeat become proposed rules.** The same page-review finding on three prototypes from Figma, the same decision [a model judged](#a-model-judges-each-screen-when-you-ask) broken on three screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-judge-primary`, `R-edit-colour`):
 
 - A page review's becomes a rule for your guidelines, such as "Each screen has one primary action in view".
 - A model's judgment becomes one too, such as "A destructive action never looks more prominent than the main decision".
@@ -809,7 +809,7 @@ rms-design-system-engine --judge-change --request "Show the orders with their st
 
 The page review measures what it can: one main action, nothing destructive in front, no card in a card, headings in order. Some decisions can't be measured. Is this the right component for what the part does? Does one action really read first, as the screen is drawn? `--judge-pages` asks a model, and only when you run it.
 
-**What the model gets, for each Showroom screen.**
+**What the model gets, for each prototype from Figma.**
 
 - Its screenshot. A picture kept beside the screen (`showroom/<Screen>.png`) is used as it is; otherwise it is taken from the built style guide, at Figma's size, in the screen's brand and mode.
 - Its code, as a short outline: each component and element, the props that decide how it looks, its words and its line.
@@ -831,7 +831,7 @@ The page review measures what it can: one main action, nothing destructive in fr
 **What comes back.** For each decision: holds, breaks or unclear, how much it matters (high, medium, low), what the model saw, and one sentence a reviewer can check on the screen.
 
 - It is advisory. It never fails a run.
-- The style guide shows it under each screen in the Showroom, beside the page review, headed "Judged by a model".
+- The style guide shows it on each prototype from Figma's own page, beside the page review, headed "Judged by a model".
 - The run ends with one line: what broke, and what it cost. Each full run repeats the last judgment's line, with what it cost then. Nothing is asked again.
 - A decision judged broken on three screens becomes a [proposed rule](#lessons-a-correction-becomes-a-guard), like the page review's.
 

@@ -145,14 +145,18 @@
   // Health: the system as a dashboard, how far each area has come weighted into one number, and the
   // components with the most left (fillHealth, from the rows the Status page lists). No task is listed here: they are
   // on the Status page.
-  // Showroom: whole screens the design team drew in Figma, written with the system's own components (DATA.showroom,
-  // each a showroom/<Screen>.vue the project's build draws), shown in the brand and mode chosen. The page lists them as
-  // a grid of cards, each its screen in small; a card opens the screen on a page of its own (#showroom/<Screen>), beside
-  // what the code still lacks for it (its stand-ins) and where the code's component differs from Figma's.
-  var SHOWROOM_CARD = null;   // a Showroom screen's card, for a component's Used in
+  // Prototypes from Figma: whole screens the design team drew in Figma, written with the system's own components
+  // (DATA.showroom, each a showroom/<Screen>.vue the project's build draws), shown in the brand and mode chosen. There
+  // is no page of their own (the owner's, 23 November 2026: the Showroom left the menu, since no part of the features
+  // page names it): each is a prototype whose source is Figma, a row of the Prototypes page that opens its screen on a
+  // page of its own (#prototypes/<Screen>), beside what the code still lacks for it (its stand-ins) and where the
+  // code's component differs from Figma's. The section built here is the Prototypes page's own (PROTO_HOST), put in
+  // its place by the Prototypes page, which adds its list to it.
+  var SHOWROOM_CARD = null;   // a Figma prototype's card, for the Prototypes page's grid and a component's Used in
+  var PROTO_HOST = null, SCREEN_STATE = null;
   if ((DATA.showroom || []).length) {
-    hr(); navLink('showroom', 'showroom');
-    var sr = section('showroom', 'System', 'Showroom', '');
+    var sr = section('prototypes', 'Prototypes', 'Prototypes', ''); sr.remove();
+    PROTO_HOST = sr;
     var brandNameOf = function (k) { var b = ((DATA.brands && DATA.brands.list) || []).filter(function (x) { return x.key === k; })[0]; return b ? b.name : k; };
     var srLead = sr.querySelector(':scope > p');
     var srGrid = document.createElement('div'); srGrid.className = 'sg-card-grid sg-showroom-grid'; sr.appendChild(srGrid);
@@ -272,7 +276,7 @@
       });
     };
     var screenCard = function (s, wait) {
-      var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own'); a.href = '#showroom/' + encodeURIComponent(s.key); a.dataset.screenKey = s.key;
+      var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own'); a.href = '#prototypes/' + encodeURIComponent(s.key); a.dataset.screenKey = s.key;
       a.innerHTML = '<h3>' + esc(s.title || s.key) + '</h3>';   // the screen's name alone
       var thumb = document.createElement('div'); thumb.className = 'sg-thumb sg-showroom-thumb'; thumb.setAttribute('aria-hidden', 'true');
       var draw = function () {
@@ -289,40 +293,13 @@
       return a;
     };
     SHOWROOM_CARD = screenCard;
-    // The grid's filter: the screens grouped by product (a screen's own "product", else the brand it is drawn in), All
-    // first, then each group in the order its first screen comes; any number of products. Each choice has its own
-    // address (#showroom/<product>), so it can be linked to; #showroom alone is always All. A segmented control while the
-    // groups are few, a dropdown when there are many. Hidden on a screen's page.
-    var groupOf = function (s) { return String(s.product || s.brand || ''); };
-    var groupName = function (g) { var b = ((DATA.brands && DATA.brands.list) || []).filter(function (x) { return x.key === g; })[0]; return b ? b.name : g; };
-    var GROUPS = []; DATA.showroom.forEach(function (s) { var g = groupOf(s); if (g && GROUPS.indexOf(g) < 0) GROUPS.push(g); });
-    var srGroup = 'all';
-    var srFilter = null;
-    var showGroup = function (g) {
-      srGroup = g;
-      Array.prototype.forEach.call(srGrid.children, function (a) { a.hidden = g !== 'all' && groupOf(SCREENS[a.dataset.screenKey] || {}) !== g; });
-      if (srFilter) Array.prototype.forEach.call(srFilter.querySelectorAll('.sg-chip'), function (b) { b.setAttribute('aria-pressed', b.dataset.v === g ? 'true' : 'false'); });
-      if (typeof refit === 'function') refit();   // the cards shown sized to the room (not yet there on the first draw)
-    };
-    if (GROUPS.length > 1) {
-      var count = function (g) { return DATA.showroom.filter(function (s) { return g === 'all' || groupOf(s) === g; }).length; };
-      var opts = [{ v: 'all', label: 'All', count: count('all') }].concat(GROUPS.map(function (g) { return { v: g, label: groupName(g), count: count(g) }; }));
-      srFilter = document.createElement('div'); srFilter.className = 'sg-size-switch sg-showroom-groups';
-      // The products as chips, each with its count in the badge; they wrap however many there are.
-      srFilter.innerHTML = '<span class="sg-chips" role="group" aria-label="Product">' + opts.map(function (o) { return '<button type="button" class="sg-chip" data-v="' + esc(o.v) + '" aria-pressed="' + (o.v === srGroup) + '">' + esc(o.label) + countHTML(o.count) + '</button>'; }).join('') + '</span>';
-      srGrid.insertAdjacentElement('beforebegin', srFilter);
-      // A choice goes to its own address; the router shows it (and Back returns to the one before).
-      var goGroup = function (g) { location.hash = '#showroom' + (g === 'all' ? '' : '/' + encodeURIComponent(g)); };
-      Array.prototype.forEach.call(srFilter.querySelectorAll('.sg-chip'), function (b) { b.addEventListener('click', function () { if (b.dataset.v !== srGroup) goGroup(b.dataset.v); }); });
-    }
-    DATA.showroom.forEach(function (s) {
-      SCREENS[s.key] = s;
-      var a = screenCard(s, true);
-      if (a._fit) fits.push(a._fit);
-      srGrid.appendChild(a);
-    });
-    if (srFilter) showGroup(srGroup);
+    // The screens by key. The Prototypes page lists them (its grid takes each card from SHOWROOM_CARD), so the grid
+    // here is never shown, and its product filter is the Prototypes page's Product.
+    DATA.showroom.forEach(function (s) { SCREENS[s.key] = s; });
+    srGrid.hidden = true;
     var refit = function () { fits.forEach(function (f) { f(); }); if (detailFit) detailFit(); };
+    // The Prototypes page's cards of these screens, fitted with the rest (sr._fit), and again when its grid is shown.
+    sr._fit = function (f) { fits.push(f); }; sr._refit = function () { refit(); };
     var sro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(refit) : null; if (sro) sro.observe(sr);
     document.addEventListener('sg-brand', refit);
     // How a screen measured against Figma when the page was built (the build writes it in): how many texts and parts
@@ -350,6 +327,9 @@
     // A screen's notes, numbered as their pins on the screen: what the code lacks (a stand-in for now), what this screen
     // corrects, and what it draws as the code has it.
     var NOTE_KIND = { missing: 'Missing in the code', fixed: 'Fixed in this screen', code: 'As the code has it' };
+    // A Figma prototype's status, in the Prototypes page's words: Not checked until its screen is drawn, Fix while the
+    // code lacks a part of it or draws a part as Figma does not, else Done.
+    SCREEN_STATE = function (s) { if (!s.markup && s.markup !== '') return 'not checked'; return (s.missing || []).length || (s.differs || []).some(function (x) { return x.fixedHere === false; }) ? 'fix' : 'done'; };
     var notesOf = function (s) {
       return (s.missing || []).map(function (x) { return { n: x, kind: 'missing', sub: x.kind + (x.standIn ? ', a stand-in for now' : '') }; })
         .concat((s.differs || []).map(function (x) { return { n: x, kind: x.fixedHere === false ? 'code' : 'fixed', sub: x.fixedHere === false ? 'drawn as the code has it' : 'corrected in this screen' }; }))
@@ -404,19 +384,21 @@
     // A screen's page heads the section as a component's does: the group's tag with Showroom beside it (back to the
     // grid), a back button and the screen's name as the title, its actions at the right level with it.
     var srTitle = sr.querySelector(':scope > h2'), srBadge = sr.querySelector(':scope > .sg-section-badge'), srName = null;
-    var srCrumb = document.createElement('a'); srCrumb.className = 'sg-crumb'; srCrumb.href = '#showroom'; srCrumb.textContent = 'Showroom'; srCrumb.hidden = true;
+    var srCrumb = document.createElement('a'); srCrumb.className = 'sg-crumb'; srCrumb.href = '#prototypes'; srCrumb.textContent = 'Prototypes'; srCrumb.hidden = true;
     if (srBadge) srBadge.insertAdjacentElement('afterend', srCrumb);
     var srActions = document.createElement('div'); srActions.className = 'sg-section-actions'; srActions.hidden = true; (srTitle || sr).appendChild(srActions);
     // The screen's buttons under the title (Full browser, Differences): on a screen's page only, never on the grid.
     var srSwitch = document.createElement('div'); srSwitch.className = 'sg-size-switch sg-showroom-frames'; srSwitch.hidden = true;
     srSwitch.innerHTML = '<span class="sg-showroom-tools"></span>';   // beside it, the screen's Full browser and Differences
     if (srTitle) srTitle.insertAdjacentElement('afterend', srSwitch);
+    // What a screen's page is made of, kept while the Prototypes page's list is hidden around it (sg-at-screen).
+    [srBadge, srCrumb, srTitle, srSwitch, srDetail].forEach(function (e) { if (e) e.setAttribute('data-screen-part', ''); });
     var BACK_SVG = '<svg class="sg-showroom-back-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>';
     var headFor = function (s) {
       if (srName == null && srTitle) srName = titleText(srTitle);
       srCrumb.hidden = !s; srActions.hidden = !s; srSwitch.hidden = !s;
       if (srTitle) {
-        if (s) { srTitle.classList.add('sg-screen-title'); srTitle.innerHTML = sysButton('a', '', ' href="#showroom" aria-label="All screens"', '', null, BACK_SVG) + '<span>' + esc(s.title || s.key) + '</span>'; }
+        if (s) { srTitle.classList.add('sg-screen-title'); srTitle.innerHTML = sysButton('a', '', ' href="#prototypes" aria-label="All prototypes"', '', null, BACK_SVG) + '<span>' + esc(s.title || s.key) + '</span>'; }
         else { srTitle.classList.remove('sg-screen-title'); srTitle.textContent = srName; }
         srTitle.appendChild(srActions);
       }
@@ -425,9 +407,10 @@
       var s = SCREENS[key] || null;
       // The Showroom shown: its drawings asked for (each card, and this screen, drawn once they are here).
       if (DATA.showroom.some(srPending)) srLoad();
-      // The grid: the product its address names, else All (never a filter left from before).
-      if (!s && srFilter) showGroup(GROUPS.indexOf(key) >= 0 ? key : 'all');
-      srGrid.hidden = !!s; if (srLead) srLead.hidden = !!s; if (srFilter) srFilter.hidden = !!s; srDetail.hidden = !s; sr._title = s ? (s.title || s.key) : null;
+      // A screen's page, or the Prototypes page's list: the list is hidden while a screen is open (sg-at-screen), never
+      // shown again by hand, so what the list hid itself (a view, a filtered row) stays as it was.
+      if (srLead) srLead.hidden = !!s; srDetail.hidden = !s; sr._title = s ? (s.title || s.key) : null;
+      sr.classList.toggle('sg-at-screen', !!s);
       headFor(s);
       if (!s) { detailFit = null; refit(); return null; }   // its cards sized at once, not a frame later
       // Opened again: the same page, back in its default view (the screen alone, no differences shown).

@@ -366,12 +366,25 @@
   var PROTO_ST = { fix: ['differs', 'Fix', 0], missing: ['differs', 'Missing', 1], 'not checked': ['figma', 'Not checked', 2], done: ['match', 'Done', 3] };
   var protoSt = function (x) { return PROTO_ST[x.state] || PROTO_ST['not checked']; };
   var protoDot = function (x) { var s = protoSt(x); return '<span class="pg-par-status pg-par--' + s[0] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(s[1]) + '</span>'; };
-  // What needs doing first, then by name: the order the page opens in, before any column is sorted.
-  PROTO.sort(function (a, b) { return protoSt(a)[2] - protoSt(b)[2] || a.name.localeCompare(b.name); });
+  // What needs doing first, then by name: the order the page opens in, before any column is sorted (once the Figma
+  // prototypes have joined, below).
   (function () {
     hr();   // its group's rule, Prototypes then the Requests they lead to
     navLink('prototypes', 'prototypes');
-    var sec = section('prototypes', 'Prototypes', 'Prototypes', '');
+    // The section the Figma prototypes' screen pages were built in (PROTO_HOST, 06-overview.js), put in its place here:
+    // one page, its list and each screen's page. Without screens from Figma, a section of its own.
+    var sec = PROTO_HOST || section('prototypes', 'Prototypes', 'Prototypes', '');
+    if (PROTO_HOST) main.appendChild(sec);
+    // Every prototype with where it came from (the owner's, 23 November 2026): Figma (a screen the design team drew,
+    // shown on a page of its own), a prompt (words a person asked an agent for) or a page rebuilt from the system. The
+    // Showroom's screens are the Figma ones, each in the same list as the rest.
+    var SOURCE = { figma: 'Figma', prompt: 'Prompt', page: 'Page' };
+    (DATA.showroom || []).forEach(function (sc) {
+      PROTO.push({ name: sc.title || sc.key, screen: sc, product: sc.product || (sc.brand && typeof brandNameOf === 'function' ? brandNameOf(sc.brand) : null), state: SCREEN_STATE ? SCREEN_STATE(sc) : 'not checked', made: { kind: 'figma', from: sc.title || sc.key }, screens: [], states: [], lacked: [], versions: [], comments: [], asks: [] });
+    });
+    PROTO.sort(function (a, b) { return protoSt(a)[2] - protoSt(b)[2] || a.name.localeCompare(b.name); });
+    var sourceOf = function (x) { return SOURCE[(x.made && x.made.kind) || 'prompt']; };
+    var screenHref = function (x) { return '#prototypes/' + encodeURIComponent(x.screen.key); };
     if (!PROTO.length) {
       sec.insertAdjacentHTML('beforeend', pageNone('prototypes', 'No prototypes yet', 'Describe a screen to your AI agent. It\'s built from the system\'s own components, and what the system lacks becomes a request.', soonLabel()));
       return;
@@ -381,25 +394,28 @@
     var versionOf = function (x) { return x.check && x.check.system ? x.check.system : null; };
     var rowHTML = function (x, i) {
       var s = protoSt(x);
-      return '<tr class="sg-row-open" tabindex="0" data-proto-row="' + i + '" data-chip="' + esc(x.state) + '" data-f="1" data-f-status="' + esc(s[1]) + '"' + (x.product ? ' data-f-product="' + esc(x.product) + '"' : '') + '>'
+      return '<tr class="sg-row-open" tabindex="0" data-proto-row="' + i + '" data-chip="' + esc(x.state) + '" data-f="1" data-f-status="' + esc(s[1]) + '" data-f-source="' + esc(sourceOf(x)) + '"' + (x.product ? ' data-f-product="' + esc(x.product) + '"' : '') + '>'
         + '<td><strong>' + esc(x.name) + '</strong></td>'
+        + '<td>' + esc(sourceOf(x)) + '</td>'
         + '<td>' + (x.product ? esc(x.product) : '<span class="pg-dim">None</span>') + '</td>'
-        + '<td>' + (versionOf(x) ? esc(versionOf(x)) : '<span class="pg-dim">Not checked</span>') + '</td>'
-        + '<td>' + (x.asked && x.asked.by ? esc(x.asked.by) : '<span class="pg-dim">Not known</span>') + '</td>'
-        + '<td>' + day(x.asked && x.asked.at) + '</td>'
+        + '<td>' + (versionOf(x) ? esc(versionOf(x)) : '<span class="pg-dim">' + (x.screen ? 'This build' : 'Not checked') + '</span>') + '</td>'
+        + '<td>' + (x.screen ? '<span class="pg-dim">Designed in Figma</span>' : x.asked && x.asked.by ? esc(x.asked.by) : '<span class="pg-dim">Not known</span>') + '</td>'
+        + '<td>' + (x.screen ? '<span class="pg-dim">Not known</span>' : day(x.asked && x.asked.at)) + '</td>'
         + '<td data-sort-value="' + s[2] + '">' + protoDot(x) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
     };
     // A card: its widest screen in small, its name, its product with who asked and when, its status.
     var cardHTML = function (x, i) {
+      if (x.screen) return '<span data-proto-card="' + i + '" data-screen-card hidden></span>';   // its drawing, put in below (SHOWROOM_CARD)
       var shot = x.screens.length ? x.screens[x.screens.length - 1] : null;
       return '<a class="sg-card sg-proto-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own') + '" href="#prototypes?panel=' + esc(encodeURIComponent(protoKey(x))) + '" data-proto-card="' + i + '">'
         + '<div class="sg-thumb sg-proto-thumb" aria-hidden="true">' + (shot ? '<img src="' + esc(shot.src) + '" alt="">' : '') + '</div>'
         + '<h3>' + esc(x.name) + '</h3>'
         // One line under its name, as every card has: its status, then its product and who asked when.
-        + '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([x.product, [x.asked && x.asked.by, x.asked && x.asked.at ? dayShort(x.asked.at) : null].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span></p></a>';
+        + '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([sourceOf(x), x.product, [x.asked && x.asked.by, x.asked && x.asked.at ? dayShort(x.asked.at) : null].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span></p></a>';
     };
     var protoPanel = function (i, from) {
       var x = PROTO[i]; if (!x) return;
+      if (x.screen) { location.hash = screenHref(x); return; }   // a Figma prototype has a page of its own
       var m = panelShell('sg-proto-panel', 'Prototypes'); m._key = protoKey(x);
       var c = x.check, v = versionOf(x);
       var todo = (x.state === 'fix' ? line('Fix what its check found, one by one below, or continue it with a change of your own.')
@@ -424,7 +440,11 @@
       var open = x.comments.filter(function (k) { return !k.done; }), closed = x.comments.filter(function (k) { return k.done; });
       var saidBy = x.comments.length ? kvList(open.concat(closed).map(function (k) { return [['Said', esc(k.says)], ['By', k.by ? esc(k.by) : ''], ['On', k.on && k.on.component ? namePills([k.on.component]) : ''], ['When', k.at ? esc(dayShort(k.at)) : ''], ['Answered', k.done ? esc(k.answer || 'Closed') : '']]; })) : '';
       // Every panel's one order (panelCard, 00-start.js): what to do, what it is about, its status, the rest.
+      // Made from: where it came from, the page it was rebuilt from or the words that asked for it, and what it is held to.
+      var made = x.made || { kind: 'prompt' };
+      var madeFrom = kvOne([['Source', esc(sourceOf(x))], [made.kind === 'page' ? 'Page' : 'Asked', made.kind === 'page' ? esc(made.from) : x.asks && x.asks[0] ? esc(x.asks[0].request) : ''], ['Held to', esc(made.kind === 'page' ? 'The system\'s components, tokens and rules, with what the page was wired to' : 'The system\'s components, tokens and rules')]]);
       var body = panelCard('What to do', todo)
+        + panelCard('Made from', madeFrom)
         + panelCard('What was asked', asks.length ? kvList(asks) : '', { bare: true })
         + panelCard('What its last check found', found, { bare: true })
         + panelCard('Status', status)
@@ -448,29 +468,39 @@
     var viewBar = document.createElement('div'); viewBar.className = 'sg-proto-view';
     viewBar.innerHTML = segHTML([{ v: 'grid', label: 'Grid' }, { v: 'table', label: 'Table' }], 'View');
     if (h2) h2.insertAdjacentElement('afterend', viewBar); else sec.prepend(viewBar);
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-proto-tablecard"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-proto-table"><thead><tr><th>Prototype</th><th>Product</th><th>System version</th><th>Asked by</th><th>Asked on</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + PROTO.map(rowHTML).join('') + '</tbody></table></div></div>'
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-proto-tablecard"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-proto-table"><thead><tr><th>Prototype</th><th>Source</th><th>Product</th><th>System version</th><th>Asked by</th><th>Asked on</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + PROTO.map(rowHTML).join('') + '</tbody></table></div></div>'
       + '<div class="sg-card-grid sg-proto-grid">' + PROTO.map(cardHTML).join('') + '</div>');
     var table = sec.querySelector('.sg-proto-table'), grid = sec.querySelector('.sg-proto-grid'), tableCard = sec.querySelector('.sg-proto-tablecard');
+    // A Figma prototype's card is its screen in small (SHOWROOM_CARD), with its status and source under its name, as
+    // every card has them, fitted to the grid's room as the screen's own page fits it.
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-screen-card]'), function (ph) {
+      var i = +ph.getAttribute('data-proto-card'), x = PROTO[i], card = SHOWROOM_CARD(x.screen, true);
+      card.classList.add('sg-proto-card'); card.setAttribute('data-proto-card', i);
+      card.insertAdjacentHTML('beforeend', '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([sourceOf(x), x.product].filter(Boolean).join(' · ')) + '</span></p>');
+      ph.replaceWith(card);
+      if (card._fit && sec._fit) sec._fit(card._fit);
+    });
     // The grid follows the table: the cards in the rows' order, a card hidden with its row.
     var follow = function () { Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) { var card = grid.querySelector('[data-proto-card="' + tr.getAttribute('data-proto-row') + '"]'); if (card) { grid.appendChild(card); card.hidden = tr.hidden; } }); };
     if (typeof MutationObserver !== 'undefined') new MutationObserver(follow).observe(table.tBodies[0], { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
     var setView = function (v, kept) {
       Array.prototype.forEach.call(viewBar.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === v); });
       tableCard.hidden = v !== 'table'; grid.hidden = v !== 'grid';
+      if (v === 'grid' && sec._refit) requestAnimationFrame(sec._refit);   // the Figma prototypes' screens fitted to the cards
       if (!kept) setHashQuery({ view: v === 'grid' ? null : v });
     };
     viewBar.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setView(b.getAttribute('data-v')); });
     var asked = (function () { try { return new URLSearchParams((location.hash.split('?')[1] || '')).get('view'); } catch (e) { return null; } })();
     setView(asked === 'table' ? 'table' : 'grid', true);
     var openRow = function (tr) { if (tr) protoPanel(+tr.getAttribute('data-proto-row'), tr); };
-    sec.addEventListener('click', function (e) { if (e.target.closest('button')) return; var card = e.target.closest('[data-proto-card]'); if (card) { e.preventDefault(); protoPanel(+card.getAttribute('data-proto-card'), card); return; } if (e.target.closest('a')) return; openRow(e.target.closest('tr[data-proto-row]')); });
+    sec.addEventListener('click', function (e) { if (e.target.closest('button') || e.target.closest('.sg-showroom-detail')) return; var card = e.target.closest('[data-proto-card]'); if (card) { if (PROTO[+card.getAttribute('data-proto-card')].screen) return; e.preventDefault(); protoPanel(+card.getAttribute('data-proto-card'), card); return; } if (e.target.closest('a')) return; openRow(e.target.closest('tr[data-proto-row]')); });
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-proto-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRow(tr); } });
     sec._openKey = function (key) { var i = PROTO.findIndex(function (x) { return protoKey(x) === key; }); if (i >= 0) protoPanel(i, null); return i >= 0; };
     // The Rules page's filters (filterBar): a chip a status, the product a list, over the table and so over the grid.
     var chips = ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], dot: PROTO_ST[k][0], col: 'status', word: PROTO_ST[k][1] }; });
     // With one product there is no list to choose from (filterBar leaves a column every row answers alike out): the
     // status chips alone, as the Requests page has them.
-    if (!filterBar(sec, { total: PROTO.length, said: 'prototypes', chips: chips, cols: [{ key: 'status' }, { key: 'product', label: 'Product' }] }))
+    if (!filterBar(sec, { total: PROTO.length, said: 'prototypes', chips: chips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'product', label: 'Product' }] }))
       pageBar(sec, { said: 'prototypes', chips: ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], n: PROTO.filter(function (x) { return x.state === k; }).length, dot: PROTO_ST[k][0] }; }).filter(function (c) { return c.n; }) });
     follow();
   })();

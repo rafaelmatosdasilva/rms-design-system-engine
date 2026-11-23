@@ -235,3 +235,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-template-parts > li + li { border-top: var(--sg-line); }
 .sg-template-note { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-s) 0 0; }
 
+
+/* A Figma prototype's page, opened on the Prototypes page: its screen's own parts alone, the page's list hidden around
+   them until it is closed (sg-at-screen, 06-overview.js), never by setting each one's hidden. */
+.sg-at-screen > :not([data-screen-part]) { display: none !important; }

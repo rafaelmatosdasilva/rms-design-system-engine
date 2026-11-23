@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tempDir } from './helpers.mjs';
-import { prototypePages, prototypeNames } from '../lib/prototype-pages.mjs';
+import { prototypePages, prototypeNames, madeFrom } from '../lib/prototype-pages.mjs';
 
 // A PNG's header with its size: what the page reads a screen's width and height from.
 const png = (w, h) => { const b = Buffer.alloc(24); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
@@ -73,11 +73,11 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   assert.match(tpl, /pageNone\('requests', 'No requests yet', 'What prototypes need and the system doesn\\'t have, the most asked first, for your team to decide\.', soonLabel\(\)\)/);
   // A grid or a table, switched beside the title, the grid following the table's filters and order.
   assert.match(tpl, /segHTML\(\[\{ v: 'grid', label: 'Grid' \}, \{ v: 'table', label: 'Table' \}\], 'View'\)/);
-  assert.match(tpl, /<th>Prototype<\/th><th>Product<\/th><th>System version<\/th><th>Asked by<\/th><th>Asked on<\/th><th>Status<\/th>/);
+  assert.match(tpl, /<th>Prototype<\/th><th>Source<\/th><th>Product<\/th><th>System version<\/th><th>Asked by<\/th><th>Asked on<\/th><th>Status<\/th>/);
   assert.match(tpl, /new MutationObserver\(follow\)/, 'the grid follows the table');
   // The statuses in the page's own words, and Product as a list chip, as the Rules page's Area.
   assert.match(tpl, /fix: \['differs', 'Fix', 0\], missing: \['differs', 'Missing', 1\], 'not checked': \['figma', 'Not checked', 2\], done: \['match', 'Done', 3\]/);
-  assert.match(tpl, /filterBar\(sec, \{ total: PROTO.length, said: 'prototypes', chips: chips, cols: \[\{ key: 'status' \}, \{ key: 'product', label: 'Product' \}\] \}\)/);
+  assert.match(tpl, /filterBar\(sec, \{ total: PROTO.length, said: 'prototypes', chips: chips, cols: \[\{ key: 'status' \}, \{ key: 'source', label: 'Source' \}, \{ key: 'product', label: 'Product' \}\] \}\)/);
   // Its panel: what to do (Continue), what was asked, what its check found (Copy fix), its status, the rest.
   assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panel\'s one order');
   // Continue and Copy fix are coming soon too: the label, never a request to copy.
@@ -203,4 +203,30 @@ test('each width a prototype was drawn at is kept with its check: whether it fit
   assert.equal(widthLine(w), '📏 Each width: Phone (375px) 1 problem · Desktop (1280px) fits');
   assert.deepEqual(checkRecord({ name: 'A', widths: w }).widths, w, 'kept with the check, where a team\'s own exit criterion reads it');
   assert.deepEqual(widthResults(null), [], 'not drawn: nothing said');
+});
+
+test('each prototype says where it came from: a screen read from Figma, a page rebuilt from the system, else a prompt', () => {
+  assert.deepEqual(madeFrom('Starting point read from the screen "Checkout" in Figma (12:34). Edit it freely: only the system\'s components.'), { kind: 'figma', from: 'Checkout' });
+  assert.deepEqual(madeFrom('Rebuilt from landing.html with the system\'s own components. Edit it freely.'), { kind: 'page', from: 'landing.html' });
+  assert.deepEqual(madeFrom(undefined), { kind: 'prompt', from: null });
+  // Read from the prototype's own file, as the page gets it.
+  const dir = tempDir('proto-made-');
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'landing.json'), JSON.stringify({ $note: 'Rebuilt from landing.html with the system\'s own components. Edit it freely.', prototype: [] }));
+  writeFileSync(join(dir, 'prototypes', 'orders.json'), JSON.stringify({ prototype: [] }));
+  const made = Object.fromEntries(prototypePages(dir).map((p) => [p.name, p.made.kind]));
+  assert.deepEqual(made, { landing: 'page', orders: 'prompt' });
+});
+
+test('the Showroom\'s screens are prototypes from Figma, in the same list, each opening its own page', async () => {
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const tpl = templateText();
+  // Each screen joins the list as a prototype whose source is Figma, its status read from what its screen found.
+  assert.match(tpl, /var SOURCE = \{ figma: 'Figma', prompt: 'Prompt', page: 'Page' \};/);
+  assert.match(tpl, /PROTO\.push\(\{ name: sc\.title \|\| sc\.key, screen: sc,[^\n]*made: \{ kind: 'figma'/);
+  assert.match(tpl, /SCREEN_STATE = function \(s\)/);
+  // A Figma prototype's row and card go to its page, the others open the side panel with Made from in it.
+  assert.match(tpl, /if \(x\.screen\) \{ location\.hash = screenHref\(x\); return; \}/);
+  assert.match(tpl, /panelCard\('What to do', todo\)\s*\+ panelCard\('Made from', madeFrom\)/);
+  assert.match(tpl, /data-f-source="' \+ esc\(sourceOf\(x\)\)/);
 });
