@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Playwright drives the browsers when it is here, the engine's own drivers when it is not (continuous evaluation)
+
+What changed since the entry below (engine 308c49d2): An evaluation run on Windows gets a whole home of its own, so Chrome starts in it, and a Firefox tab whose context was dropped is opened again (#642); Decision records kept as a chain, superseded and never edited (#644); Prototypes: a page for each, in a grid or a table, by product, with who asked, Continue and Copy fix (#643); Angular components compiled by the project's own Angular compiler and drawn by its own Angular (#645); The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node (#647); Playwright drives the browsers when it is here, the engine's own drivers when it is not. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `363e35aa3372` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md aef052f2` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md eff54ab9` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine ab15a9eb | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.056 | 0.055 |
+| Input a run | 87k | 86k |
+| Turns a run | 3.1 | 3.0 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 87k, in 3.0 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-playwright-drives-the-browsers-when`.
+
 ## 2026-11: The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node (continuous evaluation)
 
 What changed since the entry below (engine 9259e348): Each rule says how it is verified, in DSDS's words, and the must rules nothing checks are named (#638); Lit and Angular components read like Vue and React, and Lit drawn with the project's own Lit (#634); Windows: the rest of the suite passes there, and the skill evaluation starts there (#628); The colour scales' steps on the colour page and in the health report (#641); The questions a component's documentation leaves open, named before an agent answers them (#640); The semantic token named first everywhere, held rules read where the check runs, and Figma bindings by node where a path is shared. The guide changed in `cookbook/full-audit.md`, `reference/usage.md`.
