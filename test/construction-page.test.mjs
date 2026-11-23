@@ -102,7 +102,7 @@ test('both sides in one view, the grammar\'s first; nothing on either side, no p
 
 test('the page: in the menu by default, one table whose heads sort, chips for what is left to do', () => {
   const tpl = templateText();
-  const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// Changes in Figma: each change made'));
+  const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('// The changes made in Figma: each change made'));
   assert.deepEqual([...page.matchAll(/\n      \['([^']+)', function \(r\)/g)].map((m) => m[1]), ['Rule', 'Area', 'Source', 'Follow it', 'Owned by', 'Status'], 'one head a column, each sorting by it; no To do column');
   assert.match(page, /'<th data-sort="' \+ esc\(c\[0\]\) \+ '" aria-sort="none"><button type="button" class="sg-mx-sort">' \+ esc\(c\[0\]\) \+ MX_TRI/, 'every head a button, with the mark of the column sorted by');
   assert.match(page, /table\._sortDir = table\._sortKey === key \? -table\._sortDir : 1;/, 'the same head again sorts the other way round, each table its own order');

@@ -481,7 +481,7 @@ Where you see it:
 - **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
 - **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
 - **A change held for sign-off.** The guard says why it is shared and who decides it.
-- **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.
+- **A change in Figma.** `--figma-change` prints it, and the History page shows it, a row a change.
 
 #### Instructions for AI agents
 

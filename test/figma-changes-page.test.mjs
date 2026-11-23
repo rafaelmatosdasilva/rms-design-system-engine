@@ -1,5 +1,5 @@
 // The changes made to components in Figma, where people see them (component-change.mjs → changesView, the style guide's
-// Changes in Figma page and each component's History), and where a component is used in every team file (Figma's library
+// History page and each component's History area), and where a component is used in every team file (Figma's library
 // analytics, figma-analytics.mjs), or why those files were not seen.
 import { test } from 'node:test';
 import { templateText } from '../lib/styleguide-template.mjs';
@@ -44,10 +44,20 @@ test('instances in every team file from Figma\'s library analytics, a set\'s var
   assert.match(without, /Team files the engine does not read are not counted \(no FIGMA_TOKEN/);
 });
 
-test('the style guide has the Changes in Figma page, and each component\'s History links each change', () => {
+test('the changes made in Figma are read in History, on the page and in each component\'s own', () => {
   const tpl = templateText();
-  assert.match(tpl, /section\('changes-in-Figma', 'Changes', 'Changes in Figma'/);
+  // No page of its own: a row of the History table, with its own chip and the source every Figma row has.
+  assert.doesNotMatch(tpl, /section\('changes-in-Figma'/);
+  // Figma is its source and "Change in Figma" its kind, as a Figma comment is: one chip for everything Figma.
+  assert.match(tpl, /add\(x\.at, 'figma', 'Change in Figma', fcWhat\(x\), fcWho\(x\)/);
+  assert.doesNotMatch(tpl, /figma-change/);
+  // Its before and after, still the panel a row opens.
   assert.match(tpl, /card\('What the change said it does'[\s\S]*card\('What Figma shows once it was made'/);
-  assert.match(tpl, /#changes-in-Figma\?panel=' \+ esc\(encodeURIComponent\('doc:fc:'/);
+  assert.match(tpl, /if \(!only\) wn\._openKey = fcOpenKey;/);
+  // A component's History area is that same table, filtered to it: its changes are rows there, said once.
+  assert.doesNotMatch(tpl, /panelCard\('Changes in Figma'/);
+  assert.match(tpl, /historyTable\(box, c\.name, box\.firstChild\)/);
+  // The address the page had opens History.
+  assert.match(tpl, /changelog\|whats-new\|changes-in-Figma/);
   assert.match(readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.figmaChanges = fc/);
 });

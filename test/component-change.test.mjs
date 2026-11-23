@@ -119,7 +119,7 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   assert.match(report, /↻ layer: Content\/Label → Content\/Text/);
   assert.match(report, /✅ It is what the change said\./);
   assert.equal(JSON.parse(readFileSync(join(root, '.design-system-engine-out/changes/chipFilter.change.json'), 'utf8')).done.length, 1);
-  // Kept once made, for the style guide's Changes in Figma page.
+  // Kept once made, for the changes made in Figma that the style guide's History shows.
   assert.equal(readdirSync(join(root, '.design-system-engine-out/changes/done')).length, 1);
 });
 

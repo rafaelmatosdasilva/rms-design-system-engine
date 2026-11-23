@@ -10,17 +10,14 @@
     }).join('') + '</div>';
   }
   // A component's History is the History page's own table, filtered to the changes that affect it (historyTable,
-  // 07-second-in-the-list.js), drawn once its page is (33). Under it, what that page does not list: when Figma was last
-  // read for it, the changes made to it in Figma through the engine (each opening its before and after on the Changes in
-  // Figma page) and code not committed yet. Labelled values, never a table of their own.
+  // 07-second-in-the-list.js), drawn once its page is (33). Under it, what that table does not list: when Figma was
+  // last read for it, and code not committed yet. Labelled values, never a table of their own. The changes made to it
+  // in Figma were listed here too until 23 November 2026 (the owner's): the table holds them now, a row each, so
+  // saying them twice on one page said nothing more.
   function changelogHTML(c) {
     var u = c.updated || {};
-    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said', 'taken back': 'Taken back' };
-    var fc = (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
-      return [{ html: '<a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a>' }, esc(x.asked || x.steps[0] || '') + ' <span class="pg-log-date">' + esc(String(x.at || '').slice(0, 10)) + '</span>' + (x.signedOff ? '<span class="pg-par-val">' + esc('Signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '')];
-    });
     var now = [['Figma last read', u.figmaRead ? esc(when(u.figmaRead)) : ''], ['Its code', u.uncommitted ? 'Has changes not committed yet' : '']];
-    return (fc.length ? panelCard('Changes in Figma', kvOne(fc)) : '') + (u.figmaRead || u.uncommitted ? panelCard('Now', kvOne(now)) : '');
+    return u.figmaRead || u.uncommitted ? panelCard('Now', kvOne(now)) : '';
   }
   // Its History area, once its page is drawn: the History page's table above what changelogHTML put there. With nothing
   // known to have changed it, the area and its tab are left out: the page shows what it knows.

@@ -282,16 +282,19 @@
     doneCards(sec, cards);
   })();
   if (!document.getElementById('rules')) emptyPage('rules', 'rules', 'System', 'Rules', 'No rules yet', 'The rules every component follows show here once the engine has read Figma and the code together.', null);
-  // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
-  // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
-  // not as said). A row opens its before and after in the side panel: what the change said it would do (the read before
-  // beside the same once changed), what Figma shows once read again, and where it is not what was said; where the
-  // component is used, what it breaks, what it adds and who signed it off, and the faults it already had.
+  // The changes made in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges,
+  // component-change.mjs). They are rows of the History table below, a row a change: what was asked, its steps and its
+  // status (waiting to be made, made as said, not as said). A row opens its before and after in the side panel: what
+  // the change said it would do (the read before beside the same once changed), what Figma shows once read again, and
+  // where it is not what was said; where the component is used, what it breaks, what it adds and who signed it off,
+  // and the faults it already had.
   var FCH = DATA.figmaChanges || [];
   var fcKey = function (x) { return 'doc:fc:' + x.component + ':' + x.at; };
+  // Its rows and its panel, built here and read in the History table below: a change made in Figma is a change to the
+  // system, so it is read where every other change is (the owner's, 23 November 2026, when it stopped being a page of
+  // its own). fcWhat: what the row says; fcWho: who stands behind it; fcOpen: its before and after in the side panel.
+  var fcWhat = null, fcWho = null, fcOpen = null;
   if (FCH.length) (function () {
-    hr(); navLink('changes-in-Figma', 'changes in Figma');
-    var sec = section('changes-in-Figma', 'Changes', 'Changes in Figma', '');
     var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'], 'taken back': ['figma', 'Taken back'] };
     var dot = parDot;
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
@@ -304,9 +307,6 @@
         ['Before → after', (x.from != null ? '<code>' + esc(x.from) + '</code>' : '') + (x.from != null && x.to != null ? ' → ' : '') + (x.to != null ? '<code>' + esc(x.to) + '</code>' : '')]]); }); });
       // A list: the panel opens from a row of the Changes in Figma table.
       return items.length ? kvList(items) : '<p class="sg-il-line">Nothing changes.</p>';
-    };
-    var rowHTML = function (x, i) {
-      return '<tr class="sg-row-open" tabindex="0" data-fc-row="' + i + '" data-chip="' + esc(x.status) + '"><td>' + compHTML(x.component) + '</td><td><strong>' + esc(x.asked || x.steps[0] || '') + '</strong><span class="pg-par-val">' + esc(x.steps.length + ' step' + (x.steps.length === 1 ? '' : 's')) + '</span></td><td>' + esc(String(x.at || '').slice(0, 10)) + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var panel = function (i, from) {
       var x = FCH[i]; if (!x) return;
@@ -339,15 +339,22 @@
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Changes in Figma', x.component], title: x.asked || x.steps[0] || x.component, body: body });
       panelShow(m, from);
     };
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-fc-table"><thead><tr><th>Component</th><th>The change</th><th>Asked</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + FCH.map(rowHTML).join('') + '</tbody></table></div></div>');
-    var open = function (tr) { if (tr) panel(+tr.getAttribute('data-fc-row'), tr); };
-    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-fc-row]')); });
-    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-fc-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
-    sec._openKey = function (key) { var i = FCH.findIndex(function (x) { return fcKey(x) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
-    var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
-    pageBar(sec, { said: 'decisions', chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+    // What its History row says: what was asked, then its status and how many steps it has.
+    fcWhat = function (x) {
+      var p = function (h) { return '<p class="sg-il-line">' + h + '</p>'; };
+      return p('<strong>' + esc(x.asked || x.steps[0] || x.component) + '</strong>') +
+        p(dot(ST[x.status][0], ST[x.status][1]) + '<span class="pg-par-val">' + esc(x.steps.length + ' step' + (x.steps.length === 1 ? '' : 's')) + '</span>');
+    };
+    // Who stands behind it: whoever signed it off, else whoever made it (every change has a person behind it).
+    fcWho = function (x) { return [x.signedOff ? (x.signedOff.reviewerSaid || x.signedOff.by) : x.authorSaid].filter(Boolean); };
+    fcOpen = panel;
   })();
-  if (!document.getElementById('changes-in-Figma')) emptyPage('changes-in-Figma', 'changes in Figma', 'Changes', 'Changes in Figma', 'No changes in Figma', 'Nothing changed in the Figma file since it was last read. Read it again to see what designers changed.', askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>'));
+  // One change's before and after, opened by its row in History and by a link that names it (panel=doc:fc:…).
+  var fcOpenKey = function (key, from) {
+    var i = FCH.findIndex(function (x) { return fcKey(x) === key; });
+    if (i >= 0 && fcOpen) fcOpen(i, from || null);
+    return i >= 0;
+  };
   // Requests: what teams ask the system for (requests.mjs), one row a need however many prototypes ask for it, the
   // most asked first. Status is what the system owes itself, this is what others ask it for. A row opens its panel:
   // what to do, who asked, what it uses meanwhile, the team's decision and the tracker's ticket. The decision is the
@@ -595,7 +602,7 @@
   // the commits that changed a component, from the components' changelogs.
   var RLOG = DATA.releaseLog || [];
   var DECISIONS = (DATA.decisions || []).slice();
-  if (CHANGES.length || RLOG.length || DECISIONS.length || (DATA.intentChanges || []).length) {
+  if (CHANGES.length || RLOG.length || DECISIONS.length || FCH.length || (DATA.intentChanges || []).length) {
     hr(); navLink('history', 'history');
     historyTable(section('history', 'Changes', 'History', ''));
   }
@@ -723,7 +730,8 @@
     var ROWS = [];
     // group: rows of one moment (a read of Figma, the decisions a person gave one day) share their Date, Type and Done by.
     // names: the components it affects, for a component's own History.
-    var add = function (at, chip, type, what, bys, affects, tickets, group, release, names) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null, names: names || [] }); };
+    // key: the panel the row opens where it has one (a change made in Figma), nothing where the row is the whole of it.
+    var add = function (at, chip, type, what, bys, affects, tickets, group, release, names, key) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [], group: group || null, release: release || null, names: names || [], key: key || null }); };
     // The code: each commit, the issues it names (each linked, with how many commits it has when more than one), what it
     // says, and the release it shipped in, once it has shipped.
     var ticketsOf = function (r) { return r.tickets || (r.ticket ? [{ ticket: r.ticket, ticketUrl: r.ticketUrl }] : []); };
@@ -767,6 +775,10 @@
       var bys = [t.by].concat((t.replies || []).map(function (r) { return r.by; })).filter(function (b, i, a) { return b && a.indexOf(b) === i; });
       add(t.at, 'figma', 'Figma comment', line(said), bys, pillsHTML([c.name], 'history'), null, 'comment:' + c.name + ':' + t.at, null, [c.name]);
     }); });
+    // Each change made to a component in Figma through the engine (component-change.mjs): what was asked, its status
+    // (waiting to be made, made as said, not as said, taken back) and the component it changes. The row opens its
+    // before and after in the side panel, as its own page once did.
+    FCH.forEach(function (x) { add(x.at, 'figma', 'Change in Figma', fcWhat(x), fcWho(x), pillsHTML([x.component], 'history'), null, null, null, [x.component], fcKey(x)); });
     // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
     // A change the engine sent in parts (GitLab refuses one commit that large: "… (part 2 of 3)") is one change: one row,
     // its pages and files together, each of its commits named.
@@ -879,7 +891,7 @@
         var n = 1; if (x.group && (i === 0 || ROWS[i - 1].group !== x.group)) while (ROWS[i + n] && ROWS[i + n].group === x.group) n++;
         var lead = !x.group || i === 0 || ROWS[i - 1].group !== x.group, span = n > 1 ? ' rowspan="' + n + '"' : '';
         var shared = function (cell) { return cell.replace(/^<td class="([^"]+)">([\s\S]*)<\/td>$/, '<td class="$1"' + span + '><div class="sg-log-stick">$2</div></td>'); };
-        return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
+        return '<tr data-chip="' + x.chip + '"' + (lead ? ' data-log-row="' + i + '"' : '') + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (x.key ? ' data-fc="' + esc(x.key) + '" tabindex="0"' : '') + (lead ? (x.key ? ' class="sg-row-open"' : '') : ' class="sg-log-more"') + '>' +
           (lead ? shared(dateCell(x.at, x.release)) + shared('<td class="sg-log-type">' + esc(sourceOf(x)) + '</td>') : '') + '<td class="sg-log-what">' + (kindOf(x) ? line(quiet(esc(kindOf(x)))) : '') + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
     // The table itself, held now: everything below works from this table.
@@ -937,7 +949,15 @@
       var th = e.target.closest('th[data-sort]'); if (th) { logSort(th.getAttribute('data-sort')); return; }
       var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
       if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
+      if (e.target.closest('a, button')) return;
+      var fcTr = e.target.closest('tr[data-fc]'); if (fcTr) fcOpenKey(fcTr.getAttribute('data-fc'), fcTr);
     });
+    box.addEventListener('keydown', function (e) {
+      var tr = e.target.closest && e.target.closest('tr[data-fc]');
+      if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); fcOpenKey(tr.getAttribute('data-fc'), tr); }
+    });
+    // A link that names a change's panel (panel=doc:fc:…) opens it on this page, wherever it was linked from.
+    if (!only) wn._openKey = fcOpenKey;
     // Any "N more" pill opens the rest of its list: one handler for the whole guide (00-start.js).
     wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; logShown = ROWS_SHOWN; logPage(true); });
     return box;

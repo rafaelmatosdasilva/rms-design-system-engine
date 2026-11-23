@@ -28,11 +28,11 @@ test('every filter that hides rows says so when it hides them all', () => {
   assert.match(tpl, /tableNone\(logTable, 'changes'\);/, 'a ticket, on History');
   assert.match(tpl, /tableNone\(body\.parentNode, 'components'\);/, 'the Status page\'s table');
   // Each table says what it holds, so the line under can name it rather than saying "rows".
-  for (const said of ["said: 'rules'", "said: 'pages'", "said: 'decisions'", "said: 'changes'"]) assert.ok(tpl.includes(said), said);
+  for (const said of ["said: 'rules'", "said: 'pages'", "said: 'changes'"]) assert.ok(tpl.includes(said), said);
   // The Rules page is built whenever the library was read for its rules, mined or none, so its table is the one that
   // can stand there with no row of its own. History builds no page at all until it has a change to show.
   assert.match(tpl, /tableNone\(sec\.querySelector\('\.sg-cx-table'\), 'rules', \{ head: 'No rule has been mined yet', say: '[^']+' \}\);/, 'the Rules table says what fills it');
-  assert.match(tpl, /if \(CHANGES\.length \|\| RLOG\.length \|\| DECISIONS\.length \|\| \(DATA\.intentChanges \|\| \[\]\)\.length\) \{/, 'History is built only once it has a change: it is never empty');
+  assert.match(tpl, /if \(CHANGES\.length \|\| RLOG\.length \|\| DECISIONS\.length \|\| FCH\.length \|\| \(DATA\.intentChanges \|\| \[\]\)\.length\) \{/, 'History is built only once it has a change: it is never empty');
 });
 
 test('a table filtered to nothing: the head goes with the rows, and one line says why', { timeout: budget(300000) }, async (t) => {
