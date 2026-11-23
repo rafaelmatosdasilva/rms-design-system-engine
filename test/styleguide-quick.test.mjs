@@ -114,7 +114,7 @@ test('--styleguide --quick: the page in seconds, from the saved results, marked,
   assert.ok(quickPage(page), 'marked as a quick build');
   assert.match(q.stdout, /Accessibility from the saved results/);
   assert.doesNotMatch(q.stdout, /Trying the accessibility|♿ Accessibility in the page/, 'nothing tried in a browser');
-  assert.match(q.stdout, /📏 Showroom as measured by the last full build/);
+  assert.match(q.stdout, /📏 Prototypes from Figma as measured by the last full build/);
   assert.match(readFileSync(page, 'utf8'), /window\.__dseShowroomMeasured = \{"home"/, 'the last measurement in the page');
   assert.match(q.stdout, /⚡ A quick build/);
   assert.equal(existsSync(join(dir, OUT, 'styleguide-shots')), false, 'no pictures of its own pages');
