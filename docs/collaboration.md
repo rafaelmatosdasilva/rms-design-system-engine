@@ -159,6 +159,7 @@ What teams ask your system for, and what your team decided. Status is what the s
 - **Always in the menu,** below Prototypes, since a prototype's check is where a request comes from. With none yet, the page says what it will hold, in the same empty state as Prototypes.
 - **One request a need.** When a prototype needs something your system lacks (a component, an option, a token, an icon, a layout, a pattern), the check records it. Asked by ten prototypes, it is one request with ten askers, the most asked first.
 - **Your team decides.** Each request is New until someone decides it: kept out of the system (with its reason), accepted in the product, accepted for now (with a day to look again), or brought into the system. `rms-design-system-engine --request "<key>" --decide out --why "…" --by "<who>"` records it in `design-system-engine-requests.json`, to commit.
+- **Deciding from the page is coming soon.** A request's panel says what to decide, with a Coming soon label where its command will be.
 - **It closes by itself.** A request brought into the system is Built once no prototype lacks it any more. One accepted for now comes back on its day.
 - **Agents are told.** A need kept out of the system is a decision every agent reads before it asks, so nobody asks for it again.
 - **On its component's page too.** A request that names a component, as the nearest thing your system has or the thing a prototype uses meanwhile, shows in that component's Requests area: the Requests page's own table, chips and panel.

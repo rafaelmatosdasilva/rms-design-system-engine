@@ -491,9 +491,10 @@
       var m = panelShell('sg-req-panel', 'Requests'); m._key = reqKey(x);
       var card = panelCard;
       var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
-      var cmd = function (d) { return '<p class="sg-il-line"><code>' + esc('rms-design-system-engine --request "' + x.key + '" --decide ' + d) + '</code></p>'; };
-      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + cmd('out --why "<the reason>" --by "<who>"') + cmd('system --by "<who>"')
-        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + cmd('system --by "<who>"')
+      // Deciding a request from the page is coming soon (the owner's, 23 November 2026): a label where its command will be.
+      var soon = '<p class="sg-il-line">' + soonLabel() + '</p>';
+      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + soon
+        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + soon
         : x.status === 'decided' && x.decision === 'system' ? line('Build it in the system. It is Built by itself once no prototype lacks it.') : '';
       var decided = x.decisionSaid ? line(capital(x.decisionSaid) + (x.why ? '. ' + x.why : '')) + (x.by || x.at ? line([x.by, x.at ? dayShort(x.at) : null].filter(Boolean).join(', ')) : '') + (x.lookAgain ? line('Look again on ' + dayShort(x.lookAgain)) : '') : '';
       var ticket = x.ticket ? '<p class="sg-il-line"><a href="' + esc(x.ticket) + '" target="_blank" rel="noopener">' + esc(x.ticket) + '</a></p>' : '';

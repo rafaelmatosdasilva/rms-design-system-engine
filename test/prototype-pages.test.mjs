@@ -67,6 +67,9 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   // empty state while there is none.
   assert.ok(tpl.indexOf("navLink('prototypes', 'prototypes')") < tpl.indexOf("navLink('requests', 'requests')"), 'Prototypes, then Requests');
   assert.doesNotMatch(tpl, /if \(REQ\.length\) \(function/, 'Requests is never left out of the menu');
+  // Deciding a request from its panel is coming soon too: the label, never its command written out.
+  assert.match(tpl, /var soon = '<p class="sg-il-line">' \+ soonLabel\(\) \+ '<\/p>';/);
+  assert.doesNotMatch(tpl, /--request "' \+ x\.key \+ '" --decide/);
   assert.match(tpl, /pageNone\('requests', 'No requests yet', 'What prototypes need and the system doesn\\'t have, the most asked first, for your team to decide\.', soonLabel\(\)\)/);
   // A grid or a table, switched beside the title, the grid following the table's filters and order.
   assert.match(tpl, /segHTML\(\[\{ v: 'grid', label: 'Grid' \}, \{ v: 'table', label: 'Table' \}\], 'View'\)/);
