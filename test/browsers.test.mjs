@@ -52,8 +52,8 @@ test('a browser that is not here is named as missing, never passed over', () => 
   // With none at all, the first line says the whole browser check cannot run.
   assert.match(browserLines({ chrome: null, firefox: null, webkit: null })[0], /no browser check runs at all/);
   // One that is here says what runs in it and what does not, so nobody reads it as having answered everything.
-  assert.match(browserLines({ chrome: 'c', firefox: '/bin/firefox', webkit: null })[1], /rendered parity and the accessibility criteria a browser decides are tried in it\)/);
-  assert.match(browserLines({ chrome: 'c', firefox: null, webkit: '/usr/bin/safaridriver' })[2], /when ds-config\.json names webkit \(rendered\.browsers, a11y\.browsers\)/);
+  assert.match(browserLines({ chrome: 'c', firefox: '/bin/firefox', webkit: null })[1], /rendered parity, the accessibility criteria a browser decides and the drawn prototypes are tried in it\)/);
+  assert.match(browserLines({ chrome: 'c', firefox: null, webkit: '/usr/bin/safaridriver' })[2], /when ds-config\.json names webkit \(rendered\.browsers, a11y\.browsers, prototype\.browsers\)/);
   // The finders answer for this machine without throwing, whatever is installed.
   for (const f of [findFirefox, findWebKit]) { const p = f(); assert.ok(p === null || typeof p === 'string'); }
   // Turned off by name, as Chrome can be.
