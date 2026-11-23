@@ -746,6 +746,11 @@ A full audit writes `.design-system-engine-out/differences.md` and `differences.
 - Marked new when the last run did not have it. One whose line number only moved is not new.
 - Each check that did not run is named at the top, so a difference it would have found is never mistaken for a pass.
 - Lines that only point at a difference (a Figma link, who last changed it, what was skipped) stay in the audit and out of the list.
+- **Why each one is there, where the engine can read it.** Who acts follows from the cause:
+  - **the code got it wrong:** the record of what Figma and the code last agreed on says the code moved since, or that Figma moved and the code has not followed;
+  - **a product is on an older version:** the product's pinned version of the system is behind the system's own, so moving it up may settle it;
+  - **kept on purpose:** the team's kept differences, listed apart.
+  - Any other is **not sorted**, with the question that would settle it, never a guess. Whether the spec never said, or the system disagrees with itself, is not read yet.
 
 Under its verdict, the summary of a full audit counts the components that pass, drift (an open difference) and were not checked, with the names when there are few. Beside them, `findings.json` holds every finding of every check as one record, with its rule in plain words, its evidence and its verdict.
 
