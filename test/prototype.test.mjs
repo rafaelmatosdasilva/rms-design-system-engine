@@ -207,6 +207,26 @@ test('--prototype draws a valid composition with the components\' own markup and
   assert.ok(!existsSync(join(dir, '.design-system-engine-out', 'prototypes', 'bad.html')));
 });
 
+test('--prototype holds the copy to the content guidance the team wrote in its intent layer', { timeout: budget(600000) }, async () => {
+  const dir = builtTidepool('tp-proto-copy-');
+  const cfgPath = join(dir, 'ds-config.json');
+  const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+  writeFileSync(cfgPath, JSON.stringify({ ...cfg, intentLayer: 'docs/intent' }, null, 2));
+  mkdirSync(join(dir, 'docs', 'intent'), { recursive: true });
+  const { snapshotPath } = await import('../lib/doc-source-dsds.mjs');
+  const snap = snapshotPath(dir, { ...cfg, intentLayer: 'docs/intent' });
+  mkdirSync(dirname(snap), { recursive: true });
+  writeFileSync(snap, JSON.stringify({ entities: [{ name: 'Content', kind: 'foundation', layer: 'foundations', rules: [{ text: 'Use "sign in", not "log in".' }, { text: 'Buttons start with a verb.' }] }] }));
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'signin.json'), JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Log in' } }] }));
+  const r = run(dir, '--prototype', 'prototypes/signin.json');
+  assert.match(r.stdout, /✍️ {2}COPY {2}held to 2 rules of the content guidance \(Content\): 1/, r.stdout);
+  assert.match(r.stdout, /❌ "Log in" says "log in", which Content says to avoid: say "sign in"/);
+  const rec = JSON.parse(readFileSync(join(dir, 'prototypes', 'signin.check.json'), 'utf8'));
+  assert.ok(rec.items.some((i) => i.kind === 'copy'), 'the finding is in the check, so the prototype shows Fix');
+  assert.equal(rec.ok, false);
+});
+
 test('--prototype --from-screens turns each designed screen into a drawn starting point', { timeout: budget(600000) }, () => {
   const dir = builtTidepool('tp-screens-');
   const r = run(dir, '--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');

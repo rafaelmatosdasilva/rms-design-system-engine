@@ -416,6 +416,23 @@ The style guide shows them in **History** (it was the Changelog): one table, a r
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
+### The copy, held to your content guidance
+
+The engine always checked a prototype's words against the system's own writing rules. Now it also checks them against the content guidance your team writes in its intent layer: a page about content, voice, tone, writing, terminology or wording, or a Writing section on any page. Each rule is your team's own, in your words. The engine adds none.
+
+A line becomes a check when one can hold it:
+
+| Your page says | The check |
+|---|---|
+| Use "sign in", not "log in" · Avoid "please" and "simply" · Prefer "save" over "submit" | A term to avoid, and what to say instead |
+| Buttons start with a verb | A button or link that starts with an article, a possessive, a yes or a no |
+| Errors never blame the person | An error, alert or toast that says "you entered", "invalid", "wrong" |
+| Write in sentence case (or title case) | A heading or label in the other case |
+
+Each prototype check prints a ✍️ COPY section. Each finding names its rule and the page it comes from, for example: `"Log in" says "log in", which Content says to avoid: say "sign in"`. The findings go into the prototype's check, so the Prototypes page shows it as Fix, each one with a Copy fix. A line no check can hold (sound like a helpful colleague) is never guessed at: the check counts it, for whoever reviews the copy.
+
+Both kinds of prototype are checked: a composition, word by word, and a page of your code, from what its components show (label, text, title, placeholder, and the words inside a button or a link). With no content guidance in the intent layer, the check says nothing. A rule that does not fit a screen is the team's to change on its page, never the prototype's to ignore.
+
 ### The states each component owes
 
 - A component's page can list the states it must have, such as error, loading, success, disabled or read-only.

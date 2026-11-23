@@ -179,8 +179,8 @@ A row or a card opens the prototype's page in the side panel.
 
 - **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in Claude Code, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
 - **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
-- **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one.
-- **Status,** with when it was checked, against which release of the system, and at which commit or tag.
+- **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one. The copy is part of that check: each word held to your team's content guidance ([The copy, held to your content guidance](documentation.md#the-copy-held-to-your-content-guidance)).
+- **Status,** with when it was checked, against which release of the system, at which commit or tag, and each screen width it was drawn at, fitting or with how many problems. That result is kept in its `<name>.check.json` (`widths`), so a team's own exit criterion (Phone and Desktop, say) reads it rather than working it out.
 - **Its screens,** one width at a time (and each state it was pictured in), what the system lacks for it, the components it uses, its handoff's versions with what changed, its notes with their owners, and the comments on it.
 
 A component's page links each prototype that uses it to that prototype's own page. The page reads what is kept beside each prototype and changes none of it.
