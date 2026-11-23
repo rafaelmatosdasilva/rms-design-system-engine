@@ -102,7 +102,7 @@ test('approving a draft marks the page written with help, with the review and wh
   const page = JSON.parse(out.get(BUTTON));
   assert.ok(page.sections.at(-1).items.some((i) => i.statement === 'Put it last in a form.'), 'the draft is the page\'s now');
   assert.deepEqual(page.metadata.origin, { method: 'generated', author: 'generated' }, 'a page a tool wrote stays generated');
-  assert.deepEqual(page.metadata.reviewed, [{ date: '2026-11-23', by: 'human:QA', note: 'Drafted lines approved or rewritten by a person.' }]);
+  assert.deepEqual(page.metadata.reviewed, [{ date: '2026-11-23', by: 'human:QA', note: 'Lines the engine proposed, approved or rewritten by a person.' }]);
   // A page a person wrote becomes written with help, and the same review once only.
   const own = markReviewed(markReviewed({ kind: 'component', id: 'x', name: 'X', description: 'Y.' }, { by: 'QA', at: '2026-11-23' }), { by: 'QA', at: '2026-11-23' });
   assert.equal(own.metadata.origin.author, 'assisted');
