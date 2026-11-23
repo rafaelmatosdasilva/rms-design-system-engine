@@ -60,7 +60,7 @@
     var SIDE = { figma: 'Figma', code: 'Code' };   // where a rule was read from, as the column head and the crumbs say it
     var OWNER = { figma: 'Design', code: 'Engineering', both: 'Design and engineering' };
     var rows = RULES.slice().sort(function (a, b) { return (a.side === 'code') - (b.side === 'code') || ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
-    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var dot = parDot;
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
     var FIGMA_URLS = G.figmaUrls || {};
     var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>' : esc(n); };
@@ -292,7 +292,7 @@
     hr(); navLink('changes-in-Figma', 'changes in Figma');
     var sec = section('changes-in-Figma', 'Changes', 'Changes in Figma', '');
     var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'], 'taken back': ['figma', 'Taken back'] };
-    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var dot = parDot;
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
     var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>' : esc(n); };
     var SIGN = { added: '+', removed: '−', renamed: '↻', moved: '→', changed: '~' };
@@ -364,8 +364,10 @@
   var PROTO = (DATA.prototypes || []).slice();
   var protoKey = function (x) { return 'proto:' + x.name; };
   var PROTO_ST = { fix: ['differs', 'Fix', 0], missing: ['differs', 'Missing', 1], 'not checked': ['figma', 'Not checked', 2], done: ['match', 'Done', 3] };
+  // A problem's grade and its dot: red stops the task, amber is real trouble, grey reads less well (review-severity.mjs).
+  var GRADE_ORDER = ['Blocker', 'Major', 'Minor'], GRADE_DOT = { Blocker: 'differs', Major: 'figma', Minor: 'none' };
   var protoSt = function (x) { return PROTO_ST[x.state] || PROTO_ST['not checked']; };
-  var protoDot = function (x) { var s = protoSt(x); return '<span class="pg-par-status pg-par--' + s[0] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(s[1]) + '</span>'; };
+  var protoDot = function (x) { var s = protoSt(x); return parDot(s[0], s[1]); };
   // What needs doing first, then by name: the order the page opens in, before any column is sorted (once the Figma
   // prototypes have joined, below).
   (function () {
@@ -421,7 +423,7 @@
       var todo = (x.state === 'fix' ? line('Fix what its check found, one by one below, or continue it with a change of your own.')
         : x.state === 'missing' ? line('Decide on the Requests page what the system lacks for it, or continue it.')
         : x.state === 'not checked' ? line('It is checked at the next build. Continue it meanwhile if it needs a change.')
-        : line('Nothing to fix. Continue it when it needs a change.'))
+        : line(c && c.review && c.review.length ? 'Its check found nothing to fix. Continue it when it needs a change.' : 'Nothing to fix. Continue it when it needs a change.'))
         + '<p class="sg-il-line">' + soonLabel() + '</p>';   // Continue, coming soon
       var asks = (x.asks || []).map(function (a, j) { return [['Asked', esc(a.request)], [j ? 'Changed by' : 'By', a.by ? esc(a.by) : '<span class="pg-dim">Not known</span>'], ['When', a.at ? esc(dayShort(a.at)) : '']]; });
       if (!asks.length && x.asked && x.asked.by) asks.push([['By', esc(x.asked.by)], ['When', x.asked.at ? esc(dayShort(x.asked.at)) : '']]);
@@ -432,6 +434,23 @@
       var found = c && (c.items.length || c.owes.length) ? kvList(c.items.map(function (it) {
         return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)], ['', soonLabel()]];   // Copy fix, coming soon
       }).concat(c.owes.length ? [[['States it owes', esc(c.owes.map(capital).join(' · '))]]] : [])) : '';
+      // Its UX grades: each problem the review found, at the grade a reviewer gave it, else the one the engine proposed
+      // with why (review-severity.mjs). The grade is a person's call: confirming or changing one is coming soon here.
+      var review = c && c.review ? c.review : [];
+      var gradeOf = function (p) { return (p.grade || p.proposed || {}).grade || 'Minor'; };
+      var counts = { Blocker: 0, Major: 0, Minor: 0 }, confirmed = 0;
+      review.forEach(function (p) { counts[gradeOf(p)] = (counts[gradeOf(p)] || 0) + 1; if (p.grade) confirmed++; });
+      // The counts go in the card's title, as every counted card has them: a bare card holds its list only.
+      var said = GRADE_ORDER.filter(function (g) { return counts[g]; }).map(function (g) { return counts[g] + ' ' + g; }).join(', ');
+      var gradesTitle = 'Its UX grades' + (review.length ? ' (' + said + ', ' + confirmed + ' of ' + review.length + ' confirmed by a reviewer)' : '');
+      var grades = review.length ? kvList(review.slice().sort(function (a, b) { return GRADE_ORDER.indexOf(gradeOf(a)) - GRADE_ORDER.indexOf(gradeOf(b)); }).map(function (p) {
+          var g = p.grade, changed = g && p.proposed && g.grade !== p.proposed.grade;
+          return [['Grade', parDot(GRADE_DOT[gradeOf(p)], gradeOf(p))],
+            ['Found', esc(capital(p.message))],
+            ['Why', esc(g ? g.why || '' : p.proposed ? capital(p.proposed.why) : '')],
+            ['Graded by', g ? esc(g.by + (g.at ? ', ' + dayShort(g.at) : '') + (changed ? ', proposed ' + p.proposed.grade : '')) : '<span class="pg-dim">Proposed by the engine</span>'],
+            ['', g ? '' : soonLabel()]];   // Confirm or change, coming soon
+        })) : '';
       var status = '<p>' + protoDot(x) + '</p>' + (c ? kvOne([['Checked', esc(when(c.at))], ['Against the system', v ? esc(v) : ''], ['At its commit', c.commit ? '<code>' + esc(String(c.commit).slice(0, 8)) + '</code>' : ''], ['At its tag', c.tag ? '<code>' + esc(c.tag) + '</code>' : ''], ['Each width', (c.widths || []).length ? esc(c.widths.map(function (w) { return w.width + ' ' + (w.fits ? 'fits' : w.problems + (w.problems === 1 ? ' problem' : ' problems')); }).join(' · ')) : '']]) : '');
       var lacked = x.lacked.length ? x.lacked.map(function (g) { return line(g.need + (g.times > 1 ? ' (in ' + g.times + ' places)' : '')); }).join('') : '';
       var used = c && Object.keys(c.used).length ? '<p class="sg-il-line">' + namePills(Object.keys(c.used)) + '</p>' : '';
@@ -443,10 +462,14 @@
       // Made from: where it came from, the page it was rebuilt from or the words that asked for it, and what it is held to.
       var made = x.made || { kind: 'prompt' };
       var madeFrom = kvOne([['Source', esc(sourceOf(x))], [made.kind === 'page' ? 'Page' : 'Asked', made.kind === 'page' ? esc(made.from) : x.asks && x.asks[0] ? esc(x.asks[0].request) : ''], ['Held to', esc(made.kind === 'page' ? 'The system\'s components, tokens and rules, with what the page was wired to' : 'The system\'s components, tokens and rules')]]);
+      // What to do says the grades too: a page with nothing to fix can still have a Major problem its review found.
+      var ungraded = review.filter(function (p) { return !p.grade; }).length;
+      if (ungraded) todo = line('Its review proposes ' + said + ': a reviewer confirms or changes each grade, below.') + todo;
       var body = panelCard('What to do', todo)
         + panelCard('Made from', madeFrom)
         + panelCard('What was asked', asks.length ? kvList(asks) : '', { bare: true })
         + panelCard('What its last check found', found, { bare: true })
+        + panelCard(gradesTitle, grades, { bare: true })
         + panelCard('Status', status)
         + panelCard('Its screens', screens)
         + panelCard('What the system lacks for it', lacked)
@@ -511,7 +534,7 @@
     var sec = section('requests', 'Requests', 'Requests', '');
     if (!REQ.length) { sec.insertAdjacentHTML('beforeend', pageNone('requests', 'No requests yet', 'What prototypes need and the system doesn\'t have, the most asked first, for your team to decide.', soonLabel())); return; }
     var ST = { 'new': ['figma', 'New'], 'look again': ['differs', 'Look again'], decided: ['match', 'Decided'], built: ['match', 'Built'], merged: ['figma', 'Merged into another'], closed: ['figma', 'Closed'] };
-    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var dot = parDot;
     var KIND = { component: 'A component', option: 'An option', token: 'A token', icon: 'An icon', layout: 'A layout', pattern: 'A pattern' };
     var rowHTML = function (x, i) {
       return '<tr class="sg-row-open" tabindex="0" data-req-row="' + i + '" data-chip="' + esc(x.status === 'merged' ? 'closed' : x.status) + '"><td><strong>' + esc(x.need) + '</strong><span class="pg-par-val">' + esc(KIND[x.kind] || capital(x.kind)) + '</span></td><td>' + (x.count ? esc(x.count + ' prototype' + (x.count === 1 ? '' : 's')) : '<span class="pg-dim">Nobody now</span>') + '</td><td>' + (x.decisionSaid ? esc(capital(x.decisionSaid)) : '<span class="pg-dim">Not decided</span>') + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';

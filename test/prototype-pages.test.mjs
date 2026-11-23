@@ -230,3 +230,26 @@ test('the Showroom\'s screens are prototypes from Figma, in the same list, each 
   assert.match(tpl, /panelCard\('What to do', todo\)\s*\+ panelCard\('Made from', madeFrom\)/);
   assert.match(tpl, /data-f-source="' \+ esc\(sourceOf\(x\)\)/);
 });
+
+test('a prototype\'s page shows its UX grades: each problem at the reviewer\'s grade, else the one proposed with why', async () => {
+  const root = project();
+  const rec = JSON.parse(readFileSync(join(root, 'prototypes', 'Orders.check.json'), 'utf8'));
+  rec.review = [
+    { id: 'aaaa1111', source: 'layout', message: 'two main actions in view', proposed: { grade: 'Major', why: 'two main actions compete' } },
+    { id: 'bbbb2222', source: 'works', message: 'the filter does not open', proposed: { grade: 'Blocker', why: 'a control that does not do what it shows stops the task there' }, grade: { grade: 'Blocker', by: 'old record' } },
+  ];
+  writeFileSync(join(root, 'prototypes', 'Orders.check.json'), JSON.stringify(rec));
+  // A grade given after the check, in the grades file, is the one shown: the record's own copy never wins over it.
+  writeFileSync(join(root, 'design-system-engine-grades.json'), JSON.stringify({ grades: [{ prototype: 'Orders', id: 'aaaa1111', grade: 'Minor', by: 'Reviewer', at: '2026-11-22T10:00:00Z', why: 'the second one is quiet enough' }] }));
+  const review = prototypePages(root).find((x) => x.name === 'Orders').check.review;
+  assert.deepEqual(review.map((p) => [p.id, p.grade?.grade ?? null, p.grade?.by ?? null]), [['aaaa1111', 'Minor', 'Reviewer'], ['bbbb2222', null, null]]);
+  assert.equal(review[1].proposed.grade, 'Blocker');
+  const { templateText } = await import('../lib/styleguide-template.mjs');
+  const tpl = templateText();
+  // Its own card under what the check found, worst first, with who graded it, and confirming one is coming soon.
+  assert.match(tpl, /\+ panelCard\('What its last check found', found, \{ bare: true \}\)\s*\+ panelCard\(gradesTitle, grades, \{ bare: true \}\)/);
+  assert.match(tpl, /GRADE_DOT = \{ Blocker: 'differs', Major: 'figma', Minor: 'none' \}/);
+  assert.match(tpl, /'Its UX grades' \+ \(review.length \? ' \(' \+ said/);
+  assert.match(tpl, /Its review proposes '/);
+  assert.match(tpl, /\['', g \? '' : soonLabel\(\)\]/);
+});
