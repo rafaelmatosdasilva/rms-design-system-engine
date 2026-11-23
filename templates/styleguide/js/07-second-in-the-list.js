@@ -352,58 +352,6 @@
   // team's, made with the command the panel names, never a button here.
   var REQ = DATA.requests || [], REQ_PAGE = null;
   var reqKey = function (x) { return 'req:' + x.key; };
-  if (REQ.length) (function () {
-    hr(); navLink('requests', 'requests');
-    var sec = section('requests', 'Requests', 'Requests', '');
-    var ST = { 'new': ['figma', 'New'], 'look again': ['differs', 'Look again'], decided: ['match', 'Decided'], built: ['match', 'Built'], merged: ['figma', 'Merged into another'], closed: ['figma', 'Closed'] };
-    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
-    var KIND = { component: 'A component', option: 'An option', token: 'A token', icon: 'An icon', layout: 'A layout', pattern: 'A pattern' };
-    var rowHTML = function (x, i) {
-      return '<tr class="sg-row-open" tabindex="0" data-req-row="' + i + '" data-chip="' + esc(x.status === 'merged' ? 'closed' : x.status) + '"><td><strong>' + esc(x.need) + '</strong><span class="pg-par-val">' + esc(KIND[x.kind] || capital(x.kind)) + '</span></td><td>' + (x.count ? esc(x.count + ' prototype' + (x.count === 1 ? '' : 's')) : '<span class="pg-dim">Nobody now</span>') + '</td><td>' + (x.decisionSaid ? esc(capital(x.decisionSaid)) : '<span class="pg-dim">Not decided</span>') + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
-    };
-    var reqPanel = function (i, from) {
-      var x = REQ[i]; if (!x) return;
-      var m = panelShell('sg-req-panel', 'Requests'); m._key = reqKey(x);
-      var card = panelCard;
-      var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
-      var cmd = function (d) { return '<p class="sg-il-line"><code>' + esc('rms-design-system-engine --request "' + x.key + '" --decide ' + d) + '</code></p>'; };
-      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + cmd('out --why "<the reason>" --by "<who>"') + cmd('system --by "<who>"')
-        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + cmd('system --by "<who>"')
-        : x.status === 'decided' && x.decision === 'system' ? line('Build it in the system. It is Built by itself once no prototype lacks it.') : '';
-      var decided = x.decisionSaid ? line(capital(x.decisionSaid) + (x.why ? '. ' + x.why : '')) + (x.by || x.at ? line([x.by, x.at ? dayShort(x.at) : null].filter(Boolean).join(', ')) : '') + (x.lookAgain ? line('Look again on ' + dayShort(x.lookAgain)) : '') : '';
-      var ticket = x.ticket ? '<p class="sg-il-line"><a href="' + esc(x.ticket) + '" target="_blank" rel="noopener">' + esc(x.ticket) + '</a></p>' : '';
-      var status = '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.status === 'closed' ? line((x.closedBy === 'declined' ? 'Declined' : 'Closed') + ' in the team\'s tracker' + (x.reason ? '. ' + x.reason : '')) : '') + (x.status === 'merged' ? line('A duplicate of ' + x.of) : '');
-      // Every panel's one order (panelCard, 00-start.js): what to do, what it changes and where, its status, the rest.
-      var body = card('What to do', todo)
-        + card('Who asked', x.asked && x.asked.length ? '<p class="sg-il-line">' + namePills(x.asked) + '</p>' : line('No prototype asks for it now'))
-        + card('Status', status)
-        + card('Nearest in the system', x.closest ? '<p class="sg-il-line">' + namePills([x.closest]) + '</p>' : '')
-        + card('Decided', decided)
-        + card('In the team\'s tracker', ticket)
-        + card('Its key', '<p class="sg-il-line"><code>' + esc(x.key) + '</code></p>');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Requests', KIND[x.kind] || capital(x.kind)], title: x.need, body: body });
-      panelShow(m, from);
-    };
-    // The table, for this page and for a component's Requests area alike: the rows given, each keeping its number in
-    // the page's own list (data-req-row), so it opens the same panel wherever it is.
-    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-req-table"><thead><tr><th>Need</th><th>Asked by</th><th>Decision</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (x) { return rowHTML(x, REQ.indexOf(x)); }).join('') + '</tbody></table></div></div>'; };
-    var open = function (tr) { if (tr) reqPanel(+tr.getAttribute('data-req-row'), tr); };
-    // A row opens its panel on a click or Enter, and the status chips above the table count the rows given: scoped to
-    // where the table is (this page, or a component's area).
-    var wire = function (scope, list) {
-      scope.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-req-row]')); });
-      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-req-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
-      var nOf = function (st) { return list.filter(function (x) { return x.status === st; }).length; };
-      pageBar(scope, { said: 'requests', chips: [{ key: 'new', label: 'New', n: nOf('new'), dot: 'figma' }, { key: 'look again', label: 'Look again', n: nOf('look again'), dot: 'differs' }, { key: 'decided', label: 'Decided', n: nOf('decided'), dot: 'match' }, { key: 'built', label: 'Built', n: nOf('built'), dot: 'match' }, { key: 'closed', label: 'Closed', n: nOf('closed') + nOf('merged'), dot: 'figma' }].filter(function (c) { return c.n; }) });
-    };
-    var openKey = function (key) { var i = REQ.findIndex(function (x) { return reqKey(x) === key; }); if (i >= 0) reqPanel(i, null); return i >= 0; };
-    sec.insertAdjacentHTML('beforeend', tableHTML(REQ));
-    sec._openKey = openKey;
-    wire(sec, REQ);
-    // A component's Requests area: what teams ask for that names it, as the thing the system has nearest or the thing
-    // they use meanwhile.
-    REQ_PAGE = { of: function (name) { return REQ.filter(function (x) { return x.closest === name || x.used === name; }); }, tableHTML: tableHTML, wire: wire, open: openKey };
-  })();
   // Prototypes: each one a part of its own (prototype-pages.mjs), as the owner designed the page (22 November 2026). One
   // list, seen as a grid of cards (each its screen in small) or as a table, switched beside the title. The same filters
   // over both, the Rules page's own (filterBar): a chip a status, in the page's words (Fix, Missing, Not checked, Done),
@@ -421,12 +369,11 @@
   // What needs doing first, then by name: the order the page opens in, before any column is sorted.
   PROTO.sort(function (a, b) { return protoSt(a)[2] - protoSt(b)[2] || a.name.localeCompare(b.name); });
   (function () {
-    if (!REQ.length) hr();   // its group's rule, which Requests draws when it is there
+    hr();   // its group's rule, Prototypes then the Requests they lead to
     navLink('prototypes', 'prototypes');
     var sec = section('prototypes', 'Prototypes', 'Prototypes', '');
-    var ASK = ENGINE + ' prototype ';
     if (!PROTO.length) {
-      sec.insertAdjacentHTML('beforeend', pageNone('prototypes', 'No prototypes yet', 'Ask your AI agent for what you want, in your own words. It will build it from the system\'s own components and show it here.', ASK, 'Copy the request'));
+      sec.insertAdjacentHTML('beforeend', pageNone('prototypes', 'No prototypes yet', 'Describe a screen to your AI agent. It\'s built from the system\'s own components, and what the system lacks becomes a request.', soonLabel()));
       return;
     }
     var day = function (iso) { return iso ? '<span data-at="' + esc(iso) + '">' + esc(dayShort(iso)) + '</span>' : '<span class="pg-dim">Not known</span>'; };
@@ -455,12 +402,11 @@
       var x = PROTO[i]; if (!x) return;
       var m = panelShell('sg-proto-panel', 'Prototypes'); m._key = protoKey(x);
       var c = x.check, v = versionOf(x);
-      var cont = ENGINE + ' change the ' + x.name + ' prototype: ';
       var todo = (x.state === 'fix' ? line('Fix what its check found, one by one below, or continue it with a change of your own.')
         : x.state === 'missing' ? line('Decide on the Requests page what the system lacks for it, or continue it.')
         : x.state === 'not checked' ? line('It is checked at the next build. Continue it meanwhile if it needs a change.')
         : line('Nothing to fix. Continue it when it needs a change.'))
-        + askHTML(cont, 'Continue this prototype');
+        + '<p class="sg-il-line">' + soonLabel() + '</p>';   // Continue, coming soon
       var asks = (x.asks || []).map(function (a, j) { return [['Asked', esc(a.request)], [j ? 'Changed by' : 'By', a.by ? esc(a.by) : '<span class="pg-dim">Not known</span>'], ['When', a.at ? esc(dayShort(a.at)) : '']]; });
       if (!asks.length && x.asked && x.asked.by) asks.push([['By', esc(x.asked.by)], ['When', x.asked.at ? esc(dayShort(x.asked.at)) : '']]);
       // Its pictures, one at a time: each width, narrowest first, then each state it was pictured in.
@@ -468,8 +414,7 @@
       var screens = pics.length ? '<div class="sg-proto-screens">' + (pics.length > 1 ? segHTML(pics.map(function (s, j) { return { v: String(j), label: capital(s.label) }; }), 'Screen') : '')
         + pics.map(function (s, j) { return '<figure class="sg-proto-screen" data-w="' + j + '"' + (j ? ' hidden' : '') + '><img src="' + esc(s.src) + '" width="' + s.w + '" height="' + s.h + '" alt="' + esc(x.name + (s.state ? ', ' + s.label : ', at ' + s.label + ' width')) + '"></figure>'; }).join('') + '</div>' : line('Not drawn yet. Its screens show here once the engine has drawn it.');
       var found = c && (c.items.length || c.owes.length) ? kvList(c.items.map(function (it) {
-        var fix = ENGINE + ' fix the ' + x.name + ' prototype: ' + (it.component ? it.component + ', ' : '') + it.message;
-        return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)], ['', '<span class="sg-ask-act">' + copyAction('Copy fix', fix, 'approve') + SAID + '</span>']];
+        return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)], ['', soonLabel()]];   // Copy fix, coming soon
       }).concat(c.owes.length ? [[['States it owes', esc(c.owes.map(capital).join(' · '))]]] : [])) : '';
       var status = '<p>' + protoDot(x) + '</p>' + (c ? kvOne([['Checked', esc(when(c.at))], ['Against the system', v ? esc(v) : ''], ['At its commit', c.commit ? '<code>' + esc(String(c.commit).slice(0, 8)) + '</code>' : ''], ['At its tag', c.tag ? '<code>' + esc(c.tag) + '</code>' : ''], ['Each width', (c.widths || []).length ? esc(c.widths.map(function (w) { return w.width + ' ' + (w.fits ? 'fits' : w.problems + (w.problems === 1 ? ' problem' : ' problems')); }).join(' · ')) : '']]) : '');
       var lacked = x.lacked.length ? x.lacked.map(function (g) { return line(g.need + (g.times > 1 ? ' (in ' + g.times + ' places)' : '')); }).join('') : '';
@@ -528,6 +473,61 @@
     if (!filterBar(sec, { total: PROTO.length, said: 'prototypes', chips: chips, cols: [{ key: 'status' }, { key: 'product', label: 'Product' }] }))
       pageBar(sec, { said: 'prototypes', chips: ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], n: PROTO.filter(function (x) { return x.state === k; }).length, dot: PROTO_ST[k][0] }; }).filter(function (c) { return c.n; }) });
     follow();
+  })();
+  // Below Prototypes, since a prototype's check is where a request comes from, and always in the menu: with none yet,
+  // it says what it will hold, and that asking for one from the page is coming soon (the owner's, 23 November 2026).
+  (function () {
+    navLink('requests', 'requests');
+    var sec = section('requests', 'Requests', 'Requests', '');
+    if (!REQ.length) { sec.insertAdjacentHTML('beforeend', pageNone('requests', 'No requests yet', 'What prototypes need and the system doesn\'t have, the most asked first, for your team to decide.', soonLabel())); return; }
+    var ST = { 'new': ['figma', 'New'], 'look again': ['differs', 'Look again'], decided: ['match', 'Decided'], built: ['match', 'Built'], merged: ['figma', 'Merged into another'], closed: ['figma', 'Closed'] };
+    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var KIND = { component: 'A component', option: 'An option', token: 'A token', icon: 'An icon', layout: 'A layout', pattern: 'A pattern' };
+    var rowHTML = function (x, i) {
+      return '<tr class="sg-row-open" tabindex="0" data-req-row="' + i + '" data-chip="' + esc(x.status === 'merged' ? 'closed' : x.status) + '"><td><strong>' + esc(x.need) + '</strong><span class="pg-par-val">' + esc(KIND[x.kind] || capital(x.kind)) + '</span></td><td>' + (x.count ? esc(x.count + ' prototype' + (x.count === 1 ? '' : 's')) : '<span class="pg-dim">Nobody now</span>') + '</td><td>' + (x.decisionSaid ? esc(capital(x.decisionSaid)) : '<span class="pg-dim">Not decided</span>') + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
+    };
+    var reqPanel = function (i, from) {
+      var x = REQ[i]; if (!x) return;
+      var m = panelShell('sg-req-panel', 'Requests'); m._key = reqKey(x);
+      var card = panelCard;
+      var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
+      var cmd = function (d) { return '<p class="sg-il-line"><code>' + esc('rms-design-system-engine --request "' + x.key + '" --decide ' + d) + '</code></p>'; };
+      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + cmd('out --why "<the reason>" --by "<who>"') + cmd('system --by "<who>"')
+        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + cmd('system --by "<who>"')
+        : x.status === 'decided' && x.decision === 'system' ? line('Build it in the system. It is Built by itself once no prototype lacks it.') : '';
+      var decided = x.decisionSaid ? line(capital(x.decisionSaid) + (x.why ? '. ' + x.why : '')) + (x.by || x.at ? line([x.by, x.at ? dayShort(x.at) : null].filter(Boolean).join(', ')) : '') + (x.lookAgain ? line('Look again on ' + dayShort(x.lookAgain)) : '') : '';
+      var ticket = x.ticket ? '<p class="sg-il-line"><a href="' + esc(x.ticket) + '" target="_blank" rel="noopener">' + esc(x.ticket) + '</a></p>' : '';
+      var status = '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.status === 'closed' ? line((x.closedBy === 'declined' ? 'Declined' : 'Closed') + ' in the team\'s tracker' + (x.reason ? '. ' + x.reason : '')) : '') + (x.status === 'merged' ? line('A duplicate of ' + x.of) : '');
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it changes and where, its status, the rest.
+      var body = card('What to do', todo)
+        + card('Who asked', x.asked && x.asked.length ? '<p class="sg-il-line">' + namePills(x.asked) + '</p>' : line('No prototype asks for it now'))
+        + card('Status', status)
+        + card('Nearest in the system', x.closest ? '<p class="sg-il-line">' + namePills([x.closest]) + '</p>' : '')
+        + card('Decided', decided)
+        + card('In the team\'s tracker', ticket)
+        + card('Its key', '<p class="sg-il-line"><code>' + esc(x.key) + '</code></p>');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Requests', KIND[x.kind] || capital(x.kind)], title: x.need, body: body });
+      panelShow(m, from);
+    };
+    // The table, for this page and for a component's Requests area alike: the rows given, each keeping its number in
+    // the page's own list (data-req-row), so it opens the same panel wherever it is.
+    var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-req-table"><thead><tr><th>Need</th><th>Asked by</th><th>Decision</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (x) { return rowHTML(x, REQ.indexOf(x)); }).join('') + '</tbody></table></div></div>'; };
+    var open = function (tr) { if (tr) reqPanel(+tr.getAttribute('data-req-row'), tr); };
+    // A row opens its panel on a click or Enter, and the status chips above the table count the rows given: scoped to
+    // where the table is (this page, or a component's area).
+    var wire = function (scope, list) {
+      scope.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-req-row]')); });
+      scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-req-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+      var nOf = function (st) { return list.filter(function (x) { return x.status === st; }).length; };
+      pageBar(scope, { said: 'requests', chips: [{ key: 'new', label: 'New', n: nOf('new'), dot: 'figma' }, { key: 'look again', label: 'Look again', n: nOf('look again'), dot: 'differs' }, { key: 'decided', label: 'Decided', n: nOf('decided'), dot: 'match' }, { key: 'built', label: 'Built', n: nOf('built'), dot: 'match' }, { key: 'closed', label: 'Closed', n: nOf('closed') + nOf('merged'), dot: 'figma' }].filter(function (c) { return c.n; }) });
+    };
+    var openKey = function (key) { var i = REQ.findIndex(function (x) { return reqKey(x) === key; }); if (i >= 0) reqPanel(i, null); return i >= 0; };
+    sec.insertAdjacentHTML('beforeend', tableHTML(REQ));
+    sec._openKey = openKey;
+    wire(sec, REQ);
+    // A component's Requests area: what teams ask for that names it, as the thing the system has nearest or the thing
+    // they use meanwhile.
+    REQ_PAGE = { of: function (name) { return REQ.filter(function (x) { return x.closest === name || x.used === name; }); }, tableHTML: tableHTML, wire: wire, open: openKey };
   })();
   // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
   // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a

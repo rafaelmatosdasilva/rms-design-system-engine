@@ -156,6 +156,7 @@ Accessibility is tried while the page is built and kept in it, so the page opens
 
 What teams ask your system for, and what your team decided. Status is what the system owes itself. Requests is what others ask it for.
 
+- **Always in the menu,** below Prototypes, since a prototype's check is where a request comes from. With none yet, the page says what it will hold, in the same empty state as Prototypes.
 - **One request a need.** When a prototype needs something your system lacks (a component, an option, a token, an icon, a layout, a pattern), the check records it. Asked by ten prototypes, it is one request with ten askers, the most asked first.
 - **Your team decides.** Each request is New until someone decides it: kept out of the system (with its reason), accepted in the product, accepted for now (with a day to look again), or brought into the system. `rms-design-system-engine --request "<key>" --decide out --why "…" --by "<who>"` records it in `design-system-engine-requests.json`, to commit.
 - **It closes by itself.** A request brought into the system is Built once no prototype lacks it any more. One accepted for now comes back on its day.
@@ -175,13 +176,13 @@ Each prototype is a part of its own, with a page of its own. The Prototypes page
 - **Checked at every build.** Each prototype is checked against the version its product builds on (its pin, else the latest). Only the ones whose page, pin or system moved are checked again. `styleguide.checkPrototypes: false` turns it off.
 - **Shared through a repository.** Name one once (`rms-design-system-engine --store prototypes=<GitLab or GitHub link>`) and every prototype travels whole through it, product folders included. Until then, each check says the prototypes are on this computer only and asks for one.
 
-- **None yet.** With no prototype, the page shows its mark large in a dashed space, says what it will hold, and gives the request that makes the first, with a button to copy it.
+- **None yet.** With no prototype, the page shows its mark large in a dashed space and says what it will hold. Asking your agent for one from the page is coming soon, so it shows a Coming soon label and no request to copy.
 
 A row or a card opens the prototype's page in the side panel.
 
-- **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in your agent, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
+- **What to do.** Continuing a prototype from the page is coming soon: a Coming soon label stands where its request will be. Asked in your agent, the engine already hands the agent everything about it: each ask so far, what its check found and what people said.
 - **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
-- **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one. The copy is part of that check: each word held to your team's content guidance ([The copy, held to your content guidance](documentation.md#the-copy-held-to-your-content-guidance)).
+- **What its last check found,** each finding with its component. Copying the request that fixes one is coming soon, shown by a Coming soon label beside it. The copy is part of that check: each word held to your team's content guidance ([The copy, held to your content guidance](documentation.md#the-copy-held-to-your-content-guidance)).
 - **Status,** with when it was checked, against which release of the system, at which commit or tag, and each screen width it was drawn at, fitting or with how many problems. That result is kept in its `<name>.check.json` (`widths`), so a team's own exit criterion (Phone and Desktop, say) reads it rather than working it out.
 - **Its screens,** one width at a time (and each state it was pictured in), what the system lacks for it, the components it uses, its handoff's versions with what changed, its notes with their owners, and the comments on it.
 

@@ -67,12 +67,16 @@ test('in Chrome: the Rules page says which checks wait, with the request to copy
     assert.match(note.text, /^17 Figma checks wait on a fresh read of Figma The last capture predates what they read: what each layer binds · /, 'a list joined by · , never ;');
     assert.equal(note.before, true, 'above the rules\' table');
     assert.equal(note.copy, 'rms-design-system-engine refresh the Figma data', 'no agent\'s prefix: every agent routes it');
-    // A page with nothing yet (Prototypes, here): its menu mark large, its words, the request with no agent's prefix, and
-    // the one copy button every page uses, which says what to do once clicked, never naming an agent.
-    const none = await run(`(() => { const n = document.querySelector('#prototypes .sg-page-none'); if (!n) return null; const b = n.querySelector('[data-copy]'); b.click(); return { mark: !!n.querySelector('svg.sg-page-none-mark'), head: n.querySelector('.sg-page-none-head').textContent, ask: n.querySelector('code').textContent, copy: b.getAttribute('data-copy'), cls: b.className, said: n.querySelector('.sg-decide-said') !== null, tinted: !!n.closest('.sg-decide') }; })()`);
-    assert.ok(none, 'the Prototypes page with none yet');
-    assert.deepEqual({ ...none, cls: /sg-copy-act sg-copy-act--approve/.test(none.cls) }, { mark: true, head: 'No prototypes yet', ask: 'rms-design-system-engine prototype …', copy: 'rms-design-system-engine prototype ', cls: true, said: true, tinted: false });
-    assert.ok(await waitForTrue(send, sessionId, `/^(Paste it in your agent|Selected: Press)/.test(document.querySelector('#prototypes .sg-page-none .sg-decide-said').textContent)`, { attempts: 100 }), 'the line under the button says what to do');
+    // A page with nothing yet (Prototypes, here): its menu mark large and its words. Asking for one is coming soon: a
+    // label that copies nothing, and no request shown.
+    const none = await run(`(() => { const n = document.querySelector('#prototypes .sg-page-none'); if (!n) return null; return { mark: !!n.querySelector('svg.sg-page-none-mark'), head: n.querySelector('.sg-page-none-head').textContent, soon: (n.querySelector('.sg-soon') || {}).textContent, copies: n.querySelectorAll('button, [data-copy], code').length, tinted: !!n.closest('.sg-decide') }; })()`);
+    assert.deepEqual(none, { mark: true, head: 'No prototypes yet', soon: 'Coming soon', copies: 0, tinted: false });
+    // Requests too, always in the menu below Prototypes, with the same empty state.
+    const req = await run(`(() => { const n = document.querySelector('#requests .sg-page-none'); const nav = [...document.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href')); return n && { head: n.querySelector('.sg-page-none-head').textContent, soon: (n.querySelector('.sg-soon') || {}).textContent, below: nav.indexOf('#requests') > nav.indexOf('#prototypes') }; })()`);
+    assert.deepEqual(req, { head: 'No requests yet', soon: 'Coming soon', below: true });
+    // The Refresh Figma request is copied by the one copy button every page uses, which says what to do once clicked.
+    await run(`document.querySelector('#rules .sg-cx-wait [data-copy]').click()`);
+    assert.ok(await waitForTrue(send, sessionId, `/^(Paste it in your agent|Selected: Press)/.test(document.querySelector('#rules .sg-cx-wait .sg-decide-said').textContent)`, { attempts: 100 }), 'the line under the button says what to do');
     assert.doesNotMatch(await run(`document.body.innerText`), /Claude Code/, 'no agent named anywhere on the page');
     assert.deepEqual(errors, []);
     close();

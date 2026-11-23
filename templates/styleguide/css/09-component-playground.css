@@ -1072,13 +1072,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-copy-act .sg-decide-mark { color: var(--sg-decide-hue); }   /* its mark in its decision's hue, its words the page's */
 .sg-ask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); }   /* a request written out, its button beside it, and the line under them once copied */
 .sg-ask > code { flex-basis: 100%; font-size: var(--sg-s); color: var(--sg-muted); overflow-wrap: anywhere; }   /* the words it starts with, on their own line above the button */
-.sg-ask-act { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); }
 .sg-page-none { border: var(--sg-line-width, 1px) dashed var(--sg-a5); border-radius: var(--sg-radius); padding: calc(var(--sg-space-xxl) + var(--sg-space-l)) var(--sg-cell-x); text-align: center; }   /* a page with nothing yet: a dashed space where its entries will be, never a tinted box, since nothing is wrong */
 .sg-page-none-mark { width: calc(var(--sg-space-xxl) + var(--sg-space-xl)); height: calc(var(--sg-space-xxl) + var(--sg-space-xl)); color: var(--sg-muted); stroke-width: 0.8; }   /* its menu mark, drawn large and thin */
 .sg-page-none-head { margin: var(--sg-space-s) 0 var(--sg-space-xs); font-size: calc(var(--sg-h1) * 1.4); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* between the text and the page's title */
 .sg-page-none-say { margin: 0 auto; max-width: 30rem; font-size: var(--sg-s); color: var(--sg-muted); line-height: var(--sg-lh); }
-.sg-page-none .sg-ask { flex-direction: column; margin-top: var(--sg-space-m); }   /* the request, then its button under it, then what to do once copied */
+.sg-page-none-act { margin-top: var(--sg-space-l); }
+.sg-page-none .sg-ask { flex-direction: column; }   /* the request, then its button under it, then what to do once copied */
 .sg-page-none .sg-ask > code { flex-basis: auto; }
+.sg-soon { display: inline-flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); color: var(--sg-muted); cursor: default; user-select: none; }   /* a request coming soon: a label, never a button */
+.sg-soon-dot { width: calc(var(--sg-space-xs) + var(--sg-space-xxs)); height: calc(var(--sg-space-xs) + var(--sg-space-xxs)); border-radius: 50%; background: currentColor; }
 .sg-row-detail-body .sg-il-source { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); font-weight: var(--sg-text-weight); }   /* where a draft comes from */
 .sg-row-detail-body .sg-il-source--warn { color: var(--sg-text); padding-left: var(--sg-space-s); border-left: 2px solid var(--sg-danger); }   /* a name only Figma has, written as a prop */
 /* A draft that needs a fix: what is wrong with it, the wording offered instead and a button to take it, in a box of
