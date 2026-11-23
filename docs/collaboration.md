@@ -37,9 +37,9 @@ How the engine publishes the living style guide and the playground. What each pa
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
 - **Three more load when first used.**
   - The brands' embedded fonts, when a brand is chosen.
-  - The Showroom screens' drawings, when the Showroom or a screen's card is shown.
+  - The drawings of the prototypes from Figma, when the Prototypes page or one of their cards is shown.
   - What the agents read of each intent layer page, when its row opens on the Documentation page.
-  - An address that shows one at once (a brand already chosen, `#showroom`, `#documentation`) loads it with the page.
+  - An address that shows one at once (a brand already chosen, `#prototypes`, `#documentation`) loads it with the page.
 - **A large guide is published in parts.** On GitLab, a guide too large for one commit goes as several: its pictures first, then its data, then the page that links them. The page never names a file that is not there yet. If someone else commits in between, the rest waits for the next round, and the run says how many parts landed.
 - **The component panel downloads nothing twice.** The panel is the page again, in a frame. It takes the data the page around it already holds, so a host that sends no cache header costs no second download.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
@@ -86,7 +86,7 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round 
 A full build tries every component's accessibility in a browser, so it takes minutes on a large system. While you work, a quick build shows your change in seconds and keeps what the last full build found.
 
 - **`--styleguide --quick` builds the page for you to look at.** On a system of 174 components and 5 themes it took about 20 seconds, against 11 minutes for a full build.
-- **What it keeps.** The accessibility saved by the last full build, and the Showroom as it last measured it. A component changed since is tried by the browser that opens the page.
+- **What it keeps.** The accessibility saved by the last full build, and the prototypes from Figma as it last measured them. A component changed since is tried by the browser that opens the page.
 - **What it leaves out.** No accessibility tried while building, no pictures of the guide's own pages, and nothing read from or sent to your team's stores.
 - **One component, faster still.** Add `--component` with its name for a page of that component and the ones it nests. Its audit is not run first, as it is for a full build.
 - **`--styleguide --watch` builds again on each save.** It follows your project, the style guide's template and the engine, and builds a moment after you save. Several files saved together make one build. Ctrl+C stops it.
@@ -177,10 +177,13 @@ Each prototype is a part of its own, with a page of its own. The Prototypes page
 - **Checked at every build.** Each prototype is checked against the version its product builds on (its pin, else the latest). Only the ones whose page, pin or system moved are checked again. `styleguide.checkPrototypes: false` turns it off.
 - **Shared through a repository.** Name one once (`rms-design-system-engine --store prototypes=<GitLab or GitHub link>`) and every prototype travels whole through it, product folders included. Until then, each check says the prototypes are on this computer only and asks for one.
 
+- **Three sources.** A Source column and filter tell them apart: **Figma** (a screen the design team drew, written with the system's own components in your `showroom/` folder, or read with `--prototype --from-screens`), **Prompt** (asked of an agent in words) and **Page** (an existing page rebuilt from the system with `--prototype --from-page`). Each says where it came from in its own file, so nothing new is written for it.
+- **A prototype from Figma has a page of its own** (`#prototypes/<Screen>`), as the Showroom had: the screen drawn by your project's own build at Figma's size, its differences from Figma pinned on it, a full browser view, its page review and, when asked, a model's judgement. Old `#showroom` links open it there.
 - **None yet.** With no prototype, the page shows its mark large in a dashed space and says what it will hold. Asking your agent for one from the page is coming soon, so it shows a Coming soon label and no request to copy.
 
-A row or a card opens the prototype's page in the side panel.
+A row or a card from a prompt or a page opens the prototype's page in the side panel.
 
+- **Made from,** under What to do: where it came from (the prompt as it was written, or the page it was rebuilt from) and what it is held to.
 - **What to do.** Continuing a prototype from the page is coming soon: a Coming soon label stands where its request will be. Asked in your agent, the engine already hands the agent everything about it: each ask so far, what its check found and what people said.
 - **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
 - **What its last check found,** each finding with its component. Copying the request that fixes one is coming soon, shown by a Coming soon label beside it. The copy is part of that check: each word held to your team's content guidance ([The copy, held to your content guidance](documentation.md#the-copy-held-to-your-content-guidance)).

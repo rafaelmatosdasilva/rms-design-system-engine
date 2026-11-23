@@ -168,7 +168,7 @@ test('a screen with no picture and no built style guide is not judged, and the r
   const down = await judgePages(root, cfgOf(root), { ask: async () => ({ ok: false, why: 'claude: command not found' }) });
   assert.equal(down.failed.find((f) => f.screen === 'Done').why, 'claude: command not found');
   // No Showroom at all: nothing to judge.
-  assert.equal((await judgePages(tempDir('no-showroom-'), {}, { ask: async () => { throw new Error('asked'); } })).why, 'no Showroom screen to judge');
+  assert.equal((await judgePages(tempDir('no-showroom-'), {}, { ask: async () => { throw new Error('asked'); } })).why, 'no prototype from Figma to judge');
 });
 
 test('the default command reads only the screenshot, prints its price, and is asked from the project folder', async () => {
@@ -185,9 +185,9 @@ test('the default command reads only the screenshot, prints its price, and is as
 
 test('asked in Claude Code, judging the screens routes to --judge-pages; a prototype keeps its own route', () => {
   const P = { hasConfig: true, components: ['button'] };
-  for (const t of ['judge the Showroom screens with a model', 'have a model judge our pages against their briefs', 'julga os ecrãs do showroom com um modelo']) assert.deepEqual(route(t, P).run, ['rms-design-system-engine --judge-pages'], t);
+  for (const t of ['judge the screens from Figma with a model', 'judge the Showroom screens with a model', 'have a model judge our pages against their briefs', 'julga os ecrãs do showroom com um modelo']) assert.deepEqual(route(t, P).run, ['rms-design-system-engine --judge-pages'], t);
   assert.notDeepEqual(route('judge the prototype pages', P).run, ['rms-design-system-engine --judge-pages']);
-  assert.match(readFileSync(join(ENGINE, 'docs', 'features.md'), 'utf8'), /`\/rms-design-system-engine judge the Showroom screens with a model`/);
+  assert.match(readFileSync(join(ENGINE, 'docs', 'features.md'), 'utf8'), /`\/rms-design-system-engine judge the screens from Figma with a model`/);
 });
 
 test('in the style guide: the page review under each screen, then the model\'s judgment, said to be one', () => {

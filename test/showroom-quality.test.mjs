@@ -39,7 +39,7 @@ export default function Checkout() {
   assert.ok(co.findings.every((f) => f.line > 0), 'each with its line');
   assert.equal(rows[1].findings.length, 0);
   const lines = showroomQualityLines(rows);
-  assert.match(lines[0], /^🎨 Showroom screens as pages: 1 of 2 with something a page should not do/);
+  assert.match(lines[0], /^🎨 Prototypes from Figma as pages: 1 of 2 with something a page should not do/);
   assert.match(lines[1], /Checkout \d+\/10 {2}\(showroom\/Checkout\.jsx\)/);
   // No Showroom: nothing said.
   assert.deepEqual(await showroomQuality(tempDir('no-showroom-'), {}), []);
