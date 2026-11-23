@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The route hands a recipe's steps, measured with six more criteria and prototypes in every browser (continuous evaluation)
+
+What changed since the entry below (engine 559b7cb8): Svelte components drawn in the browser by the project's own Svelte (#682); Six more criteria and the drawn prototypes in Firefox and WebKit (#684); Move the IBM Equal Access pin to 4.0.35 (#683); The route hands a recipe's own steps, never its long reference, and the main guide keeps only what every request needs; An idea for the engine is searched for with grep, which follows a linked install, never find; Skill evaluation of the engine-ideas search, and what both measurements taught. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `01fcb34fcf0b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ed605684` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 1475b197` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 953c4385` `rms-design-system-engine.md abe85009`
+
+| Haiku, engine 071bcc9d | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.049 |
+| Input a run | 80k | 83k |
+| Turns a run | 3.2 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 83k a run against 80k, in 3.3 turns against 3.2. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-guide-cost-on-six-more-criteria`.
+
 ## 2026-11: An idea for the engine is searched for with grep, which follows a linked install (continuous evaluation)
 
 What changed since the entry below (engine 5288ebe7): An idea for the engine is searched for with grep, which follows a linked install, never find. The guide changed in `cookbook/engine-ideas.md`.
