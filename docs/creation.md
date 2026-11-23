@@ -121,6 +121,23 @@ Each component's line names its props as the code takes them. Where Figma and th
 
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. Under the tokens it says what each is for in your team's own words, from the descriptions you write on the variables in Figma, the brand's first, so an agent picks a colour by its purpose and not by its name alone. The notes your team writes in Figma outside any component (on its foundations, brand and pattern pages) are said too, by page, once the annotation categories are read (`--annotation-categories`); a note for whoever draws the file (Authoring) is left out. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
+### A catalog for A2UI agents
+
+An agent building generative UI with [A2UI](https://a2ui.org) may place only the components its host registered in a catalog. The engine writes that catalog from your contracts, so there is no second list to keep up by hand.
+
+- **Only for the version you declare.** Set it in `ds-config.json`: `"a2ui": { "version": "1.0" }`. It writes 0.9 (0.9.1) and 1.0, whose catalog shapes are published in full, and never guesses the newest.
+- **Where it goes.** `contracts/a2ui-catalog.json`, beside `catalog.json`, written again with the contracts.
+- **What it holds.** Your real components with their allowed values and defaults, under the names your code takes. A component you removed is left out, and one on its way out says what replaces it.
+- **Its id.** `"a2ui": { "catalogId": "…" }` names your own. Without one it is `urn:<your system>:a2ui-catalog:<version>`, and the run says so.
+- **Names A2UI cannot carry.** A name with a space (a Figma property with no code name) is left out and listed, never renamed.
+
+`--check-ui` reads A2UI's own messages too: one `updateComponents` message, a list of them, or a JSONL stream.
+
+- A later message replaces a part with the same id, as a host does.
+- The top part must have the id `root`.
+- A value bound to the data model (`{ "path": "/user/name" }`) and what A2UI gives every part (`action`, `weight`, `accessibility`) are left to the host.
+- Messages in another version than the one you declared fail the check.
+
 ### In a product beside your system
 
 A product checked out beside your system (listed in `pluginDirs` or `products` in `ds-config.json`) imports it by its package name, as products do: `import { AcmeButton } from '@acme/ds'`.
