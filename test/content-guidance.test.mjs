@@ -45,7 +45,7 @@ test('a prototype\'s copy held to them: each finding names the rule and the page
 });
 
 test('a code page\'s copy is read from its markup, and the check says what it held the copy to', () => {
-  const src = '<template><Card title="Recent Orders Overview"><Button label="Log in" /><a href="/x">Your account</a></Card></template><script>const t = "Log in";</script>';
+  const src = '<template><Card title="Recent Orders Overview"><Button label="Log in" /><a href="/x">Your account</a></Card></template><script>const t = \'<Button label="Log in" />\';</script ><style>.x{}</style>';
   const texts = textsOfMarkup(src);
   assert.deepEqual(texts.map((t) => [t.text, t.role]), [['Recent Orders Overview', 'text'], ['Log in', 'button'], ['Your account', 'button']], 'the words a component shows, never the script');
   const c = copyCheck(intent, texts);
