@@ -264,6 +264,20 @@ It is kept now: one picture a width, beside the page.
 
 The picture is taken on a fresh draw, before anything clicks the page: a control that leads somewhere takes the page with it, and a picture taken afterwards is of wherever it went.
 
+### Each width really drawn
+
+Each width is drawn at the browser's own width, never in a box inside a wider window. A media query reads the window, so a box alone would leave every width drawn as the widest, and every check passing.
+
+At each width the engine also reads which of your CSS's media rules hold, and how the page is laid out. Two neighbouring widths drawn the same, though a rule holds at one and not the other, are listed:
+
+```
+⚠️  Phone and Tablet are drawn the same, though the CSS has rules for one and not the other (@media (min-width: 768px)): what the rules say does not change the page between them
+```
+
+- **Only rules for parts the page has.** Your system's CSS holds rules for components this page never uses, and those change nothing here.
+- **Any change counts.** A rule that only recolours a part keeps two widths apart, as one that moves it does.
+- **A container query reads the box around a part**, not the window, and the line says when the page has any.
+
 ### The flow is told to you, not asked for
 
 A designer is building a journey, not a page. So every time a page is drawn, you are told what it did to the flow it belongs to — no command to remember:
