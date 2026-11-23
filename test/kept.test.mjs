@@ -161,4 +161,18 @@ test('on the demo system: a kept difference no longer fails its gate and leaves 
   assert.equal(kept.length, 1, 'one kept difference on the pages');
   assert.equal(kept[0].reason, 'The chip keeps the smaller radius of the product');
   assert.equal(kept[0].by, 'QA');
+  // Each open difference carries its cause to its task: one the audit could not sort says the question that would sort
+  // it, and one the code got wrong goes to a developer, saying why.
+  const open = (data.components ?? []).flatMap((c) => c.differences ?? []);
+  assert.ok(open.length && open.every((d) => d.cause && d.causeSays), 'every open difference with its cause');
+  assert.ok(open.some((d) => d.cause === 'unsorted' && /^Not sorted yet\. .+\?/.test(d.causeSays)));
+  const dj = join(root, '.design-system-engine-out', 'differences.json'), dd = JSON.parse(readFileSync(dj, 'utf8'));
+  const first = dd.groups.find((g) => g.items.length).items[0];
+  first.cause = { cause: 'code', who: 'the code', why: 'Figma changed since they last agreed, and the code has not followed' };
+  writeFileSync(dj, JSON.stringify(dd));
+  r = run('--styleguide');
+  const data2 = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(readPage(join(root, '.design-system-engine-out', 'styleguide', 'index.html')))[1]);
+  const routed = (data2.components ?? []).flatMap((c) => c.differences ?? []).find((d) => d.what === first.what);
+  assert.deepEqual([routed.cause, routed.who], ['code', 'code'], 'a developer acts');
+  assert.equal(routed.causeSays, 'The code got it wrong. Figma changed since they last agreed, and the code has not followed.');
 });

@@ -303,11 +303,17 @@ found:
 | The browser | What Tab reaches, where the focus shows and whether anything hides it, reflow at 320px, zoom, text spacing, what an input does when it changes, dragging, target size | Each browser's result, *Chrome ✓ · Firefox ✓ · WebKit ✕*, where the other browsers tried it |
 | Chrome's accessibility tree | What a screen reader hears (4.1.2) | *Chrome only* — no other engine exposes one, and a tool that works it out itself reads the same everywhere |
 
-**Tried in Firefox and WebKit too.** Six of the criteria a browser decides are tried again in the other browsers, on
+**Tried in Firefox and WebKit too.** Nine of the criteria a browser decides are tried again in the other browsers, on
 each component the style guide draws:
 
 - **Which ones.** What Tab reaches (2.1.1), whether the focus shows when it gets there (2.4.7), reflow at 320px
-  (1.4.10), text spacing (1.4.12), zoom to 200% (1.4.4) and target size (2.5.8).
+  (1.4.10), text spacing (1.4.12), zoom to 200% (1.4.4) and target size (2.5.8). From the same Tab walk: a focus the
+  component never lets go of (2.1.2), a positive `tabindex` that takes a control out of the page's order (2.4.3), and a
+  control hidden behind something when the focus is on it (2.4.11). A trap counts for a component only when it holds
+  that component's own controls.
+- **Still in Chrome alone.** What shows on hover or focus (1.4.13), pointer cancellation (2.5.2), dragging (2.5.7),
+  what focus and input change (3.2.1, 3.2.2) and accessible authentication (3.3.8): each needs a pointer or typing the
+  other browsers' pass does not do yet.
 - **The same measurements.** They are plain scripts run in the page, with real Tab presses. Chrome is measured by the
   same code in the same pass, so a difference is never two ways of measuring.
 - **Only what differs is said.** A fault in Chrome is reported once, by the Chrome run. One that only another browser
