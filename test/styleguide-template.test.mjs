@@ -799,8 +799,8 @@ test('no page repeats another: Colors, Typography, Spacing, Radii and In use are
 test('a page with nothing to show keeps its place in the menu and says so; Prototypes and Requests under Accessibility', () => {
   const tpl = templateText();
   assert.match(tpl, /function emptyPage\(id, label, badge, title, head, say, action, foundation\) \{\s*hr\(\); \(foundation \? foundationLink : navLink\)\(id, label\);/);
-  for (const id of ['rules', 'changes-in-Figma', 'history', 'documentation', 'accessibility', 'templates', 'identity', 'tokens', 'motion', 'icons']) assert.match(tpl, new RegExp(`if \\(!document\\.getElementById\\('${id}'\\)\\) emptyPage\\('${id}', `), id);
-  assert.match(tpl, /emptyPage\('changes-in-Figma'[^\n]*askHTML\(ENGINE \+ ' refresh the Figma data'/, 'a request only where the engine answers it');
+  for (const id of ['rules', 'history', 'documentation', 'accessibility', 'templates', 'identity', 'tokens', 'motion', 'icons']) assert.match(tpl, new RegExp(`if \\(!document\\.getElementById\\('${id}'\\)\\) emptyPage\\('${id}', `), id);
+  assert.match(tpl, /emptyPage\('tokens'[^\n]*askHTML\(ENGINE \+ ' refresh the Figma data'/, 'a request only where the engine answers it');
   assert.doesNotMatch(tpl, /emptyPage\('(rules|documentation|accessibility|templates|history)'[^\n]*askHTML/, 'a page that fills on its own has no request');
   assert.match(tpl, /var at = nav\.querySelector\('a\[href="#accessibility"\]'\) \|\| nav\.querySelector\('a\[href="#documentation"\]'\) \|\| nav\.querySelector\('a\[href="#status"\]'\); if \(!at\) return; \['prototypes', 'requests'\]/);
 });
@@ -1760,8 +1760,10 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   const shared = ['var when =', 'var MONTHS', 'var whenShort', 'var dayShort', 'var PILLS_SHOWN', 'var PILLS_CHEV', 'function pillsMore(', 'function namePill(', 'function namePills('].map((k) => tpl.slice(tpl.indexOf('  ' + k), tpl.indexOf('\n', tpl.indexOf('  ' + k)) + 1)).join('');
   const src = shared + tpl.slice(tpl.indexOf('    // The rest of a list behind pillsMore, one for the whole guide'), tpl.indexOf("    // A component's History: only the rows of the changes that affect it"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
-    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1), {});
+  // FCH and the three it reads: the changes made in Figma, which this run has none of (they have their own test).
+  const run = (order, components = [], FCH = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', 'DATA', 'FCH', 'fcKey', 'fcWhat', 'fcWho', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
+    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1), {},
+    FCH, (x) => 'doc:fc:' + x.component + ':' + x.at, (x) => esc(x.asked || ''), (x) => [x.by].filter(Boolean));
   const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f', by: 'Done by QA' }, comps: [
     { name: 'navTab', changed: ['property tileSlot added'] }, { name: 'buttonFloat', changed: ['property showLabel added', 'property labelContent added'] },

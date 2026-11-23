@@ -10,7 +10,10 @@ import globals from 'globals';
 export default [
   // This file lives with the tool; what it checks is the repository two folders up.
   { basePath: '../..' },
-  { ignores: ['test/**', 'templates/**', '**/node_modules/**', '.design-system-engine-out/**'] },
+  // .claude holds the worktrees other branches are checked out in: whole copies of the engine, whose lib/ and
+  // .githooks/ sit under a path the files list below does not match, so they would be linted with no globals at all
+  // (every process and console an error). Each is linted in its own checkout, where it is the root.
+  { ignores: ['test/**', 'templates/**', '**/node_modules/**', '.design-system-engine-out/**', '.claude/**'] },
   js.configs.recommended,
   {
     files: ['lib/**/*.mjs', 'lib/**/*.js', '*.mjs', '.githooks/*.mjs'],

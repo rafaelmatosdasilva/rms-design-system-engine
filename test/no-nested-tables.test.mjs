@@ -15,9 +15,9 @@ const JS = (f) => readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', f),
 const between = (src, from, to) => { const a = src.indexOf(from), b = src.indexOf(to, a + from.length); assert.ok(a >= 0 && b > a, `${from} is where it was`); return src.slice(a, b); };
 
 test('what each panel opened from a row draws holds no table', () => {
-  // The Rules panel, Changes in Figma's diff, an issue's "What it affects", and the token panel with its users.
+  // The Rules panel, a change in Figma's diff, an issue's "What it affects", and the token panel with its users.
   assert.equal(/<table/.test(between(JS('07-second-in-the-list.js'), 'var panel = function', "m.querySelector('.sg-row-detail').innerHTML = sidePanelPage")), false, 'the Rules panel');
-  assert.equal(/<table/.test(between(JS('07-second-in-the-list.js'), 'var diffTable = function', 'var rowHTML = function')), false, 'a change\'s parts');
+  assert.equal(/<table/.test(between(JS('07-second-in-the-list.js'), 'var diffTable = function', 'var panel = function (i, from)')), false, 'a change\'s parts');
   assert.equal(/<table/.test(between(JS('22-one-table-for-every-issue.js'), 'var COLS = [', 'What it affects')), false, 'what an issue affects');
   assert.equal(/<table/.test(between(JS('11-brand-kit.js'), "var m = document.getElementById('sg-tk-panel');", 'm._from = from || null;')), false, 'a token\'s panel');
   assert.equal(/<table/.test(between(JS('00-start.js'), 'function usersTable(names) {', '\n  }')), false, 'the components that use a token');

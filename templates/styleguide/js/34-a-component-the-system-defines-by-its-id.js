@@ -383,7 +383,7 @@
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
     else if (/^#(documentation|coverage|intent-layer|for-agents)$/.test(location.hash)) history.replaceState(null, '', location.search + (document.getElementById('documentation') ? '#documentation' : '#status/documentation'));   // the address says where it lives now: the Documentation page, else (no intent layer) the Status page's
-    else if (/^#(changelog|whats-new)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#history' + location.hash.replace(/^#(changelog|whats-new)/, ''));   // History was once the Changelog
+    else if (/^#(changelog|whats-new|changes-in-Figma)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#history' + location.hash.replace(/^#(changelog|whats-new|changes-in-Figma)/, ''));   // History was once the Changelog, and held the changes made in Figma from 23 November 2026
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#construction([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#rules' + location.hash.replace(/^#construction/, ''));   // Rules was once Construction
     else if (/^#(colors|typography|spacing|radii)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#tokens');   // their values are on Tokens, and Identity draws them

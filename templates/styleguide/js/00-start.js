@@ -226,7 +226,6 @@
     rules: '<rect x="5.5" y="5.5" width="5" height="5" rx=".75"/><rect x="2" y="2" width="2.5" height="2.5" rx=".4"/><rect x="11.5" y="2" width="2.5" height="2.5" rx=".4"/><rect x="2" y="11.5" width="2.5" height="2.5" rx=".4"/><rect x="11.5" y="11.5" width="2.5" height="2.5" rx=".4"/><path d="M4.5 4.5l1 1M11.5 4.5l-1 1M4.5 11.5l1-1M11.5 11.5l-1-1"/>',   // parts joined to a whole: how the system's components are built
     accessibility: '<circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="4.6" r=".9"/><path d="M5 6.6l3 .6 3-.6M8 7.2v2M8 9.2l-1.4 2.6M8 9.2l1.4 2.6"/>',   // a person, arms open, in a circle: the system as everyone uses it
   };
-  NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   NAV_MARK.requests = '<path d="M8 1.5a4.75 4.75 0 0 0-2.75 8.6v1.65h5.5V10.1A4.75 4.75 0 0 0 8 1.5Z"/><path d="M5.75 14.25h4.5"/>';   // a lightbulb: what others ask the system for
   NAV_MARK.prototypes = '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6.5 5.6v4.8l4.1-2.4Z"/>';   // a screen that plays: a page somebody can try
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }

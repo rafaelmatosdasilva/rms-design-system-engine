@@ -1796,11 +1796,12 @@ person says yes.
 
 **--change-report.** `--change-report <component>`, once Figma is read again: the read before beside the read after,
 section by section, and each place where it is not what the change said (warned when Figma was last read before the
-change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The style guide has a
-**Changes in Figma** page: one table, a row a change (its component, what was asked, waiting, made as said or not as
-said), each opening its before and after in the side panel (what the change said it does, what Figma shows once read
-again, where it is used, what it breaks and adds, who signed it off, the faults it already had); each component's History
-lists its changes, linked to that panel.
+change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The style guide reads them
+in **History**, with every other change: a row a change (what was asked, waiting, made as said or not as said, and the
+component it changes), under its own chip and with Figma as its source, each opening its before and after in the side
+panel (what the change said it does, what Figma shows once read again, where it is used, what it breaks and adds, who
+signed it off, the faults it already had); each component's own History lists its changes, linked to that panel. They
+had a page of their own until 23 November 2026; its address opens History.
 #### A scheduled pipeline (`--ci-changed`)
 
 `rms-design-system-engine --ci-changed` says whether anything a build is made from moved since the last build, for a
