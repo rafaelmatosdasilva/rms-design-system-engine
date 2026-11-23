@@ -52,6 +52,16 @@ test('each component\'s effects against Figma\'s, its layers against the code\'s
   assert.ok(!found.some((f) => f.component === 'overlay'), 'no rule of its own in the CSS: nothing compared');
 });
 
+// Found on a real file: an overlay's inner layer named Overlay is drawn by .overlay itself. Compared apart, the one rule
+// was held to the component's no blur and to the layer's blur at once, and failed one of them whatever it said.
+test('a layer named as its component is the component\'s own rule: compared once, its effects joined', () => {
+  const snap = { components: { overlay: { parts: { Overlay: { effects: [{ type: 'BACKGROUND_BLUR', radius: 4 }] } } } } };
+  const rule = (css) => [{ file: 'theme.css', text: css }];
+  assert.deepEqual(effectsFindings(snap, rule('.overlay { backdrop-filter: blur(2px); }'), (n) => n), [], 'the blur the layer asks for, once');
+  const none = effectsFindings(snap, rule('.overlay { background: #0008; }'), (n) => n);
+  assert.deepEqual(none.map((f) => [f.part, f.what]), [[null, 'background blur']], 'and missing, said once');
+});
+
 test('the capture changes nothing and keeps its answer small; the snapshot keeps the components', () => {
   assert.match(effectsCaptureScript('1-439'), /^const PAGE_IDS = \["1:439"\];/m);
   assert.match(EFFECTS_CAPTURE_JS, /n\.effects/);
