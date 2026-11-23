@@ -318,5 +318,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-23-playwright-drives-the-browsers-merged` | The 25 guide tasks on Haiku (engine bbc0ab79) | "Playwright drives the browsers, measured with main's page loads in a product's health" |
 | `2026-11-23-each-showroom-screen-in-its-frame` | The 25 guide tasks on Haiku (engine 9e2d83b2) | "Each Showroom screen drawn in a frame as wide as the screen, and motion differences at their own line" |
 | `2026-11-23-tasks-routed-by-cause-and-sequences` | The 25 guide tasks on Haiku (engine ca14b005) | "Tasks routed by each difference's cause, motion sequences, and three more criteria in every browser" |
+| `2026-11-23-six-more-criteria-and-prototypes-in-every-browser` | The 25 guide tasks on Haiku (engine 4b18b974) | "Six more criteria and the drawn prototypes in Firefox and WebKit" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
