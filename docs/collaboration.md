@@ -330,15 +330,12 @@ Every table shows each mode as a column of its own, side by side, never a switch
 
 - **Brand kit.** The system at a glance, for the brand chosen: its main hues with its family set large, the primitive ramps, its colour names and values running across the page, its type set for effect, semantic pairs with their contrast, its shapes, motion samples that move as the system does, and its icons lighting up in a grid. Every value is one of its tokens.
 - **Tokens.** Every token Figma has, as Figma keeps them: a Collection filter (Figma's own collections, never one made up), the groups as a tree you open and close, and a table for each collection with its own modes as columns. Filter chips at the top show only Colors, Typography, Spacing, Radii or Motion. Each row has a mark for its kind, its name and its values. An alias shows as Figma's pill and opens the token it points at. The arrow at the end of a row opens its details: what it styles, its name in the code with Copy, what it is for, its values and the components that use it. Download all tokens saves them all, in every mode, as one JSON file.
-- **Colours, typography, spacing, radii and motion.** Each page shows its own tokens in the Tokens page's tables, with the same aliases and details; an alias or a group's path opens it on the Tokens page.
-- **Colours.** The primitive ramp first, then the semantic roles, each mode with its swatch and value.
-- **Typography.** The family once, with its letters drawn. Then Figma's text styles in Figma's order, each under its full name (`s/regular`), with the fields Figma gives it: size, weight, line height, letter spacing and case.
-  - A style shows only when every one of its fields was compared and agrees, in every breakpoint. The others are named at the top and listed on the Status page.
-  - When the family differs, the styles use the code's family, with a note.
-- **Spacing and radii.** One card per family, smallest first.
+- **Colours, type, spacing and radii** have no page of their own: Identity draws them, and Tokens lists each one in every mode. An old link to one of those pages opens Tokens.
 - **Motion.** The durations and easings, each played when you press Play, each easing's curve drawn, and what the system does for someone who asks for less motion.
 - **Icons.** Grouped by size, shown at the size Figma gives them, with their stroke widths.
   - From your sprite, or from a folder of SVG files, one icon each (such as `src/assets/icons`), found on its own. `styleguide.iconSource` names either one.
+
+A page with nothing to show stays in the menu and says so: what it will hold, and how to fill it where the engine can (a request to copy), else nothing to do but wait.
 
 A token shows only when the token check finds it equal to Figma in every mode. Anything named after a component, its colours or sizes, is shown in that component instead.
 

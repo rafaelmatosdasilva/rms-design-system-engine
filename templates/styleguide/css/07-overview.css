@@ -32,7 +32,7 @@
   .sg-card-grid .sg-thumb-dot { width: 20px; height: 20px; }
   .sg-card-grid .sg-thumb-box { width: 24px; height: 24px; }
   /* The other grids of cards two side by side too: the icons, the products a component is used in, its pictures in use. */
-  .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid, .sg-main .sg-screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* Each overview link is the system's own card (DATA.ui.card); with none (or none read yet), the page's default card: the
    tables' border, corners and shadow, on the page's own cards only (sg-card--own), so neither the system's card nor its
@@ -218,7 +218,6 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-card > h3 + p { margin: 0; padding: 0 var(--sg-space-l) calc(var(--sg-space-m) + var(--sg-space-s)); background: var(--sg-tint); }   /* the line under the name, aligned with it, on its background */
 .sg-card > :last-child:not(.sg-thumb):not(.pg-shot) { flex-grow: 1; }   /* that background down to the card's edge */
 .sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: calc(var(--sg-space-m) + var(--sg-space-s)) var(--sg-space-l); background: var(--sg-tint); border-top: var(--sg-line); overflow-wrap: anywhere; }   /* a long name wraps, never spills, with wider text spacing too (WCAG 1.4.12) */
-.sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
 .sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); border-top: var(--sg-line); }

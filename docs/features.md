@@ -260,6 +260,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Shows each draft beside where it comes from: the code's prop, the line it says again, or a name only Figma has, flagged so it is not taken for a prop.
 - Offers a rewrite for a draft that names a property only Figma has, saying what carries it in the code.
 - Flags lists copied into the layer that will go stale, and names the generated file to link instead.
+- Reads who each DSDS section is for, where each page came from and the links inside it: what is for agents alone stays off your pages, a page a tool wrote and nobody reviewed counts for less, and a link to something renamed or deleted is flagged.
 - Rates how ready your guidance is for AI agents, component by component.
 - Gives agents the mistakes that look right, each with why it fails and what to use instead, and suggests the ones your pages leave out, such as a status shown by colour alone.
 - Reads how much damage each destructive action does, and checks your screens against it: undo for what can be undone, how long when it is only for a while, and a confirmation with the safe option selected for what is permanent.
@@ -314,7 +315,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: each prop is a control read from Figma and the code. The controls are still being tuned, so some props are missing or not shown well.*
 
 - Draws each component from your own markup and CSS, with Figma's props as its controls.
-- A Vue, React, Lit or Angular component is drawn by your project's own build, every variant as it renders: its hooks, context, portals and shadow roots run, and an Angular one is compiled by your own Angular compiler first (`styleguide.renderVue`, `styleguide.renderReact`, `styleguide.renderLit` or `styleguide.renderAngular: false` reads the source instead).
+- A Vue, React, Lit, Angular or Svelte component is drawn by your project's own build, every variant as it renders: its hooks, context, portals and shadow roots run, and an Angular one is compiled by your own Angular compiler first (`styleguide.renderVue`, `styleguide.renderReact`, `styleguide.renderLit`, `styleguide.renderAngular` or `styleguide.renderSvelte: false` reads the source instead).
 - Every state, every theme and every breakpoint your Figma file gives.
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.

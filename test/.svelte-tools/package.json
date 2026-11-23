@@ -1,0 +1,1 @@
+{ "private": true, "description": "The Svelte and Vite a Svelte project uses, for test/svelte-harness.test.mjs.", "dependencies": { "vite": "8", "svelte": "5", "@sveltejs/vite-plugin-svelte": "7" } }

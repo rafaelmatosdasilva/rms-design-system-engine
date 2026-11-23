@@ -354,6 +354,10 @@ Ask to see a product's screens built from the system and the engine redraws each
 - **Each region marked.** Every part of a header, a navigation or a section is the system's own component, the product's own built where the system has one, or a stand-in where the system has none.
 - **Drawn in the engine's workshop.** Each screen is written as a composition in `.design-system-engine-out/workshop/<product>/`, which `--prototype <file>` draws. Nothing is written into your Storybook or the product.
 - **What drifted.** Each run keeps the marks, so the next one says which screens moved: a part that was the system's and is now the product's own, a region added or gone.
+- **In your own Storybook too.** Add `--stories` and each screen is also written as a story, drawn exactly as the workshop draws it, in `.design-system-engine-out/workshop/<product>/stories/`. The engine never writes into your Storybook: it says the one line to add to `stories` in `.storybook/main`, and the screens show under Product screens, beside your components.
+  - Each story shows the drawn page in a frame of its own, so it imports nothing and your Storybook's styles never reach into it.
+  - Written for the framework your Storybook names: Vue, React, or HTML and web components. Another framework is said plainly, and no story is written.
+  - Each run writes them again, and a screen the product no longer has loses its story. Files of your own in that folder are left alone.
 
 #### Dates, numbers and money
 
@@ -531,7 +535,7 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 - **On its style guide page too.** The page carries the Tailwind your build compiles, so each component looks as it ships there. Tailwind's reset (its preflight and your own base rules) applies only where components are drawn, never to the guide around them. A component is known by its `data-slot` (`data-slot="switch"`), since its classes are Tailwind's. Any Tailwind system whose theme file is Tailwind's entry (`@import "tailwindcss"`) gets the same.
 - **Drawn as it ships.** With React and Vite installed, the components are drawn by your own Vite config, so its alias and its Tailwind plugin compile the classes and Radix runs: a switch switches, and its `data-[state=checked]` classes follow.
 
-#### Lit, Angular and Web Components
+#### Lit, Angular, Svelte and Web Components
 
 A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
 
@@ -556,6 +560,9 @@ A component written as a class is read the way a Vue or React one is, into the s
 - **Angular drawn as it ships.** Your own Vite (yours, or the one `@angular/build` installs) serves the compiled components, and your own Angular draws each in each of its cases, on the element its selector names. Each value is set as an input by the name a template uses (an alias among them), what a person puts in it is projected into its `<ng-content>`, and a library that ships partly compiled (Angular Material) is finished by your own `@angular/compiler`. No zone.js is needed from Angular 18 on, and before that your own zone.js runs. The accessibility check and the browser measurements read it drawn.
 - **On the style guide too.** Each case is kept as Angular drew it, with the styles Angular scoped to it and a library's own styles beside it. `styleguide.renderAngular: false` leaves them undrawn.
 - **Proven on a real app.** An app the Angular CLI made (Angular 22, SCSS, no zone.js) with Angular Material had all three of its components drawn in all ten of their cases: Material's buttons and slide toggle among them, its theme and its styles kept.
+- **Svelte drawn as it ships.** With Svelte, its plugin for Vite (`@sveltejs/vite-plugin-svelte`) and Vite installed, each Svelte component is built by your own Svelte and drawn in a real browser, in each of its cases. Svelte 5 mounts it and Svelte 3 and 4 make it, as each of them does, and what a person puts in it goes in as its content. Your `svelte.config.js` is read by your own plugin, as it always is. A SvelteKit app's own Vite config starts its router, so it is left out, and `$lib` points at `src/lib`. The accessibility check and the browser measurements read it drawn.
+- **Svelte 5's props.** What `$props()` is taken apart into is its props, with their defaults (`let { size = 'm' } = $props()`), and the content it renders (`{@render children()}`, a named snippet) is what it holds. Svelte 3 and 4's `export let` are read as before. A Svelte file's props are read from its script only, so a selector in its styles (`[aria-pressed='true']`) is never a default.
+- **On the style guide too.** Each case is kept as Svelte drew it, with the styles Svelte scoped to it. `styleguide.renderSvelte: false` leaves them undrawn.
 - **Every case can draw.** A prop a component requires (`input.required()`) is given in every case, never only in its own, since without it the component refuses to draw. This holds for every framework.
 
 #### Values written by hand

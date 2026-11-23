@@ -392,6 +392,8 @@ A team's exit criterion can ask for no Blocker and no Major in a prototype's UX.
 - **An agent never grades.** The hooks hold a grade the person did not give, and an agent's own edit of that file.
 - **It stays with the problem.** A problem found again keeps its id, so its grade stays. A changed problem is graded again.
 - **Kept with the prototype.** The check record beside the page (`<name>.check.json`) holds each problem, its proposal and the reviewer's grade. `--grade <prototype>` alone lists them.
+- **Shown on its page.** In the style guide, the prototype's panel has a UX grades card: each problem worst first, at the reviewer's grade with who gave it, else at the one proposed with why. Confirming or changing a grade from the page is coming soon.
+
 ### What a prototype only pretends
 
 A prototype is meant to pretend: nothing is sent, and the data is made up. What goes wrong is when that is not said. The check says each of these, and the record beside the prototype keeps the list:

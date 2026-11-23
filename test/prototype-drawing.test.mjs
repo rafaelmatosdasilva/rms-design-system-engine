@@ -78,7 +78,8 @@ test('a prototype drawn from product copies: parts inside their component, slots
     // The page opens in the computer's colour mode: this one is measured in light, whatever the computer is set to.
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }, sessionId);
     await send('Runtime.evaluate', { expression: 'window.__before = true; location.reload()' }, sessionId);
-    await waitForTrue(send, sessionId, `!window.__before && ${FILE_PAGE_LOADED} && !!document.querySelector('[data-pt-path="0"]')`, { attempts: 200 });
+    // Asked while the page reloads, Chrome can answer that it navigated: that is the reload, so it is asked again.
+    await waitForTrue(send, sessionId, `!window.__before && ${FILE_PAGE_LOADED} && !!document.querySelector('[data-pt-path="0"]')`, { attempts: 200, tolerateErrors: true });
     await send('Emulation.setDeviceMetricsOverride', { width: 800, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
     const ev = async (e) => { const r = await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, sessionId); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text); return r.result?.value; };
     const key = async (k, shift = false) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: k, windowsVirtualKeyCode: k === 'Tab' ? 9 : 27, modifiers: shift ? 8 : 0 }, sessionId); };

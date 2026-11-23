@@ -117,10 +117,10 @@
         add('Component', c.name, '#' + cid(c.name), null, [c.cls]);   /* by its name and class: not its props, slots or words */
         ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#' + cid(c.name), t.figma, [t.var, t.value]); });
       });
-      FLAT.forEach(function (t) { add('Colour', t.figma, '#colors', t.figma, [t.var]); });
-      [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#' + k[0], t.figma, [t.var, t.value]); }); });
+      FLAT.forEach(function (t) { add('Colour', t.figma, '#tokens', t.figma, [t.var]); });
+      [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#tokens', t.figma, [t.var, t.value]); }); });
       [['durations', 'Duration'], ['easings', 'Easing']].forEach(function (k) { ((DATA.motion || {})[k[0]] || []).forEach(function (t) { add(k[1], t.figma || t.var, '#motion', t.figma, [t.var, t.value]); }); });
-      (TOKENS.typography || []).forEach(function (t) { add('Type style', t.scale, '#typography', null, ['size', 'weight', 'lh', 'family'].map(function (k) { return t[k] ? [t[k].figma, t[k].var, t[k].value].join(' ') : ''; })); });
+      (TOKENS.typography || []).forEach(function (t) { add('Type style', t.scale, '#tokens', null, ['size', 'weight', 'lh', 'family'].map(function (k) { return t[k] ? [t[k].figma, t[k].var, t[k].value].join(' ') : ''; })); });
       (TOKENS.iconStrokes || []).forEach(function (t) { add('Icon stroke', t.figma, '#icons', t.figma, [t.var, t.value]); });
       var FIGI = DATA.iconFigma || {};
       (DATA.icons || []).forEach(function (id) { var n = (FIGI[id] && FIGI[id].name) || id, px = FIGI[id] && FIGI[id].size; add('Icon' + (px ? ' ' + px + 'px' : ''), n, '#icons', n, [id]); });
@@ -386,6 +386,8 @@
     else if (/^#(changelog|whats-new)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#history' + location.hash.replace(/^#(changelog|whats-new)/, ''));   // History was once the Changelog
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#construction([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#rules' + location.hash.replace(/^#construction/, ''));   // Rules was once Construction
+    else if (/^#(colors|typography|spacing|radii)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#tokens');   // their values are on Tokens, and Identity draws them
+    else if (/^#in-use([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#prototypes');   // the screens built with the system are prototypes from Figma, and each component says where it is used
     else if (/^#showroom([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#prototypes' + location.hash.replace(/^#showroom/, ''));   // the Showroom's screens are prototypes from Figma now
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);

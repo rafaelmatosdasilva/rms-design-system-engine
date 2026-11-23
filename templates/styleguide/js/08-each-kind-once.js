@@ -344,12 +344,6 @@
   }
   // What the team has written for every component is on the Status page (#status/documentation), each component's
   // Documentation table with a kind not written yet: no page of its own (an old #documentation or #coverage link opens it).
-  if ((DATA.screens || []).length) {
-    hr(); navLink('in-use', 'in use');
-    var iu = section('in-use', 'In use', 'The system in use', 'Screens built with the system.');
-    var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
-    DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img loading="lazy" alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
-  }
   // Templates: each page frame Figma composes of the system's components (DATA.templates), what it is made of in Figma's
   // order, whether its code uses each one, and the frame it comes from. A component with a page of its own is linked.
   if ((DATA.templates || []).length) {
@@ -382,6 +376,10 @@
       tl.appendChild(a);
     });
   }
+  if (!document.getElementById('templates')) emptyPage('templates', 'templates', 'System', 'Templates', 'No templates yet', 'The page frames Figma builds from the system\'s components, and whether the code uses each part, show here.', null);
+  // Prototypes, then the Requests they lead to, under Accessibility (the owner's, 23 November 2026): the system's own
+  // pages first, then what is made with it. Under Documentation where there is no Accessibility page, else under Status.
+  (function () { var at = nav.querySelector('a[href="#accessibility"]') || nav.querySelector('a[href="#documentation"]') || nav.querySelector('a[href="#status"]'); if (!at) return; ['prototypes', 'requests'].forEach(function (id) { var a = nav.querySelector('a[href="#' + id + '"]'); if (a && a !== at) { at.insertAdjacentElement('afterend', a); at = a; } }); })();
   // The History last in the System group: first the pages about the system as it is, then what changed in it and why.
-  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#accessibility"], a[href="#in-use"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
+  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#documentation"], a[href="#accessibility"], a[href="#prototypes"], a[href="#requests"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
 
