@@ -720,6 +720,28 @@ Answer with `--lesson-answer <id> yes` or `no`. `--rule "<sentence>"` gives a st
 
 The page review reads each screen's structure. How a page looks, rather than how it is built, is judged only when you ask a model to (below), and a lesson about it is kept as a rule for your guidelines.
 
+### A second reader for an agent's change, when you ask
+
+The checks that give the same answer every time already run on each edit. A change can pass all of them and still be
+wrong as a whole: it builds a table by hand where your catalog has one, or it does something near what was asked.
+Only a reader of the whole diff, beside the request, sees that.
+
+```bash
+rms-design-system-engine --judge-change --request "Show the orders with their status"
+```
+
+- **A second model, with its own context.** Your own command (by default `claude -p`) runs as a process of its own,
+  never the session that made the change, which would be marking its own work. It reads the diff (your branch
+  against its base, else what is not committed), the request (`--request`, or `--request-file` with a pull request's
+  description) and each component of your system with what it is for.
+- **Two answers, apart.** *It stayed inside the system*: the component made for each job, nothing rebuilt that the
+  catalog has, tokens rather than values. *It did what was asked*: the whole of the request, and nothing it did not
+  ask for. Each comes with its evidence from the diff and what to check.
+- **Advice, never a gate.** It always exits 0, and neither answer passes or fails the change on its own.
+  `--markdown <file>` writes it for the pull request.
+- **Paid once.** It spends your model tokens, so it runs only when you ask, and the same change with the same request
+  is never paid for twice.
+
 ### A model judges each screen, when you ask
 
 The page review measures what it can: one main action, nothing destructive in front, no card in a card, headings in order. Some decisions can't be measured. Is this the right component for what the part does? Does one action really read first, as the screen is drawn? `--judge-pages` asks a model, and only when you run it.
