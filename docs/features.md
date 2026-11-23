@@ -161,7 +161,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Warns when a Figma frame changed since the version you approved.
 - Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
 - Runs 25 checks, called gates, each listed in the [technical documentation](audit.md#the-gates).
-- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
+- Compares how components move and what they draw beyond their colours, such as shadows and blurs.
 - Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
 
 ### What to ask
