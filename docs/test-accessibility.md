@@ -152,6 +152,11 @@ The style guide has a page of its own for accessibility, under Documentation in 
   - **A focus ring around an image too.** A ring is measured against what is around the control. Where that is a
     photo or a pattern, a band just outside the control is captured with it not focused, and the ring has to reach
     3:1 (WCAG 1.4.11) against the worst stretch of those pixels, said the same way.
+- **A theme that follows the colour scheme is measured in dark too.** Values written as `light-dark(light, dark)`,
+  as Angular Material's themes are, change with the page's `color-scheme`, not with a media query or a class. The
+  engine reads them as a dark mode of its own (and a class that only switches `color-scheme`, as one more mode). For a
+  system that declares no dark mode, that dark is implied. It is switched by setting the colour scheme to dark, for the
+  contrast checks, and the style guide's Dark switch draws it the same way.
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
