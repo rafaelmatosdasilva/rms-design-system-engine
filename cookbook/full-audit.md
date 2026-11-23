@@ -4,9 +4,29 @@
 
 ## Steps
 
-1. Refresh the Figma data first when a refresh path exists (`--recipe refresh-figma`); otherwise say which snapshots were used.
-2. Run `rms-design-system-engine`.
-3. Relay the SUMMARY; the phases below say what each part of the run covers.
+1. Refresh the Figma data first whenever a refresh path exists (a valid `FIGMA_TOKEN`, figma-cli, a Figma MCP, or the Plugin API through `use_figma`, on any plan): `--recipe refresh-figma`. An unscoped run is a full audit, never a pass over whatever snapshots are committed: stale snapshots read green while the system has drifted. A snapshot from an earlier session counts as stale too.
+2. When no refresh path exists (no token, no MCP, no Plugin API, or a component set's link with no frames), audit the committed snapshots and say which were used. Never hand-read Figma or hand-fill a snapshot to fake a refresh, and never overwrite one with a capture less faithful than the Step 1c logic: a capture that picks the wrong variant or measures a wrapper adds differences that are not there. Leave such a snapshot stale and say so.
+3. Run `rms-design-system-engine`.
+4. Relay the SUMMARY, then what the run can vouch for, in the table below. Name every row not run or skipped: never imply full coverage.
+
+| Area | Method | Confidence |
+|---|---|---|
+| Token values match Figma | Automated (Gate [3] (Token values) - resolver against live snapshot) | High |
+| All Figma tokens have a CSS var | Automated (Gate [4] (Tokens used in screens exist in CSS) - bound-check against frame walk, auto-refreshed) | High if frames configured; **not run** if `frames: []` |
+| All state tokens wired | Automated (Gate [14] (All states are built) - state walk, auto-refreshed) | High |
+| No unused CSS vars | Automated (Gate [11] (Clean CSS)) | High |
+| No hardcoded values in rules | Automated (Gate [11] (Clean CSS)) | High |
+| Structural parity (height, padding, gap) | Automated (Gate [13] (Structure)) | High |
+| Figma annotation acknowledgment + CSS verification | Automated (Gate [13] (Structure)) | High |
+| Surface container --area-bg declarations | Automated (Gate [13] (Structure)) | High if SURFACE_CONTAINERS populated |
+| Button modifier-class base compliance | Automated (Gate [13] (Structure)) | High if BUTTON_CLASS_RULES populated |
+| Nested components keep their styles | Automated (Gate [12] (Nested components keep their own styles)) | High |
+| Build freshness | Automated (Gate [1] (Data is up to date)) | High |
+| Removed tokens reconciled | Manual (Phase 1 diff) | Medium - verify any "used in a rule" replacements visually |
+| Component states fully wired | Automated (Gate [14] (All states are built)) | High |
+| SVG symbols + path freshness | Automated (Gate [20] (Icons) - icon contract: symbol docs + path data + live Figma check) | High if all symbols documented and FIGMA_TOKEN set |
+| Looks the same as Figma | Automated (Gate [2] (Figma frame unchanged), requires FIGMA_TOKEN) or Manual (Step 7 screenshots) | **Not run** if neither is configured |
+| CI enforcement | GitHub Actions (`.github/workflows/design-system-engine.yml`) | High if configured |
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
