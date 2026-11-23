@@ -18,8 +18,9 @@ test('a project with nothing switched on says each layer off, in the order it ru
   assert.deepEqual(state(layers), { 'Looks before it builds': 'off', 'A way to ask': 'on', 'Each edit checked': 'off', 'A second judge': 'off', 'A gate a person approves': 'off' });
   const text = harnessLines(layers).join('\n');
   assert.match(text, /turn it on: rms-design-system-engine --install-hooks/);
-  assert.match(text, /"args": \["\/e\/mcp\.mjs", "--project=\."\]/);
-  assert.match(text, /Set it up in CI, GitHub's or GitLab's \(\/e\/docs\/documentation\.md\)/);
+  // The engine's own path as the system writes it: a JSON line a person pastes as it is, on Windows too.
+  assert.ok(text.includes(`"args": [${JSON.stringify(join('/e', 'mcp.mjs'))}, "--project=."]`), text);
+  assert.ok(text.includes(`Set it up in CI, GitHub's or GitLab's (${join('/e', 'docs', 'documentation.md')})`), text);
   assert.match(text, /NEXT: rms-design-system-engine \(one run writes them\)/);
 });
 
