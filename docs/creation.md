@@ -378,6 +378,16 @@ A team's exit criterion can ask for no Blocker and no Major in a prototype's UX.
 - **An agent never grades.** The hooks hold a grade the person did not give, and an agent's own edit of that file.
 - **It stays with the problem.** A problem found again keeps its id, so its grade stays. A changed problem is graded again.
 - **Kept with the prototype.** The check record beside the page (`<name>.check.json`) holds each problem, its proposal and the reviewer's grade. `--grade <prototype>` alone lists them.
+### What a prototype only pretends
+
+A prototype is meant to pretend: nothing is sent, and the data is made up. What goes wrong is when that is not said. The check says each of these, and the record beside the prototype keeps the list:
+
+- **A success with nothing sent.** A part that leads to a state or a page called saved, done or confirmed. A form that shows "Saved" reads as a form that saves.
+- **A figure nobody gave.** Money, a share, a count like 12,400 or 3k, a rating. A step number or a year is not one.
+- **A quote nobody gave.** Words in quotation marks long enough to be somebody's sentence, which reads as a real customer's.
+- **A logo nobody gave.** A company's mark reads as that company's agreement.
+
+A figure, a quote or a logo the request gave is left alone. They are warnings, never errors: a prototype may pretend, as long as nobody is fooled by it.
 
 ### What a prototype still owes a developer
 
