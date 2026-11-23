@@ -8,7 +8,7 @@
   // row says its side and who fixes it, its status (a rule once every component follows it; to fix when most do, the
   // team decided it, or it is the system's own rule; to decide otherwise) and how many follow it. Every column head
   // sorts by it, again for the other way round. A row opens in the side panel: what is suggested, every component or
-  // place it changes and the decision under them, in one card; each fix is copied into Claude Code (renames are made by the engine's script,
+  // place it changes and the decision under them, in one card; each fix is copied for the person's agent (renames are made by the engine's script,
   // --figma-fix; a name to give, layout and bindings are a person's; the code's change is a patch handed back). No
   // exceptions: a component follows it or is to fix. In the menu, unless the team leaves it out (styleguide.construction).
   // The page lives at #rules; #construction, the address it had, opens it still.
@@ -76,7 +76,7 @@
       return '<span class="sg-cx-follow">' + r.follows + ' of ' + r.of + ' <span class="pg-par-val sg-cx-share">(' + p + '%)</span></span><span class="sg-cx-follow-bar">' + healthBar(p) + '</span>';   // how many and the share on one line, the bar under them
     };
     var cmd = 'rms-design-system-engine';
-    // The one change for every component a rule has to fix, as it is copied into Claude Code: renames the engine writes,
+    // The one change for every component a rule has to fix, as it is copied for the person's agent: renames the engine writes,
     // names for unnamed layers Claude proposes as one list, layout and bindings Claude walks through; the code's change
     // handed back as a patch, never written over the code people wrote.
     var applyAll = function (r) {
@@ -89,7 +89,7 @@
       return lead + 'The engine does not change layout or variable bindings: give me one list of what to change in Figma, component by component, in the order to do it.';
     };
     // A decision's buttons, as Documentation's are: the same buttons in a row under the task, each copying its decision
-    // for Claude Code, and one line under them that says it was copied.
+    // for the person's agent (copyAction), and one line under them that says it was copied.
     // See in Figma for a Figma task: one component opens its node, several open the file their nodes are in (a node's
     // link without its node). Nothing when Figma gave no link.
     var seeInFigma = function (r) {
@@ -98,8 +98,8 @@
       var one = cs.length === 1, u = one ? urls[0] : urls[0].replace(/([?&])node-id=[^&#]*&?/, '$1').replace(/[?&]$/, '');
       return '<p class="sg-see">' + sysButton('a', 'See in Figma', ' href="' + esc(u) + '" target="_blank" rel="noopener" title="' + esc(one ? 'Open ' + cs[0] + ' in Figma' : 'Open the Figma file') + '" data-see="sg-cx-figma"', null, null, FIGMA_SVG) + '</p>';
     };
-    var copyBtn = function (k, head, text) { return sysButton('button', head, ' data-cx-copy="' + esc(text) + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark(k)); };
-    var decideRow = function (btns) { return '<div class="sg-il-group-actions" role="group" aria-label="Decision">' + btns + '<span class="sg-decide-said" role="status"></span></div>'; };
+    var copyBtn = function (k, head, text) { return copyAction(head, text, k, 'Copies the decision: paste it in your agent'); };
+    var decideRow = function (btns) { return '<div class="sg-il-group-actions" role="group" aria-label="Decision">' + btns + SAID + '</div>'; };
     var rowHTML = function (r, i) {
       return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '" data-f data-f-area="' + esc(AREA[r.area] || capital(r.area)) + '" data-f-source="' + esc(SIDE[r.side] || SIDE.figma) + '" data-f-status="' + esc(ST[r.status][1]) + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + esc(SIDE[r.side] || SIDE.figma) + '</td><td>' + followHTML(r) + '</td><td>' + esc(OWNER[r.who] || OWNER.figma) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
@@ -221,7 +221,6 @@
       var body = card('What to do', lead) + placesCard + (r.status === 'rule' ? '' : card((byComponent(r) ? 'Components it changes (' : 'Places it changes (') + n + ')', list)) + card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Owned by', '<p>' + esc((OWNER[r.who] || OWNER.figma) + ', ' + (r.side === 'code' ? 'in the code' : 'in Figma')) + '</p>')
         + decidedCard + card('Why', why)
         + (fam ? card('How the ' + fam.components + ' in the family are built', ways) : '');
-      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Rules', SIDE[r.side] || SIDE.figma, ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
@@ -239,8 +238,7 @@
     var WAIT = G.waiting || [];
     if (WAIT.length) { var nW = WAIT.reduce(function (k, w) { return k + w.rules.length; }, 0);
       sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-cx-wait" role="note"><p><strong>' + esc(nW + ' Figma check' + (nW === 1 ? '' : 's') + ' wait on a fresh read of Figma') + '</strong></p><p>' + esc('The last capture predates what they read: ' + WAIT.map(function (w) { return w.what; }).join(' · ') + '. Until Figma is read again they find nothing, which says nothing about the library.') + '</p>'
-        // The copy as a decision's, without its mark: decideMark is set further down the script, after this page is drawn.
-        + '<div class="sg-decide sg-decide--approve"><strong class="sg-decide-head">Refresh Figma</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc('/rms-design-system-engine refresh the Figma data') + '"') + '<span class="sg-decide-said" role="status"></span></div></div>'); }
+        + askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>') + '</div>'); }
     // The table, for this page and for a component's Rules area alike: the rows given, each keeping its number in the
     // page's own list (data-cx-row), so it opens the same panel wherever it is.
     var tableHTML = function (list) { return '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-follow-col"><col class="sg-cx-owner-col"><col class="sg-cx-col"><col></colgroup><thead><tr>' + SORT.map(function (c) { return '<th data-sort="' + esc(c[0]) + '" aria-sort="none"><button type="button" class="sg-mx-sort">' + esc(c[0]) + MX_TRI + '</button></th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + list.map(function (r) { return rowHTML(r, rows.indexOf(r)); }).join('') + '</tbody></table></div></div>'; };
@@ -273,8 +271,6 @@
     var openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
     sec.insertAdjacentHTML('beforeend', tableHTML(rows));
     tableNone(sec.querySelector('.sg-cx-table'), 'rules', { head: 'No rule has been mined yet', say: 'A rule is read from what most components already do. The next run that reads the library fills this table.' });
-    // The request to read Figma again, copied as a rule's decision is.
-    sec.addEventListener('click', function (e) { var cp = e.target.closest('.sg-cx-wait [data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said')); });
     sec._openKey = openKey;
     wire(sec, rows);
     // A component's Rules area: the rules that change it, on either side, to fix or to decide.
@@ -356,9 +352,164 @@
   // team's, made with the command the panel names, never a button here.
   var REQ = DATA.requests || [], REQ_PAGE = null;
   var reqKey = function (x) { return 'req:' + x.key; };
-  if (REQ.length) (function () {
-    hr(); navLink('requests', 'requests');
+  // Prototypes: each one a part of its own (prototype-pages.mjs), as the owner designed the page (22 November 2026). One
+  // list, seen as a grid of cards (each its screen in small) or as a table, switched beside the title. The same filters
+  // over both, the Rules page's own (filterBar): a chip a status, in the page's words (Fix, Missing, Not checked, Done),
+  // and Product as a list chip. The grid follows the table: what its filters hide and the order its columns sort, so
+  // the two never disagree. A row or a card opens the prototype's page in the side panel: what to do (with Continue),
+  // what was asked and by whom, what its check found (each with Copy fix), its status and the version it was checked
+  // against, then its screens, what the system lacks, its handoff, notes and comments. The page reads what is kept
+  // beside each prototype and changes nothing of it: its buttons copy a request to paste in the person's agent.
+  // With no prototype yet, the page says so and copies the request that makes the first.
+  var PROTO = (DATA.prototypes || []).slice();
+  var protoKey = function (x) { return 'proto:' + x.name; };
+  var PROTO_ST = { fix: ['differs', 'Fix', 0], missing: ['differs', 'Missing', 1], 'not checked': ['figma', 'Not checked', 2], done: ['match', 'Done', 3] };
+  var protoSt = function (x) { return PROTO_ST[x.state] || PROTO_ST['not checked']; };
+  var protoDot = function (x) { var s = protoSt(x); return '<span class="pg-par-status pg-par--' + s[0] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(s[1]) + '</span>'; };
+  // What needs doing first, then by name: the order the page opens in, before any column is sorted (once the Figma
+  // prototypes have joined, below).
+  (function () {
+    hr();   // its group's rule, Prototypes then the Requests they lead to
+    navLink('prototypes', 'prototypes');
+    // The section the Figma prototypes' screen pages were built in (PROTO_HOST, 06-overview.js), put in its place here:
+    // one page, its list and each screen's page. Without screens from Figma, a section of its own.
+    var sec = PROTO_HOST || section('prototypes', 'Prototypes', 'Prototypes', '');
+    if (PROTO_HOST) main.appendChild(sec);
+    // Every prototype with where it came from (the owner's, 23 November 2026): Figma (a screen the design team drew,
+    // shown on a page of its own), a prompt (words a person asked an agent for) or a page rebuilt from the system. The
+    // Showroom's screens are the Figma ones, each in the same list as the rest.
+    var SOURCE = { figma: 'Figma', prompt: 'Prompt', page: 'Page' };
+    (DATA.showroom || []).forEach(function (sc) {
+      PROTO.push({ name: sc.title || sc.key, screen: sc, product: sc.product || (sc.brand && typeof brandNameOf === 'function' ? brandNameOf(sc.brand) : null), state: SCREEN_STATE ? SCREEN_STATE(sc) : 'not checked', made: { kind: 'figma', from: sc.title || sc.key }, screens: [], states: [], lacked: [], versions: [], comments: [], asks: [] });
+    });
+    PROTO.sort(function (a, b) { return protoSt(a)[2] - protoSt(b)[2] || a.name.localeCompare(b.name); });
+    var sourceOf = function (x) { return SOURCE[(x.made && x.made.kind) || 'prompt']; };
+    var screenHref = function (x) { return '#prototypes/' + encodeURIComponent(x.screen.key); };
+    if (!PROTO.length) {
+      sec.insertAdjacentHTML('beforeend', pageNone('prototypes', 'No prototypes yet', 'Describe a screen to your AI agent. It\'s built from the system\'s own components, and what the system lacks becomes a request.', soonLabel()));
+      return;
+    }
+    var day = function (iso) { return iso ? '<span data-at="' + esc(iso) + '">' + esc(dayShort(iso)) + '</span>' : '<span class="pg-dim">Not known</span>'; };
+    var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
+    var versionOf = function (x) { return x.check && x.check.system ? x.check.system : null; };
+    var rowHTML = function (x, i) {
+      var s = protoSt(x);
+      return '<tr class="sg-row-open" tabindex="0" data-proto-row="' + i + '" data-chip="' + esc(x.state) + '" data-f="1" data-f-status="' + esc(s[1]) + '" data-f-source="' + esc(sourceOf(x)) + '"' + (x.product ? ' data-f-product="' + esc(x.product) + '"' : '') + '>'
+        + '<td><strong>' + esc(x.name) + '</strong></td>'
+        + '<td>' + esc(sourceOf(x)) + '</td>'
+        + '<td>' + (x.product ? esc(x.product) : '<span class="pg-dim">None</span>') + '</td>'
+        + '<td>' + (versionOf(x) ? esc(versionOf(x)) : '<span class="pg-dim">' + (x.screen ? 'This build' : 'Not checked') + '</span>') + '</td>'
+        + '<td>' + (x.screen ? '<span class="pg-dim">Designed in Figma</span>' : x.asked && x.asked.by ? esc(x.asked.by) : '<span class="pg-dim">Not known</span>') + '</td>'
+        + '<td>' + (x.screen ? '<span class="pg-dim">Not known</span>' : day(x.asked && x.asked.at)) + '</td>'
+        + '<td data-sort-value="' + s[2] + '">' + protoDot(x) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
+    };
+    // A card: its widest screen in small, its name, its product with who asked and when, its status.
+    var cardHTML = function (x, i) {
+      if (x.screen) return '<span data-proto-card="' + i + '" data-screen-card hidden></span>';   // its drawing, put in below (SHOWROOM_CARD)
+      var shot = x.screens.length ? x.screens[x.screens.length - 1] : null;
+      return '<a class="sg-card sg-proto-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own') + '" href="#prototypes?panel=' + esc(encodeURIComponent(protoKey(x))) + '" data-proto-card="' + i + '">'
+        + '<div class="sg-thumb sg-proto-thumb" aria-hidden="true">' + (shot ? '<img src="' + esc(shot.src) + '" alt="">' : '') + '</div>'
+        + '<h3>' + esc(x.name) + '</h3>'
+        // One line under its name, as every card has: its status, then its product and who asked when.
+        + '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([sourceOf(x), x.product, [x.asked && x.asked.by, x.asked && x.asked.at ? dayShort(x.asked.at) : null].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span></p></a>';
+    };
+    var protoPanel = function (i, from) {
+      var x = PROTO[i]; if (!x) return;
+      if (x.screen) { location.hash = screenHref(x); return; }   // a Figma prototype has a page of its own
+      var m = panelShell('sg-proto-panel', 'Prototypes'); m._key = protoKey(x);
+      var c = x.check, v = versionOf(x);
+      var todo = (x.state === 'fix' ? line('Fix what its check found, one by one below, or continue it with a change of your own.')
+        : x.state === 'missing' ? line('Decide on the Requests page what the system lacks for it, or continue it.')
+        : x.state === 'not checked' ? line('It is checked at the next build. Continue it meanwhile if it needs a change.')
+        : line('Nothing to fix. Continue it when it needs a change.'))
+        + '<p class="sg-il-line">' + soonLabel() + '</p>';   // Continue, coming soon
+      var asks = (x.asks || []).map(function (a, j) { return [['Asked', esc(a.request)], [j ? 'Changed by' : 'By', a.by ? esc(a.by) : '<span class="pg-dim">Not known</span>'], ['When', a.at ? esc(dayShort(a.at)) : '']]; });
+      if (!asks.length && x.asked && x.asked.by) asks.push([['By', esc(x.asked.by)], ['When', x.asked.at ? esc(dayShort(x.asked.at)) : '']]);
+      // Its pictures, one at a time: each width, narrowest first, then each state it was pictured in.
+      var pics = x.screens.concat((x.states || []).map(function (s) { return { label: s.label, src: s.src, w: s.w, h: s.h, state: true }; }));
+      var screens = pics.length ? '<div class="sg-proto-screens">' + (pics.length > 1 ? segHTML(pics.map(function (s, j) { return { v: String(j), label: capital(s.label) }; }), 'Screen') : '')
+        + pics.map(function (s, j) { return '<figure class="sg-proto-screen" data-w="' + j + '"' + (j ? ' hidden' : '') + '><img src="' + esc(s.src) + '" width="' + s.w + '" height="' + s.h + '" alt="' + esc(x.name + (s.state ? ', ' + s.label : ', at ' + s.label + ' width')) + '"></figure>'; }).join('') + '</div>' : line('Not drawn yet. Its screens show here once the engine has drawn it.');
+      var found = c && (c.items.length || c.owes.length) ? kvList(c.items.map(function (it) {
+        return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)], ['', soonLabel()]];   // Copy fix, coming soon
+      }).concat(c.owes.length ? [[['States it owes', esc(c.owes.map(capital).join(' · '))]]] : [])) : '';
+      var status = '<p>' + protoDot(x) + '</p>' + (c ? kvOne([['Checked', esc(when(c.at))], ['Against the system', v ? esc(v) : ''], ['At its commit', c.commit ? '<code>' + esc(String(c.commit).slice(0, 8)) + '</code>' : ''], ['At its tag', c.tag ? '<code>' + esc(c.tag) + '</code>' : ''], ['Each width', (c.widths || []).length ? esc(c.widths.map(function (w) { return w.width + ' ' + (w.fits ? 'fits' : w.problems + (w.problems === 1 ? ' problem' : ' problems')); }).join(' · ')) : '']]) : '');
+      var lacked = x.lacked.length ? x.lacked.map(function (g) { return line(g.need + (g.times > 1 ? ' (in ' + g.times + ' places)' : '')); }).join('') : '';
+      var used = c && Object.keys(c.used).length ? '<p class="sg-il-line">' + namePills(Object.keys(c.used)) + '</p>' : '';
+      var handoff = x.versions.length ? kvList(x.versions.slice().reverse().map(function (hv) { return [['Version', '<code>' + esc(hv.version || 'Draft') + '</code>'], ['Given', hv.at ? esc(dayShort(hv.at)) : ''], ['What changed', hv.since.length ? hv.since.map(esc).join(' · ') : '']]; })) : '';
+      var notes = x.notes ? kvList(x.notes.map(function (p) { return [['Part', esc(p.title)], ['Owner', esc(p.owner || 'Not assigned')], ['Says', p.empty ? '<span class="pg-dim">Empty</span>' : esc(p.body)]]; })) : '';
+      var open = x.comments.filter(function (k) { return !k.done; }), closed = x.comments.filter(function (k) { return k.done; });
+      var saidBy = x.comments.length ? kvList(open.concat(closed).map(function (k) { return [['Said', esc(k.says)], ['By', k.by ? esc(k.by) : ''], ['On', k.on && k.on.component ? namePills([k.on.component]) : ''], ['When', k.at ? esc(dayShort(k.at)) : ''], ['Answered', k.done ? esc(k.answer || 'Closed') : '']]; })) : '';
+      // Every panel's one order (panelCard, 00-start.js): what to do, what it is about, its status, the rest.
+      // Made from: where it came from, the page it was rebuilt from or the words that asked for it, and what it is held to.
+      var made = x.made || { kind: 'prompt' };
+      var madeFrom = kvOne([['Source', esc(sourceOf(x))], [made.kind === 'page' ? 'Page' : 'Asked', made.kind === 'page' ? esc(made.from) : x.asks && x.asks[0] ? esc(x.asks[0].request) : ''], ['Held to', esc(made.kind === 'page' ? 'The system\'s components, tokens and rules, with what the page was wired to' : 'The system\'s components, tokens and rules')]]);
+      var body = panelCard('What to do', todo)
+        + panelCard('Made from', madeFrom)
+        + panelCard('What was asked', asks.length ? kvList(asks) : '', { bare: true })
+        + panelCard('What its last check found', found, { bare: true })
+        + panelCard('Status', status)
+        + panelCard('Its screens', screens)
+        + panelCard('What the system lacks for it', lacked)
+        + panelCard('Components it uses', used)
+        + panelCard('Its handoff', handoff, { bare: true })
+        + panelCard('What people wrote for it', notes, { bare: true })
+        + panelCard('What people said', saidBy, { bare: true });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Prototypes'].concat(x.product ? [x.product] : []), title: x.name, body: body });
+      var shots = m.querySelector('.sg-proto-screens');
+      if (shots) {
+        var pick = function (w) { Array.prototype.forEach.call(shots.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === w); }); Array.prototype.forEach.call(shots.querySelectorAll('.sg-proto-screen'), function (f) { f.hidden = f.getAttribute('data-w') !== w; }); };
+        shots.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) pick(b.getAttribute('data-v')); });
+        pick('0');
+      }
+      panelShow(m, from);
+    };
+    // The switch, beside the title: Grid or Table, kept in the address so a link opens the view it was sent in.
+    var h2 = sec.querySelector(':scope > h2');
+    var viewBar = document.createElement('div'); viewBar.className = 'sg-proto-view';
+    viewBar.innerHTML = segHTML([{ v: 'grid', label: 'Grid' }, { v: 'table', label: 'Table' }], 'View');
+    if (h2) h2.insertAdjacentElement('afterend', viewBar); else sec.prepend(viewBar);
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-proto-tablecard"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-proto-table"><thead><tr><th>Prototype</th><th>Source</th><th>Product</th><th>System version</th><th>Asked by</th><th>Asked on</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + PROTO.map(rowHTML).join('') + '</tbody></table></div></div>'
+      + '<div class="sg-card-grid sg-proto-grid">' + PROTO.map(cardHTML).join('') + '</div>');
+    var table = sec.querySelector('.sg-proto-table'), grid = sec.querySelector('.sg-proto-grid'), tableCard = sec.querySelector('.sg-proto-tablecard');
+    // A Figma prototype's card is its screen in small (SHOWROOM_CARD), with its status and source under its name, as
+    // every card has them, fitted to the grid's room as the screen's own page fits it.
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-screen-card]'), function (ph) {
+      var i = +ph.getAttribute('data-proto-card'), x = PROTO[i], card = SHOWROOM_CARD(x.screen, true);
+      card.classList.add('sg-proto-card'); card.setAttribute('data-proto-card', i);
+      card.insertAdjacentHTML('beforeend', '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([sourceOf(x), x.product].filter(Boolean).join(' · ')) + '</span></p>');
+      ph.replaceWith(card);
+      if (card._fit && sec._fit) sec._fit(card._fit);
+    });
+    // The grid follows the table: the cards in the rows' order, a card hidden with its row.
+    var follow = function () { Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) { var card = grid.querySelector('[data-proto-card="' + tr.getAttribute('data-proto-row') + '"]'); if (card) { grid.appendChild(card); card.hidden = tr.hidden; } }); };
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(follow).observe(table.tBodies[0], { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    var setView = function (v, kept) {
+      Array.prototype.forEach.call(viewBar.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === v); });
+      tableCard.hidden = v !== 'table'; grid.hidden = v !== 'grid';
+      if (v === 'grid' && sec._refit) requestAnimationFrame(sec._refit);   // the Figma prototypes' screens fitted to the cards
+      if (!kept) setHashQuery({ view: v === 'grid' ? null : v });
+    };
+    viewBar.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setView(b.getAttribute('data-v')); });
+    var asked = (function () { try { return new URLSearchParams((location.hash.split('?')[1] || '')).get('view'); } catch (e) { return null; } })();
+    setView(asked === 'table' ? 'table' : 'grid', true);
+    var openRow = function (tr) { if (tr) protoPanel(+tr.getAttribute('data-proto-row'), tr); };
+    sec.addEventListener('click', function (e) { if (e.target.closest('button') || e.target.closest('.sg-showroom-detail')) return; var card = e.target.closest('[data-proto-card]'); if (card) { if (PROTO[+card.getAttribute('data-proto-card')].screen) return; e.preventDefault(); protoPanel(+card.getAttribute('data-proto-card'), card); return; } if (e.target.closest('a')) return; openRow(e.target.closest('tr[data-proto-row]')); });
+    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-proto-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRow(tr); } });
+    sec._openKey = function (key) { var i = PROTO.findIndex(function (x) { return protoKey(x) === key; }); if (i >= 0) protoPanel(i, null); return i >= 0; };
+    // The Rules page's filters (filterBar): a chip a status, the product a list, over the table and so over the grid.
+    var chips = ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], dot: PROTO_ST[k][0], col: 'status', word: PROTO_ST[k][1] }; });
+    // With one product there is no list to choose from (filterBar leaves a column every row answers alike out): the
+    // status chips alone, as the Requests page has them.
+    if (!filterBar(sec, { total: PROTO.length, said: 'prototypes', chips: chips, cols: [{ key: 'status' }, { key: 'source', label: 'Source' }, { key: 'product', label: 'Product' }] }))
+      pageBar(sec, { said: 'prototypes', chips: ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], n: PROTO.filter(function (x) { return x.state === k; }).length, dot: PROTO_ST[k][0] }; }).filter(function (c) { return c.n; }) });
+    follow();
+  })();
+  // Below Prototypes, since a prototype's check is where a request comes from, and always in the menu: with none yet,
+  // it says what it will hold, and that asking for one from the page is coming soon (the owner's, 23 November 2026).
+  (function () {
+    navLink('requests', 'requests');
     var sec = section('requests', 'Requests', 'Requests', '');
+    if (!REQ.length) { sec.insertAdjacentHTML('beforeend', pageNone('requests', 'No requests yet', 'What prototypes need and the system doesn\'t have, the most asked first, for your team to decide.', soonLabel())); return; }
     var ST = { 'new': ['figma', 'New'], 'look again': ['differs', 'Look again'], decided: ['match', 'Decided'], built: ['match', 'Built'], merged: ['figma', 'Merged into another'], closed: ['figma', 'Closed'] };
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var KIND = { component: 'A component', option: 'An option', token: 'A token', icon: 'An icon', layout: 'A layout', pattern: 'A pattern' };
@@ -370,9 +521,10 @@
       var m = panelShell('sg-req-panel', 'Requests'); m._key = reqKey(x);
       var card = panelCard;
       var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
-      var cmd = function (d) { return '<p class="sg-il-line"><code>' + esc('rms-design-system-engine --request "' + x.key + '" --decide ' + d) + '</code></p>'; };
-      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + cmd('out --why "<the reason>" --by "<who>"') + cmd('system --by "<who>"')
-        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + cmd('system --by "<who>"')
+      // Deciding a request from the page is coming soon (the owner's, 23 November 2026): a label where its command will be.
+      var soon = '<p class="sg-il-line">' + soonLabel() + '</p>';
+      var todo = x.status === 'new' ? line('Decide it. Keep it out of the system with its reason, accept it in the product, accept it for now with a day to look again, or bring it into the system.') + soon
+        : x.status === 'look again' ? line('Its day to look again has come. Decide it again.') + soon
         : x.status === 'decided' && x.decision === 'system' ? line('Build it in the system. It is Built by itself once no prototype lacks it.') : '';
       var decided = x.decisionSaid ? line(capital(x.decisionSaid) + (x.why ? '. ' + x.why : '')) + (x.by || x.at ? line([x.by, x.at ? dayShort(x.at) : null].filter(Boolean).join(', ')) : '') + (x.lookAgain ? line('Look again on ' + dayShort(x.lookAgain)) : '') : '';
       var ticket = x.ticket ? '<p class="sg-il-line"><a href="' + esc(x.ticket) + '" target="_blank" rel="noopener">' + esc(x.ticket) + '</a></p>' : '';
@@ -407,136 +559,6 @@
     // A component's Requests area: what teams ask for that names it, as the thing the system has nearest or the thing
     // they use meanwhile.
     REQ_PAGE = { of: function (name) { return REQ.filter(function (x) { return x.closest === name || x.used === name; }); }, tableHTML: tableHTML, wire: wire, open: openKey };
-  })();
-  // Prototypes: each one a part of its own (prototype-pages.mjs), as the owner designed the page (22 November 2026). One
-  // list, seen as a grid of cards (each its screen in small) or as a table, switched beside the title. The same filters
-  // over both, the Rules page's own (filterBar): a chip a status, in the page's words (Fix, Missing, Not checked, Done),
-  // and Product as a list chip. The grid follows the table: what its filters hide and the order its columns sort, so
-  // the two never disagree. A row or a card opens the prototype's page in the side panel: what to do (with Continue),
-  // what was asked and by whom, what its check found (each with Copy fix), its status and the version it was checked
-  // against, then its screens, what the system lacks, its handoff, notes and comments. The page reads what is kept
-  // beside each prototype and changes nothing of it: its buttons copy a request to paste in Claude Code.
-  // With no prototype yet, the page says so and copies the request that makes the first.
-  var PROTO = (DATA.prototypes || []).slice();
-  var protoKey = function (x) { return 'proto:' + x.name; };
-  var PROTO_ST = { fix: ['differs', 'Fix', 0], missing: ['differs', 'Missing', 1], 'not checked': ['figma', 'Not checked', 2], done: ['match', 'Done', 3] };
-  var protoSt = function (x) { return PROTO_ST[x.state] || PROTO_ST['not checked']; };
-  var protoDot = function (x) { var s = protoSt(x); return '<span class="pg-par-status pg-par--' + s[0] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(s[1]) + '</span>'; };
-  // What needs doing first, then by name: the order the page opens in, before any column is sorted.
-  PROTO.sort(function (a, b) { return protoSt(a)[2] - protoSt(b)[2] || a.name.localeCompare(b.name); });
-  (function () {
-    if (!REQ.length) hr();   // its group's rule, which Requests draws when it is there
-    navLink('prototypes', 'prototypes');
-    var sec = section('prototypes', 'Prototypes', 'Prototypes', '');
-    var ASK = '/rms-design-system-engine prototype ';
-    var copyBtn = function (label, text) { return sysButton('button', label, ' data-proto-copy="' + esc(text) + '" title="' + esc('Copies the request: paste it in Claude Code') + '"'); };
-    var said = '<span class="sg-decide-said" role="status"></span>';
-    sec.addEventListener('click', function (e) { var cp = e.target.closest('[data-proto-copy]'); if (cp) copyText(cp.getAttribute('data-proto-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); });
-    if (!PROTO.length) {
-      sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-proto-none" role="note"><p><strong>No prototype yet</strong></p><p>' + esc('Ask for one in Claude Code, with what to build after these words. It is drawn with the system\'s own components, checked against the system, and shown here with its screens.') + '</p>'
-        + '<div class="sg-decide sg-decide--approve"><code>' + esc(ASK) + '…</code>' + copyBtn('Copy', ASK) + said + '</div></div>');
-      return;
-    }
-    var day = function (iso) { return iso ? '<span data-at="' + esc(iso) + '">' + esc(dayShort(iso)) + '</span>' : '<span class="pg-dim">Not known</span>'; };
-    var line = function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; };
-    var versionOf = function (x) { return x.check && x.check.system ? x.check.system : null; };
-    var rowHTML = function (x, i) {
-      var s = protoSt(x);
-      return '<tr class="sg-row-open" tabindex="0" data-proto-row="' + i + '" data-chip="' + esc(x.state) + '" data-f="1" data-f-status="' + esc(s[1]) + '"' + (x.product ? ' data-f-product="' + esc(x.product) + '"' : '') + '>'
-        + '<td><strong>' + esc(x.name) + '</strong></td>'
-        + '<td>' + (x.product ? esc(x.product) : '<span class="pg-dim">None</span>') + '</td>'
-        + '<td>' + (versionOf(x) ? esc(versionOf(x)) : '<span class="pg-dim">Not checked</span>') + '</td>'
-        + '<td>' + (x.asked && x.asked.by ? esc(x.asked.by) : '<span class="pg-dim">Not known</span>') + '</td>'
-        + '<td>' + day(x.asked && x.asked.at) + '</td>'
-        + '<td data-sort-value="' + s[2] + '">' + protoDot(x) + '</td><td class="sg-row-go"><span aria-hidden="true">›</span></td></tr>';
-    };
-    // A card: its widest screen in small, its name, its product with who asked and when, its status.
-    var cardHTML = function (x, i) {
-      var shot = x.screens.length ? x.screens[x.screens.length - 1] : null;
-      return '<a class="sg-card sg-proto-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own') + '" href="#prototypes?panel=' + esc(encodeURIComponent(protoKey(x))) + '" data-proto-card="' + i + '">'
-        + '<div class="sg-thumb sg-proto-thumb" aria-hidden="true">' + (shot ? '<img src="' + esc(shot.src) + '" alt="">' : '') + '</div>'
-        + '<h3>' + esc(x.name) + '</h3>'
-        // One line under its name, as every card has: its status, then its product and who asked when.
-        + '<p>' + protoDot(x) + '<br><span class="pg-dim">' + esc([x.product, [x.asked && x.asked.by, x.asked && x.asked.at ? dayShort(x.asked.at) : null].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span></p></a>';
-    };
-    var protoPanel = function (i, from) {
-      var x = PROTO[i]; if (!x) return;
-      var m = panelShell('sg-proto-panel', 'Prototypes'); m._key = protoKey(x);
-      var c = x.check, v = versionOf(x);
-      var cont = '/rms-design-system-engine change the ' + x.name + ' prototype: ';
-      var todo = (x.state === 'fix' ? line('Fix what its check found, one by one below, or continue it with a change of your own.')
-        : x.state === 'missing' ? line('Decide on the Requests page what the system lacks for it, or continue it.')
-        : x.state === 'not checked' ? line('It is checked at the next build. Continue it meanwhile if it needs a change.')
-        : line('Nothing to fix. Continue it when it needs a change.'))
-        + '<div class="sg-decide sg-decide--approve"><code>' + esc(cont) + '…</code>' + copyBtn('Continue this prototype', cont) + said + '</div>';
-      var asks = (x.asks || []).map(function (a, j) { return [['Asked', esc(a.request)], [j ? 'Changed by' : 'By', a.by ? esc(a.by) : '<span class="pg-dim">Not known</span>'], ['When', a.at ? esc(dayShort(a.at)) : '']]; });
-      if (!asks.length && x.asked && x.asked.by) asks.push([['By', esc(x.asked.by)], ['When', x.asked.at ? esc(dayShort(x.asked.at)) : '']]);
-      // Its pictures, one at a time: each width, narrowest first, then each state it was pictured in.
-      var pics = x.screens.concat((x.states || []).map(function (s) { return { label: s.label, src: s.src, w: s.w, h: s.h, state: true }; }));
-      var screens = pics.length ? '<div class="sg-proto-screens">' + (pics.length > 1 ? segHTML(pics.map(function (s, j) { return { v: String(j), label: capital(s.label) }; }), 'Screen') : '')
-        + pics.map(function (s, j) { return '<figure class="sg-proto-screen" data-w="' + j + '"' + (j ? ' hidden' : '') + '><img src="' + esc(s.src) + '" width="' + s.w + '" height="' + s.h + '" alt="' + esc(x.name + (s.state ? ', ' + s.label : ', at ' + s.label + ' width')) + '"></figure>'; }).join('') + '</div>' : line('Not drawn yet. Its screens show here once the engine has drawn it.');
-      var found = c && (c.items.length || c.owes.length) ? kvList(c.items.map(function (it) {
-        var fix = '/rms-design-system-engine fix the ' + x.name + ' prototype: ' + (it.component ? it.component + ', ' : '') + it.message;
-        return [['Component', it.component ? namePills([it.component]) : ''], ['Found', esc(it.message)], ['', '<span class="sg-decide">' + copyBtn('Copy fix', fix) + said + '</span>']];
-      }).concat(c.owes.length ? [[['States it owes', esc(c.owes.map(capital).join(' · '))]]] : [])) : '';
-      var status = '<p>' + protoDot(x) + '</p>' + (c ? kvOne([['Checked', esc(when(c.at))], ['Against the system', v ? esc(v) : ''], ['At its commit', c.commit ? '<code>' + esc(String(c.commit).slice(0, 8)) + '</code>' : ''], ['At its tag', c.tag ? '<code>' + esc(c.tag) + '</code>' : ''], ['Each width', (c.widths || []).length ? esc(c.widths.map(function (w) { return w.width + ' ' + (w.fits ? 'fits' : w.problems + (w.problems === 1 ? ' problem' : ' problems')); }).join(' · ')) : '']]) : '');
-      var lacked = x.lacked.length ? x.lacked.map(function (g) { return line(g.need + (g.times > 1 ? ' (in ' + g.times + ' places)' : '')); }).join('') : '';
-      var used = c && Object.keys(c.used).length ? '<p class="sg-il-line">' + namePills(Object.keys(c.used)) + '</p>' : '';
-      var handoff = x.versions.length ? kvList(x.versions.slice().reverse().map(function (hv) { return [['Version', '<code>' + esc(hv.version || 'Draft') + '</code>'], ['Given', hv.at ? esc(dayShort(hv.at)) : ''], ['What changed', hv.since.length ? hv.since.map(esc).join(' · ') : '']]; })) : '';
-      var notes = x.notes ? kvList(x.notes.map(function (p) { return [['Part', esc(p.title)], ['Owner', esc(p.owner || 'Not assigned')], ['Says', p.empty ? '<span class="pg-dim">Empty</span>' : esc(p.body)]]; })) : '';
-      var open = x.comments.filter(function (k) { return !k.done; }), closed = x.comments.filter(function (k) { return k.done; });
-      var saidBy = x.comments.length ? kvList(open.concat(closed).map(function (k) { return [['Said', esc(k.says)], ['By', k.by ? esc(k.by) : ''], ['On', k.on && k.on.component ? namePills([k.on.component]) : ''], ['When', k.at ? esc(dayShort(k.at)) : ''], ['Answered', k.done ? esc(k.answer || 'Closed') : '']]; })) : '';
-      // Every panel's one order (panelCard, 00-start.js): what to do, what it is about, its status, the rest.
-      var body = panelCard('What to do', todo)
-        + panelCard('What was asked', asks.length ? kvList(asks) : '', { bare: true })
-        + panelCard('What its last check found', found, { bare: true })
-        + panelCard('Status', status)
-        + panelCard('Its screens', screens)
-        + panelCard('What the system lacks for it', lacked)
-        + panelCard('Components it uses', used)
-        + panelCard('Its handoff', handoff, { bare: true })
-        + panelCard('What people wrote for it', notes, { bare: true })
-        + panelCard('What people said', saidBy, { bare: true });
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Prototypes'].concat(x.product ? [x.product] : []), title: x.name, body: body });
-      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-proto-copy]'); if (cp) copyText(cp.getAttribute('data-proto-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
-      var shots = m.querySelector('.sg-proto-screens');
-      if (shots) {
-        var pick = function (w) { Array.prototype.forEach.call(shots.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === w); }); Array.prototype.forEach.call(shots.querySelectorAll('.sg-proto-screen'), function (f) { f.hidden = f.getAttribute('data-w') !== w; }); };
-        shots.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) pick(b.getAttribute('data-v')); });
-        pick('0');
-      }
-      panelShow(m, from);
-    };
-    // The switch, beside the title: Grid or Table, kept in the address so a link opens the view it was sent in.
-    var h2 = sec.querySelector(':scope > h2');
-    var viewBar = document.createElement('div'); viewBar.className = 'sg-proto-view';
-    viewBar.innerHTML = segHTML([{ v: 'grid', label: 'Grid' }, { v: 'table', label: 'Table' }], 'View');
-    if (h2) h2.insertAdjacentElement('afterend', viewBar); else sec.prepend(viewBar);
-    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card sg-proto-tablecard"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-proto-table"><thead><tr><th>Prototype</th><th>Product</th><th>System version</th><th>Asked by</th><th>Asked on</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + PROTO.map(rowHTML).join('') + '</tbody></table></div></div>'
-      + '<div class="sg-card-grid sg-proto-grid">' + PROTO.map(cardHTML).join('') + '</div>');
-    var table = sec.querySelector('.sg-proto-table'), grid = sec.querySelector('.sg-proto-grid'), tableCard = sec.querySelector('.sg-proto-tablecard');
-    // The grid follows the table: the cards in the rows' order, a card hidden with its row.
-    var follow = function () { Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) { var card = grid.querySelector('[data-proto-card="' + tr.getAttribute('data-proto-row') + '"]'); if (card) { grid.appendChild(card); card.hidden = tr.hidden; } }); };
-    if (typeof MutationObserver !== 'undefined') new MutationObserver(follow).observe(table.tBodies[0], { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
-    var setView = function (v, kept) {
-      Array.prototype.forEach.call(viewBar.querySelectorAll('[data-v]'), function (b) { sayChoice(b, b.getAttribute('data-v') === v); });
-      tableCard.hidden = v !== 'table'; grid.hidden = v !== 'grid';
-      if (!kept) setHashQuery({ view: v === 'grid' ? null : v });
-    };
-    viewBar.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setView(b.getAttribute('data-v')); });
-    var asked = (function () { try { return new URLSearchParams((location.hash.split('?')[1] || '')).get('view'); } catch (e) { return null; } })();
-    setView(asked === 'table' ? 'table' : 'grid', true);
-    var openRow = function (tr) { if (tr) protoPanel(+tr.getAttribute('data-proto-row'), tr); };
-    sec.addEventListener('click', function (e) { if (e.target.closest('button')) return; var card = e.target.closest('[data-proto-card]'); if (card) { e.preventDefault(); protoPanel(+card.getAttribute('data-proto-card'), card); return; } if (e.target.closest('a')) return; openRow(e.target.closest('tr[data-proto-row]')); });
-    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-proto-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRow(tr); } });
-    sec._openKey = function (key) { var i = PROTO.findIndex(function (x) { return protoKey(x) === key; }); if (i >= 0) protoPanel(i, null); return i >= 0; };
-    // The Rules page's filters (filterBar): a chip a status, the product a list, over the table and so over the grid.
-    var chips = ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], dot: PROTO_ST[k][0], col: 'status', word: PROTO_ST[k][1] }; });
-    // With one product there is no list to choose from (filterBar leaves a column every row answers alike out): the
-    // status chips alone, as the Requests page has them.
-    if (!filterBar(sec, { total: PROTO.length, said: 'prototypes', chips: chips, cols: [{ key: 'status' }, { key: 'product', label: 'Product' }] }))
-      pageBar(sec, { said: 'prototypes', chips: ['fix', 'missing', 'not checked', 'done'].map(function (k) { return { key: k, label: PROTO_ST[k][1], n: PROTO.filter(function (x) { return x.state === k; }).length, dot: PROTO_ST[k][0] }; }).filter(function (c) { return c.n; }) });
-    follow();
   })();
   // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
   // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a
@@ -1040,14 +1062,8 @@
   // Documentation (once the Intent layer page): every page of the intent layer and every component, what is written
   // about it from every source (the intent layer, Figma, the code, the contract) and what is still to write, and where.
   // Its rows read each component's documentation, defined further down: it is drawn with the Status page's first lists.
-  // A decision's own mark (Documentation's drafts, a part's question): a tick, a pencil, a bin.
-  var DECIDE_MARK = { approve: '<path d="m3 8.5 3.2 3L13 4.5"/>', change: '<path d="M10.5 2.5 13.5 5.5 5.5 13.5H2.5V10.5Z"/><path d="m9 4 3 3"/>', drop: '<path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 9h6.6l.7-9"/>' };
-  var decideMark = function (k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; };
   // A word quoted for the shell, as a command to paste takes it.
   var shq = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
-  // What every decision copied from the guide starts with: the system's own command (styleguide-gen.mjs → engineCommand),
-  // so whoever pastes it runs it for this system and no other.
-  var ENGINE = DATA.engineCommand || 'rms-design-system-engine';
   // The page a decision is about, by its kind and name as the guide shows them: "Component Button", "Template Checkout",
   // "Legend, part of Component Pie chart", "the System page". Never its file: the person reads what they decide on.
   var ilOn = function (p) {
@@ -1213,7 +1229,7 @@
     // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it says so on its own line, No its
     // answer until a person says otherwise), and Other changes (what is still to write, a part's page to move, the notes no agent
     // reads). Three actions a group, under it, never on an item: Approve all, Change, Drop all, each copying its decision
-    // on everything the group shows, in the person's words, for Claude Code. Never where each is written (Claude Code finds it).
+    // on everything the group shows, in the person's words, for the person's agent. Never where each is written (the agent finds it).
     var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
     // Where a draft comes from (draft-sources.mjs): each prop it names as the code has it, a name only Figma has (never
     // a prop the code takes: said as a warning), and the line it says again, wherever it is written.
@@ -1242,7 +1258,7 @@
       var x = ilDraftParts(d, p), box = '';
       if (x.figmaOnly.length || x.rewrite) {
         box = '<div class="sg-il-fix"><strong>' + esc(x.figmaOnly.length ? 'This names something the code doesn\'t have.' : 'This could say it better.') + '</strong> ' + x.figmaOnly.map(ilPillText).join(' ')
-          + (x.rewrite ? '<span class="sg-il-fix-use">Use instead: “' + ilPillText(x.rewrite) + '”</span>' + (fixCmd ? '<span class="sg-il-fix-act">' + sysButton('button', 'Use the suggested wording', ' data-il-copy="' + esc(fixCmd(x.rewrite)) + '" data-il-said="Paste it in Claude Code"', 'sg-il-act', null, decideMark('approve')) + '<span class="sg-decide-said" role="status"></span></span>' : '')
+          + (x.rewrite ? '<span class="sg-il-fix-use">Use instead: “' + ilPillText(x.rewrite) + '”</span>' + (fixCmd ? '<span class="sg-il-fix-act">' + copyAction('Use the suggested wording', fixCmd(x.rewrite), 'approve') + SAID + '</span>' : '')
             : '<span class="sg-il-fix-use">' + esc('Change the draft to say what the code does, or name it as Figma\'s.') + '</span>') + '</div>';
       }
       return box + x.out.filter(function (t) { return !(skip && skip[t]); }).map(function (t) { return '<span class="sg-il-source">' + ilPillText(t) + '</span>'; }).join('');
@@ -1268,12 +1284,12 @@
       all = all || {};
       var said = function (k) { return all[k] ? ' data-il-all-' + k + '="' + esc(all[k]) + '"' : ''; };
       var acts = items.length && !all.none ? '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head) + '">' + IL_DO.map(function (d) {
-        return sysButton('button', items.length === 1 || d[0] === 'change' ? d[2] : d[1] + ' ' + items.length, ' data-il-all="' + key + '" data-il-do="' + d[0] + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark(d[0]));
+        return sysButton('button', items.length === 1 || d[0] === 'change' ? d[2] : d[1] + ' ' + items.length, ' data-il-all="' + key + '" data-il-do="' + d[0] + '" title="' + esc('Copies the decision: paste it in your agent') + '"', 'sg-il-act sg-copy-act sg-copy-act--' + d[0], null, decideMark(d[0]));
       }).join('') + '<span class="sg-decide-said" role="status"></span></div>' : '';
       return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + said('change') + said('drop') + '>' + (bare ? '' : '<div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong></div>') + (intro || '') + (items.length ? '<ul class="sg-il-points">' + items.join('') + '</ul>' : '') + acts
         + (quiet.length ? '<div class="sg-il-quiet"><ul class="sg-il-points">' + quiet.join('') + '</ul>'
           // its own way to say yes, a button as the group's: it copies the decision on these alone
-          + '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head + ', optional') + '">' + sysButton('button', quiet.length === 1 ? 'Turn it on' : 'Turn all ' + quiet.length + ' on', ' data-il-all="' + key + '" data-il-do="approve" data-il-quiet title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-act', null, decideMark('approve')) + '<span class="sg-decide-said" role="status"></span></div></div>' : '') + '</div>';
+          + '<div class="sg-il-group-actions" role="group" aria-label="' + esc(head + ', optional') + '">' + sysButton('button', quiet.length === 1 ? 'Turn it on' : 'Turn all ' + quiet.length + ' on', ' data-il-all="' + key + '" data-il-do="approve" data-il-quiet title="' + esc('Copies the decision: paste it in your agent') + '"', 'sg-il-act sg-copy-act sg-copy-act--approve', null, decideMark('approve')) + SAID + '</div></div>' : '') + '</div>';
     };
     // A group's decision, in the person's words: the group's own words for it when it has them (all: "Approve all 3
     // drafts"), else each item's in turn (steps: those the group proposes, never one it has no ground for).
@@ -1326,7 +1342,7 @@
       var noteOf = function (x) { return capital(x.what || x.text); }, q = function (x) { return '"' + x + '"'; };
       var noteBody = function (x, why) { return '<span class="pg-par-val">“' + esc(noteOf(x)) + '”</span><span class="sg-il-text">' + esc(why) + '</span>'; };
       // Each decision in the person's words: the system's command, the page by its kind and name, then each item's. Never
-      // a file or a flag: Claude Code finds the page and runs the rest.
+      // a file or a flag: the agent finds the page and runs the rest.
       var on = ENGINE + ' on ' + ilOn(p) + ', ', from = ilTaskOf(p.missingFor ? [] : p.drafts);
       var noFile = function (w) { return String(w || '').replace(/^[^,]*\.(?:md|json)\b,?\s*/i, ''); };
       // What every draft shares is said once, in the card's own sentence (the owner's, 12 November 2026): the section they
@@ -1368,7 +1384,7 @@
         return ilItem(head, '<span class="pg-par-val">' + esc((x.kind === 'fix' ? x.subject + ': ' : '') + x.proposal) + '</span>' + (x.split ? '<span class="sg-il-source">The evidence is split: a person decides.</span>' : '') + ilAnsweredBy(x),
           { approve: says(a[0], x), change: 'Change ' + q(x.proposal) + ': ask me for my words', changeTo: 'Change ' + q(x.proposal) + ' to "{to}"', drop: says(a[1], x) }, null, { edit: x.proposal, tips: { approve: a[0].does, drop: a[1].does } });
       };
-      var otherItems = toWrite.map(function (x) { return ilItem((x.check ? 'To check · ' : 'To draft · ') + x.what, x.html, { approve: 'write ' + q(x.what) + (noFile(x.where) ? ' ' + noFile(x.where) : '') + ' as drafts I review', change: 'for ' + q(x.what) + ', ask me what to write', changeTo: 'for ' + q(x.what) + ', write "{to}" as a draft I review' }, null, { edit: '', tips: { approve: 'Claude Code drafts it for you to review.', drop: 'It stays to write.' } }); })
+      var otherItems = toWrite.map(function (x) { return ilItem((x.check ? 'To check · ' : 'To draft · ') + x.what, x.html, { approve: 'write ' + q(x.what) + (noFile(x.where) ? ' ' + noFile(x.where) : '') + ' as drafts I review', change: 'for ' + q(x.what) + ', ask me what to write', changeTo: 'for ' + q(x.what) + ', write "{to}" as a draft I review' }, null, { edit: '', tips: { approve: 'Your agent drafts it for you to review.', drop: 'It stays to write.' } }); })
         .concat(parts.map(function (x) { return ilItem(x.what, x.html, { approve: 'copy what this page says into Component ' + x.part.root + '\'s page, under Parts, as ### ' + x.part.name + ', then delete this page', change: 'ask me what to copy into Component ' + x.part.root + '\'s page' }, null, { tips: { drop: 'The page stays as it is.' } }); }))
         .concat(off.map(function (x) { return ilItem('Remove · ' + capital(x.from || 'a note'), noteBody(x, x.why || x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.'), { approve: 'remove ' + q(noteOf(x)) + ' where it lives', change: 'for ' + q(noteOf(x)) + ', ask me what to change', changeTo: 'change ' + q(noteOf(x)) + ' to "{to}" where it lives' }, null, { edit: noteOf(x), tips: { drop: 'The note stays as it is.' } }); }))
         .concat(fix.map(function (x) { return ilItem('Change · ' + capital(x.from || 'a note'), noteBody(x, [x.why, x.fix].filter(Boolean).join(' ')), { approve: 'for ' + q(noteOf(x)) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'), change: 'for ' + q(noteOf(x)) + ', ask me what to change', changeTo: 'change ' + q(noteOf(x)) + ' to "{to}" where it lives' }, null, { edit: noteOf(x), tips: { drop: 'The note stays as it is.' } }); }));
@@ -1586,10 +1602,9 @@
         var all = e.target.closest('[data-il-all]');
         if (all && box) {
           var k = all.getAttribute('data-il-do'), g = all.closest('[data-il-group]'), q = all.hasAttribute('data-il-quiet'), shown = Array.prototype.filter.call(g.querySelectorAll('[data-il-item]'), function (it) { return !!it.closest('.sg-il-quiet') === q; });
-          copyText(ilGroupDecision(box.getAttribute('data-il-on'), q ? null : g.getAttribute('data-il-all-' + k), shown.map(function (it) { return it.getAttribute('data-il-' + k); })), all, all.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code');
+          copyText(ilGroupDecision(box.getAttribute('data-il-on'), q ? null : g.getAttribute('data-il-all-' + k), shown.map(function (it) { return it.getAttribute('data-il-' + k); })), all, all.parentNode.querySelector('.sg-decide-said'), PASTE);
           return;
         }
-        var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said'));
       };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.component || p.name || p.file || 'Page', body: body });
       panelShow(m, from);

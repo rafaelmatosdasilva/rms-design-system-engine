@@ -110,5 +110,5 @@ test('style guide: the component\'s page asks each pair, with the two decisions 
   const data = JSON.parse(/<script[^>]*\bid="sg-data"[^>]*>([\s\S]*?)<\/script>/.exec(html)[1]);
   const tile = data.components.find((x) => x.name === 'cardTile');
   assert.deepEqual(tile.pairAsks.map((x) => [x.figma, x.code, x.yes]), [['Content', 'contentList', 'rms-design-system-engine --prop-pair cardTile Content yes'], ['Size', 'sizeName', 'rms-design-system-engine --prop-pair cardTile Size yes'], ['Tone', 'toneKind', 'rms-design-system-engine --prop-pair cardTile Tone yes']]);
-  assert.match(html, /data-pair-copy/, 'the page draws the decisions to copy');
+  assert.match(html, /copyAction\('Copy decision', cmd\(d\[2\]\)/, 'the page draws the decisions to copy, with its one copy button');
 });

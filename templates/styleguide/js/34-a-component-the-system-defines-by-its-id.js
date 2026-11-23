@@ -386,6 +386,7 @@
     else if (/^#(changelog|whats-new)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#history' + location.hash.replace(/^#(changelog|whats-new)/, ''));   // History was once the Changelog
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#construction([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#rules' + location.hash.replace(/^#construction/, ''));   // Rules was once Construction
+    else if (/^#showroom([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#prototypes' + location.hash.replace(/^#showroom/, ''));   // the Showroom's screens are prototypes from Figma now
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);
     // A component whose part is not here yet: its page says so while it loads, then is drawn as the address asks.
@@ -403,7 +404,7 @@
     if (sec0 && stWant) (function pick(n) { var chip = sec0.querySelector('.pg-area:not([hidden]) .sg-chip[data-st="' + stWant + '"]'); if (chip) { if (chip.getAttribute('aria-pressed') !== 'true') chip.click(); } else if (n < 40) setTimeout(function () { pick(n + 1); }, 250); })(0);
     route.last = id;
     var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById(homeId()) || document.getElementById('index');
-    if (target._screen) target._screen(at.slug);   // the Showroom: its grid, or the screen the address names (#showroom/<Screen>)
+    if (target._screen) target._screen(at.slug);   // Prototypes: its list, or the Figma prototype's page the address names (#prototypes/<Screen>)
     // The filter and the panel the address names, once they are drawn: the page bar's chip (show), a Showroom screen's
     // kind of note (kind), the side panel (panel).
     var qWant = function (k) { return at.q && at.q.get(k); };

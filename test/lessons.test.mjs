@@ -230,11 +230,11 @@ test('an edit-check finding made in three edits becomes a proposed agent step; t
 test('lessons show where decisions show, and an agent is told what a correction ruled out', () => {
   const d = dir();
   recordLesson(d, { what: 'Put a buttonClock inside a cardTile', why: 'a tile holds one action', component: 'cardTile' }, { by: 'QA', at: T(1) });
-  recordWrong(d, [{ check: 'Showroom screens as pages', what: 'Orders has 2 main actions in view', component: null }], { why: 'the second is in a menu', by: 'QA' });
+  recordWrong(d, [{ check: 'Prototypes from Figma as pages', what: 'Orders has 2 main actions in view', component: null }], { why: 'the second is in a menu', by: 'QA' });
   const view = lessonsView(d, { components: COMPONENTS, wrong: JSON.parse(readFileSync(join(d, 'design-system-engine-wrong.json'), 'utf8')).findings });
   assert.equal(view.counts.lessons, 2);
   assert.equal(view.lessons[1].source, 'wrong');
-  assert.match(view.lessons[1].became.text, /a case Showroom screens as pages must pass/, 'a page-review finding a person overrode: its guard is already written');
+  assert.match(view.lessons[1].became.text, /a case Prototypes from Figma as pages must pass/, 'a page-review finding a person overrode: its guard is already written');
   assert.match(lessonsLine(view), /^Lessons: 2 lessons \(1 held: 1 check\) · 1 waiting for a yes\. rms-design-system-engine --lessons lists them\.$/);
   const text = lessonsLines(view).join('\n');
   assert.match(text, /L1 {2}cardTile: Put a buttonClock inside a cardTile/);

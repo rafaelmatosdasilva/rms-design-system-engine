@@ -161,7 +161,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Warns when a Figma frame changed since the version you approved.
 - Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
 - Runs 25 checks, called gates, each listed in the [technical documentation](audit.md#the-gates).
-- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
+- Compares how components move and what they draw beyond their colours, such as shadows and blurs.
 - Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
 
 ### What to ask
@@ -415,7 +415,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
 - Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
 - Proposes a rule when the same finding comes back on three screens or in three edits.
-- Has a model judge each Showroom screen on its screenshot and its code, when you ask: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, shown beside the page review, with what it cost.
+- Has a model judge each prototype from Figma on its screenshot and its code, when you ask: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, shown beside the page review, with what it cost.
 - Says when a lesson comes back, and which guard did not hold.
 - Measures whether your guidance actually helps agents build better.
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Coming soon)*
@@ -500,7 +500,7 @@ Two things it will not do. It never shows a zero where it means *not yet*: a ste
 | `/rms-design-system-engine are our prototypes getting better?` | The whole loop on one screen: the patterns a new page is held to, what agents got wrong and whose fault each was, what was written, what is left for a person, and whether the number is falling |
 | `/rms-design-system-engine rebuild landing.html from our design system` | The page rebuilt from your components as a prototype, with each part's match and why, the counts before and after, and what the system lacks |
 | `/rms-design-system-engine draw prototypes/settings.json as a text wireframe` | The prototype as plain text to paste anywhere, every box a real component, with a note for each part the check marked |
-| `/rms-design-system-engine judge the Showroom screens with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |
+| `/rms-design-system-engine judge the screens from Figma with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |
 
 ## Works with your tools
 

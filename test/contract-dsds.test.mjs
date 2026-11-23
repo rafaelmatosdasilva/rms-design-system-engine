@@ -279,3 +279,24 @@ test('a build writes the view in the version the intent layer declares, with its
   assert.equal(again.dsdsCounts.version, DSDS_VERSION);
   assert.equal(read('components/main.dsds.json').entries[0].uuid, uuid);
 });
+
+test('a token\'s uuid survives a rename: made from Figma\'s id for it, and kept from the view written before', () => {
+  const EXTK = 'com.rms.design-system-engine';
+  const tok = (figmaId) => ({ $type: 'color', $value: '#111', ...(figmaId ? { $extensions: { [EXTK]: { figmaId } } } : {}) });
+  const view = (tokens, opts = {}) => dsdsDocuments([], { tokens, tokensHref: '../tokens.json', ...opts }).find((d) => d.rel === 'tokens.dsds.json').doc.entries;
+  const [before] = view({ text: { primary: tok('VariableID:1:1') } });
+  assert.equal(before.uuid, uuidOf('figma-token:VariableID:1:1'));
+  // Renamed in Figma: a new path, the same id, the same uuid.
+  const [after] = view({ text: { body: tok('VariableID:1:1') } });
+  assert.deepEqual([after.id, after.uuid], ['text.body', before.uuid]);
+  // Figma gives no id (a route that does not read it): no uuid, rather than one a rename would break.
+  const [none] = view({ text: { primary: tok(null) } });
+  assert.equal(none.uuid, undefined);
+  assert.equal(none.$extensions, undefined);
+  // The uuid written before is kept by the id, and an older version holds it under the engine's key.
+  const previous = uuidsFrom([{ entries: [{ ...before, uuid: '11111111-2222-5333-8444-555555555555' }] }]);
+  assert.equal(view({ text: { body: tok('VariableID:1:1') } }, { previous })[0].uuid, '11111111-2222-5333-8444-555555555555');
+  const old = view({ text: { primary: tok('VariableID:1:1') } }, { version: '0.22.0' })[0];
+  assert.deepEqual([old.uuid, old.$extensions[DSDS_EXT].uuid], [undefined, before.uuid]);
+  for (const v of DSDS_TRIED) for (const { doc } of dsdsDocuments([], { tokens: { text: { primary: tok('VariableID:1:1') } }, tokensHref: '../tokens.json', version: v })) assert.deepEqual(errorsOf(doc, SCHEMAS[v]), [], v);
+});

@@ -1619,21 +1619,28 @@ test("the guide's spacing is the template's own, whatever spacing tokens the sys
   assert.match(templateText(), /--sg-space-xxs: 0\.125rem; --sg-space-xs: 0\.25rem; --sg-space-s: 0\.5rem;/, 'the template\'s own steps');
 });
 
-test('the Showroom lists its screens as a grid of cards, each opening on a page of its own (#showroom/<Screen>)', () => {
+test('a prototype from Figma opens on a page of its own (#prototypes/<Screen>), the Showroom gone from the menu', () => {
   const tpl = templateText();
-  // One card a screen, linking to the screen's own address, its thumbnail the screen's own drawing kept out of reach.
-  assert.match(tpl, /a\.href = '#showroom\/' \+ encodeURIComponent\(s\.key\)/);
+  // Its card links to the screen's own address, its thumbnail the screen's own drawing kept out of reach.
+  assert.match(tpl, /a\.href = '#prototypes\/' \+ encodeURIComponent\(s\.key\)/);
   assert.match(tpl, /small\.setAttribute\('inert', ''\)/);
-  // The address names the screen: the router opens it, and a new screen is a new page (scrolled to its top).
+  // No page or menu entry of its own: its section is the Prototypes page's, which puts it in its place.
+  assert.doesNotMatch(tpl, /navLink\('showroom'/);
+  assert.match(tpl, /var sr = section\('prototypes', 'Prototypes', 'Prototypes', ''\); sr\.remove\(\);/);
+  assert.match(tpl, /var sec = PROTO_HOST \|\| section\('prototypes'/);
+  // The address names the screen: the router opens it, and an old #showroom address goes to Prototypes.
   assert.match(tpl, /if \(target\._screen\) target\._screen\(at\.slug\)/);
   assert.match(tpl, /var page = target\.id \+ \(target\._screen \?/);
-  // A screen's page heads like a component's: Showroom beside the group's tag, a back button (the system's own)
-  // before the screen's name as the title, its actions at the section's right; the measurement opens each in turn.
-  assert.match(tpl, /srCrumb\.href = '#showroom'; srCrumb\.textContent = 'Showroom'/);
-  assert.match(tpl, /sysButton\('a', '', ' href="#showroom" aria-label="All screens"'/);
+  assert.match(tpl, /\/\^#showroom\(\[\\\/\?\]\|\$\)\/\.test\(location\.hash\)\) history\.replaceState\(null, '', location\.search \+ '#prototypes'/);
+  // A screen's page heads like a component's: Prototypes beside the group's tag, a back button (the system's own)
+  // before the screen's name as the title, its actions at the section's right; the list hidden while it is open.
+  assert.match(tpl, /srCrumb\.href = '#prototypes'; srCrumb\.textContent = 'Prototypes'/);
+  assert.match(tpl, /sysButton\('a', '', ' href="#prototypes" aria-label="All prototypes"'/);
   assert.match(tpl, /srActions\.className = 'sg-section-actions'/);
+  assert.match(tpl, /sr\.classList\.toggle\('sg-at-screen', !!s\)/);
+  assert.match(tpl, /\.sg-at-screen > :not\(\[data-screen-part\]\) \{ display: none !important; \}/);
   const cmp = readFileSync(join(ENGINE, 'lib', 'showroom-compare.mjs'), 'utf8');
-  assert.match(cmp, /location\.hash = '#showroom\/' \+ encodeURIComponent\(key\)/);
+  assert.match(cmp, /location\.hash = '#prototypes\/' \+ encodeURIComponent\(key\)/);
 });
 
 test('a Showroom screen opens clean: its differences, pinned over it and listed beside it, only when asked for', () => {

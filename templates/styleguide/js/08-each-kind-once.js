@@ -133,10 +133,10 @@
       var pwritten = '<p>' + pd.described + ' of ' + pd.total + (pd.total === 1 ? ' prop says what it is' : ' props say what they are') + ' for.</p>' +
         (pmiss.length ? '<p class="pg-missing">No description:</p><ul>' + pmiss.map(function (m) { return '<li>' + pname(m) + ': ' + namePill(m.where) + '</li>'; }).join('') + '</ul>' : '') +
         (pdrafts.length ? '<p class="pg-par-val">Drafted, to approve</p><ul>' + pdrafts.map(function (m) { return '<li>' + pname(m) + ': ' + esc(m.draft) + (m.inPatch ? '' : ' <span class="pg-dim">(write it by hand)</span>') + '</li>'; }).join('') + '</ul>' : '');
-      var ptodo = !pmiss.length ? '' : [inPatch.length && pd.patch ? 'Read each drafted line. To write them in the code, where the engine reads them on the next run, copy the request and paste it into Claude Code: it applies ' + pd.patch + '. A line that says it wrong: write the right words in the code instead.' : '',
+      var ptodo = !pmiss.length ? '' : [inPatch.length && pd.patch ? 'Read each drafted line. To write them in the code, where the engine reads them on the next run, copy the request and paste it in your agent: it applies ' + pd.patch + '. A line that says it wrong: write the right words in the code instead.' : '',
         pmiss.length > inPatch.length ? 'Write the others where each line says: the comment above the prop in its code file, or contract.authored.json under propDescriptions.' : ''].filter(Boolean).join(' ');
       var prow = { key: c.name + '\u0000doc:propdesc', area: 'Documentation', kind: 'What each prop is for', written: pwritten, todo: esc(ptodo), who: !pmiss.length ? '' : inPatch.length ? WHO.both : WHO.code, st: pmiss.length ? 'todo' : 'done', rel: '', at: DATA.builtAt || null, src: ['Its contract' + (k ? ' (' + k.file + ')' : '')] };
-      if (inPatch.length && pd.patch && pd.apply) prow.decide = '<div class="sg-decide-grid"><div class="sg-decide sg-decide--approve" title="' + esc('Applies the patch: each drafted line goes above its prop in the code.') + '"><strong class="sg-decide-head">' + decideMark('approve') + esc('Apply the ' + inPatch.length + (inPatch.length === 1 ? ' draft' : ' drafts')) + '</strong>' + sysButton('button', 'Copy request', ' data-pair-copy="' + esc(pd.apply) + '"') + '<span class="sg-decide-said" role="status"></span></div></div>';
+      if (inPatch.length && pd.patch && pd.apply) prow.decide = '<div class="sg-decide-grid"><div class="sg-decide sg-decide--approve" title="' + esc('Applies the patch: each drafted line goes above its prop in the code.') + '"><strong class="sg-decide-head">' + decideMark('approve') + esc('Apply the ' + inPatch.length + (inPatch.length === 1 ? ' draft' : ' drafts')) + '</strong>' + copyAction('Copy the request', pd.apply) + SAID + '</div></div>';
       rows.push(prow);
     }
     // The prototypes built with it, from each one's own record kept beside it. The page said what agents got wrong
@@ -226,20 +226,19 @@
       todo: said ? '' : esc('Change its page as the Intent layer page says.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: [capital(il.source || 'the intent layer') + ' (' + il.file + ')'] };
   };
   // What the engine could not settle about it (component-parts.mjs): is it a part of another component? Each answer a
-  // card to copy into Claude Code, which records it in the intent layer.
+  // card to copy for the person's agent, which records it in the intent layer.
   var partQuestionRow = function (c) {
     var q = (DATA.partQuestions || []).filter(function (x) { return x.part === c.name; })[0]; if (!q) return null;
     // The answer in the person's words: the system's command, the component, then what it is.
     var run = function (to) { return ENGINE + ' on Component ' + c.name + ', ' + (to === 'none' ? 'It is its own component' : 'It is a part of Component ' + to); };
-    var card = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-part-copy="' + esc(copy) + '"') + '</div>'; };
+    var card = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + copyAction('Copy decision', copy, null, 'Copies the decision: paste it in your agent') + SAID + '</div>'; };
     var cards = q.roots.map(function (r) { return card('approve', 'Part of ' + r, 'Shown and documented inside ' + r + ', never on its own.', run(r)); })
-      .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Claude Code asks which component it belongs to.', ENGINE + ' on Component ' + c.name + ', Ask me which component it is a part of')])
+      .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Your agent asks which component it belongs to.', ENGINE + ' on Component ' + c.name + ', Ask me which component it is a part of')])
       .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
     var ask = esc('Is ' + c.name + ' a part of ') + (q.roots.length ? q.roots.map(namePill).join(' or ') + '?' : 'another component?');
     return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + ask + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
-      todo: esc('Say whether it is a part, then copy your decision and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
+      todo: esc('Say whether it is a part, then copy your decision and paste it in your agent.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
   };
-  document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-part-copy]'); if (cp) copyText(cp.getAttribute('data-part-copy'), cp); });
   // A part's documentation: what its root's page says of it under Parts (### its name), or where to write it.
   var partDocRow = function (c) {
     var lines = c.partOf.docs || [], page = c.partOf.page, root = c.partOf.root;

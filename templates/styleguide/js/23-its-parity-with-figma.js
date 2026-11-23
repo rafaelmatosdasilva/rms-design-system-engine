@@ -72,7 +72,7 @@
     (c.pairAsks || []).forEach(function (x) {
       var cmd = function (t) { return String(t).replace(/^rms-design-system-engine\b/, ENGINE); };
       var decide = '<div class="sg-decide-grid">' + [['approve', 'Yes, the same prop', x.yes, x.yesDoes], ['drop', 'No, two props', x.no, x.noDoes]].map(function (d) {
-        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + sysButton('button', 'Copy decision', ' data-pair-copy="' + esc(cmd(d[2])) + '"') + '<span class="sg-decide-said" role="status"></span></div>';
+        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + copyAction('Copy decision', cmd(d[2]), null, 'Copies the decision: paste it in your agent') + SAID + '</div>';
       }).join('') + '</div>';
       var todo = 'Say whether Figma\'s ' + nm(x.figma) + ' is the code\'s ' + nm(x.code) + ': yes or no.', pairWhy = '<p>The engine suggests the pair from their names and never takes it on its own.</p>';
       var at = out.filter(function (r) { return r.type === 'Prop' && r.rel === PAR_REL.figma && r.figma.indexOf('>' + esc(x.figma) + '<') >= 0; })[0];
@@ -122,7 +122,7 @@
       out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: todo, who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
     });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
-    (SR_FOR[c.name] || []).forEach(function (f) { var n = f.screens.length; out.push({ key: c.name + '\u0000showroom:' + f.m.name, area: 'Parity', kind: 'Showroom', type: 'Other', figma: side({ name: f.m.name }), code: '<span class="pg-par-none">Not there</span>', todo: esc(f.m.what), why: '<p>' + esc('Needed by ' + n + (n === 1 ? ' Showroom screen.' : ' Showroom screens.')) + '</p>', who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 }); });
+    (SR_FOR[c.name] || []).forEach(function (f) { var n = f.screens.length; out.push({ key: c.name + '\u0000showroom:' + f.m.name, area: 'Parity', kind: 'Prototype', type: 'Other', figma: side({ name: f.m.name }), code: '<span class="pg-par-none">Not there</span>', todo: esc(f.m.what), why: '<p>' + esc('Needed by ' + n + (n === 1 ? ' prototype from Figma.' : ' prototypes from Figma.')) + '</p>', who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 }); });
     if (c.codeOnly && c.codeOnly.figma) out.push({ key: c.name + '\u0000codeOnly', area: 'Parity', kind: 'Component', type: 'Other', figma: side(null), code: side({ name: c.name, value: c.codeOnly.file }), todo: esc('Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.'), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 });
     return out;
   }

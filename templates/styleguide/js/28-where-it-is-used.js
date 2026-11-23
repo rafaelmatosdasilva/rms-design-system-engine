@@ -1,10 +1,10 @@
   // ── Where it is used: a card per product, its own page pictured as it opens with each place the component sits on it
   // marked, linked to the product ─────────────────────────────────────────────────────────────────────────────────────
-  // The Showroom's screens built with it (each screen's imports), as the Showroom's own cards, after its products.
+  // The prototypes from Figma built with it (each screen's imports), as the Prototypes page's own cards, after its products.
   function usedScreensHTML(c) {
     var screens = (DATA.showroom || []).filter(function (s) { return (s.uses || []).indexOf(c.name) >= 0; });
     if (!screens.length) return '';
-    return '<h3 class="pg-usedin-title">In the Showroom</h3><div class="sg-card-grid sg-showroom-grid pg-usedin-screens" data-screens="' + esc(screens.map(function (s) { return s.key; }).join(' ')) + '"></div>';
+    return '<h3 class="pg-usedin-title">In prototypes from Figma</h3><div class="sg-card-grid sg-showroom-grid pg-usedin-screens" data-screens="' + esc(screens.map(function (s) { return s.key; }).join(' ')) + '"></div>';
   }
   // Where a component is used is known once the products' pages are read (DATA.productsRead), or once one component is
   // found in one, or on a Showroom screen. Before that, no component's Used in is shown, rather than "not found" for each.

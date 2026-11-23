@@ -29,7 +29,7 @@ For whoever approves tools for a team: each line links to its detail below.
 - **On your computer, or your CI runner.** The engine is a set of Node scripts. There is no engine server and no engine account, and nothing it reads is sent to its author.
 - **No npm dependencies.** `package.json` lists none, so there is no third-party package to trust. What it uses beside Node is yours: Chrome, TypeScript, and axe-core, which the installer fetches.
 - **Your own sign-ins.** It reaches Figma, your code host and Notion with your own access, so your company's single sign-on and permissions on those tools apply as they are.
-- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Three steps ask one, each only when you ask, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`), judging your Showroom screens on their screenshots (`pageJudgment.cmd`) and drafting changes to the intent layer.
+- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Three steps ask one, each only when you ask, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`), judging your prototypes from Figma on their screenshots (`pageJudgment.cmd`) and drafting changes to the intent layer.
 
 ### What goes over the network
 
