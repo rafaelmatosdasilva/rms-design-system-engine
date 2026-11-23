@@ -102,9 +102,12 @@ jobs:
           fi
           # A test that skipped checked nothing on Windows, whatever its reason: a missing tool, or a stand-in only another
           # system runs. The run fails on any, so "proven on Windows" never hides a test that did not run there.
+          # One reason is not a gap: a test that holds the Playwright path to the engine's own skips here for want of
+          # Playwright, which this suite runs without on purpose, and the playwright job of tests.yml runs every one of
+          # them on windows-latest with Playwright installed, failing on any skip. Counted there, not twice.
           # grep finds nothing in a clean run, and with pipefail on that would end the step: a run with no skip is not a failure.
-          { grep -E '# SKIP' test.log || true; } | while IFS= read -r line; do echo "::error title=Skipped on Windows::${line#*- }"; done
-          skipped=$(grep -cE '# SKIP' test.log || true)
+          { grep -E '# SKIP' test.log | grep -vE "# SKIP Playwright('s [A-Za-z]+)? not here" || true; } | while IFS= read -r line; do echo "::error title=Skipped on Windows::${line#*- }"; done
+          skipped=$({ grep -E '# SKIP' test.log | grep -vE "# SKIP Playwright('s [A-Za-z]+)? not here" || true; } | wc -l | tr -d ' ')
           if [ "$skipped" != 0 ]; then
             echo "::error title=Tests skipped::$skipped test(s) skipped on Windows; every one must run."
             code=1

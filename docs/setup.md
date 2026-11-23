@@ -57,7 +57,7 @@ irm https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engin
 - **A company's setup** passes its two values: `& ([scriptblock]::Create((irm <the installer's link>))) -Client <team> -Profile <the profile's link>`.
 - **PowerShell, the command prompt and Git Bash** all run the command it writes. Git Bash is the shell Claude Code runs its commands in on Windows, so the installer puts a bash script beside the `.cmd` for it.
 - **WSL** is Linux: inside it, run the bash installer above, as on Linux.
-- **Proven on every change.** The full suite runs on a Windows runner beside Ubuntu's for every pull request, and the run fails if a single test is skipped. The same run installs the engine from PowerShell, and from the bash installer inside WSL, and starts the terminal command (from PowerShell and Git Bash), the MCP server and the hooks.
+- **Proven on every change.** The full suite runs on a Windows runner beside Ubuntu's for every pull request, and the run fails if a single test is skipped. The tests that need Playwright run in a job of their own, on Windows too, and that job fails on any skip. The same run installs the engine from PowerShell, and from the bash installer inside WSL, and starts the terminal command (from PowerShell and Git Bash), the MCP server and the hooks.
 - **The skill evaluation on Windows.** The guide's tasks run in Claude Code on a Windows runner (the Skill evaluation on Windows workflow, started by hand), scored as on a Mac. Its first full run passed 82 of 82 (22 November 2026).
 
 ### A company's own setup
