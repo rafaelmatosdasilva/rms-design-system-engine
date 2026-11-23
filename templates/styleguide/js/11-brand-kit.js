@@ -1702,6 +1702,7 @@
     };
     var bkRun = lazyDraw(bk, bkDraw); DRAWERS.push(bkRun); bkRun();
   }
+  if (!document.getElementById('identity')) emptyPage('identity', 'identity', 'Foundations', 'Identity', 'No identity yet', 'The system at a glance, its colours, type, shapes, icons and motion, shows here once its variables are read from Figma.', askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>'), true);
   if (ALL_TOKENS.length) {
     hr(); foundationLink('tokens', 'tokens');
     var tk = section('tokens', 'Foundations', 'Tokens', null);
@@ -1999,4 +2000,5 @@
       saveFile('tokens.json', 'application/json', JSON.stringify(out, null, 2));
     });
   }
+  if (!document.getElementById('tokens')) emptyPage('tokens', 'tokens', 'Foundations', 'Tokens', 'No tokens yet', 'Every variable of the system, in every mode, shows here once Figma is read.', askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>'), true);
 

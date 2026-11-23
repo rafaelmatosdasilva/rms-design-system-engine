@@ -682,7 +682,7 @@ test('in the browser: no script error, a control changes the real component, the
       // Its line is the head's last pixel: no border under it, not even a transparent one, for the rows to show through.
       assert.equal(await run(`(() => { const th = (${pick}).querySelector('thead th, tr > th'); return getComputedStyle(th).borderBottomWidth + '|' + /inset/.test(getComputedStyle(th).boxShadow); })()`), '0px|true', `${sel}: the head's line drawn inside it, with no border under it`);
     };
-    await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
+    await run(`location.hash = '#tokens'`); await shownIs('tokens'); await headsStick('#tokens');
     // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
     // with no table (Identity) never has its content cut short under the line.
     // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
@@ -786,17 +786,23 @@ test('in the browser: no script error, a control changes the real component, the
   } finally { c.kill(); }
 });
 
-test('"In use" shows the approved pictures of the system\'s own frames', { timeout: budget(300000) }, () => {
-  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
-  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frames: [{ name: 'Settings', nodeId: '5:1' }, { name: 'Missing', nodeId: '9:9' }] }));
-  mkdirSync(join(dir, '.design-system-engine-refs'), { recursive: true });
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-  writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
-  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
-  const data = JSON.parse(readPage(join(dir, '.design-system-engine-out/styleguide/index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
-  assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
-  assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
+test('no page repeats another: Colors, Typography, Spacing, Radii and In use are gone, their old addresses open where it lives now', () => {
+  const tpl = templateText();
+  assert.doesNotMatch(tpl, /foundationLink\('(colors|typography|spacing|radii)'|sizeList\(|navLink\('in-use'/, 'Identity and Tokens show the foundations, a component\'s Used in where it is used');
+  assert.match(tpl, /\^#\(colors\|typography\|spacing\|radii\)\(\[\\\/\?\]\|\$\)\/\.test\(location\.hash\)\) history\.replaceState\(null, '', location\.search \+ '#tokens'\)/);
+  assert.match(tpl, /\^#in-use\(\[\\\/\?\]\|\$\)\/\.test\(location\.hash\)\) history\.replaceState\(null, '', location\.search \+ '#prototypes'\)/);
+  assert.doesNotMatch(tpl, /'#(colors|typography|spacing|radii)'/, 'the search opens a colour, a type style, a space or a radius on Tokens');
+  assert.match(tpl, /id = 'sg-system-family'/, 'the system\'s own family still sets everything the page draws of it');
+  assert.doesNotMatch(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /view\.screens =/, 'no pictures of frames built for a page that is gone');
+});
+
+test('a page with nothing to show keeps its place in the menu and says so; Prototypes and Requests under Accessibility', () => {
+  const tpl = templateText();
+  assert.match(tpl, /function emptyPage\(id, label, badge, title, head, say, action, foundation\) \{\s*hr\(\); \(foundation \? foundationLink : navLink\)\(id, label\);/);
+  for (const id of ['rules', 'changes-in-Figma', 'history', 'documentation', 'accessibility', 'templates', 'identity', 'tokens', 'motion', 'icons']) assert.match(tpl, new RegExp(`if \\(!document\\.getElementById\\('${id}'\\)\\) emptyPage\\('${id}', `), id);
+  assert.match(tpl, /emptyPage\('changes-in-Figma'[^\n]*askHTML\(ENGINE \+ ' refresh the Figma data'/, 'a request only where the engine answers it');
+  assert.doesNotMatch(tpl, /emptyPage\('(rules|documentation|accessibility|templates|history)'[^\n]*askHTML/, 'a page that fills on its own has no request');
+  assert.match(tpl, /var at = nav\.querySelector\('a\[href="#accessibility"\]'\) \|\| nav\.querySelector\('a\[href="#documentation"\]'\) \|\| nav\.querySelector\('a\[href="#status"\]'\); if \(!at\) return; \['prototypes', 'requests'\]/);
 });
 
 test('the template\'s heading and paragraph rules reach only its own chrome, never a component in a preview', () => {
@@ -883,13 +889,10 @@ test('a text goes to the part whose own words they are; a shape part stays empty
   assert.match(tpl, /\.pg-updated \{ display: grid; gap: var\(--sg-space-l\);/);
 });
 
-test('a title in the style guide has no line under it; each type style lists its size, weight, line height, letter spacing and case, the family once', () => {
+test('a title in the style guide has no line under it', () => {
   const tpl = templateText();
   const h3 = /\.sg-subsection > h3 \{[^}]*\}/.exec(tpl)[0];
   assert.doesNotMatch(h3, /border-bottom/);
-  for (const [k, word] of [['size', 'size'], ['weight', 'weight'], ['lh', 'line height'], ['ls', 'letter spacing'], ['textTransform', 'case']]) assert.ok(tpl.includes(`['${k}', `) && tpl.includes(`'${word}']`), k);
-  assert.match(tpl, /<div class="type-specimen pg-inspect"><div class="pg-inspect-head">family<\/div>/, 'the family once, as a typography table of its own');
-  assert.match(tpl, /card\.innerHTML = tokenCard\(t\.scale, TYPE_PROPS/, 'each style a token table, as every foundation: its name, then its value at each breakpoint');
 });
 
 test('the Playground has the tokens behind what is drawn, no Computed box and no Its tokens table: Parity lists every token', () => {
@@ -1323,14 +1326,11 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"><\/div>/, 'the sizing mode in the bar above the stage');
   assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--bottom"><div class="pg-actions"><\/div><p class="pg-anat-line" hidden><\/p><div class="pg-stage-mode"><\/div>/, 'the colour mode in the bar below it, at the right, a button that plays how it moves at its left');
   assert.match(tpl, /\.pg-stage-mode \.sg-mode-label \{ position: absolute; width: 1px/, 'no visible label on the switches inside the playground');
-  assert.match(tpl, /var modes = colourModes\(\);/, 'the colours page shows every colour mode side by side, no switch');
-  assert.match(tpl, /hexOf\(backgroundIn\(cd, m, t\.var\)\)/, 'each colour shows the value it is drawn with, in each mode');
   assert.match(tpl, /'<div class="pg-areas-scroll">' \+ tabsHTML\(|<div class="pg-areas-scroll">' \+ tabsHTML\(/, 'the areas are tabs');
   assert.match(tpl, /\.sg-tab\.is-on::after \{ content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: var\(--sg-radius-pill\); background: var\(--sg-text\);/, 'the page\'s own tabs mark the chosen one with a line, in the system\'s colour');
   assert.match(tpl, /if \(inspecting && WIDTH !== 'fit'\) showWidth\('fit'\);/, 'Inspect draws the component at Fit, in the middle of the stage');
   assert.match(tpl, /\.sg-token-sample > \.spacing-bar \{ height: var\(--sg-space-xxl\)/, 'every sample as tall as the others');
   assert.match(tpl, /function tokenCard\(head, rows, cols\)/, 'colours, spacing and radii are lists in cards, the group as the head');
-  assert.match(tpl, /sizeList\('radii', 'Radii'/, 'radii are listed as spacing is');
   assert.doesNotMatch(tpl, /Each swatch is the CSS variable itself/, 'no line under the colours title');
   assert.match(tpl, /a\.scoped && a\.attr === 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr !== 'data-size'/, 'the sizing mode top left, the colour mode bottom right, inside the playground');
   assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
@@ -1341,9 +1341,9 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(fit, /var over = k\.scrollWidth - k\.clientWidth; if \(over > 1\)/);
   assert.match(fit, /for \(var i = 0; i < e\.children\.length; i\+\+\) drawn\(e\.children\[i\]\)/);
   assert.match(fit, /'translate\(' \+ tx\.toFixed\(1\) \+ 'px, ' \+ ty\.toFixed\(1\) \+ 'px\) scale\('/);
-  // On a phone every grid of cards is two side by side: the overview, the icons, Used in, the pictures in use.
+  // On a phone every grid of cards is two side by side: the overview, the icons, Used in.
   const phone = tpl.slice(tpl.indexOf('@media (max-width: 480px)'), tpl.indexOf('/* Each overview link is'));
-  assert.match(phone, /\.sg-card-grid\.pg-usedin, \.sg-main \.sg-icon-grid, \.sg-main \.sg-screens \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
+  assert.match(phone, /\.sg-card-grid\.pg-usedin, \.sg-main \.sg-icon-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
   // A token's value is never cut or broken inside a word; narrow token cards size their columns by what they hold.
   assert.match(tpl, /\.pg-inspect\.sg-token-card td\.sg-token-value \{ overflow-wrap: normal; \}/);
   assert.match(tpl, /@container \(max-width: 560px\) \{\s*\.pg-inspect\.sg-token-card :is\(td, th\) \{ padding-left: var\(--sg-space-s\)/, 'narrow cards: tighter cells, never a sideways scroll');
@@ -1357,9 +1357,6 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /function stickHeight\(sec\) \{[\s\S]*?setProperty\('--pg-areas-h'[\s\S]*?setProperty\('--pg-card-head-h'/);
   assert.match(tpl, /\.pg-inspect \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); overflow: clip;/, 'a card clips, so its head can stick');
   assert.match(tpl, /:is\(\.pg-inspect-head, \.pg-code-head\) \{ position: sticky; top: calc\(var\(--sg-sticky-top, 0px\) \+ var\(--pg-areas-h, 0px\)\);/, 'a card\'s head and the code\'s stay in view');
-  // Spacing is its names and values, no bar per space; radii keep their samples.
-  assert.match(tpl, /sizeList\('spacing', 'Spacing', TOKENS\.spacing, null\);/);
-  assert.match(tpl, /sizeList\('radii', 'Radii', TOKENS\.radii, function \(t\) \{ return '<span class="sg-token-radius"/);
 });
 
 test('what uses each token: in a component\'s own rules, or through another token, nearest first', async () => {

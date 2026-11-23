@@ -206,12 +206,10 @@ test('style guide: a style shows only when every field Figma gives it agrees, in
   assert.match(typographyTodos({ fail: [{ dimension: 'typography', family: true, figma: 'Lumen Sans', css: 'Serifa', cssVar: '--type-family', styles: ['a', 'b'] }] }).at(-1).say, /family differs: Figma Lumen Sans, 2 styles; the code's --type-family is Serifa/);
 });
 
-test('style guide page: a style lists only its own fields, the family once, the styles left off named', () => {
+test('style guide page: no Typography page of its own; the system\'s family still sets what the page draws of it', () => {
   const tpl = templateText();
-  const block = tpl.slice(tpl.indexOf('/* ── Typography ─'), tpl.indexOf('/* ── Spacing, radii, other sizes ─'));
-  assert.match(block, /TYPE_PROPS\.filter\(function \(k\) \{ return t\[k\[0\]\]; \}\)/, 'a field the style does not have is not listed');
-  assert.doesNotMatch(block, /\['family', val\('family'/, 'no family line per style');
-  assert.match(block, /TOKENS\.typeFamily/);
-  assert.match(block, /Left off until Figma and the code agree/);
-  assert.match(block, /DRAWERS\.push\(drawType\); drawType\(\);/, 'every breakpoint drawn at once, a column each');
+  assert.doesNotMatch(tpl, /foundationLink\('typography'/, 'its text styles are on Tokens, its type set large on Identity');
+  const block = tpl.slice(tpl.indexOf('/* ── The system\'s own font family ─'));
+  assert.match(block, /var TYPE_FAMILY = TOKENS\.typeFamily \|\| null;/);
+  assert.match(block, /tfs\.id = 'sg-system-family'/);
 });
