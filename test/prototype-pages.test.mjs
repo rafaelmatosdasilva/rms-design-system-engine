@@ -60,8 +60,10 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   const tpl = templateText();
   assert.match(tpl, /navLink\('prototypes', 'prototypes'\)/);
   assert.match(tpl, /section\('prototypes', 'Prototypes', 'Prototypes'/);
-  // Shown with none yet, saying so and copying the request that makes the first.
-  assert.match(tpl, /No prototype yet[\s\S]*copyBtn\('Copy', ASK\)/);
+  // Shown with none yet as the page that has nothing yet (pageNone): its mark large, what it will hold, and the request
+  // that makes the first, with no agent's prefix, copied by the one copy button every page uses.
+  assert.match(tpl, /var ASK = ENGINE \+ ' prototype ';/);
+  assert.match(tpl, /pageNone\('prototypes', 'No prototypes yet', 'Ask your AI agent for what you want, in your own words\. It will build it from the system\\'s own components and show it here\.', ASK, 'Copy the request'\)/);
   // A grid or a table, switched beside the title, the grid following the table's filters and order.
   assert.match(tpl, /segHTML\(\[\{ v: 'grid', label: 'Grid' \}, \{ v: 'table', label: 'Table' \}\], 'View'\)/);
   assert.match(tpl, /<th>Prototype<\/th><th>Product<\/th><th>System version<\/th><th>Asked by<\/th><th>Asked on<\/th><th>Status<\/th>/);
@@ -71,8 +73,9 @@ test('the style guide has a Prototypes page: a grid or a table, filtered by stat
   assert.match(tpl, /filterBar\(sec, \{ total: PROTO.length, said: 'prototypes', chips: chips, cols: \[\{ key: 'status' \}, \{ key: 'product', label: 'Product' \}\] \}\)/);
   // Its panel: what to do (Continue), what was asked, what its check found (Copy fix), its status, the rest.
   assert.match(tpl, /panelCard\('What to do', todo\)[\s\S]*panelCard\('What was asked'[\s\S]*panelCard\('What its last check found'[\s\S]*panelCard\('Status'[\s\S]*panelCard\('Its screens'[\s\S]*panelCard\('What the system lacks for it'[\s\S]*panelCard\('Its handoff'[\s\S]*panelCard\('What people wrote for it'[\s\S]*panelCard\('What people said'/, 'the panel\'s one order');
-  assert.match(tpl, /copyBtn\('Continue this prototype', cont\)/);
-  assert.match(tpl, /copyBtn\('Copy fix', fix\)/);
+  assert.match(tpl, /askHTML\(cont, 'Continue this prototype'\)/);
+  assert.match(tpl, /copyAction\('Copy fix', fix, 'approve'\)/);
+  assert.doesNotMatch(tpl, /'\/rms-design-system-engine /, 'no request in one agent\'s form');
   assert.match(tpl, /#prototypes\?panel=' \+ esc\(encodeURIComponent\('proto:' \+ p\.name\)\)/, 'a component\'s page links each prototype to its own');
   assert.match(tpl, /: !!\(target\._openKey && target\._openKey\(panelWant\)\)/, 'a link opens any page\'s own panel by its key');
   assert.match(tpl, /NAV_MARK\.prototypes = /);

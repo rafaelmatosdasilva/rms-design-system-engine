@@ -175,9 +175,11 @@ Each prototype is a part of its own, with a page of its own. The Prototypes page
 - **Checked at every build.** Each prototype is checked against the version its product builds on (its pin, else the latest). Only the ones whose page, pin or system moved are checked again. `styleguide.checkPrototypes: false` turns it off.
 - **Shared through a repository.** Name one once (`rms-design-system-engine --store prototypes=<GitLab or GitHub link>`) and every prototype travels whole through it, product folders included. Until then, each check says the prototypes are on this computer only and asks for one.
 
+- **None yet.** With no prototype, the page shows its mark large in a dashed space, says what it will hold, and gives the request that makes the first, with a button to copy it.
+
 A row or a card opens the prototype's page in the side panel.
 
-- **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in Claude Code, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
+- **What to do,** with **Continue this prototype**. It copies the request to change it, to which you add what to change. Pasted in your agent, the engine hands the agent everything about it: each ask so far, what its check found and what people said.
 - **What was asked.** Each ask in order, with who and when: the one that made it, then each that changed it.
 - **What its last check found,** each finding with its component and a **Copy fix** that copies the request fixing that one. The copy is part of that check: each word held to your team's content guidance ([The copy, held to your content guidance](documentation.md#the-copy-held-to-your-content-guidance)).
 - **Status,** with when it was checked, against which release of the system, at which commit or tag, and each screen width it was drawn at, fitting or with how many problems. That result is kept in its `<name>.check.json` (`widths`), so a team's own exit criterion (Phone and Desktop, say) reads it rather than working it out.

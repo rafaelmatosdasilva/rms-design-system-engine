@@ -228,8 +228,33 @@
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   NAV_MARK.requests = '<path d="M2 9.5V13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.5"/><path d="M2 9.5 4 3h8l2 6.5h-3.5a2.5 2.5 0 0 1-5 0z"/>';   // an inbox tray: what others ask the system for
-  NAV_MARK.prototypes = '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 5.5h12M5 8.5h6M5 11h3.5"/>';   // a screen drawn with lines: a page somebody is building
+  NAV_MARK.prototypes = '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 5.5h12"/><path d="M6.75 7.6v3.8l3.25-1.9Z"/>';   // a screen that plays: a page somebody can try
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
+  // A decision's mark, to tell approve, change and drop apart at a glance. Set here, before any page is drawn, so every
+  // page has them.
+  var DECIDE_MARK = { approve: '<path d="m3 8.5 3.2 3L13 4.5"/>', change: '<path d="M10.5 2.5 13.5 5.5 5.5 13.5H2.5V10.5Z"/><path d="m9 4 3 3"/>', drop: '<path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 9h6.6l.7-9"/>' };
+  function decideMark(k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; }
+  // What every request copied from the guide starts with: the system's own command (styleguide-gen.mjs → engineCommand),
+  // with no agent's prefix. Every agent the engine runs in takes it as written: Claude Code's and Codex's hooks route a
+  // request that starts with it (guard.mjs), and Cursor's guide routes it (agent-rules.mjs). Nobody picks an agent.
+  var ENGINE = String(DATA.engineCommand || 'rms-design-system-engine').replace(/^[/$]+/, '');   // a page built before the command lost its prefix too
+  // The one way the page hands a request to the person's agent (the owner's, 23 November 2026): a button that copies it,
+  // with its decision's mark, and the line under it that says it was copied (SAID, once for the buttons beside it). The
+  // agent is never named: it is whichever one the person uses. One handler below serves every such button.
+  var PASTE = 'Paste it in your agent';
+  var SAID = '<span class="sg-decide-said" role="status"></span>';
+  function copyAction(label, text, mark, title) {
+    return sysButton('button', label, ' data-copy="' + esc(text) + '" title="' + esc(title || 'Copies the request: paste it in your agent') + '"', 'sg-copy-act' + (mark ? ' sg-copy-act--' + mark : ''), null, mark ? decideMark(mark) : null);
+  }
+  document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-copy]'); if (cp) copyText(cp.getAttribute('data-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), PASTE); });
+  // A request to copy, written out above its button: the words it starts with, and "…" where the person's own go.
+  function askHTML(ask, label) { return '<div class="sg-ask"><code>' + esc(ask) + '…</code>' + copyAction(label, ask, 'approve') + SAID + '</div>'; }
+  // A page with nothing on it yet (the owner's, 23 November 2026): its menu mark drawn large, what it will hold, and how
+  // to start it, in a dashed space where its entries will be. Never a tinted box: nothing is wrong, it is only empty.
+  function pageNone(id, head, say, ask, label) {
+    return '<div class="sg-page-none" role="note">' + navMark(id).replace('class="sg-nav-mark"', 'class="sg-page-none-mark"')
+      + '<p class="sg-page-none-head">' + esc(head) + '</p><p class="sg-page-none-say">' + esc(say) + '</p>' + (ask ? askHTML(ask, label) : '') + '</div>';
+  }
   // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }
   // The foundations in the menu under their own label, as the components are under theirs.

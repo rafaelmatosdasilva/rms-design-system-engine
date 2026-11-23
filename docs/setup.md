@@ -321,6 +321,7 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 Both read the guide and run the same guard as Claude Code, as their own hooks.
 
 - **In Codex the whole guide is a skill.** When Codex is set up on your computer, the installer also puts the engine's guide where Codex reads skills (`~/.codex/skills/rms-design-system-engine`), and the engine keeps it current. Ask for it the way Codex asks for a skill: `$rms-design-system-engine audit the chip`. The engine routes a request asked that way just as it routes `/rms-design-system-engine` in Claude Code.
+- **One request for every agent.** A request that starts with the engine's name alone (`rms-design-system-engine audit the chip`) is routed in each of them too: by the hooks in Claude Code and Codex, and by the guide in Cursor. That is the form the style guide copies, so a request copied from it works in whichever agent you paste it, and the page never asks which one you use.
 
 In the project, run:
 
