@@ -257,7 +257,8 @@
       + '<p class="sg-page-none-head">' + esc(head) + '</p><p class="sg-page-none-say">' + esc(say) + '</p>' + (action ? '<div class="sg-page-none-act">' + action + '</div>' : '') + '</div>';
   }
   // A page with nothing to show still has its place in the menu and its title, and says so with pageNone (the owner's,
-  // 23 November 2026): no page is left out of the menu for being empty. A foundation under the Foundations label.
+  // 23 November 2026): no page is left out of the menu for being empty, Templates apart (08-each-kind-once.js), which
+  // nobody can start from the guide. A foundation under the Foundations label.
   function emptyPage(id, label, badge, title, head, say, action, foundation) {
     hr(); (foundation ? foundationLink : navLink)(id, label);
     var s = section(id, badge, title, null); s.insertAdjacentHTML('beforeend', pageNone(id, head, say, action)); return s;
