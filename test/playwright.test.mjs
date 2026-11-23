@@ -16,7 +16,7 @@ import {
   extractTgz, fetchPlaywright, playwrightHere, playwrightLine,
 } from '../lib/playwright.mjs';
 import { openBrowser } from '../lib/page-driver.mjs';
-import { altTabIn } from '../lib/a11y-browsers.mjs';
+import { altTabIn, untriedIn, browserRows } from '../lib/a11y-browsers.mjs';
 import { findChrome } from '../lib/cdp.mjs';
 import { findFirefox } from '../lib/browsers.mjs';
 
@@ -121,11 +121,18 @@ test('a browser is Playwright\'s only when its build for that Playwright is inst
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('Option-Tab in WebKit on macOS alone, where Tab skips links: Tab alone everywhere else and in every other browser', () => {
-  assert.equal(altTabIn('webkit', 'darwin'), true);
-  assert.equal(altTabIn('webkit', 'linux'), false);
-  assert.equal(altTabIn('webkit', 'win32'), false);
-  assert.equal(altTabIn('firefox', 'darwin'), false);
+test('Option-Tab in WebKit, and Tab\'s criteria left untried in WebKit on Windows, never counted as passing there', () => {
+  assert.equal(altTabIn('webkit'), true);
+  assert.equal(altTabIn('firefox'), false);
+  assert.deepEqual(untriedIn('webkit', 'win32'), ['2.1.1', '2.4.7']);
+  assert.deepEqual(untriedIn('webkit', 'linux'), []);
+  assert.deepEqual(untriedIn('firefox', 'win32'), []);
+  const run = { browsers: [{ label: 'Chrome' }, { label: 'WebKit', altTab: true, untried: ['2.1.1', '2.4.7'] }],
+    components: { chip: { Chrome: [], WebKit: [{ kind: 'target', sc: '2.5.8', desc: 'a.x' }] } } };
+  const rows = browserRows(run, 'chip');
+  assert.deepEqual(rows['2.1.1'].by, { Chrome: 'pass' }, 'untried in WebKit: Chrome alone answers it');
+  assert.deepEqual(rows['2.4.7'].by, { Chrome: 'pass' });
+  assert.deepEqual(rows['2.5.8'].by, { Chrome: 'pass', WebKit: 'fail' }, 'the rest are tried there as anywhere');
 });
 
 test('which driver opens each browser: Playwright for what it has, the engine\'s own for the rest', () => {
@@ -148,7 +155,9 @@ test('which driver opens each browser: Playwright for what it has, the engine\'s
 // focus moved by a real key press. A value one path gives and the other does not fails here.
 const HERE = playwrightHere();
 const CHROME = findChrome();
-const FIREFOX_OWN = findFirefox({ env: { ...process.env, DESIGN_SYSTEM_ENGINE_PLAYWRIGHT: 'none' } });
+// Playwright left out by `here`, never by a copy of the environment: Windows reads process.env without regard to case and
+// a copy with it, so a copy missed the Program Files folder Git Bash names in capitals.
+const FIREFOX_OWN = findFirefox({ here: null });
 const PAGE = '<!doctype html><style>.t{height:56px;padding:4px 6px;color:#111;font:16px/1.5 serif}@media (prefers-color-scheme: dark){.t{color:#eee}}@media (max-width:400px){.t{height:40px}}</style><div class="t">T</div><button>a</button><input>';
 const MEASURE = '(() => { const s = getComputedStyle(document.querySelector(".t")); return [innerWidth, s.height, s.paddingLeft, s.color, matchMedia("(prefers-color-scheme: dark)").matches]; })()';
 
@@ -206,7 +215,9 @@ test('WebKit through Playwright, headless on any system: every scheme set, and T
         assert.equal(await p.evaluate('getComputedStyle(document.querySelector(".t")).color'), color);
         const seen = [];
         for (let i = 0; i < 2; i++) { await p.press('Tab', { alt: altTabIn('webkit') }); seen.push(await p.evaluate('document.activeElement.tagName')); }
-        assert.deepEqual(seen, ['BUTTON', 'A'], 'the Tab the pass presses reaches buttons and links: Option-Tab on macOS, as in Safari, Tab alone elsewhere');
+        // Its WebKit on Windows skips every link, with Option or without: there the pass leaves Tab's criteria untried.
+        if (process.platform === 'win32') assert.equal(seen[1], 'BODY', 'WebKit on Windows still skips links: if it reaches them now, try Tab there again (a11y-browsers.mjs untriedIn)');
+        else assert.deepEqual(seen, ['BUTTON', 'A'], 'Option-Tab reaches buttons and links, as in Safari');
         await p.close();
       } finally { await b.close(); }
     }
