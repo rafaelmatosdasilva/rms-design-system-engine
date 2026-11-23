@@ -362,6 +362,21 @@ Any prototype can be drawn as plain text to paste into code review, a ticket or 
 - A part the check found wrong, or one the system lacks, carries a numbered mark, with a note under the drawing.
 - It is drawn from the checked composition, so a name your system does not hold can never look like one of its parts.
 
+### A grade proposed for each problem, for the reviewer to confirm
+
+A team's exit criterion can ask for no Blocker and no Major in a prototype's UX. Each problem the check finds gets a grade proposed for it, with why, so a reviewer starts from a proposal instead of a blank page:
+
+| Grade | When it is proposed | Examples |
+|---|---|---|
+| Blocker | The task stops there | A control that does not do what it shows |
+| Major | A person gets through with real trouble, or some people cannot | Two main actions in view, a target under 24px, a part past the screen's edge, a state the page owes, a dialog that keeps the focus out |
+| Minor | The page reads less well, and nothing is stopped | Alignment, spacing, hierarchy, long lines, a problem only with the words 40% longer |
+
+- **The grade is the reviewer's.** `rms-design-system-engine --grade <prototype> <id> <Blocker|Major|Minor> --by "<name>"` confirms or changes one, with `--why` for the reason. It is kept in `design-system-engine-grades.json` as theirs.
+- **An agent never grades.** The hooks hold a grade the person did not give, and an agent's own edit of that file.
+- **It stays with the problem.** A problem found again keeps its id, so its grade stays. A changed problem is graded again.
+- **Kept with the prototype.** The check record beside the page (`<name>.check.json`) holds each problem, its proposal and the reviewer's grade. `--grade <prototype>` alone lists them.
+
 ### What a prototype still owes a developer
 
 Your prototypes are meant to reach production — handed to the development team as the starting point, not as a picture to rebuild. What that needs was written down nowhere, so the handoff was a conversation each time, and the parts obvious to whoever drew the page were the parts that got missed.
