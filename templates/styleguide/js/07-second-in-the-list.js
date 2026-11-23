@@ -1478,7 +1478,9 @@
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
     // A page whose component changed since it was written: its review is that, whatever else it waits on.
     var isStale = function (p) { return (p.wrong || []).some(function (f) { return f.kind === 'stale'; }); };
-    var reviewTopic = function (p) { return p._part ? IL_PART_TOPIC[p._part] : isStale(p) && p.action === 'review' ? 'Changed since written' : p.recheck && p.action === 'review' ? 'Decision to review again' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    // A page whose only fixes are links to nothing (intent-truth.mjs linkFindings) says so, not Not in the system.
+    var linksOnly = function (p) { var f = (p.wrong || []).filter(function (x) { return x.kind !== 'copy' && x.kind !== 'stale'; }); return p.action === 'fix' && f.length > 0 && f.every(function (x) { return x.kind === 'link'; }); };
+    var reviewTopic = function (p) { return p._part ? IL_PART_TOPIC[p._part] : isStale(p) && p.action === 'review' ? 'Changed since written' : p.recheck && p.action === 'review' ? 'Decision to review again' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : linksOnly(p) ? 'link' : p.action) : 'To check'; };
     // Who a row waits on (ds-config.json owners, decided-by.mjs): its page's, else its component's, else the system's.
     var deciderOf = function (p) { var d = p.decider || (docComp(p) || {}).decider || (p.absent ? IL.systemDecider : null); return d && d.name ? d.name : null; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
@@ -1506,7 +1508,7 @@
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
     // component, a name not in the system, a component with no page, drafts…
     var IL_PART_TOPIC = { move: 'Part of a component', drafts: 'Drafts', rules: 'Rule checks', asks: 'Decisions', other: 'Other changes' };
-    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
+    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', link: 'Links to nothing', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
     // A page with nothing left to do reads Done here (the intent layer's own decision for it is Keep).
     var labelOf = function (k) { if (k === 'keep') return 'Done'; if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     // One status a row: Review (yellow) when a person decides or checks anything, with what under it (and, when there is
