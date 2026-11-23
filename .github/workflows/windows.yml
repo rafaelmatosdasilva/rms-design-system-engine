@@ -59,6 +59,10 @@ jobs:
       # Lit and the Vite a Lit project builds with (test/lit-harness.test.mjs): without them its browser tests skip.
       - name: Install the Lit build tools the Lit tests use
         run: npm ci --prefix test/.lit-tools --no-audit --no-fund
+      # Svelte, its plugin for Vite and the Vite a Svelte project builds with (test/svelte-harness.test.mjs): without them
+      # its browser tests skip.
+      - name: Install the Svelte build tools the Svelte tests use
+        run: npm ci --prefix test/.svelte-tools --no-audit --no-fund
       # Angular's compiler, its builder (which brings Vite) and Angular itself, as an Angular project installs them
       # (test/angular-harness.test.mjs): without them its browser tests skip.
       - name: Install the Angular build tools the Angular tests use
