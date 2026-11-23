@@ -205,7 +205,6 @@
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);
     det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, titleTip: tipNode ? tipNode.outerHTML : '', body: body });
-    det.onclick = function (e) { var cp = e.target.closest('[data-pair-copy]'); if (cp) copyText(cp.getAttribute('data-pair-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
     panelShow(m, from);
   }
   // The side panel from the right a row opens in (and a module's, window.SG.openPanel): its scrim, its close button,

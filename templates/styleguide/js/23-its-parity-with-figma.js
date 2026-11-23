@@ -70,7 +70,7 @@
     (c.pairAsks || []).forEach(function (x) {
       var cmd = function (t) { return String(t).replace(/^rms-design-system-engine\b/, ENGINE); };
       var decide = '<div class="sg-decide-grid">' + [['approve', 'Yes, the same prop', x.yes, x.yesDoes], ['drop', 'No, two props', x.no, x.noDoes]].map(function (d) {
-        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + sysButton('button', 'Copy decision', ' data-pair-copy="' + esc(cmd(d[2])) + '"') + '<span class="sg-decide-said" role="status"></span></div>';
+        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + copyAction('Copy decision', cmd(d[2]), null, 'Copies the decision: paste it in your agent') + SAID + '</div>';
       }).join('') + '</div>';
       var todo = 'Say whether Figma\'s ' + nm(x.figma) + ' is the code\'s ' + nm(x.code) + ': yes or no.', pairWhy = '<p>The engine suggests the pair from their names and never takes it on its own.</p>';
       var at = out.filter(function (r) { return r.type === 'Prop' && r.rel === PAR_REL.figma && r.figma.indexOf('>' + esc(x.figma) + '<') >= 0; })[0];

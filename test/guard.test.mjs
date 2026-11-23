@@ -252,6 +252,12 @@ test('the router as a hook: a request made with the command arrives already rout
   assert.ok(spaced.includes('\nRUN: node "/Users/a/My Drive/engine/audit.mjs" --component chip\n'), spaced);
   assert.ok(refresh.length < MAX_RECIPE);
   assert.equal(ctx('audit the chip'), null);                           // not the command: no opinion
+  // The engine's name alone, as the style guide copies a request so it works in whichever agent it is pasted: routed the
+  // same as Claude Code's /command and Codex's $skill. A sentence that only mentions the engine further on is not one.
+  assert.equal(ctx('rms-design-system-engine audit the chip'), chip);
+  assert.equal(ctx('$rms-design-system-engine audit the chip'), chip);
+  assert.equal(ctx('why does rms-design-system-engine audit the chip slowly?'), null);
+  assert.equal(ctx('rms-design-system-engine-acme audit the chip').split('\n')[1], chip.split('\n')[1], 'a company\'s own command too');
   assert.equal(ctx('/rms-design-system-engine'), null);                   // the command alone: nothing to route
   assert.equal(ctx('/rms-design-system-engine audit the chip', { hooks: false }), null);   // opt-out
 
