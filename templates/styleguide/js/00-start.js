@@ -385,7 +385,9 @@
   }
   // The components a token is used by, as the Status table shows them: whether Figma has each (Found) and the code (Built), and an
   // arrow to its page (one only in Figma has none to open).
-  var STATUS_PILL = function (ok, yes) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? yes || 'Found' : 'Missing') + '</span>'; };
+  // A status with its dot (match, differs, figma, code, none, paired), the one way every page writes one.
+  var parDot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+  var STATUS_PILL = function (ok, yes) { return parDot(ok ? 'match' : 'differs', ok ? yes || 'Found' : 'Missing'); };
   var USERS_ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A filter's mark: three lines, each shorter, centred. Shared, as the sort mark is: the pages that filter are built
   // before the Status page's part runs.
