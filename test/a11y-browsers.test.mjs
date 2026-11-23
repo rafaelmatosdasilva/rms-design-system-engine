@@ -19,7 +19,7 @@ test('the pass answers only criteria a browser decides, each by its own kind of 
     assert.equal(WCAG22.find((c) => c.sc === sc)?.browser, 'each', sc);
     for (const k of p.kinds) assert.equal(WCAG_KIND[k], sc, k);
   }
-  assert.deepEqual(Object.keys(PASS), ['1.4.4', '1.4.10', '1.4.12', '2.1.1', '2.4.7', '2.5.8']);
+  assert.deepEqual(Object.keys(PASS), ['1.4.4', '1.4.10', '1.4.12', '2.1.1', '2.4.7', '2.5.8', '2.1.2', '2.4.3', '2.4.11']);
 });
 
 test('a key press is a real one, with its modifiers held around it', () => {
@@ -92,5 +92,38 @@ test('in Chrome and Firefox: real Tab presses, and a focus ring Firefox alone ta
     assert.equal(browserLine(rows['2.4.7']), 'Chrome ✕ · Firefox ✕');
     assert.deepEqual(rows['2.4.7'].only, [{ desc: 'button.ff', browsers: ['Firefox'] }]);
     assert.deepEqual(differByBrowser(run), []);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Three more criteria from the same Tab walk, as Chrome's own check reads them, now in every browser: a component that
+// holds the focus (2.1.2), a positive tabindex (2.4.3), and a control hidden behind something when focused (2.4.11).
+const TRAP = `<!doctype html><html><head><meta charset="utf-8"><style>
+  .cover { position: relative; display: inline-block; } .lid { position: absolute; inset: 0; background: #fff; }
+</style></head><body><section id="c-trap"><div class="pg-preview">
+  <button id="a">First</button><button id="b">Second</button>
+</div></section><section id="c-order"><div class="pg-preview">
+  <button>Plain</button><button tabindex="3">Jumps the queue</button><div class="cover"><button id="hid">Under a cover</button><div class="lid"></div></div>
+</div></section><p><a href="#after">After</a></p>
+<script>
+  // Tab on the second button goes back to the first, Shift+Tab on the first back to the second: the focus never leaves.
+  document.getElementById('b').addEventListener('keydown', (e) => { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('a').focus(); } });
+  document.getElementById('a').addEventListener('keydown', (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); document.getElementById('b').focus(); } });
+</script></body></html>`;
+
+test('in Chrome and Firefox: a focus held, a positive tabindex and a control hidden when focused, said in each', { skip: !(HERE.chrome && HERE.firefox) && 'Chrome and Firefox are both needed', timeout: budget(180000) }, async () => {
+  const dir = makeFixture({});
+  const page = join(dir, 'trap.html');
+  writeFileSync(page, TRAP);
+  try {
+    const run = await a11yBrowsers({ url: () => pathToFileURL(page).href, components: ['trap', 'order'], browsers: [{ name: 'chrome', path: HERE.chrome }, { name: 'firefox', path: HERE.firefox }], open: openBrowser, rootOf: (n) => `#c-${n} .pg-preview` });
+    assert.deepEqual(run.refused, []);
+    for (const l of ['Chrome', 'Firefox']) {
+      const of = (c) => run.components[c][l].map((f) => f.kind);
+      assert.ok(of('trap').includes('tabtrap'), `${l} trap: ${of('trap')}`);
+      assert.ok(of('order').includes('tabindex'), `${l} order: ${of('order')}`);
+      assert.ok(of('order').includes('obscured'), `${l} order: ${of('order')}`);
+      assert.ok(!of('order').includes('tabtrap'), `${l}: nothing holds the focus there`);
+    }
+    assert.equal(browserLine(browserRows(run, 'trap')['2.1.2']), 'Chrome ✕ · Firefox ✕');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
