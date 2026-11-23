@@ -124,6 +124,29 @@ test('emits token $description/$deprecated (tokenMeta), captured component descr
   assert.equal(c.props.find((p) => p.name === 'disabled').description, 'Whether the button is disabled.');  // authored
 });
 
+test('each token keeps Figma\'s id for it, a text style its own, never a variable\'s of the same short name', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root{}\n',
+    'vars.json': {
+      color: { light: { 'text/primary': '#111' }, dark: { 'text/primary': '#eee' } },
+      sizing: { m: '4px', l: '8px' },
+      typography: { 'body/m': { size: '14px', weight: 400, lh: '20px' }, 'caption/l': { size: '12px', weight: 400, lh: '16px' } },
+      tokenIds: { 'text/primary': 'VariableID:1:1', m: 'VariableID:1:2', l: 'VariableID:1:3' },
+      textStyleIds: { 'body/m': 'S:abc' },
+    },
+    'struct.json': { components: {} },
+    'props.json': {},
+  });
+  const r = await generateContracts(dir, { paths: cfg.paths, figma: cfg.figma }, {});
+  const tokens = JSON.parse(readFileSync(r.tokensOut, 'utf8'));
+  const id = (leaf) => leaf.$extensions?.['com.rms.design-system-engine']?.figmaId ?? null;
+  assert.equal(id(tokens.text.primary), 'VariableID:1:1', 'a colour, beside its other modes');
+  assert.equal(id(tokens.m), 'VariableID:1:2');
+  assert.equal(id(tokens.typography.m), 'S:abc', 'a text style its own');
+  assert.equal(id(tokens.typography.l), null, 'never the variable named l');
+  assert.equal(tokens.text.primary.$extensions['com.rms.design-system-engine'].modes.dark, '#eee', 'the modes kept beside it');
+});
+
 test('lints contract.authored.json: a malformed binding is surfaced, a valid one is not', async () => {
   const dir = fixture();
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({

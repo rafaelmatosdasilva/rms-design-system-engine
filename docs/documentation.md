@@ -133,7 +133,7 @@ Each part, in DSDS's own terms:
 - **What never goes together** is a `combo` on the component, at `must-not`, where the other component has an entry. One the view has none for stays a sentence in its guidelines.
 - **Shared rules.** How your system builds a component in Figma and in the code (`contracts/construction.json`) is written once, in the index's `shared` list. A rule every component follows is a `must`, one most follow or your team decided is a `should`, and one still to decide is left out.
 - **The status on each platform.** A component Figma has and your code does not yet is `planned` on each platform the system ships on, beside its own status.
-- **A uuid that survives a rename.** Each component, page and theme gets one, made from what stays when a name changes: the Figma node, the code file, the page's file. When one of those changes too, the uuid the last build wrote is kept while any other still matches.
+- **A uuid that survives a rename.** Each component, page, theme and token gets one, made from what stays when a name changes: the Figma node, the code file, the page's file, Figma's own id for a variable or text style. When one of those changes too, the uuid the last build wrote is kept while any other still matches. A token gets its uuid once Figma is read again with this version (the read keeps each variable's id, and `tokens.json` carries it), and a token read through a route that gives no id has none.
 
 Every file it writes passes DSDS's own schema for the version it is written in, and DSDS's own reference validator over the whole view:
 
