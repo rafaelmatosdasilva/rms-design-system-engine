@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Each Showroom screen drawn in a frame as wide as the screen, and motion differences at their own line (continuous evaluation)
+
+What changed since the entry below (engine bbc0ab79): A theme that follows the page's colour scheme measured and drawn in dark too (#652); A prototype's check keeps each width it was drawn at, and holds its copy to the team's content guidance (#648); Playwright drives the browsers when it is here, the engine's own drivers when it is not (#639); A second pass on an agent's change: inside the system, and what was asked (#653); The component catalog written for A2UI too (#655); Which layers of the agent harness a project has, said in one place (#656); A page rebuilt from the system keeps its wiring (#654); The A2UI versions the engine writes are in the list of pins it watches (#658); Windows counts a skip as a gap, apart from the Playwright path its own job runs (#657); What following the guide cost a run before it did anything, measured (#659); Two widths drawn the same, though the CSS has rules for one and not the other, said (#660); The harness test expects the engine's path as the system writes it, on Windows too (#662); A grade proposed for each problem a prototype's check finds, for the reviewer to confirm (#661); test-tools: bump fast-check in /test/.ci-tools in the ci-tools group (#664); test-tools: bump @anthropic-ai/claude-agent-sdk (#665); actions: bump ossf/scorecard-action (#666); A prototype says what it only pretends to do (#663); Motion differences point at the line the transition or animation is written on; Each Showroom screen drawn in a frame as wide as the screen. The guide changed in `reference/usage.md`.
+
+Guide set measured: `006b76e02a74` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md aef052f2` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md c9aff215` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 9e2d83b2 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.056 | 0.058 |
+| Input a run | 85k | 90k |
+| Turns a run | 2.9 | 3.1 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 90k a run against 85k, in 3.1 turns against 2.9. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-each-showroom-screen-in-its-frame`.
+
 ## 2026-11: Playwright drives the browsers, measured with main's page loads in a product's health (continuous evaluation)
 
 What changed since the entry below (engine ab15a9eb): Option-Tab in WebKit again, and Tab's criteria left untried in WebKit on Windows, which reaches no link; The guide's evaluation on Windows is on record: 82 of 82, and what its first run taught (#646); Each rule kept as a decision: how strongly it binds, the mistake it stops, and why (#649); Lit and Angular badges on the parts a real run proves: parity, accessibility and the playground (#650); A product's pages opened in a browser for its health: what they load from other hosts and how long they take (#651). The guide changed in `reference/usage.md`.
