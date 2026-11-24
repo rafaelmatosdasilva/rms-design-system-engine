@@ -335,5 +335,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-24-the-tokens-as-a-wordpress` | The 25 guide tasks on Haiku (engine 599fbbaf) | "The tokens as a WordPress theme from Figma, every mode carried, and a patch for the theme" |
 | `2026-11-24-the-contracts-as-a-wordpress` | The 25 guide tasks on Haiku (engine b570a62f) | "The contracts as a WordPress theme: the button, link and headings styled by the system, only what theme.json can say" |
 | `2026-11-24-guide-inside-compaction` | The 25 guide tasks on Haiku (engine f59f9c73) | "The main guide is held inside what a compaction keeps" |
+| `2026-11-24-a-project-with-no-react` | The 25 guide tasks on Haiku (engine f497927a) | "React components checked, drawn and read as Vue's are" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
