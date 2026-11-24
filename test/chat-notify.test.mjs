@@ -69,3 +69,26 @@ test('the page of the run that is posting, as each host gives it', () => {
   assert.equal(jobUrl({ GITHUB_SERVER_URL: 'https://github.com' }), null, 'half of it is no link');
   assert.equal(jobUrl({}), null);
 });
+
+test('what changed since the run before: what got worse first, then what was fixed, from the parity history', async () => {
+  const { sinceLast, runMessage } = await import('../lib/chat-notify.mjs');
+  const run = (gates) => ({ gates: Object.entries(gates).map(([label, pass]) => ({ label, pass })) });
+  const hist = [run({ 'Token values': true, Icons: false, Shadows: true }), run({ 'Token values': false, Icons: true, Shadows: true, 'A new check': false })];
+  // A check the run before had no word for is neither worse nor fixed: it is new.
+  assert.deepEqual(sinceLast(hist), { worse: ['Token values'], better: ['Icons'] });
+  assert.equal(runMessage({ project: 'Acme', failed: 2, checks: 26, since: sinceLast(hist) }), 'Acme: 2 of 26 checks fail · worse since the last run: Token values · fixed since the last run: Icons');
+  assert.equal(runMessage({ failed: 1, checks: 3, since: sinceLast([run({ a: false }), run({ a: false })]) }), '1 of 3 checks fail · no check changed since the last run', 'an old failure is said as old');
+  // A check the Figma plan held back moved for no reason in the code: never said as worse.
+  assert.deepEqual(sinceLast([{ gates: [{ label: 'Frame', pass: true }] }, { gates: [{ label: 'Frame', pass: false, planLimited: true }] }]), { worse: [], better: [] });
+  assert.equal(sinceLast([run({ a: true })]), null, 'the first run has nothing to compare with');
+  assert.equal(runMessage({ failed: 0, checks: 3, since: null }), 'all 3 checks pass');
+});
+
+test('a style guide build in one line: built or not, what it holds, its page check, and whether it was published', async () => {
+  const { buildMessage } = await import('../lib/chat-notify.mjs');
+  assert.equal(buildMessage({ project: 'Acme', components: '12 components agreed', published: true, url: 'https://ci.example.com/1' }), 'Acme: style guide built · 12 components agreed · published to the page the team opens · https://ci.example.com/1');
+  assert.equal(buildMessage({ components: '12 components agreed', published: false }), 'style guide built · 12 components agreed · not published: the team\'s page is behind it');
+  assert.equal(buildMessage({ components: '12 components agreed', problems: 2, published: false }), 'style guide built · 12 components agreed · its page check found 2 problems, so it was not published');
+  assert.equal(buildMessage({ components: '12 components agreed' }), 'style guide built · 12 components agreed', 'already the page the team opens: nothing to add');
+  assert.equal(buildMessage({ built: false, why: 'its script stopped' }), 'the style guide was not built: its script stopped');
+});

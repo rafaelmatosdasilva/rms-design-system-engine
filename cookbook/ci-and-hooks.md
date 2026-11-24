@@ -84,8 +84,9 @@ A check that fails is an error, one that only advises a warning, and what blocks
 finding about the system rather than a file keeps no line, and the run says how many of those there are, so a shorter
 report is never read as every finding.
 
-**The result in the team's chat.** Add `--notify` to a scheduled run and it posts one line saying what failed, what is
-open, where to read it and which job said so. The address goes in the job's secrets as `DSE_CHAT_WEBHOOK` and is read
+**The result in the team's chat.** Add `--notify` to a scheduled run and it posts one line saying what failed, what got
+worse or was fixed since the run before, what is open, where to read it and which job said so; on a style guide build
+it says whether the page was built and published. The address goes in the job's secrets as `DSE_CHAT_WEBHOOK` and is read
 from there alone, never from `ds-config.json` and never printed, and it must be `https`. It posts `{ "text": "…" }`,
 which is what most chat services read; one that reads another field is named with `DSE_CHAT_FORMAT=content`. With
 `DSE_CHAT_WEBHOOK` unset the run says so and posts nothing.

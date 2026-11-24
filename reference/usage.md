@@ -1651,8 +1651,10 @@ file the team's own review surface reads, inventing nothing.
   can wait on.
 - **`--code-quality [file]`** writes **GitLab's code quality** report (`code-quality.json` by default): name it as the
   job's `artifacts.reports.codequality` and each finding shows in the merge request's widget and on the line.
-- **`--notify`** posts one line to the team's chat saying what failed, what is open, where the whole of it is and
-  which job said so. The address is read from `DSE_CHAT_WEBHOOK` in the run's environment and from nowhere else: never
+- **`--notify`** posts one line to the team's chat saying what failed, which checks got worse or were fixed since the
+  run before (from the parity history), what is open, where the whole of it is and which job said so. With
+  `--styleguide` it posts when the build ends: built or not, what the page holds, its page check, and whether it was
+  published to the page the team opens. The address is read from `DSE_CHAT_WEBHOOK` in the run's environment and from nowhere else: never
   `ds-config.json`, never a file, never printed, so a public repository cannot carry it. It must be `https`, or nothing
   is sent and the run says why. What it posts is one field of JSON, `{ "text": "…" }`, which is what most services
   read; a service that reads another is named by the team (`DSE_CHAT_FORMAT=content`, which is what Discord reads).
