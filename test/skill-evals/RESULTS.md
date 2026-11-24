@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The team's chat hears what got worse since the run before, and a spec says nothing is in Figma yet (continuous evaluation)
+
+What changed since the entry below (engine 00f30f19): Three rounds the check answers the same way go to the person (#704); The style guide is the control center the page already called itself (#710); The team's chat hears what got worse since the run before, and when a style guide build ends; A spec says nothing is in Figma yet, so its summary never reads as a component made there. The guide changed in `cookbook/ci-and-hooks.md`, `reference/usage.md`.
+
+Guide set measured: `124c5f262298` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 23f08edc` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 337ea2f8` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 851bd4e2` `reference/usage.md 937f6314` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine d4fc6de1 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.049 |
+| Input a run | 82k | 76k |
+| Turns a run | 3.4 | 3.1 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 76k a run against 82k, in 3.1 turns against 3.4. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-chat-says-what-got-worse`.
+
 ## 2026-11: The rename measured: 82/82, and where a measurement has to run (continuous evaluation)
 
 What changed since the entry below (engine ca33340d): Confluence read from a real site: links under a site's own path, public pages with no sign-in, sub-pages walked when the quick call fails (#708); A main that stays red says so, and a main that flakes once does not (#709); The changes made in Figma are read in History, not on a page of their own (#689); The style guide is the control center the page already called itself; The rename measured: 82/82, and where a measurement has to run. The guide changed in `cookbook/a11y-notes.md`, `cookbook/ci-and-hooks.md`, `cookbook/figma-edits.md`, `cookbook/first-setup.md`, `cookbook/guidelines-links.md`, `cookbook/publish-styleguide.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/personality.md`, `reference/usage.md`, `rms-design-system-engine.md`.
