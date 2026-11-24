@@ -99,8 +99,10 @@ before(async () => {
   url = `http://127.0.0.1:${port}`;
   let said = '';
   server = runBin(BIN, ['server', `--port=${port}`, `--wp=${WORDPRESS}`, `--blueprint=${join(root, 'blueprint.json')}`,
-    `--mount=${join(root, 'acme')}:/wordpress/wp-content/themes/acme`, `--mount=${join(root, 'acme-fluid')}:/wordpress/wp-content/themes/acme-fluid`,
-    `--mount=${join(root, 'proof')}:/wordpress/engine-proof`], (file, args, opts) => spawn(file, args, opts), { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+    // Each folder and where it sits in WordPress as two arguments (--mount-dir), never one joined by a colon (--mount),
+    // which a Windows path's own colon (D:\…) breaks.
+    '--mount-dir', join(root, 'acme'), '/wordpress/wp-content/themes/acme', '--mount-dir', join(root, 'acme-fluid'), '/wordpress/wp-content/themes/acme-fluid',
+    '--mount-dir', join(root, 'proof'), '/wordpress/engine-proof'], (file, args, opts) => spawn(file, args, opts), { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.on('data', (d) => { said += d; });
   server.stderr.on('data', (d) => { said += d; });
   // Ready once WordPress answers the proof, which it does only once it is installed with the theme active.
