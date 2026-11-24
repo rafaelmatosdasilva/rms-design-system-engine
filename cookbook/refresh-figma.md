@@ -1578,7 +1578,7 @@ For every changed or new token:
 
 ## Phase 1 - Step 5: Update snapshots
 
-Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in), `_collections` (the collections the capture read, from which the engine fills what setup could not know) and the probe's `brokenAliases` (a variable that points at one no longer in the file; `[]` when none) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
+Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the control center lists them in), `_collections` (the collections the capture read, from which the engine fills what setup could not know) and the probe's `brokenAliases` (a variable that points at one no longer in the file; `[]` when none) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
 
 > **Also stamp `_figmaVersion` on the vars snapshot.** Fetch it with
 > `GET /v1/files/{key}?depth=1` (the `version` field) and write it alongside `_updated`.

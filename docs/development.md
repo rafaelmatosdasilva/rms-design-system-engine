@@ -25,7 +25,7 @@ The engine's modules are in `lib/`. Four files stay at the root because people's
 | `audit.mjs` | the `rms-design-system-engine` command |
 | `guard.mjs` | the Claude Code hooks |
 | `mcp.mjs` | the MCP server |
-| `styleguide-files.mjs` | the style guide publishing job |
+| `styleguide-files.mjs` | the control center publishing job |
 
 Each one only loads its module from `lib/`.
 
@@ -245,6 +245,6 @@ So every pull request also carries one `after:` label, and the release's notes g
 | `after: nothing` | Nothing to do. Almost always the answer, and what a pull request with no `after:` label counts as. |
 | `after: refresh figma` | Refresh Figma, so the engine reads your library again. |
 | `after: run setup` | Run setup again, so your configuration takes what changed. |
-| `after: build the style guide` | Build the style guide again, so its pages show what changed. |
+| `after: build the style guide` | Build the control center again, so its pages show what changed. |
 
 Each line names the changes that ask it. A release that asks nothing says so in one line rather than staying silent — silence reads as nobody having written it down.
