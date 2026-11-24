@@ -2,7 +2,7 @@
 // (scaffold.mjs), handed back as a patch, and checked by the engine once it is applied.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { cpSync, readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -51,6 +51,12 @@ test('--scaffold in build mode: asks what it cannot tell, hands back a patch, an
   mkdirSync(join(root, 'src/styles'), { recursive: true });
   writeFileSync(join(root, 'src/styles/tokens.css'), readFileSync(join(root, '.design-system-engine-out/handback/tokens-to-build.css'), 'utf8'));
   assert.match(cli('--scaffold').stdout, /needs what the components are written in \(vue, react or shadcn\) and the folder they go in[\s\S]*NEXT: ask the person/);
+  // A project that lists both Vue and React is asked which, never given Vue for listing it first.
+  const pkgFile = join(root, 'package.json');
+  const pkgWas = existsSync(pkgFile) ? readFileSync(pkgFile, 'utf8') : null;
+  writeFileSync(pkgFile, JSON.stringify({ name: 'tidepool', private: true, dependencies: { vue: '3', react: '19' } }));
+  assert.match(cli('--scaffold', '--folder', 'src/components').stdout, /needs what the components are written in \(vue, react or shadcn\)[\s\S]*NEXT: ask the person/);
+  if (pkgWas == null) rmSync(pkgFile); else writeFileSync(pkgFile, pkgWas);
   const out = cli('--scaffold', '--framework', 'vue', '--folder', 'src/components').stdout;
   assert.match(out, /🧱 10 files written from what is exact in Figma \(vue\), in build order/);
   assert.match(out, /• button → src\/components\/Button\.vue \+ src\/components\/button\.css/);

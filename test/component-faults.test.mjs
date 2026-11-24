@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { componentFaults, faultLines, partsOf } from '../lib/component-faults.mjs';
+import { componentFaults, faultLines, partsOf, scriptText } from '../lib/component-faults.mjs';
 import { componentOf } from '../lib/run-diff.mjs';
 import { systemFacts, checkPage } from '../lib/intent-truth.mjs';
 import { codeSnapshotPath } from '../lib/names.mjs';
@@ -214,4 +214,112 @@ test('a slot Figma stretches its content in, inside a column of the code that dr
   assert.match(f[0].says, /"sheet-body" slot is drawn at its own width: the element around it \(\.acme-sheet\) is a column with align-items: flex-start, while Figma's slotBody stretches/);
   assert.deepEqual(componentFaults([sheet('stretch')], { styles: css(sheet('stretch')), stretched: { acmeSheet: { 'sheet-body': 'slotBody' } } }), []);
   assert.deepEqual(componentFaults([sheet('flex-start')], { styles: css(sheet('flex-start')) }), [], 'a slot Figma does not stretch is not asked');
+});
+
+// ── React ─────────────────────────────────────────────────────────────────────────────────────────────────
+// The same faults in a React component's own code (.jsx, .tsx), read from its returned JSX as the same tree a Vue
+// template is, each said in React's own terms. The same invented system (Acme), written in React.
+test('React: a className no rule styles is said, and the classes of its own markup are never read as a script\'s hooks', () => {
+  const tile = { name: 'acmeTile', file: 'src/tiles/Tile.jsx', text: `import './tile.css';
+export function Tile({ flat, tone }) {
+  return (<div className={clsx('acme-tile', { 'is-flat': flat })}>
+    <p className="acme-tile-empty">Nothing yet</p>
+  </div>);
+}` };
+  const f = componentFaults([tile], { styles: ['.acme-tile { display: flex }'], scripts: [scriptText(tile.file, tile.text)] }).filter((x) => x.kind === 'unstyled');
+  assert.equal(f.length, 2);
+  assert.match(f[0].says, /\.acme-tile-empty/);
+  assert.match(f[1].says, /\.is-flat/);
+  assert.equal(f[0].file, 'src/tiles/Tile.jsx');
+  assert.equal(f[0].line, 4, 'on the line of the element');
+  // A class a script really looks for stays a hook.
+  assert.equal(componentFaults([tile], { styles: ['.acme-tile{}'], scripts: ['el.closest(".acme-tile-empty")'] }).filter((x) => x.kind === 'unstyled' && /empty/.test(x.says)).length, 0);
+});
+
+test('React: one click that calls the same callback twice, the child\'s and the row\'s around it', () => {
+  const tick = { name: 'acmeTick', file: 'src/tick/Tick.jsx', text: `export function Tick({ onPick }) {
+  return (<label className="acme-tick" onClick={() => onPick(true)}><input type="checkbox" /></label>);
+}` };
+  const row = (stop) => ({ name: 'acmePickerRow', file: 'src/picker/Row.jsx', text: `export function Row({ item, onSelect }) {
+  const pick = () => onSelect(item);
+  return (<li className="acme-row" onClick={${stop ? '(e) => { e.stopPropagation(); onSelect(item); }' : '() => onSelect(item)'}}><Tick onPick={pick} /></li>);
+}` });
+  const f = componentFaults([tick, row(false)], { styles: ['.acme-tick{} .acme-row{}'] }).filter((x) => x.kind === 'twice');
+  assert.equal(f.length, 1);
+  assert.equal(f[0].component, 'acmePickerRow');
+  assert.match(f[0].says, /one click on acmeTick's <label className="acme-tick"> calls `onSelect` twice: acmeTick calls `onPick` \(passed on as `onSelect`\)/);
+  assert.match(f[0].says, /event\.stopPropagation\(\)/, 'the fix in React\'s terms');
+  assert.deepEqual(componentFaults([tick, row(true)], { styles: ['.acme-tick{} .acme-row{}'] }).filter((x) => x.kind === 'twice'), [], 'a row that stops the event is fine');
+});
+
+test('React: children drawn inside a .map() show the same content in every row; a render prop does not', () => {
+  const list = (body) => ({ name: 'acmeList', file: 'src/list/List.tsx', text: `export const List = ({ items, children, renderItem }: ListProps) => (
+  <ul className="acme-list">{items.map((it) => <li key={it.id} className="acme-list-row">${body}</li>)}</ul>
+);` });
+  const f = componentFaults([list('{children}')], { styles: ['.acme-list{} .acme-list-row{}'] }).filter((x) => x.kind === 'sameSlot');
+  assert.equal(f.length, 1);
+  assert.match(f[0].says, /its `children` are drawn inside a \.map\(\)/);
+  assert.deepEqual(componentFaults([list('{renderItem(it)}')], { styles: ['.acme-list{} .acme-list-row{}'] }).filter((x) => x.kind === 'sameSlot'), []);
+});
+
+test('React: a prop copied into its own state, or read only in an effect that runs once, is read once', () => {
+  const panel = (body, jsx = '{isOpen && <div className="acme-panel-body" />}') => ({ name: 'acmePanel', file: 'src/panel/Panel.jsx', text: `import { useState, useEffect } from 'react';
+export function Panel({ startOpen, title }) {
+${body}
+  return (<section className="acme-panel"><h2>{title}</h2>${jsx}</section>);
+}` });
+  const once = (c) => componentFaults([c], { styles: ['.acme-panel{} .acme-panel-body{}'] }).filter((x) => x.kind === 'once');
+  const f = once(panel('  const [isOpen, setOpen] = useState(startOpen);'));
+  assert.equal(f.length, 1);
+  assert.match(f[0].says, /`startOpen` is read once, when it is mounted .*open or close it from outside\. Read it as it is on each render/);
+  assert.equal(f[0].line, 3);
+  assert.equal(once(panel('  const [isOpen, setOpen] = useState(false);\n  useEffect(() => { setOpen(startOpen); }, []);')).length, 1, 'an effect that runs once');
+  assert.deepEqual(once(panel('  const [isOpen, setOpen] = useState(false);\n  useEffect(() => { setOpen(startOpen); }, [startOpen]);')), [], 'one that follows it is fine');
+  assert.deepEqual(once(panel('  const isOpen = startOpen;')), [], 'read on each render is fine');
+  assert.deepEqual(once(panel('  const [isOpen] = useState(startOpen);', '{startOpen && <div className="acme-panel-body" />}')), [], 'and so is one the markup reads too');
+});
+
+test('React: a longer text shown with its line breaks lost; one with white-space pre-line is not; HTML in one, text in another', () => {
+  const note = (style) => ({ name: 'acmeNote', file: 'src/notes/Note.jsx', text: `export function Note({ description, label }) {
+  return (<div className="acme-note"><b>{label}</b><p className="acme-note-text"${style}>{description}</p></div>);
+}` });
+  const css = ['.acme-note{} .acme-note-text{}'];
+  const f = componentFaults([note('')], { styles: css }).filter((x) => x.kind === 'breaks');
+  assert.equal(f.length, 1);
+  assert.match(f[0].says, /a line break in its `description` is lost/);
+  assert.deepEqual(componentFaults([note(" style={{ whiteSpace: 'pre-line' }}")], { styles: css }).filter((x) => x.kind === 'breaks'), []);
+  const rich = { name: 'acmeNoteRich', file: 'src/notes/Rich.jsx', text: `export function Rich({ description }) {
+  return (<div className="acme-note" style={{ whiteSpace: 'pre-line' }} dangerouslySetInnerHTML={{ __html: description }} />);
+}` };
+  const u = componentFaults([note(" style={{ whiteSpace: 'pre-line' }}"), rich], { styles: css }).filter((x) => x.kind === 'unlike');
+  assert.equal(u.length, 1);
+  assert.equal(u[0].component, 'acmeNote');
+  assert.match(u[0].says, /its `description` takes text only, while acmeNoteRich takes HTML/);
+});
+
+test('React: an on/off that hides more than in Figma, a children slot that shrinks, and a part imported with no extension', () => {
+  const drop = { name: 'acmeDrop', file: 'src/drop/Drop.jsx', text: `export function Drop({ label, hint, showArea }) {
+  return (<div className="acme-drop">{showArea && (<div className="acme-drop-region"><div className="acme-drop-label">{label}</div><div className="acme-drop-area" /><p className="acme-drop-hint">{hint}</p></div>)}</div>);
+}` };
+  const h = componentFaults([drop], { styles: ['.acme-drop{} .acme-drop-region{} .acme-drop-label{} .acme-drop-area{} .acme-drop-hint{}'], toggles: { acmeDrop: { showArea: ['Area'], showLabel: ['Label'], showHint: ['Hint'] } } }).filter((x) => x.kind === 'hidesMore');
+  assert.equal(h.length, 1);
+  assert.match(h[0].says, /turning `showArea` off in the code also hides its label \(\.acme-drop-label\) and hint \(\.acme-drop-hint\)/);
+  const sheet = { name: 'acmeSheet', file: 'src/sheet/Sheet.jsx', text: `export function Sheet({ children }) {
+  return (<div className="acme-sheet"><h2 className="acme-sheet-title">Title</h2>{children}</div>);
+}` };
+  const s = componentFaults([sheet], { styles: ['.acme-sheet { display: flex; flex-direction: column; align-items: flex-start; } .acme-sheet-title{}'], stretched: { acmeSheet: { default: 'Body' } } }).filter((x) => x.kind === 'shrinks');
+  assert.equal(s.length, 1);
+  assert.match(s[0].says, /what goes in its "default" slot is drawn at its own width/);
+  const card = { name: 'acmeCard', file: 'src/card/Card.jsx', text: "import { Base } from './Base';\nexport function Card() { return (<Base />); }" };
+  const base = { file: 'src/card/Base.jsx', text: 'export function Base() { return (<div className="acme-card-base">x</div>); }' };
+  assert.deepEqual(partsOf(card, [base]).map((f) => f.file), ['src/card/Base.jsx']);
+  assert.match(componentFaults([card], { styles: [''], files: [base] }).find((x) => x.kind === 'unstyled')?.says ?? '', /\.acme-card-base/, 'what its part does wrong is said on it');
+});
+
+test('React: the fix for a fault is said in React\'s terms, Vue\'s in Vue\'s', async () => {
+  const { plainAction } = await import('../lib/run-diff.mjs');
+  assert.match(plainAction('acmePanel: Read once. `startOpen` is read once, when it is mounted  (src/panel/Panel.jsx:3)', 'acmePanel').todo, /controlled prop with its onChange/);
+  assert.match(plainAction('acmeRow: Fires twice. One click on acmeTick\'s <label>  (src/picker/Row.tsx:3)', 'acmeRow').todo, /stopPropagation/);
+  assert.match(plainAction('acmeList: Same content in every row. Its `children`  (src/list/List.tsx:2)', 'acmeList').todo, /render prop/);
+  assert.match(plainAction('acmePanel: Read once. `startOpen` is read once  (src/panel/Panel.vue:11)', 'acmePanel').todo, /v-model/);
 });

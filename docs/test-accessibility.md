@@ -47,9 +47,13 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
   capture, your structure contract or your config. A published library often has none of those, and its own code is
   then the list, the same one your control center's pages are built from. A file that draws nothing of its own (a
   context, a provider, a feature-flag holder) is not a component. The run says how many it read that way.
-- **Your React, not an imitation of it.** React components are drawn with the React and the Vite your project has
-  installed, so a component that keeps state, reads a context or renders through a portal behaves here as it does in
-  your product. Without React installed, a smaller stand-in draws what it can and the run says what it left out.
+- **Your React, not an imitation of it.** React components are drawn with the React and the build your project has
+  installed (its Vite, or its webpack), so a component that keeps state, reads a context or renders through a portal
+  behaves here as it does in your product. Without React installed, a smaller stand-in draws what it can and the run
+  says what it left out.
+- **Every variant, beside your pages.** Your Vue or React components are drawn in each of their variants on a page of
+  their own and checked beside your control center and your pages, on every run. A variant no page shows is still
+  tried. Before, a React system's components were drawn this way only when it had no control center.
 - **Your Lit, Angular or plain Web Component, too.** A component written as a class is drawn by your own Vite and
   read where it really lives, through its shadow root. Each case is set the way its framework reads it: a property
   for Lit, an input for Angular, and for a custom element written with no library, each watched attribute under its
