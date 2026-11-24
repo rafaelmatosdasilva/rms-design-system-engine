@@ -1,5 +1,5 @@
 // The codebase rules read Lit and Angular components as they read Vue and React: Lit's :host and its styles module,
-// Angular's styles and styleUrls, each component's own template (code-grammar.mjs).
+// Angular's styles and styleUrls, a plain Web Component's <style>, each component's own template (code-grammar.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -59,4 +59,39 @@ export class BadgeComponent {}`);
   const g = await codeGrammarFor(root, {}, { reports: false });
   const a = Object.values(g.code.anatomy)[0];
   assert.ok(a?.states.some((s) => s.state === 'focus'), JSON.stringify(a));
+});
+
+test('a Web Component with no library has its styles read from the <style> of its template, and one with none says so', async () => {
+  const root = tempDir('wc-style-grammar-');
+  mkdirSync(join(root, 'src'), { recursive: true });
+  writeFileSync(join(root, 'src/acme-check.js'), `const template = document.createElement('template');
+template.innerHTML = \`
+  <style>
+    :host { display: inline-block; width: var(--size-m); }
+    :host([checked]) { background: var(--check-on); }
+    :host([disabled]) { opacity: var(--opacity-disabled); }
+  </style>
+\`;
+class AcmeCheck extends HTMLElement {
+  static get observedAttributes() { return ['checked', 'disabled']; }
+  constructor() { super(); this.attachShadow({ mode: 'open' }); this.shadowRoot.appendChild(template.content.cloneNode(true)); }
+  get checked() { return this.hasAttribute('checked'); }
+  set checked(v) { this.toggleAttribute('checked', Boolean(v)); }
+}
+customElements.define('acme-check', AcmeCheck);
+`);
+  writeFileSync(join(root, 'src/acme-hint.js'), `class AcmeHint extends HTMLElement {
+  connectedCallback() { this.setAttribute('role', 'tooltip'); }
+}
+customElements.define('acme-hint', AcmeHint);
+`);
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'acme-wc' }));
+  const g = await codeGrammarFor(root, {}, { reports: false });
+  const a = g.code.anatomy['acme-check'];
+  assert.ok(a, JSON.stringify(g.code.notRead));
+  assert.equal(a.root, '.acme-check');
+  const states = a.states.map((s) => s.state);
+  assert.ok(states.includes('checked') && states.includes('disabled'), JSON.stringify(a.states));
+  assert.ok(a.states.every((s) => /acme-check\.js:[4-6]$/.test(s.at)), 'each state points at its own line: ' + JSON.stringify(a.states.map((s) => s.at)));
+  assert.deepEqual(g.code.notRead, [{ component: 'acme-hint', file: 'src/acme-hint.js', why: 'no styles of its own' }]);
 });
