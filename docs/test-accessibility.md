@@ -450,6 +450,9 @@ look at, **how to look at it**, and keeps the answer only while it is still true
 - **Several pages are tried at once.** When many need trying, a few browsers share them out (`a11y.parallel`, by default a quarter of the computer's cores), and the report is the same as one browser's.
 - **Each part lays out only its own components.** The style guide's own screens (Status, History, Documentation) are left out of a part's page. They hold a copy of every component, and on a big guide laying them out made each part slow, until the browser stopped answering.
 - **A run stays inside its time.** The browsers that share the parts, and then the run itself, each stop on their own before `a11y.timeoutSec` runs out. What they checked is kept, so the next run goes on from there.
+- **Each page gets time for each component it draws.** That holds for a part of the style guide, and for the page your own build draws with every component in each variant. On a large system that page used to get one page's time, so it was stopped halfway on every run, even a run of one component.
+- **Your build's page is checked beside the parts.** It gets a browser of its own and its own time, while the parts are shared out. Your build is started once, never once per browser.
+- **A stopped run says where it was.** It names the page it was on and how many of that page's checks were done, so a slow system is told apart from a stuck check.
 - **A check of a few components opens only their parts.** `--component` no longer goes through the whole guide to reach them.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
