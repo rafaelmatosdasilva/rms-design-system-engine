@@ -106,3 +106,15 @@ test('the router knows a project set up from its code alone, with no Figma to ma
   assert.equal(projectState(dir).noFigma, true);
   assert.equal(projectState(tempDir('wp-none-')).noFigma, false, 'nothing set up is setup\'s to ask, not this');
 });
+
+test('a Figma variable named __proto__/x reaches no prototype in the contracts\' tokens either', async () => {
+  const { dir, cfg } = project();
+  const at = join(dir, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+  const vars = json(at);
+  vars.sizing = { ...(vars.sizing ?? {}), '__proto__/polluted': '4px' };
+  writeFileSync(at, JSON.stringify(vars));
+  const { generateContracts } = await import('../lib/contract-gen.mjs');
+  const r = await generateContracts(dir, cfg, {});
+  assert.equal(({}).polluted, undefined);
+  assert.ok(r.droppedTokens.includes('__proto__/polluted'), 'named among the tokens that could not be written');
+});

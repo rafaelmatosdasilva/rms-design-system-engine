@@ -217,3 +217,18 @@ test('WordPress: a theme\'s own theme.json takes the system\'s presets and keeps
   const fresh = mergeTheme(null, { ...ours, title: 'Acme DS' });
   assert.deepEqual([fresh.theme.$schema, fresh.theme.version, fresh.theme.title], ['https://schemas.wp.org/trunk/theme.json', 3, 'Acme DS'], 'no theme.json yet: the system\'s whole');
 });
+
+test('WordPress: a key that would reach a prototype, from Figma or from the theme, is never written', () => {
+  const ours = { settings: { custom: JSON.parse('{"__proto__": {"polluted": "yes"}, "constructor": {"prototype": {"x": 1}}, "ok": {"toString": "1px"}}') } };
+  const theirs = JSON.parse('{"settings": {"custom": {"__proto__": {"polluted": "theirs"}}}}');
+  const m = mergeTheme(theirs, ours);
+  assert.equal(({}).polluted, undefined, 'Object.prototype is untouched');
+  assert.equal(Object.getPrototypeOf(m.theme.settings.custom), Object.prototype, 'the custom object keeps its own prototype');
+  assert.deepEqual(m.theme.settings.custom.ok, { toString: '1px' }, 'a key the prototype has is still a key of its own');
+  assert.ok(m.added.includes('custom ok.toString'));
+  const made = fromVariables([{ figma: '__proto__/polluted', var: null, type: 'number', collection: 'X', modes: ['Value'], values: ['1'] }, { figma: 'toString', var: null, type: 'number', collection: 'X', modes: ['Value'], values: ['2'] }]);
+  assert.equal(({}).polluted, undefined, 'a Figma variable named __proto__/x reaches no prototype');
+  assert.deepEqual(made.dropped, ['__proto__/polluted'], 'it is named, as every token that cannot be written is');
+  assert.equal(made.tokens.toString.$value, 2, 'a name the prototype has is a token like any other');
+  assert.equal(wordpressTheme(made.tokens).theme.settings.custom.toString, 2);
+});
