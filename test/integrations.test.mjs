@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INTEGRATIONS, WAITING, PARTS, HOW, badgesByPart } from '../lib/integrations.mjs';
+import { INTEGRATIONS, WAITING, PARTS, HOW, badgesByPart, badgeName } from '../lib/integrations.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => readFileSync(join(ENGINE, f), 'utf8');
@@ -14,15 +14,15 @@ function readmeBadges() {
   const out = [];
   for (const line of read('README.md').split('\n').filter((l) => l.startsWith('| <dl><dd><h3>'))) {
     const part = line.match(/features\.md#[^"]+">([^<]+)<\/a><\/h3>/)?.[1];
-    const pieces = line.split(/<img [^>]*src="[^"]*label-(reads|runs|writes|publishes|follows)\.svg"[^>]*\/>/);
+    const pieces = line.split(/<img [^>]*src="[^"]*label-(reads|runs|writes|exports|publishes|follows)\.svg"[^>]*\/>/);
     for (let i = 1; i < pieces.length; i += 2) for (const m of pieces[i + 1].matchAll(/<a href="([^"]+)"><img [^>]*alt="([^"]+)"/g)) out.push({ part, how: pieces[i], name: m[2], site: m[1] });
   }
   return out;
 }
 
 test('the list is whole: every integration has a name, its own site, a part it serves and its proof', () => {
-  const names = INTEGRATIONS.map((x) => x.name);
-  assert.equal(new Set(names).size, names.length, 'each integration once');
+  const names = INTEGRATIONS.map(badgeName);
+  assert.equal(new Set(names).size, names.length, 'each badge once');
   for (const it of INTEGRATIONS) {
     assert.match(it.site, /^https:\/\/(?!github\.com\/rafaelmatosdasilva\/rms-design-system-engine)/, `${it.name}: its own site, never a page of this repository`);
     assert.ok(Object.keys(it.uses).length, `${it.name}: a part that uses it`);
@@ -48,9 +48,11 @@ test('the README shows a badge for each integration where the list says, linked 
   for (const b of badges) ((have[b.part] ??= {})[b.how] ??= []).push(b.name);
   const sorted = (o) => Object.fromEntries(Object.entries(o).sort().map(([p, v]) => [p, Object.fromEntries(Object.entries(v).sort().map(([h, n]) => [h, [...n].sort()]))]));
   assert.deepEqual(sorted(have), sorted(want));
-  const site = Object.fromEntries(INTEGRATIONS.map((x) => [x.name, x.site]));
+  const site = Object.fromEntries(INTEGRATIONS.map((x) => [badgeName(x), x.site]));
   for (const b of badges) assert.equal(b.site, site[b.name], `${b.name} on ${b.part} links to its own site`);
   for (const w of WAITING) assert.ok(!badges.some((b) => b.name === w.name), `${w.name} is waiting: no badge`);
+  // A badge that says a file says which tool it is for, so the entry keeps the tool's name beside the label.
+  for (const it of INTEGRATIONS) if (it.label) assert.ok(it.name && it.name !== it.label, `${it.label}: the tool it is for`);
 });
 
 // The tools the features page names in Works with your tools are each in the list, or waiting with why: a tool the
