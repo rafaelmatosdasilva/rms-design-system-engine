@@ -82,7 +82,7 @@ a.sg-card > h3, a.sg-card > h3 + p { padding-right: calc(var(--sg-space-l) * 2 +
 .sg-showroom-body.is-open { grid-template-columns: minmax(0, 1fr) minmax(340px, auto); }   /* its differences beside it, asked for: at least 340px, wider when its filter needs it to stay on one line */
 .sg-showroom-gaps > .sg-notes, .sg-showroom-gaps > p { contain: inline-size; }   /* the notes wrap to the panel; only the filter and its legend set its width */
 .sg-showroom-actions { display: flex; align-items: center; gap: var(--sg-space-s); flex: none; }
-#showroom .sg-section-actions:not([hidden]) { display: flex; align-items: center; gap: calc(var(--sg-space-s) * 2); }
+.sg-section-actions:not([hidden]) { display: flex; align-items: center; gap: calc(var(--sg-space-s) * 2); }   /* a page's actions in a row, a gap between each (Showroom's, the Tokens downloads) */
 .sg-showroom-frames:not([hidden]) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s) var(--sg-space-l); }   /* the breakpoint, and beside it the screen's own buttons */
 .sg-showroom-tools { display: inline-flex; align-items: center; gap: var(--sg-space-s); }   /* a screen's page only: never on the grid */
 /* A screen full browser: the product alone over the whole window, the way out at its bottom left corner. */

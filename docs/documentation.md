@@ -126,6 +126,15 @@ The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C De
 - **A value no format of 2025.10 holds is kept as written.** A colour CSS spells another way (`color-mix()`), and a size in `%` or `em`, are left as the design file gives them.
 - **A reference stays a reference** (`{color.blue}`).
 - **What you read is unchanged.** Whatever the engine shows you or an agent says the value as CSS writes it: `#0a84ff`, `24px`. The Style Dictionary and Tokens Studio files carry the same text their formats always held.
+- **The same tokens from the style guide.** The Tokens page saves them in three formats, made from one dictionary when the page is built:
+
+| Download | What it holds |
+|---|---|
+| DTCG | Every token of Figma's variables, at its Figma name's path. An alias is the reference to its token. Every mode of its collection, its collection, what it styles and its name in the code are under `$extensions` (`com.rms.design-system-engine`). A word or a yes or no, which DTCG has no type for, keeps its value with no `$type`. |
+| Tokens Studio | A set per collection. A collection with modes has its first mode in its own set, a set per other mode with only what differs in it (`Theme/Dark`), and a theme per mode that turns them on. |
+| WordPress | A `theme.json` (version 3): colours in the palette, font sizes, font families and spacing as presets, each named by the code's variable when there is one. A radius, a border, a duration and every other token go under `settings.custom`. `theme.json` has no modes, so each token's first mode is written. |
+
+- **Two tokens at one name.** A token where another one's group already is (or the same name in two collections) cannot be in one file. It is left out of the downloads, and each button's hint names it.
 - **Watched like the other standards.** Its version is pinned in `lib/dtcg.mjs`. A newer one moves the writer through a pull request.
 
 ### The whole system in DSDS too
