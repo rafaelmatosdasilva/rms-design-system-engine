@@ -142,6 +142,7 @@ The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C De
 `rms-design-system-engine --wordpress` writes your tokens as a WordPress theme's files, straight from the Figma snapshot. No control center has to be built. It uses the same dictionary as the Tokens page's downloads, so both give the same answer.
 
 - **Asked in Claude Code, Figma is read first.** "Export the tokens to WordPress" reads Figma's variables again (only those), then makes the theme. When Figma cannot be read in that session, you are told, and the theme comes from the last capture.
+- **Figma is needed.** The theme is made from Figma's variables. In a project not set up yet, setup asks for the Figma link as needed, not optional, and makes the theme right after. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
 - **The command alone reads the capture.** `--wordpress` uses the Figma variables the engine last captured, and the run says their date. After a change in Figma, read it again first (`--refresh-figma`), or run a full audit, which does both when `wordpress.theme` is set.
 
 What it writes, in `.design-system-engine-out/wordpress/`:

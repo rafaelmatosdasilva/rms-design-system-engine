@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { writeWordpress, wordpressLines, themeFolder, jsonText, PATCH_FILE } from '../lib/wordpress-theme.mjs';
 import { tempDir } from './helpers.mjs';
+import { projectState } from '../lib/route.mjs';
 
 const DEMO = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'demo-ds');
 const project = () => { const dir = tempDir('wp-theme-'); cpSync(DEMO, dir, { recursive: true }); return { dir, cfg: JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')) }; };
@@ -80,6 +81,8 @@ test('nothing to make it from, and a theme folder that is not there, are said', 
   const missing = await writeWordpress(dir, { ...cfg, paths: { ...cfg.paths, snapshotVars: 'nowhere.json' } });
   assert.match(missing.error, /no Figma variables snapshot/);
   assert.deepEqual(wordpressLines(missing), [`⚠️  WordPress theme not made: ${missing.error}.`]);
+  const codeOnly = await writeWordpress(dir, { ...cfg, figmaFileKey: '', paths: { ...cfg.paths, snapshotVars: 'nowhere.json' } });
+  assert.match(codeOnly.error, /set up from its code alone, with no Figma file.*--init --figma-url/, 'a project with no Figma file is told what the theme needs');
   const gone = await writeWordpress(dir, cfg, { theme: 'no-such-theme' });
   assert.match(gone.error, /is not there/);
   rmSync(join(dir, '.design-system-engine-out'), { recursive: true, force: true });
@@ -94,4 +97,12 @@ test('the theme\'s folder from the command or the config, and JSON written in th
   assert.equal(jsonText({ a: 1 }), '{\n\t"a": 1\n}\n');
   assert.equal(jsonText({ a: 1 }, '{\n    "a": 2\n}'), '{\n    "a": 1\n}', 'four spaces and no last newline, as the file had');
   assert.equal(jsonText({ a: 1 }, '{\r\n  "a": 2\r\n}\r\n'), '{\r\n  "a": 1\r\n}\r\n', 'a file with Windows line ends keeps them');
+});
+
+test('the router knows a project set up from its code alone, with no Figma to make the theme from', () => {
+  const { dir, cfg } = project();
+  assert.equal(projectState(dir).noFigma, false, 'a project with its Figma file');
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, figmaFileKey: '', paths: { ...cfg.paths, snapshotVars: 'nowhere.json' } }, null, 2));
+  assert.equal(projectState(dir).noFigma, true);
+  assert.equal(projectState(tempDir('wp-none-')).noFigma, false, 'nothing set up is setup\'s to ask, not this');
 });
