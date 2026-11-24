@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The rename measured: 82/82, and where a measurement has to run (continuous evaluation)
+
+What changed since the entry below (engine ca33340d): Confluence read from a real site: links under a site's own path, public pages with no sign-in, sub-pages walked when the quick call fails (#708); A main that stays red says so, and a main that flakes once does not (#709); The changes made in Figma are read in History, not on a page of their own (#689); The style guide is the control center the page already called itself; The rename measured: 82/82, and where a measurement has to run. The guide changed in `cookbook/a11y-notes.md`, `cookbook/ci-and-hooks.md`, `cookbook/figma-edits.md`, `cookbook/first-setup.md`, `cookbook/guidelines-links.md`, `cookbook/publish-styleguide.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/personality.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `de63fc913bcd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 305b41f9` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 337ea2f8` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 851bd4e2` `reference/usage.md b58f2a8b` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine 00f30f19 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.049 |
+| Input a run | 85k | 82k |
+| Turns a run | 3.5 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 82k a run against 85k, in 3.4 turns against 3.5. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-the-rename-measured-82-82-2`.
+
 ## 2026-11: The changes made in Figma are read in History, not on a page of their own (continuous evaluation)
 
 What changed since the entry below (engine 1c5f8027): A lost browsing context costs one step its go, not the whole page (#700); One list of what the engine works with, each with its proof, and the README's badges and the features page held to it (#701); The changes made in Figma are read in History, not on a page of their own; The component reading is the engine's own, not the lint's (#702); Opening the tab has its own go, wherever it is opened from (#703); The font test proves no wait by order, not a clock, and the integrations list says the style guide writes DTCG (#705); What a motion token is for, checked against each component's size, and a five-column Motion table (#707); The README's two live badges are drawn here, so GitHub's proxy cannot break them (#706). The guide changed in `reference/usage.md`.
@@ -19,6 +37,24 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 85k a run against 85k, in 3.5 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-the-changes-made-in-figma`.
+
+## 2026-11: The rename measured: 82/82, and where a measurement has to run (continuous evaluation)
+
+What changed since the entry below (engine 1c5f8027): A lost browsing context costs one step its go, not the whole page (#700); One list of what the engine works with, each with its proof, and the README's badges and the features page held to it (#701); The component reading is the engine's own, not the lint's (#702); Opening the tab has its own go, wherever it is opened from (#703); The font test proves no wait by order, not a clock, and the integrations list says the style guide writes DTCG (#705); What a motion token is for, checked against each component's size, and a five-column Motion table (#707); The README's two live badges are drawn here, so GitHub's proxy cannot break them (#706); The style guide is the control center the page already called itself; The rename measured: 82/82, and where a measurement has to run. The guide changed in `cookbook/a11y-notes.md`, `cookbook/ci-and-hooks.md`, `cookbook/figma-edits.md`, `cookbook/first-setup.md`, `cookbook/guidelines-links.md`, `cookbook/publish-styleguide.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/personality.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `e8ba95ba8ae3` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 305b41f9` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 337ea2f8` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 851bd4e2` `reference/usage.md 2026b044` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine 61b1c370 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.050 |
+| Input a run | 85k | 86k |
+| Turns a run | 3.3 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 85k, in 3.4 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-the-rename-measured-82-82`.
 
 ## 2026-11: What a motion token is for, checked against each component's size, and a five-column Motion table (continuous evaluation)
 
@@ -38,6 +74,23 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 85k a run against 81k, in 3.3 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-what-a-motion-token-is-for`.
 
+## 2026-11: The style guide is the control center the page already called itself (continuous evaluation)
+
+What changed since the entry below (engine 857c85d): The style guide is the control center the page already called itself. The guide changed in `cookbook/a11y-notes.md`, `cookbook/ci-and-hooks.md`, `cookbook/figma-edits.md`, `cookbook/first-setup.md`, `cookbook/guidelines-links.md`, `cookbook/publish-styleguide.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/personality.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `8ed493da94be` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 305b41f9` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 337ea2f8` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 851bd4e2` `reference/usage.md 9c44ca53` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine 4a0f6c2c | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.049 |
+| Input a run | 81k | 82k |
+| Turns a run | 3.3 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 82k a run against 81k, in 3.3 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-the-style-guide-is-the`.
 ## 2026-11: Token downloads: DTCG, Tokens Studio modes, WordPress (continuous evaluation)
 
 What changed since the entry below (engine 071bcc9d): reference/config.md: contracts.tokensStudioOut carries modes as sets and themes, and the style guide's Tokens page saves DTCG, Tokens Studio and a WordPress theme.json. The guide changed in `reference/config.md`.
