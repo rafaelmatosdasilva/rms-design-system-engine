@@ -626,7 +626,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Figma names, what it is for (Repeats, Opens, Closes, On hover, On press, On focus), the components that move so,
   each once and linked to its Motion tab, Figma's timing for them, and For the system: a purpose with several timings
   (choose one for every component), a timing several components share (keep it as one variable), one written as values
-  (make it a variable); a duration or curve variable no component uses is a row too (use it, or remove it). The rows
+  (make it a variable), a token used by a component of another size than it is for (use the token for its size); a
+  duration or curve variable no component uses is a row too (use it, or remove it). What a token is for is written
+  where it comes from: `@for small|medium|large` in its Figma description (`tokenMeta`), and for a token only the code
+  has on the intent layer's motion page beside its name (`tokenPurposes`); a component's size is its Figma box (up to
+  100 by 100 small, up to 200 by 200 medium, larger large, `sizeOf`), and each mismatch is also a task for the code in
+  its Motion area (`outsidePurpose`, kind `Motion purpose`). The rows
   come from each component's own (`motionSpec`): its loop (a spinner turning), its opening and its closing, the code's
   (its `@keyframes` on it or a part of it, a transition an open or closed state plays, a size it transitions) beside
   Figma's (its Motion keyframes and animation styles, an overlay its prototype opens, played backwards as it closes,
