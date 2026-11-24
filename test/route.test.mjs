@@ -310,17 +310,22 @@ test('the tokens as a WordPress theme\'s files, with the theme\'s folder when th
   for (const q of ['export the tokens to WordPress', 'sync our theme.json with Figma', 'give me a WordPress theme.json from Figma', 'exporta os tokens para o WordPress']) {
     assert.deepEqual([r(q).recipe, r(q).run], ['refresh-figma', ['rms-design-system-engine --refresh-figma', 'rms-design-system-engine --wordpress']], q);
   }
-  assert.match(r('export the tokens to WordPress').notes.join(' '), /only its variables/, 'Figma read again first, its variables alone');
+  assert.match(r('export the tokens to WordPress').notes.join(' '), /its variables and its components/, 'Figma read again first: the theme takes its tokens and its components');
   assert.match(r('export the tokens to WordPress').say.join(' '), /The WordPress theme uses the committed snapshots/, 'with no Figma tool here, the person hears the theme comes from the last capture');
   assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run.at(-1), 'rms-design-system-engine --wordpress ../acme-theme');
   assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run.at(-1), 'rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"', 'quoted, and the engine reads the ~ as the home');
   assert.ok(!r('how does the WordPress export work?').run.some((c) => c.includes('--wordpress')));
-  // Nothing set up yet: setup first, the Figma link asked as needed (the theme is made from Figma's variables), the request after.
-  const fresh = r('export the tokens to WordPress', { ...P, hasConfig: false });
+  // Nothing set up yet: setup here, from Figma alone, the Figma link the only question, and the export right after.
+  const fresh = r('export the Figma tokens to WordPress', { ...P, hasConfig: false, noCode: true });
   assert.equal(fresh.recipe, 'first-setup');
-  assert.match(fresh.ask, /Figma file \(needed here: the WordPress theme is made from Figma's variables/);
-  assert.doesNotMatch(fresh.ask, /optional: without it only the code is checked/);
-  assert.match(fresh.run[0], /--then='export the tokens to WordPress'/);
+  assert.deepEqual(fresh.run, ["rms-design-system-engine --init --figma-url='<the Figma link>' --project='.' --build --then='export the Figma tokens to WordPress'"], 'this folder, built from Figma, since it has no code');
+  assert.match(fresh.ask, /^the link to the design system's Figma file \(needed, and the only question/);
+  assert.doesNotMatch(fresh.ask, /code is|documentation/, 'no question about the code or the documentation: the theme needs neither');
+  const linked = r('export the Figma tokens to WordPress from https://www.figma.com/design/AbC123/Acme', { ...P, hasConfig: false, noCode: true });
+  assert.equal(linked.ask, null, 'the link given: no question at all');
+  assert.match(linked.run[0], /^rms-design-system-engine --init --figma-url='https:\/\/www\.figma\.com\/design\/AbC123\/Acme' --project='\.' --build --then=/);
+  const themed = r('exporta os tokens do figma para o tema wordpress em ../acme-theme', { ...P, hasConfig: false, noCode: false });
+  assert.match(themed.run[0], /--project='\.' --then='exporta os tokens do figma para o tema wordpress em \.\.\/acme-theme'$/, 'a folder with code is used as it is, and the folder named is the theme\'s, carried on to the export');
   assert.match(r('check the button', { ...P, hasConfig: false }).ask, /optional: without it only the code is checked/, 'any other request keeps Figma optional');
   // Set up from its code alone: the link is asked before anything runs, and only the Figma file changes.
   const codeOnly = r('export the tokens to WordPress', { ...P, noFigma: true });
