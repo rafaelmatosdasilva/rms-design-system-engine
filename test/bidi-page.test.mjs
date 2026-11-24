@@ -44,11 +44,19 @@ test('a page is waited for by asking it, never by the navigation\'s own wait, wh
 });
 
 test('a lost context in a tab Firefox still lists is a move: the step runs again on the same tab, no new load', async () => {
-  const ff = fakeFirefox({ moves: 2 });
+  const ff = fakeFirefox({ moves: 1 });
   const page = await bidiPage(ff.send, 'file:///page.html', fast);
-  assert.equal(await page.evaluate('1'), 'on tab1', 'met twice in one step, and still on its own tab');
+  assert.equal(await page.evaluate('1'), 'on tab1', 'still on its own tab');
   assert.equal(count(ff.calls, 'browsingContext.create'), 1, 'no tab opened again, so no second move to meet');
   assert.equal(count(ff.calls, 'browsingContext.navigate'), 1);
+});
+
+// GitHub's Windows runners: the tab stayed listed, and every retry on it met the loss again.
+test('a second loss in one step opens a fresh tab, even when Firefox still lists the old one', async () => {
+  const ff = fakeFirefox({ moves: 2 });
+  const page = await bidiPage(ff.send, 'file:///page.html', fast);
+  assert.equal(await page.evaluate('1'), 'on tab2');
+  assert.equal(count(ff.calls, 'browsingContext.create'), 2);
 });
 
 test('a tab Firefox no longer lists is opened again at the same page and width, and the step runs again', async () => {
@@ -63,7 +71,7 @@ test('a tab Firefox no longer lists is opened again at the same page and width, 
 test('a step that keeps meeting the loss ends after its goes, and says so', async () => {
   const ff = fakeFirefox({ moves: 99 });
   const page = await bidiPage(ff.send, 'file:///page.html', fast);
-  await assert.rejects(page.evaluate('1'), /DiscardedBrowsingContext/);
+  await assert.rejects(page.evaluate('1'), /DiscardedBrowsingContext.*\(met 3 times in one step: waited on the same tab, then opened a new tab, then opened a new tab\)/);
   assert.equal(ff.calls.filter(([m, p]) => m === 'script.evaluate' && p.expression === '1').length, 3);
 });
 
