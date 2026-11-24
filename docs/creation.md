@@ -931,7 +931,43 @@ The full options are in [the reference](../reference/usage.md) (`--spec-from-cod
 
 ## Build from your documentation
 
-Your whole library built from your written docs alone, in Figma and in code, the same every time. It is not available yet: what it will do is on the [features page](features.md#build-from-your-documentation).
+Your whole library built from your written docs alone, in Figma and in code, the same every time. What it promises is on the [features page](features.md#build-from-your-documentation).
+
+### What it reads
+
+The system as the engine writes it down, read back as the source:
+
+- **The DSDS view** (`contracts/dsds/system.dsds.json`) and every file it points at.
+- **The tokens** in the W3C format, each value from the file its entry points at, in every theme.
+- **Each component's contract**: its variants and properties, its anatomy (padding, gap, corners, height, text style) and what each variant paints with.
+
+Nothing else goes in: no model, and no AI credit spent.
+
+### What it builds in Figma
+
+One plugin script, run only once you say yes:
+
+- **Variables**: a collection for each kind (colour, size, number), a mode for each theme, and each value or the variable it points at.
+- **Text styles**: their size and line height.
+- **Components**: each on a page of its own name, a variant for each combination of its options, its text properties driving its text, and its frame bound to the variables its contract names.
+
+Each piece is found by its name. Run it again and it changes only what your docs changed, and nothing when nothing did. Each write records what it replaces, so it has a way back.
+
+Each component's documentation is drawn beside it afterwards, by the same step as for any system (`--figma-specs`), once the engine has read the file again.
+
+### What it writes in code
+
+- **The tokens** as custom properties, one block a mode, where the code has none yet.
+- **Each component** the code does not have yet, written the way your own components are (the same writer as a spec's).
+
+It is all one patch you apply with `git apply`. A file the code already has is compared, never written over. Each new component is read back with the code's own reader and held against your docs.
+
+### What it never does
+
+- It never guesses what your docs do not say exactly. A font family, a part with no kind, a property that needs another component, the direction a component lays out: each is listed for a person.
+- It never writes to Figma or the code without your yes.
+
+The full options are in [the reference](../reference/usage.md) (`--build-library`).
 
 ## Generate in Figma from a prompt
 

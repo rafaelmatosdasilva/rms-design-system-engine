@@ -46,12 +46,13 @@ test('emits a DTCG dictionary + a schema-valid contract that references tokens b
 
   const tokens = JSON.parse(readFileSync(r.tokensOut, 'utf8'));
   assert.equal(tokens.radii.button.$type, 'dimension');
-  assert.equal(tokens.radii.button.$value, '24px');
+  // DTCG's official version, 2025.10: a dimension is its number and unit, a colour its space, components and hex.
+  assert.deepEqual(tokens.radii.button.$value, { value: 24, unit: 'px' });
   assert.equal(tokens.buttonPrimary.background.color.$type, 'color');
-  assert.equal(tokens.buttonPrimary.background.color.$value, '#0a84ff');
-  assert.equal(tokens.buttonPrimary.background.color.$extensions['com.rms.design-system-engine'].modes.dark, '#0060df');
+  assert.deepEqual(tokens.buttonPrimary.background.color.$value, { colorSpace: 'srgb', components: [0.0392, 0.5176, 1], hex: '#0a84ff' });
+  assert.equal(tokens.buttonPrimary.background.color.$extensions['com.rms.design-system-engine'].modes.dark.hex, '#0060df');
   assert.equal(tokens.typography.m.$type, 'typography');
-  assert.equal(tokens.typography.m.$value.fontSize, '11px');
+  assert.deepEqual(tokens.typography.m.$value, { fontSize: { value: 11, unit: 'px' }, fontWeight: 600, lineHeight: 1.4545 });
 
   const c = JSON.parse(readFileSync(join(r.outDir, 'buttonPrimary.contract.json'), 'utf8'));
   assert.equal(c.id, 'rms.buttonPrimary');
@@ -144,7 +145,7 @@ test('each token keeps Figma\'s id for it, a text style its own, never a variabl
   assert.equal(id(tokens.m), 'VariableID:1:2');
   assert.equal(id(tokens.typography.m), 'S:abc', 'a text style its own');
   assert.equal(id(tokens.typography.l), null, 'never the variable named l');
-  assert.equal(tokens.text.primary.$extensions['com.rms.design-system-engine'].modes.dark, '#eee', 'the modes kept beside it');
+  assert.equal(tokens.text.primary.$extensions['com.rms.design-system-engine'].modes.dark.hex, '#eeeeee', 'the modes kept beside it');
 });
 
 test('lints contract.authored.json: a malformed binding is surfaced, a valid one is not', async () => {
@@ -191,7 +192,7 @@ test('authored decisions live in the committed contract.authored.json; regen ref
   assert.deepEqual(c2.props.find((p) => p.name === 'disabled').bindings.code, { attribute: 'isDisabled' });
   // captured refreshed: the token dictionary picked up the new value; the contract still refs by name
   const tokens = JSON.parse(readFileSync(r2.tokensOut, 'utf8'));
-  assert.equal(tokens.radii.button.$value, '999px');
+  assert.deepEqual(tokens.radii.button.$value, { value: 999, unit: 'px' });
   assert.equal(c2.anatomy.root.radiusToken, '{radii.button}');
 });
 
@@ -381,8 +382,8 @@ test('a text style keeps a token when Figma also has variables under its name (t
   assert.deepEqual(r.undefinedRefs, []);
   assert.deepEqual(r.droppedTokens ?? [], []);
   const tokens = JSON.parse(readFileSync(r.tokensOut, 'utf8'));
-  assert.equal(tokens.typography.m['font-size'].$value, '11px', 'the variables keep their own path');
-  assert.equal(tokens.textStyle.m.$value.fontSize, '11px');
+  assert.deepEqual(tokens.typography.m['font-size'].$value, { value: 11, unit: 'px' }, 'the variables keep their own path');
+  assert.deepEqual(tokens.textStyle.m.$value.fontSize, { value: 11, unit: 'px' });
   assert.equal(tokens.typography.s.$type, 'typography', 'a style with no variables under it stays where it was');
   assert.equal(JSON.parse(readFileSync(join(r.outDir, 'label.contract.json'), 'utf8')).anatomy.root.typographyToken, '{textStyle.m}');
   assert.equal(JSON.parse(readFileSync(join(r.outDir, 'tag.contract.json'), 'utf8')).anatomy.root.typographyToken, '{typography.s}');

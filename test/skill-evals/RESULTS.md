@@ -2,6 +2,77 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The whole library built from its written description, in Figma and in code (continuous evaluation)
+
+What changed since the entry below (engine 4b18b974): The whole library built from its written description, in Figma and in code. The guide changed in `reference/usage.md`.
+
+Guide set measured: `9f6944117d87` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ba27e8f7` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md aef052f2` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 1475b197` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 5b78a5bb` `rms-design-system-engine.md 4f65f1f9`
+
+| Haiku, engine 8587d93 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.058 | 0.056 |
+| Input a run | 97k | 86k |
+| Turns a run | 3.3 | 3.0 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 97k, in 3.0 turns against 3.3. no task changed state, and no run moved: the same result. Input moved but input a turn held (29k to 28k): the turns moved, 3.3 to 3.0, and nothing a run reads grew - most in `figma-add-option` 12.3 to 3.0, `engine-idea` 5.3 to 3.0, `pasted-steps` 2.0 to 3.3. Records: `records/2026-11-23-the-whole-library-built-from`.
+
+## 2026-11: The route hands a recipe's steps, measured with six more criteria and prototypes in every browser (continuous evaluation)
+
+What changed since the entry below (engine 559b7cb8): Svelte components drawn in the browser by the project's own Svelte (#682); Six more criteria and the drawn prototypes in Firefox and WebKit (#684); Move the IBM Equal Access pin to 4.0.35 (#683); The route hands a recipe's own steps, never its long reference, and the main guide keeps only what every request needs; An idea for the engine is searched for with grep, which follows a linked install, never find; Skill evaluation of the engine-ideas search, and what both measurements taught. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `01fcb34fcf0b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ed605684` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 1475b197` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 953c4385` `rms-design-system-engine.md abe85009`
+
+| Haiku, engine 071bcc9d | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.049 |
+| Input a run | 80k | 83k |
+| Turns a run | 3.2 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 83k a run against 80k, in 3.3 turns against 3.2. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-guide-cost-on-six-more-criteria`.
+
+## 2026-11: An idea for the engine is searched for with grep, which follows a linked install (continuous evaluation)
+
+What changed since the entry below (engine 5288ebe7): An idea for the engine is searched for with grep, which follows a linked install, never find. The guide changed in `cookbook/engine-ideas.md`.
+
+Guide set measured: `150028b867d2` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ed605684` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 4a6cce60` `rms-design-system-engine.md abe85009`
+
+| Haiku, engine 559b7cb8 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.048 | 0.049 |
+| Input a run | 81k | 80k |
+| Turns a run | 3.3 | 3.2 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 80k a run against 81k, in 3.2 turns against 3.3. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-engine-idea-search-follows-links`.
+
+## 2026-11: The route hands a recipe's own steps, and the main guide keeps what every request needs (continuous evaluation)
+
+What changed since the entry below (engine ca14b005): One copy button for every request, requests that work in every agent, and Prototypes and Requests coming soon (#672); Motion and effects comparison is ready: run on a real Figma file (engine #669) (#671); A token's uuid survives a rename (#673); One Prototypes page: the Showroom's screens as prototypes from Figma, each prototype with its source (#675); Update README.md (#674); Each difference says its cause, motion sequences compared, and three more criteria in every browser (#676); Who each DSDS section is for, where a page came from, and the links in it (#677); A product's screens as stories the team opens in its own Storybook (#678); Each prototype's panel shows its UX grades: each problem at the reviewer's grade, else the one proposed with why (#679); Every page says when it has nothing; Prototypes and Requests under Accessibility; no page repeats another (#680); The route hands a recipe's own steps, never its long reference, and the main guide keeps only what every request needs. The guide changed in `cookbook/audit-component.md`, `cookbook/first-setup.md`, `cookbook/fix-a-difference.md`, `cookbook/full-audit.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `238af9a3688b` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md e611aec5` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ed605684` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 63a2bb27` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 4a6cce60` `rms-design-system-engine.md abe85009`
+
+| Haiku, engine 5288ebe7 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.057 | 0.048 |
+| Input a run | 90k | 81k |
+| Turns a run | 3.2 | 3.3 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 81k a run against 90k, in 3.3 turns against 3.2. no task changed state, and no run moved: the same result. Records: `records/2026-11-23-route-hands-recipe-steps`.
 ## 2026-11: Six more criteria and the drawn prototypes in Firefox and WebKit (continuous evaluation)
 
 What changed since the entry below (engine ca14b005): One copy button for every request, requests that work in every agent, and Prototypes and Requests coming soon (#672); Motion and effects comparison is ready: run on a real Figma file (engine #669) (#671); A token's uuid survives a rename (#673); One Prototypes page: the Showroom's screens as prototypes from Figma, each prototype with its source (#675); Update README.md (#674); Each difference says its cause, motion sequences compared, and three more criteria in every browser (#676); X1's rest: six more criteria and prototypes in Firefox and WebKit (work in progress); Six more criteria and the drawn prototypes in Firefox and WebKit. The guide changed in `reference/config.md`, `reference/usage.md`.

@@ -796,12 +796,15 @@ test('no page repeats another: Colors, Typography, Spacing, Radii and In use are
   assert.doesNotMatch(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /view\.screens =/, 'no pictures of frames built for a page that is gone');
 });
 
-test('a page with nothing to show keeps its place in the menu and says so; Prototypes and Requests under Accessibility', () => {
+test('a page with nothing to show keeps its place in the menu and says so, Templates apart; Prototypes and Requests under Accessibility', () => {
   const tpl = templateText();
   assert.match(tpl, /function emptyPage\(id, label, badge, title, head, say, action, foundation\) \{\s*hr\(\); \(foundation \? foundationLink : navLink\)\(id, label\);/);
-  for (const id of ['rules', 'changes-in-Figma', 'history', 'documentation', 'accessibility', 'templates', 'identity', 'tokens', 'motion', 'icons']) assert.match(tpl, new RegExp(`if \\(!document\\.getElementById\\('${id}'\\)\\) emptyPage\\('${id}', `), id);
+  for (const id of ['rules', 'changes-in-Figma', 'history', 'documentation', 'accessibility', 'identity', 'tokens', 'motion', 'icons']) assert.match(tpl, new RegExp(`if \\(!document\\.getElementById\\('${id}'\\)\\) emptyPage\\('${id}', `), id);
   assert.match(tpl, /emptyPage\('changes-in-Figma'[^\n]*askHTML\(ENGINE \+ ' refresh the Figma data'/, 'a request only where the engine answers it');
-  assert.doesNotMatch(tpl, /emptyPage\('(rules|documentation|accessibility|templates|history)'[^\n]*askHTML/, 'a page that fills on its own has no request');
+  assert.doesNotMatch(tpl, /emptyPage\('(rules|documentation|accessibility|history)'[^\n]*askHTML/, 'a page that fills on its own has no request');
+  // Templates alone is left out of the menu while it has nothing: nobody can start it from the guide.
+  assert.doesNotMatch(tpl, /emptyPage\('templates'/, 'Templates stays out of the menu while there are none');
+  assert.match(tpl, /if \(\(DATA\.templates \|\| \[\]\)\.length\) \{\s*\n\s*hr\(\); navLink\('templates', 'templates'\);/, 'Templates in the menu only when there are templates');
   assert.match(tpl, /var at = nav\.querySelector\('a\[href="#accessibility"\]'\) \|\| nav\.querySelector\('a\[href="#documentation"\]'\) \|\| nav\.querySelector\('a\[href="#status"\]'\); if \(!at\) return; \['prototypes', 'requests'\]/);
 });
 

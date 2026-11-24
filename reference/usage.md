@@ -1756,10 +1756,29 @@ one Figma lacks is a question. Its spec is named after the file (`settings`).
 construction rules, an axis as a prop with its options, a property as a prop of its kind, a part as an element (another
 of the system's components its own tag, a text the prop that writes it, set in the text style the system sets it with:
 its mixin or its class), each bound variable the custom property the naming convention gives it. Nothing is written to
-the code: the file goes to `.design-system-engine-out/handback/code-build-<name>.patch`, a patch that adds it, which a
-person applies with `git apply`. It is read back with the code's own reader and held against the spec (every layer a
+the code: the file goes to `.design-system-engine-out/handback/code-build-<name>.patch`, a patch that adds it (a JSX file with
+the stylesheet it imports), which a person applies with `git apply`. It is read back with the code's own reader and held against the spec (every layer a
 part, every property a prop), and exits 1 when it falls short. A spec that still asks a question, or a file the code
 already has, stops it with the one to use.
+
+**--build-library.** `--build-library [<folder>]` builds the whole library from its written description
+(`library-build.mjs`): the DSDS view (`contracts/dsds` by default, or the folder named), the W3C tokens its entries point
+at and the contract each component's entry links. In Figma, one script (`.design-system-engine-out/handback/build-library.js`,
+run with use_figma on the person's yes, and not written where `writes.figma` is `no`) makes a variable collection a token
+kind with a mode a theme, each value or its alias, a text style a typography token (size and line height), and each
+component on a page of its own name as a set of every combination of its variant options, with its text and boolean
+properties, a text layer where the anatomy names the part a text property drives (or the one text property of a
+component whose anatomy names no part, in the root's text style), its padding, gap, corners and height bound to the
+anatomy's tokens and each variant's fills to the contract's `tokens.byVariant`. Every piece is found by its name and
+written only where it differs, so a second run changes only what the description changed, and each write is recorded
+for its way back. It returns made, changed, kept, missing, faults and the node id of each component. In code, one patch
+(`build-library.patch`, applied with `git apply`) adds the tokens as custom properties (the naming convention's names,
+the first mode on `:root`, each other under its `figma.modes` `cssSelector`) where `paths.themeCSS` is not there yet, and
+each component the code lacks as `--code-build` writes one, with the styles a JSX file imports, read back with the code's
+own reader. What the description does not say exactly is listed and never built: a font family and weight, a duration
+or other token Figma has no variable for, a swap property, a part the anatomy names without saying what it is, the
+direction a component lays out, the value each option paints with in code. A file the code already has is never
+written over. Its documentation beside each component is `--figma-specs`'s, once the file is read again.
 
 **--figma-build.** `--figma-build <name> [--signed-off "<who>"]` (a foundation's name with `-` for `/`: `spacing-40`) checks the spec again against the capture as it is now,
 and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the

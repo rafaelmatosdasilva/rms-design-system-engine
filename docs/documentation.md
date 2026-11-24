@@ -113,6 +113,21 @@ A Figma property that no code prop is paired with may still have a near name in 
 - **A yes.** `--prop-pair <component> "<Figma property>" yes` writes the pair into `contract.authored.json` (the component's `bindings`). The next contract pairs them, with the code prop's type, description and default, and its values mapped where both sides write them with the same letters (`Large` and `large`).
 - **A no.** `--prop-pair <component> "<Figma property>" no` keeps the answer there too (`declinedPairs`), so the same pair is never asked again, in the contract or by the props check.
 
+### The tokens, in DTCG's official version
+
+The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C Design Tokens format. It follows that format's official version, [2025.10](https://www.designtokens.org/tr/2025.10/), the first stable one, published on 28 October 2025.
+
+| Type | Written as | For example |
+|---|---|---|
+| Colour | its colour space, its components, an alpha when it is see-through, and a hex fallback | `{ "colorSpace": "srgb", "components": [0.0392, 0.5176, 1], "hex": "#0a84ff" }` |
+| Dimension | a number and its unit, px or rem | `{ "value": 24, "unit": "px" }` |
+| Typography | the font size as a dimension, the weight as a number, the line height as a multiple of the font size | `{ "fontSize": { "value": 16, "unit": "px" }, "fontWeight": 600, "lineHeight": 1.5 }` |
+
+- **A value no format of 2025.10 holds is kept as written.** A colour CSS spells another way (`color-mix()`), and a size in `%` or `em`, are left as the design file gives them.
+- **A reference stays a reference** (`{color.blue}`).
+- **What you read is unchanged.** Whatever the engine shows you or an agent says the value as CSS writes it: `#0a84ff`, `24px`. The Style Dictionary and Tokens Studio files carry the same text their formats always held.
+- **Watched like the other standards.** Its version is pinned in `lib/dtcg.mjs`. A newer one moves the writer through a pull request.
+
 ### The whole system in DSDS too
 
 Beside the contracts, `contracts/dsds/` holds your system in [DSDS](https://designsystemdocspec.org), for a team that documents its system in that format. It says what the engine knows and links the rest, as DSDS asks: the contract as each component's spec, the code file as its source, the Figma component, and your own pages, whose guidance is never copied back.

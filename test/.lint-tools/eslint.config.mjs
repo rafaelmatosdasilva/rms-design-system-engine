@@ -10,7 +10,7 @@ import globals from 'globals';
 export default [
   // This file lives with the tool; what it checks is the repository two folders up.
   { basePath: '../..' },
-  { ignores: ['test/**', 'templates/**', '**/node_modules/**', '.design-system-engine-out/**'] },
+  { ignores: ['test/**', 'templates/**', '**/node_modules/**', '.design-system-engine-out/**', '.claude/**'] },
   js.configs.recommended,
   {
     files: ['lib/**/*.mjs', 'lib/**/*.js', '*.mjs', '.githooks/*.mjs'],

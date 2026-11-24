@@ -246,11 +246,14 @@ test('the router as a hook: a request made with the command arrives already rout
   assert.match(figma, /\nSAY: I can't change this in Figma: the skill writes to Figma only what the code already states/);
   const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
   assert.match(refresh, /SAY \(when there is no Figma tool in this session\): I couldn't refresh the Figma snapshots here: .* \(captured 2026-03-02\)/);
-  assert.match(refresh, /--- recipe refresh-figma: read it with node .+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline
+  // Its own part only (its steps), and the long capture reference after it one command away: never 140 KB on every turn.
+  assert.match(refresh, /--- recipe refresh-figma \(node .+ --recipe refresh-figma\) ---\n# /);
+  assert.match(refresh, /\n--- the recipe goes on past its steps, with the reference they point into: node .+ --recipe refresh-figma prints it whole, for a step that needs it ---$/);
+  assert.doesNotMatch(refresh, /## Phase 1 - Step 2: Read the snapshots/);
   // An engine kept in a folder whose name has a space: its path is quoted, so the command runs as written.
   const spaced = routePrompt({ prompt: '/rms-design-system-engine audit the chip' }, { root: dir, engineDir: '/Users/a/My Drive/engine', cfg: {}, env });
   assert.ok(spaced.includes('\nRUN: node "/Users/a/My Drive/engine/audit.mjs" --component chip\n'), spaced);
-  assert.ok(refresh.length < MAX_RECIPE);
+  assert.ok(refresh.length < MAX_RECIPE + 4000);
   assert.equal(ctx('audit the chip'), null);                           // not the command: no opinion
   // The engine's name alone, as the style guide copies a request so it works in whichever agent it is pasted: routed the
   // same as Claude Code's /command and Codex's $skill. A sentence that only mentions the engine further on is not one.

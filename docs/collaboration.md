@@ -231,7 +231,7 @@ Also on each component.
 
 ### Templates
 
-A template is a page frame in Figma made of your system's components, such as a settings page or a list with a side panel. List yours under `templates` in `ds-config.json` and the style guide gets a Templates page.
+A template is a page frame in Figma made of your system's components, such as a settings page or a list with a side panel. List yours under `templates` in `ds-config.json` and the style guide gets a Templates page. List none and the page is not there at all, nor in the menu: it is the one page a reader cannot start from the guide, so an empty one would ask for work nobody can do from there.
 
 - **What it is made of.** The components Figma places in it, in Figma's order. Each one with a page of its own is linked.
 - **Whether the code uses each one.** Each component says In the code, Not in the code, Kept out on purpose or In progress. It is the same answer the template check gives (Gate [17]).
