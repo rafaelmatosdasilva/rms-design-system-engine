@@ -226,6 +226,7 @@
 ℹ️  DSDS view → contracts/dsds: the 4 contracts in DSDS 0.23.1, with 19 tokens, 2 themes and 8 shared rules, for a team that documents its system in that format.
 ℹ️  Specs view → contracts/specs: the 4 contracts in the open component specs format 0.39.0, for a team that specifies its components that way.
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
+ℹ️  WordPress view → contracts/wordpress/theme.json: the tokens as its presets, 2 components as its styles, 2 style variations, for a team whose site is a WordPress theme (wordpress.theme for the patch).
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
 ℹ️  Prune candidates: 6 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 5 token(s) only one component uses
