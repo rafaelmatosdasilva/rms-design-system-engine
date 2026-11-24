@@ -341,6 +341,10 @@ on each component the control center draws:
   Safari is never touched.
 - **A browser that is missing is said.** The run names it rather than passing over it, and the rows keep saying
   *Tried in Chrome*.
+- **Each browser is named with its version.** A row says *Tried in Chrome 131 ✓ · Firefox 133 ✕ · WebKit 18.2 ✓*,
+  what fails in one browser only says *Fails in Firefox 133 only*, and where a row was read says *Tested in Chrome 131,
+  Firefox 133 and WebKit 18.2*. A row tried on the page itself names the reader's own browser: *Tested in this browser
+  (Safari 18.2)*. A run saved before versions were kept names the browser alone.
 - **Counted on the Status page.** Its Accessibility card says how many criteria differ by browser, and opens
   [the Accessibility page](#the-accessibility-page) on them.
 

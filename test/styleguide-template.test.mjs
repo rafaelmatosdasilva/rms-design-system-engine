@@ -410,7 +410,7 @@ test('in the browser: no script error, a control changes the real component, the
     }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
-    assert.match(live, /Tested in a browser/, 'each finding says where it comes from, its date said once, in Last checked');
+    assert.match(live, /Tested in this browser \(Chrome \d+\)/, 'each finding says where it comes from, in the reader\'s own browser named with its version, its date said once, in Last checked');
     // The text contrast is measured on the same pass, as each variant is drawn, and joins the table with these results:
     // read with them, never from the table as first drawn.
     assert.match(live, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
