@@ -115,7 +115,10 @@ test('--prototype measures the drawn page against the designed screen, saves its
   const last = JSON.parse(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'last.json'), 'utf8'));
   assert.ok(last.gaps.some((g) => g.kind === 'screen' && /padding/.test(g.line)));
   r = run('--prototype', 'prototypes/notify.json', '--no-browser');
-  assert.doesNotMatch(r.stdout, /📏/);
+  // Nothing is measured against the screen without a browser - and the run says that, rather than leaving the section
+  // out. A report missing the section reads as a page that matched, which is the opposite of what happened.
+  assert.doesNotMatch(r.stdout, /📏 AGAINST THE DESIGNED SCREEN "/, 'no comparison ran: the real section names the screen');
+  assert.match(r.stdout, /⏭ {2}[^\n]*📏 AGAINST THE DESIGNED SCREEN[^\n]*Not run: the browser was not asked for/);
 });
 
 test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing; a toggle turns on and off', { skip: CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {

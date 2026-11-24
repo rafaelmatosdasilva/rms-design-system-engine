@@ -294,6 +294,23 @@ At each width the engine also reads which of your CSS's media rules hold, and ho
 - **Any change counts.** A rule that only recolours a part keeps two widths apart, as one that moves it does.
 - **A container query reads the box around a part**, not the window, and the line says when the page has any.
 
+### A check that did not run says so
+
+A section of the report that the browser measures is printed when it has something to say. Printed only that way, it is missing in two different cases: it ran and found nothing, and it never ran at all. From the outside the two look the same, and the reassuring reading is the wrong one — a report with no `📱` section reads as a page that fits at every width.
+
+So each one now says which it is:
+
+```
+⏭  📏 AGAINST THE DESIGNED SCREEN · ♿ ACCESSIBILITY OF THE DRAWN PAGE · 🎨 DESIGN REVIEW · 📱 EVERY SIZE AND STATE  Not run: the browser was not asked for (--no-browser)
+```
+
+- **One line a reason.** Sections that did not run for the same reason are named together, and the reason is said once.
+- **The reason is the run's own.** The browser was not asked for, the page has errors so nothing was drawn, or the browser itself said why. Nothing is guessed: a wrong reason is worse than the silence it replaced.
+- **No designed screen is not a match.** A page your product has designed no screen for says there was nothing to hold it against, instead of quietly showing you a picture.
+- **Nothing to click is not a pass.** A page with no control to try says that, rather than leaving the section out.
+
+This is the same thing the audit's gates have always done: a gate that could not run says **Not run** and never Pass.
+
 ### The flow is told to you, not asked for
 
 A designer is building a journey, not a page. So every time a page is drawn, you are told what it did to the flow it belongs to — no command to remember:
