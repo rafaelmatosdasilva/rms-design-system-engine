@@ -35,12 +35,12 @@ For whoever approves tools for a team: each line links to its detail below.
 
 | To | When | What |
 |---|---|---|
-| Figma's API | Refreshing Figma with `FIGMA_TOKEN`, and the style guide's Figma images | Reads the file. Writes only through the script you said yes to |
+| Figma's API | Refreshing Figma with `FIGMA_TOKEN`, and the control center's Figma images | Reads the file. Writes only through the script you said yes to |
 | Your GitLab or GitHub | Reading code or documentation kept there | Reads. Writes only where the [write setting](setup.md#where-the-engine-may-write-and-where-it-must-never) says yes |
 | GitHub | Installing, and the daily self-update (`DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off) | A `git pull` of the engine |
 | Notion's API | Only when guidelines are kept in Notion, with `NOTION_TOKEN` | Reads the pages shared with that integration |
 | cdnjs | Installing axe-core | A download |
-| Google Fonts and Fontsource | Building the style guide, when the system uses their web fonts | The font names, so the fonts are embedded in the page |
+| Google Fonts and Fontsource | Building the control center, when the system uses their web fonts | The font names, so the fonts are embedded in the page |
 
 Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTEM_ENGINE_USAGE_LOG=1`) stay on your computer. A Figma webhook exists only if you deploy `webhook-server.mjs` yourself.
 
@@ -63,10 +63,10 @@ Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTE
 Everything it writes stays on your computer, and almost all of it in the project you run it in:
 
 - **The captures it reads from Figma and the code** (`*.snapshot.json`), where `ds-config.json` says.
-- **What it builds** (the style guide, findings, contracts), in `.design-system-engine-out/`.
+- **What it builds** (the control center, findings, contracts), in `.design-system-engine-out/`.
 - **Your tokens,** in the git-ignored `.env`, only when you put them there.
 - **A usage log,** only when you turn it on (`DESIGN_SYSTEM_ENGINE_USAGE_LOG=1`): which route each request took, never the request's text, in `.design-system-engine-out/skill-usage.json`.
-- **Outside the project, one file:** the list of style guide pages this computer built, so they can be rebuilt when the engine updates (`~/.claude/.rms-design-system-engine-pages.json`). It holds paths only.
+- **Outside the project, one file:** the list of control center pages this computer built, so they can be rebuilt when the engine updates (`~/.claude/.rms-design-system-engine-pages.json`). It holds paths only.
 
 Delete the project's `.design-system-engine-out/` and that one file, and nothing of the engine's is left beside the engine itself.
 
@@ -80,7 +80,7 @@ An IT team can allow only these hosts. Leave out the ones for a service you do n
 | Your GitLab host, or `github.com`, `api.github.com` and `raw.githubusercontent.com` | Reading code and documentation, installing and the daily self-update |
 | `api.notion.com` | Guidelines kept in Notion |
 | `cdnjs.cloudflare.com`, with `registry.npmjs.org` as its fallback | Downloading axe-core once, for the accessibility checks |
-| `fonts.googleapis.com`, `fonts.gstatic.com`, `api.fontsource.org` and `cdn.jsdelivr.net` | Embedding the system's web fonts in the style guide |
+| `fonts.googleapis.com`, `fonts.gstatic.com`, `api.fontsource.org` and `cdn.jsdelivr.net` | Embedding the system's web fonts in the control center |
 
 With the self-update off (`DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1`) and axe-core already downloaded, the engine needs only the hosts of the services your system lives in.
 
@@ -136,7 +136,7 @@ Why the engine can be trusted with a team's code, design files and credentials: 
 |---|---|
 | Command injection (CWE-78) | Commands are started with argument lists, not shell strings; the one shell use runs the person's own configured command |
 | Exposure of credentials (CWE-200, CWE-532) | Tokens live in a git-ignored `.env`, are sent only to their host, are never printed; a required privacy check refuses private names and addresses on every pull request |
-| Cross-site scripting in the style guide (CWE-79) | Project data is embedded as JSON with `<` escaped, the page escapes text through one helper when it shows it, and icons are stripped of scripts and event attributes |
+| Cross-site scripting in the control center (CWE-79) | Project data is embedded as JSON with `<` escaped, the page escapes text through one helper when it shows it, and icons are stripped of scripts and event attributes |
 | Prototype pollution (CWE-1321) | Name lookups use own keys only; found and covered by the property tests |
 | Supply-chain compromise (CWE-1357) | No runtime dependencies; workflow actions pinned by commit and watched for updates, so a pin never outlives its own security fixes; test tools installed from committed lockfiles; advisories tracked by OpenSSF Scorecard |
 | Tampered releases (CWE-494) | Each release carries a Sigstore provenance attestation (`gh attestation verify`) for its archive and its software bill of materials, and npm versions carry npm provenance |

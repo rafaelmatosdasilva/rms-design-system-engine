@@ -45,7 +45,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
   components the index lists first. The run says how many components it reached.
 - **Components it can find even when nothing lists them.** The engine learns your components from your Figma
   capture, your structure contract or your config. A published library often has none of those, and its own code is
-  then the list, the same one your style guide's pages are built from. A file that draws nothing of its own (a
+  then the list, the same one your control center's pages are built from. A file that draws nothing of its own (a
   context, a provider, a feature-flag holder) is not a component. The run says how many it read that way.
 - **Your React, not an imitation of it.** React components are drawn with the React and the Vite your project has
   installed, so a component that keeps state, reads a context or renders through a portal behaves here as it does in
@@ -59,7 +59,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
   to (`ActionListItem` inside `ActionList`).
 - **Why a React component did not draw.** What it threw while React drew it is said, and so is a case that drew
   nothing with the props it was given (a closed dialog, tabs with no tabs), each with how many of its cases it hits.
-- **Your components.** On a page you name, your style guide or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
+- **Your components.** On a page you name, your control center or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
 - **First as a person meets them.** Each starts at rest, then each state is drawn on its own. A set whose first option is `disabled` is still tried enabled, so Tab, focus and the keys are tested where people use it.
 - **What your app gives them.** A Vue component that reads a Pinia store or links with Vue Router gets your project's own, when your `package.json` lists it and it is installed.
 - **What your entry installs.** Whatever your `main.js` puts on the app goes on each component too, however it does it: `app.use`, a property set on every component (a translation function), `app.provide`, a mixin, or a setup function handed the app.
@@ -106,7 +106,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 
 ### The Accessibility page
 
-The style guide has a page of its own for accessibility, under Documentation in the menu, as Rules and Documentation have theirs.
+The control center has a page of its own for accessibility, under Documentation in the menu, as Rules and Documentation have theirs.
 
 - **One table for every component.** Each row is one criterion of one component, the same row its own Accessibility area shows, under the same task number.
 - **The same panel.** A row opens the panel it opens on the component's page, with what to do first, and under it a link to where the fix is made: See in Figma on a designer's task, See in code (the component's file) on a developer's, then the component it is on (a link to its page) and where it was read, then the criterion's level and its principle (Level AA · Operable).
@@ -160,7 +160,7 @@ The style guide has a page of its own for accessibility, under Documentation in 
   as Angular Material's themes are, change with the page's `color-scheme`, not with a media query or a class. The
   engine reads them as a dark mode of its own (and a class that only switches `color-scheme`, as one more mode). For a
   system that declares no dark mode, that dark is implied. It is switched by setting the colour scheme to dark, for the
-  contrast checks, and the style guide's Dark switch draws it the same way.
+  contrast checks, and the control center's Dark switch draws it the same way.
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
@@ -183,7 +183,7 @@ A control's parts are checked with it: the label tied to its field, the error jo
 
 ### Products' pages
 
-Run on the style guide, it also opens each product's built page whole, with every rule, axe-core's heading order and landmarks among them. On a whole page the Tab walk also says when the focus goes back up the page within a column (2.4.3) and when it lands on a control no one can see (2.4.7). `a11y.products: false` leaves the products out.
+Run on the control center, it also opens each product's built page whole, with every rule, axe-core's heading order and landmarks among them. On a whole page the Tab walk also says when the focus goes back up the page within a column (2.4.3) and when it lands on a control no one can see (2.4.7). `a11y.products: false` leaves the products out.
 
 Findings are named after the product and listed on the Status page under Products.
 
@@ -215,7 +215,7 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 - **More than one way.** 2.4.5 counts the ways one product offers of finding a page: its menu, a search, a sitemap, breadcrumbs, and links between its own pages. Two or more pass. A product whose pages are all steps of one named flow is the process the criterion excepts, and passes with that said.
 - **What a person decides.** Without a walk the pages are opened one by one and never filled in, so a field a flow fills once it runs looks empty here. Whether a step really commits money or data, and whether its review lets people correct it, is read from words only. These end as A person checks, never as Passes.
 - **One page alone.** 3.2.3, 3.2.4 and 3.2.6 need two pages of the product. With one, the check says so and asks for more pages.
-- **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the style guide's Status page, each one left to fix or to check is a row under Accessibility, with its pages.
+- **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the control center's Status page, each one left to fix or to check is a row under Accessibility, with its pages.
 
 ### Beyond A and AA
 
@@ -231,7 +231,7 @@ Three things the check looks at are not asked for by WCAG 2.2 at level A or AA. 
 
 A run that finds none of these says none were found, never that the page is accessible.
 
-All three are the audit's: the mode is set through the browser, which the style guide's own page cannot do, so each row says to run the audit until one has.
+All three are the audit's: the mode is set through the browser, which the control center's own page cannot do, so each row says to run the audit until one has.
 
 Why apart: an icon that disappears in high contrast mode used to be reported as WCAG 1.4.11 failing, and a focus ring as 2.4.7. That told a team an AA criterion was broken where the standard asks for nothing at all — and a conformance claim has to be true about the standard, not about everything worth fixing.
 
@@ -273,7 +273,7 @@ rms-design-system-engine --hear
 
 - **The computer's own reader.** VoiceOver on a Mac, NVDA on Windows, driven through Guidepup. `--reader nvda` or
   `--reader voiceover` names one, and `--component menu` hears one component.
-- **Each control, as Tab reaches it.** Each component the style guide draws opens in a browser window in front.
+- **Each control, as Tab reaches it.** Each component the control center draws opens in a browser window in front.
   Tab is pressed through the reader itself, from the control before, and everything it says for that Tab is
   recorded. A control Tab does not reach is marked as skipped.
 - **Held against the browser.** The name, the role and every state the browser gives must be in what was said, in
@@ -285,7 +285,7 @@ rms-design-system-engine --hear
 - **It speaks aloud and changes nothing.** The reader talks while it runs. A reader that cannot be driven yet is said
   with what to turn on (on a Mac: "Allow VoiceOver to be controlled with AppleScript" in VoiceOver Utility), and the
   engine never turns it on itself.
-- **Kept in one file.** `.design-system-engine-out/heard-by-reader.json`, which the style guide reads.
+- **Kept in one file.** `.design-system-engine-out/heard-by-reader.json`, which the control center reads.
 - **Heard for real in the engine's own CI.** Every week, and on each change to the screen reader code, GitHub runs
   VoiceOver on a macOS machine and NVDA on a Windows machine over the two fictional demo systems
   (`.github/workflows/screen-readers.yml`). Guidepup's own setup lets each reader be driven there. The run fails
@@ -308,7 +308,7 @@ found:
 | Chrome's accessibility tree | What a screen reader hears (4.1.2) | *Chrome only* — no other engine exposes one, and a tool that works it out itself reads the same everywhere |
 
 **Tried in Firefox and WebKit too.** Fifteen of the criteria a browser decides are tried again in the other browsers,
-on each component the style guide draws:
+on each component the control center draws:
 
 - **From the page's layout.** What Tab reaches (2.1.1), whether the focus shows when it gets there (2.4.7), reflow at
   320px (1.4.10), text spacing (1.4.12), zoom to 200% (1.4.4) and target size (2.5.8).
@@ -438,7 +438,7 @@ look at, **how to look at it**, and keeps the answer only while it is still true
 
 - **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
 - **A token change tries only the components that use it.** Each component is signed with its own CSS rules and the tokens they reach, through `var()` and in every brand. A colour changed in Figma tries again only the components that show it.
-- **A token the whole page shares tries every component.** That is a token the style guide's frame or your global CSS uses (a page background, the body text).
+- **A token the whole page shares tries every component.** That is a token the control center's frame or your global CSS uses (a page background, the body text).
 - **An unchanged page is not opened again.** The next run puts its results back, and the report says how many pages it reused. When nothing changed, no browser opens and the check takes seconds.
 - **An engine update tries again only what it could have changed.** Results are signed by what decides them: the
   checks, the thresholds, the rules they run and the in-page script. What a finding is called, why it matters,
@@ -446,15 +446,15 @@ look at, **how to look at it**, and keeps the answer only while it is still true
   never makes a whole system check itself again. A comment on a line of its own is left out too; one after code
   is kept, because finding where it really begins means reading the strings around it, and a signature that
   guessed wrong would put back results the engine should have checked again.
-- **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
-- **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
+- **A change is tried at once.** A control center is checked a few components a page, so a change to one component tries only its page again.
+- **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the control center, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **A change to your CSS's comments or spacing keeps every result.** Only the rules count.
-- **A change to the style guide's own screens keeps every result.** The Status table, the Documentation panel and the other screens around the components never reach what the check measures. When only that CSS changed, each part's page is opened just long enough to read what surrounds its components, and its results are put back. A change around a component (its stage, the page behind it) still tries it again.
+- **A change to the control center's own screens keeps every result.** The Status table, the Documentation panel and the other screens around the components never reach what the check measures. When only that CSS changed, each part's page is opened just long enough to read what surrounds its components, and its results are put back. A change around a component (its stage, the page behind it) still tries it again.
 - **The report says why a page was tried again:** the check changed, the CSS every component shares changed, which components changed and the tokens that moved them, or it was never checked before.
 - **Several pages are tried at once.** When many need trying, a few browsers share them out (`a11y.parallel`, by default a quarter of the computer's cores), and the report is the same as one browser's.
-- **Each part lays out only its own components.** The style guide's own screens (Status, History, Documentation) are left out of a part's page. They hold a copy of every component, and on a big guide laying them out made each part slow, until the browser stopped answering.
+- **Each part lays out only its own components.** The control center's own screens (Status, History, Documentation) are left out of a part's page. They hold a copy of every component, and on a big guide laying them out made each part slow, until the browser stopped answering.
 - **A run stays inside its time.** The browsers that share the parts, and then the run itself, each stop on their own before `a11y.timeoutSec` runs out. What they checked is kept, so the next run goes on from there.
-- **Each page gets time for each component it draws.** That holds for a part of the style guide, and for the page your own build draws with every component in each variant. On a large system that page used to get one page's time, so it was stopped halfway on every run, even a run of one component.
+- **Each page gets time for each component it draws.** That holds for a part of the control center, and for the page your own build draws with every component in each variant. On a large system that page used to get one page's time, so it was stopped halfway on every run, even a run of one component.
 - **Your build's page is checked beside the parts.** It gets a browser of its own and its own time, while the parts are shared out. Your build is started once, never once per browser.
 - **Firefox and WebKit take the time that is left.** Their pass reloads the page for each component in each browser, so on a large guide it may not reach every component in one run. It starts none past the run's time, keeps what an earlier run found for the rest, and the next run tries those first.
 - **A stopped run says where it was.** It names the page it was on and how many of that page's checks were done, so a slow system is told apart from a stuck check.
@@ -597,11 +597,11 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
 Each gap reaches the design team:
 
 - **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
-- **On the style guide.** Each one is on its component's Accessibility list and on the Status page, for you in Figma.
+- **On the control center.** Each one is on its component's Accessibility list and on the Status page, for you in Figma.
 
 The same contrast and target-size checks reach the screens your team designs too, not only the components, once they are read (`--figma-a11y`).
 
-- **A task each.** Each problem on a screen is a task on the style guide, for whoever keeps the Figma file, under its WCAG criterion and its screen.
+- **A task each.** Each problem on a screen is a task on the control center, for whoever keeps the Figma file, under its WCAG criterion and its screen.
 - **What was measured.** The panel says what the check found, such as the two colours and their ratio.
 - **Its layer, one click away.** See in Figma opens the layer it is on, in a tab of its own, so it is fixed there like any other Figma task.
 

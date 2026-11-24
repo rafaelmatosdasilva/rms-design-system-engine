@@ -14,7 +14,7 @@ How the engine makes new themes of your system, and builds prototypes with your 
 
 ## Design themes over your system
 
-The theme editor is built into every style guide the engine builds, and needs no extra install. While it is Coming soon on the [features page](features.md#design-themes-over-your-system), a built page does not show it: its New theme button and Create new theme… stay hidden. A page built for showing it turns it on in the page's own data (`enabled: true` in the `sg-theme-editor-data` block).
+The theme editor is built into every control center the engine builds, and needs no extra install. While it is Coming soon on the [features page](features.md#design-themes-over-your-system), a built page does not show it: its New theme button and Create new theme… stay hidden. A page built for showing it turns it on in the page's own data (`enabled: true` in the `sg-theme-editor-data` block).
 
 ### Where it opens
 
@@ -269,7 +269,7 @@ The picture is taken on a fresh draw, before anything clicks the page: a control
 The same widths, states and longer words are tried in Firefox, and in WebKit when Playwright is here. Fonts, form controls and line breaks differ between browsers, so a label that fits in Chrome can wrap in WebKit.
 
 - **Only what differs is said.** A problem Chrome has is said once, above. One only another browser has gets a line of its own, with the browsers it happens in.
-- **A picture of each width.** Each browser keeps its own, in a folder named for it, so the style guide's pictures stay Chrome's.
+- **A picture of each width.** Each browser keeps its own, in a folder named for it, so the control center's pictures stay Chrome's.
 - **Which browsers.** `prototype.browsers` in `ds-config.json` names them, and `false` turns it off ([config](../reference/config.md)).
 
 ```
@@ -282,7 +282,7 @@ The same widths, states and longer words are tried in Firefox, and in WebKit whe
 
 Each width is drawn at the browser's own width, never in a box inside a wider window. A media query reads the window, so a box alone would leave every width drawn as the widest, and every check passing.
 
-The style guide's Showroom does the same: each screen is drawn in a frame of its own, as wide as the screen, so its media rules, its `vw` and its fixed parts read the screen's width, never the style guide's window. Its pins, its full browser view and the build's measurements of it all work inside that frame.
+The control center's Showroom does the same: each screen is drawn in a frame of its own, as wide as the screen, so its media rules, its `vw` and its fixed parts read the screen's width, never the control center's window. Its pins, its full browser view and the build's measurements of it all work inside that frame.
 
 At each width the engine also reads which of your CSS's media rules hold, and how the page is laid out. Two neighbouring widths drawn the same, though a rule holds at one and not the other, are listed:
 
@@ -392,7 +392,7 @@ A team's exit criterion can ask for no Blocker and no Major in a prototype's UX.
 - **An agent never grades.** The hooks hold a grade the person did not give, and an agent's own edit of that file.
 - **It stays with the problem.** A problem found again keeps its id, so its grade stays. A changed problem is graded again.
 - **Kept with the prototype.** The check record beside the page (`<name>.check.json`) holds each problem, its proposal and the reviewer's grade. `--grade <prototype>` alone lists them.
-- **Shown on its page.** In the style guide, the prototype's panel has a UX grades card: each problem worst first, at the reviewer's grade with who gave it, else at the one proposed with why. Confirming or changing a grade from the page is coming soon.
+- **Shown on its page.** In the control center, the prototype's panel has a UX grades card: each problem worst first, at the reviewer's grade with who gave it, else at the one proposed with why. Confirming or changing a grade from the page is coming soon.
 
 ### What a prototype only pretends
 
@@ -514,7 +514,7 @@ This is the same loop a correction goes through — a lesson becomes the stronge
 Three things it is careful about:
 
 - **A flow is one place, not one per page.** A flow of four pages judged broken once is one count. Counting it per page would say a single judgement was four mistakes, and a rule would fall due on the first prototype anyone judged.
-- **Prototype judgements and screen judgements never mix.** A rule proposed from whole flows is counted apart from one proposed from the style guide's screens: they are judged on different things, and a proposal should never cite the other as its evidence.
+- **Prototype judgements and screen judgements never mix.** A rule proposed from whole flows is counted apart from one proposed from the control center's screens: they are judged on different things, and a proposal should never cite the other as its evidence.
 - **It proposes, and remembers a no.** The rule is drafted for your team to accept or turn down. Turned down, it is not asked again until the evidence has grown.
 
 A decision that holds is never counted. Only the four fixed decisions are, because a rule is only worth proposing where the answer should be the same every time.
@@ -794,7 +794,7 @@ Answer with `--lesson-answer <id> yes` or `no`. `--rule "<sentence>"` gives a st
 
 - Every full run ends with one line: how many lessons hold and as what, what waits for your yes, and what came back.
 - `--lessons` lists each lesson with what it became, the proposed rules and the changed lines. `--unlesson <id>` takes one back.
-- The style guide shows them with the decisions, on the History page and on each component's History, with what each became.
+- The control center shows them with the decisions, on the History page and on each component's History, with what each became.
 - Agents are told what a lesson ruled out, the same way they are told every other decision.
 
 The page review reads each screen's structure. How a page looks, rather than how it is built, is judged only when you ask a model to (below), and a lesson about it is kept as a rule for your guidelines.
@@ -827,7 +827,7 @@ The page review measures what it can: one main action, nothing destructive in fr
 
 **What the model gets, for each prototype from Figma.**
 
-- Its screenshot. A picture kept beside the screen (`showroom/<Screen>.png`) is used as it is; otherwise it is taken from the built style guide, at Figma's size, in the screen's brand and mode.
+- Its screenshot. A picture kept beside the screen (`showroom/<Screen>.png`) is used as it is; otherwise it is taken from the built control center, at Figma's size, in the screen's brand and mode.
 - Its code, as a short outline: each component and element, the props that decide how it looks, its words and its line.
 - The components it uses, each with what your intent layer (or Figma's description) says it is for.
 - Its brief, when one is known: `"brief"` in its `<Screen>.json`, or a `<Screen>.brief.md` beside it.
@@ -847,7 +847,7 @@ The page review measures what it can: one main action, nothing destructive in fr
 **What comes back.** For each decision: holds, breaks or unclear, how much it matters (high, medium, low), what the model saw, and one sentence a reviewer can check on the screen.
 
 - It is advisory. It never fails a run.
-- The style guide shows it on each prototype from Figma's own page, beside the page review, headed "Judged by a model".
+- The control center shows it on each prototype from Figma's own page, beside the page review, headed "Judged by a model".
 - The run ends with one line: what broke, and what it cost. Each full run repeats the last judgment's line, with what it cost then. Nothing is asked again.
 - A decision judged broken on three screens becomes a [proposed rule](#lessons-a-correction-becomes-a-guard), like the page review's.
 
@@ -873,7 +873,7 @@ The page review measures what it can: one main action, nothing destructive in fr
 - **Stale names.** A name in backticks that is no token, property or component of the system is listed to rename or take out.
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
-- **In the style guide.** Each component's rating sits in its Documentation area.
+- **In the control center.** Each component's rating sits in its Documentation area.
 
 ## Turn Figma into code
 

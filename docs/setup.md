@@ -101,7 +101,7 @@ Setup ends with a first result, so you see what the engine is for before learnin
 
 - **One component, checked.** The one Figma and your code pair most fully, compared with Figma (`--first-result`, or `--first-result <component>` for another).
 - **Its three main findings.** What fails first, one per check, each with what to do and who does it.
-- **What to ask next.** Three requests to try, such as showing that component in the style guide.
+- **What to ask next.** Three requests to try, such as showing that component in the control center.
 - With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
 
 ### Which layers keep an agent inside your system
@@ -155,7 +155,7 @@ Add `/-/tree/<branch>` for a branch other than the default one.
 - **Always the latest commit.** It keeps a mirror of the branch's latest commit beside where it runs, through the GitLab API, with no git, no clone and no SSH key. Every run asks GitLab for the latest commit first and fetches again only when the branch has moved.
 - **You see what was checked.** The summary names the commit, `Code checked: GitLab <project> @ <branch> <commit>`, and says GitHub for a project read from GitHub.
 - **Private projects.** Put `GITLAB_TOKEN` (a personal access token with the `read_api` scope) in a `.env` in the folder you run it from. For a company host, add `GITLAB_HOST=<host>` beside it. A run started inside the mirror finds them there too, in the folder that holds the mirror. The token is only sent to gitlab.com or that host, and never printed.
-- **A Figma read is sent at once.** When Figma is read again (`--refresh-figma`, `--from-figma-cli`, or a whole capture through the session's Figma tool), the snapshots go to the team's snapshots store in the same run, so everyone's next run reads them and the style guide's History lists the read. `--keep-snapshots` keeps them in this folder; `--refresh-snapshots` sends them later.
+- **A Figma read is sent at once.** When Figma is read again (`--refresh-figma`, `--from-figma-cli`, or a whole capture through the session's Figma tool), the snapshots go to the team's snapshots store in the same run, so everyone's next run reads them and the control center's History lists the read. `--keep-snapshots` keeps them in this folder; `--refresh-snapshots` sends them later.
 - **A shared store can live on GitHub too.** Point a store at a GitHub repository (`{ "github": "https://github.com/<owner>/<repo>", "path": "snapshots" }`) and the engine reads it with git, the same way you clone it yourself — no second API, no token of the engine's own. Writing back works the same way: there is no second API and no token of the engine's own, so what you may push is what GitHub already lets you push — your key, the branch's protection, your role. With no branch named, it writes to the repository's default branch.
 - **Each commit says whose run made it.** A shared store is usually written with the team's own token, so without this every change looks like that token. The commit now carries the person who ran it as its author (the name their git uses, or `--by "<name>"`), while the token's owner stays the committer — so GitLab's roles and audit trail are untouched and you can still tell three people's runs apart.
 - **No token? Your own git access is enough to read.** If you already clone your team's projects — over SSH, or with a credential helper — the engine reads the shared files that way and you need no token at all. It only does this where there is no token, so nothing changes if you have one, and it never stops to ask you for a password: if git cannot get in by itself, the run says what is missing and carries on. **Writing works the same way.** The engine builds the commit inside that mirror and pushes it, without checking anything out, so your folders are untouched. What you may push is still your host's to decide. On GitLab, a protected branch gets a merge request instead, as it does with a token: the engine pushes to a branch of its own and asks GitLab, through its push options, to open the merge request for a Maintainer to merge. On GitHub, a protected branch refuses exactly as it would from your terminal, and the run tells you what it said.
@@ -252,10 +252,10 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - **A lesson's answer is yours.** `--lesson-answer`, or an edit to `design-system-engine-lessons.json`, waits for your yes or no.
 - **A change to the system waits for a sign-off.** An edit that adds a token to the theme or an option to a component is held until someone signs it off. The agent that made it never does: see [A second reviewer](#a-second-reviewer).
 - **A shared token keeps its value until someone decides.** An agent fixing one button can change a token's value and recolour every card that uses it. An edit that gives an existing token another value is held too, and the hold says:
-  - what the token reaches: the components the last style guide build saw using it, directly or through another token, and the products that use those;
+  - what the token reaches: the components the last control center build saw using it, directly or through another token, and the products that use those;
   - the way out for one component: the component's own token, when it has one, so the shared one stays as it is;
   - how to sign it off when the change is meant for all of them.
-- **What passes.** A value Figma gives that token (the parity fix the audit asks for), and a token one component at most uses. Before the first style guide build the engine cannot say what a token reaches, so it holds the edit and says so.
+- **What passes.** A value Figma gives that token (the parity fix the audit asks for), and a token one component at most uses. Before the first control center build the engine cannot say what a token reaches, so it holds the edit and says so.
 
 ### A second reviewer
 
@@ -276,7 +276,7 @@ The agent that made a change to the system never signs it off. Someone else revi
 
 **Who may sign each kind of change.** `review.approvers` names them per kind: a new token, a component's new option, a new value for a shared token, an exception, a new reference picture, or any change an agent made. Without it, your repository's `CODEOWNERS` decides for the file that changed. Anyone else is refused, and the run's summary lists each change still waiting with who may sign it. The full list is in [the configuration reference](../reference/config.md).
 
-The sign-offs keep who made each change and who reviewed it (`design-system-engine-signoffs.json`). `--sign-off` alone lists them, and the style guide's History shows both names on each one, and on each change in Figma.
+The sign-offs keep who made each change and who reviewed it (`design-system-engine-signoffs.json`). `--sign-off` alone lists them, and the control center's History shows both names on each one, and on each change in Figma.
 
 ### Every UI edit is checked as it is made
 
@@ -331,7 +331,7 @@ The engine is built for Claude Code, but its answers and checks work in any AI t
 Both read the guide and run the same guard as Claude Code, as their own hooks.
 
 - **In Codex the whole guide is a skill.** When Codex is set up on your computer, the installer also puts the engine's guide where Codex reads skills (`~/.codex/skills/rms-design-system-engine`), and the engine keeps it current. Ask for it the way Codex asks for a skill: `$rms-design-system-engine audit the chip`. The engine routes a request asked that way just as it routes `/rms-design-system-engine` in Claude Code.
-- **One request for every agent.** A request that starts with the engine's name alone (`rms-design-system-engine audit the chip`) is routed in each of them too: by the hooks in Claude Code and Codex, and by the guide in Cursor. That is the form the style guide copies, so a request copied from it works in whichever agent you paste it, and the page never asks which one you use.
+- **One request for every agent.** A request that starts with the engine's name alone (`rms-design-system-engine audit the chip`) is routed in each of them too: by the hooks in Claude Code and Codex, and by the guide in Cursor. That is the form the control center copies, so a request copied from it works in whichever agent you paste it, and the page never asks which one you use.
 
 In the project, run:
 
@@ -468,7 +468,7 @@ Nobody copies a value by hand. The engine writes a read-only script for one chun
 
 ### Every output says what it was built from
 
-Every snapshot, the contracts and the style guide record the code's commit (and whether it had uncommitted changes), Figma's file version or when Figma was read, and the engine's commit.
+Every snapshot, the contracts and the control center record the code's commit (and whether it had uncommitted changes), Figma's file version or when Figma was read, and the engine's commit.
 
 A run whose inputs are older than those of the output already there keeps that output and says so. `--force` replaces it. A run from the same inputs, or from two branches that cannot be ordered, writes as before.
 
@@ -479,10 +479,10 @@ Until now the answer was the same in every project, and it was always the most c
 | Place | What it holds |
 |---|---|
 | The design file | What Figma shows: a role, a name, an annotation, a component |
-| The code the engine generated | The tokens, the contracts, the style guide |
+| The code the engine generated | The tokens, the contracts, the control center |
 | The engine's own files | The authored contract, the structure contract's notes, the kept differences |
 
-**Your product's code is not on that list, and never will be.** The engine does not change code people wrote. What it finds there comes back as a patch for a person to apply and as the difference on that component's page in the style guide. At most it writes the intent layer; everything else it flags.
+**Your product's code is not on that list, and never will be.** The engine does not change code people wrote. What it finds there comes back as a patch for a person to apply and as the difference on that component's page in the control center. At most it writes the intent layer; everything else it flags.
 
 Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Status page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
 
@@ -507,7 +507,7 @@ A project that says never gets the list of Figma changes and no script to run. A
 
 | Variable | What it does |
 |---|---|
-| `FIGMA_TOKEN` | Reads Figma through its API, and lets the style guide fetch Figma's images |
+| `FIGMA_TOKEN` | Reads Figma through its API, and lets the control center fetch Figma's images |
 | `FIGMA_REFRESH=force` | Refreshes from Figma even when the file has not changed |
 | `GITLAB_TOKEN` | Reads a private GitLab project (a personal access token with `read_api`) |
 | `GITLAB_HOST` | The host of a company GitLab |

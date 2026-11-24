@@ -24,7 +24,7 @@ What the engine does for design and product teams. Every part reads the same kno
 
 | Feature | What it does | Status |
 |---|---|---|
-| [Publish a living style guide](#publish-a-living-style-guide) | The team's control center, each component's parity, accessibility, docs and decisions in one place, with who acts on what. | Ready to use |
+| [Publish a living control center](#publish-a-living-control-center) | Everything your system holds in one place, its status, accessibility, docs, decisions and history, with who acts on each. | Ready to use |
 | [Try components in a playground](#try-components-in-a-playground) | A component's props changed live, in every state and theme, as the code draws it, for design review and visual and functional QA. | Early development |
 
 ### Creation
@@ -62,7 +62,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 *Today: it only reads Figma. Renames are applied after you say yes. Every other fix is for your design team to make.*
 
 - Finds values with no token or style, detached instances, missing auto layout and missing descriptions.
-- Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the style guide's Rules page, beside the code's.
+- Writes down how your system builds components and tokens (names, properties, layers, variables) and lists the ones that break it, on the control center's Rules page, beside the code's.
 - Fixes a component's construction, such as renaming its layers, after you say yes.
 - Compares components of one kind, so every button sets its states and names its options the same way.
 - Names each auto-layout frame after the code's own layout part it is laid out as (a stack, a cluster), so `Frame 47` comes back into code as what it is.
@@ -90,11 +90,11 @@ Name a component the way your system does (button primary, Button Primary and pr
 - What breaks only in a combination of modes, such as dark on a phone.
 - Brands that pin a value they should inherit from the brand they extend.
 - Two components whose own rules are nearly the same.
-- A health number per area on the style guide's Status page.
+- A health number per area on the control center's Status page.
 
 **In your apps' code**
 
-- Writes down the rules your code already follows and lists what breaks them, on the style guide's Construction page, beside Figma's.
+- Writes down the rules your code already follows and lists what breaks them, on the control center's Construction page, beside Figma's.
 - Lists each story and example that still sets a value its component no longer takes, such as a size the system dropped.
 - Keeps every exception honest: a reason that says something, an owner and a date, for kept differences, excused values and accepted debt.
 - Holds a rule once every component follows it, so the next break fails, and gives a deprecation one release before its uses fail.
@@ -189,7 +189,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Measures touch targets, on the page and again on a small 320 pixel screen.
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
-- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
+- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The control center filters by person, so a team sees only its own work.
 - Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again. It is shown as their word, not a measurement, and what meets the standard says how much of it rests on one.
 - Sorts the judgement calls for whoever checks them, when you ask: a model reads your headings, labels, link words and error messages and lists the ones worth looking at first, with why. It decides nothing — no criterion passes or fails on it.
 - Listens with a real screen reader when you ask: VoiceOver on a Mac or NVDA on Windows is moved through each control of each component, and what it said is held against the name, role and states the browser gives. A measurement of one reader, shown on the 4.1.2 row. It never turns a setting of your computer on.
@@ -265,7 +265,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Gives agents the mistakes that look right, each with why it fails and what to use instead, and suggests the ones your pages leave out, such as a status shown by colour alone.
 - Reads how much damage each destructive action does, and checks your screens against it: undo for what can be undone, how long when it is only for a while, and a confirmation with the safe option selected for what is permanent.
 - Never overwrites a sentence a person wrote.
-- A change to the layer reaches the published style guide on its own, checked on the pages it was about.
+- A change to the layer reaches the published control center on its own, checked on the pages it was about.
 
 ### What to ask
 
@@ -277,7 +277,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine rate our guidelines for agents` | How much an agent can take from your guidance: ready, partial or thin, for each component, with what to add |
 | `/rms-design-system-engine rate our guidelines and test extraction with a model` | The same, plus a test where a model answers questions from your guidance alone (uses your model tokens) |
 
-## Publish a living style guide
+## Publish a living control center
 
 **Ready to use** · **Why it matters:** Design, engineering and product see the same status, with no doc going stale.
 
@@ -303,10 +303,10 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 | Ask in Claude Code | What you get |
 |---|---|
-| `/rms-design-system-engine build the style guide` | The living style guide |
-| `/rms-design-system-engine check the modal and show it in the style guide` | One component's page |
-| `/rms-design-system-engine publish the style guide for the team` | The job that publishes it on every push |
-| `/rms-design-system-engine rebuild my style guide` | Your own copy built again, only the parts the change reached |
+| `/rms-design-system-engine build the control center` | The living control center |
+| `/rms-design-system-engine check the modal and show it in the control center` | One component's page |
+| `/rms-design-system-engine publish the control center for the team` | The job that publishes it on every push |
+| `/rms-design-system-engine rebuild my control center` | Your own copy built again, only the parts the change reached |
 
 ## Try components in a playground
 
@@ -327,7 +327,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 *Today: a theme starts from scratch. Starting from a Figma file, a file of tokens or pictures is on its menu, and comes next.*
 
-- Opens from the style guide's Theme choice, as **Create new theme…**, beside the system's own themes.
+- Opens from the control center's Theme choice, as **Create new theme…**, beside the system's own themes.
 - Sets the colours, the font, the corners, the spacing, the borders and the shadows, with the screen on the right taking each change live.
 - Previews every system on a specimen of its own components, as your code renders them, each checked against the catalog so nothing is invented.
 - Works out dark from light the way your system does, so a new colour keeps each step of a scale as light as yours, and every text it sits under stays readable (WCAG AA).
@@ -339,7 +339,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 | Ask in Claude Code | What you get |
 |---|---|
-| `/rms-design-system-engine make a new theme in the style guide` | The style guide built, with Create new theme… in its Theme choice |
+| `/rms-design-system-engine make a new theme in the control center` | The control center built, with Create new theme… in its Theme choice |
 
 ## Turn Figma into code
 
@@ -355,7 +355,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 **Coming soon** · **Why it matters:** A component that exists only in code gets a Figma home, so designers can fine-tune it and Figma and the code can be compared.
 
 - Draws a component that exists only in code as a Figma component: its props as properties and variants, its tokens as variables, its parts as layers.
-- Starts from the components the style guide marks Only in the code.
+- Starts from the components the control center marks Only in the code.
 - Draws a template or a pattern too, as a frame made of the system's own components.
 - Uses only the system's own variables, text styles and components. It never makes up a value.
 - Shows you every change first. Nothing is written to Figma until you say yes.

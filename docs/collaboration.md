@@ -1,17 +1,17 @@
 # Collaboration
 
-How the engine publishes the living style guide and the playground. What each part promises, and what to ask for it, is on the [features page](features.md#collaboration). All pages: [technical documentation](README.md).
+How the engine publishes the living control center and the playground. What each part promises, and what to ask for it, is on the [features page](features.md#collaboration). All pages: [technical documentation](README.md).
 
 **On this page**
 
-- [Publish a living style guide](#publish-a-living-style-guide)
+- [Publish a living control center](#publish-a-living-control-center)
 - [Try components in a playground](#try-components-in-a-playground)
 
-## Publish a living style guide
+## Publish a living control center
 
-[The style guide](features.md#publish-a-living-style-guide) is one page with every token and component, from what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`.
+[The control center](features.md#publish-a-living-control-center) is one page with every token and component, from what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`.
 
-**[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**, the RMS Design System's style guide, built by this engine and published by that design system, so it shows what the engine makes today.
+**[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**, the RMS Design System's control center, built by this engine and published by that design system, so it shows what the engine makes today.
 
 - **One component at a time.** A page for one component checks it first, against Figma and for accessibility, then shows it and the components it nests, `styleguide/modal.html`.
 - **One link for the team.** Publishing writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
@@ -25,9 +25,9 @@ How the engine publishes the living style guide and the playground. What each pa
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
   - **A token that may write but not read is refused, not guessed at.** Sending the page reads the project's files first: that is how the engine tells what is already there from what is new. A token your host lets commit but not read the repository (a fine-grained token without **Repository: Read**) stops the publish and says so, rather than sending every file as new and leaving the store between two builds.
-- **Your own copy is rebuilt when you ask.** A round, the build that publishes, never starts by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](features.md#publish-a-living-style-guide)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
+- **Your own copy is rebuilt when you ask.** A round, the build that publishes, never starts by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](features.md#publish-a-living-control-center)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
 - **The page on your computer keeps up with your git, the engine and the code.** After each commit and each pull, or at the end of a Claude Code turn once the engine or the code it reads moved, it is built again quickly and never published ([See a change in seconds](#see-a-change-in-seconds)).
-- **Built in one place only.** The guide is built from your design system's own project, and published to your team's style guide store. Never inside another store:
+- **Built in one place only.** The guide is built from your design system's own project, and published to your team's control center store. Never inside another store:
   - Asked to build or publish a guide inside one of your stores (your intent layer's repository, your snapshots'), the engine stops. It says what that folder keeps and where the guide is built, and builds nothing there.
   - Only if you mean it, `--here` builds it in that folder anyway. A pipeline is never stopped.
   - The README of each store that does not keep the guide says where it is, so a person or an agent working there opens the real one instead of building a copy that has none of your setup.
@@ -53,12 +53,12 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round 
 
   | What moved | What runs |
   |---|---|
-  | The intent layer | The contracts and the design intent, then the style guide, its check and the publish. No audit. |
-  | The themes | The style guide, its check and the publish |
+  | The intent layer | The contracts and the design intent, then the control center, its check and the publish. No audit. |
+  | The themes | The control center, its check and the publish |
   | The code, Figma, the snapshots, the team's decisions or the profile | The audit, then everything after it |
   | The engine | Everything, since its output may differ. Each step's own caches keep it short. |
 
-- **It publishes only a page that changed.** With a style guide store set, the published `built-from.json` keeps the page's fingerprint, so a build that made the same page sends only that record.
+- **It publishes only a page that changed.** With a control center store set, the published `built-from.json` keeps the page's fingerprint, so a build that made the same page sends only that record.
 - **It tells a CI your git host cannot reach.** A CI on a company network often polls the store, because the git host may not send webhooks into that network, so a published page waits for the next poll. Your computer is inside that network, so the engine can call the CI itself once the write has landed. Name the links under the part's store, in `ds-config.json` or your team's profile:
 
   ```json
@@ -66,11 +66,11 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round 
                               "notify": { "url": "https://ci.acme.test/job/style-guide/build", "authEnv": "ACME_CI_AUTH" } } }
   ```
 
-  - `notify` is a link, `{ "url", "method", "authEnv" }` (`method` is `POST` unless you say `PUT` or `GET`), or a list of them. Any CI with a trigger link works: a remote build with a user's API token, a generic webhook. Every part's store takes one, not only the style guide's.
+  - `notify` is a link, `{ "url", "method", "authEnv" }` (`method` is `POST` unless you say `PUT` or `GET`), or a list of them. Any CI with a trigger link works: a remote build with a user's API token, a generic webhook. Every part's store takes one, not only the control center's.
   - **The credential stays in `.env`.** `authEnv` names its variable: `user:token` is sent as Basic, anything else as a Bearer token. Not set yet? The run says which variable to add and calls nothing.
   - **Only a write that landed.** A commit or a push on the branch, or a folder written. Never a merge request (nothing is on the branch until someone merges it), a store that already had the files, a refused write, or an `--offline` run.
   - **Never another token.** A variable the engine uses for something else (`GITLAB_TOKEN`, `GITLAB_WRITE_TOKEN`, `GITHUB_TOKEN`, `FIGMA_TOKEN`, a store's `tokenEnv`) is refused, so a profile can never send one of your tokens to a host it was not made for. Only `https` links are called (`http` only on `localhost`), and a link with a password in it is refused: put the password in `.env`.
-  - **One line per link:** `🔔 Style guide: told ci.acme.test/job/style-guide/build (201)`. The line never shows the link's query or a credential. A CI that refuses, or does not answer in 10 seconds, gets a line of its own, and the write still counts.
+  - **One line per link:** `🔔 Control center: told ci.acme.test/job/style-guide/build (201)`. The line never shows the link's query or a credential. A CI that refuses, or does not answer in 10 seconds, gets a line of its own, and the write still counts.
 - **Never from a branch of your own.** A checkout on another branch than its remote's default is built, never published.
 - **A failed step is never published.** The round says where it failed, and the next round tries it again.
 - **One round at a time.** A lock file stops a second round while one runs.
@@ -79,7 +79,7 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round 
 - **A scheduler of your own.** `--auto` is one round and an exit code, so a cron entry or a CI job of your own can call it on whatever rhythm you choose. The engine never writes one for you.
 - **Never two at once.** An audit, a build or a publish you start while a round runs waits for it to end first, so the two never write the same files or share the computer.
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
-- **`--guide-status`** says whether the style guide the team opens is behind what it is built from, and what this folder's last round did.
+- **`--guide-status`** says whether the control center the team opens is behind what it is built from, and what this folder's last round did.
 
 ### See a change in seconds
 
@@ -89,7 +89,7 @@ A full build tries every component's accessibility in a browser, so it takes min
 - **What it keeps.** The accessibility saved by the last full build, and the prototypes from Figma as it last measured them. A component changed since is tried by the browser that opens the page.
 - **What it leaves out.** No accessibility tried while building, no pictures of the guide's own pages, and nothing read from or sent to your team's stores.
 - **One component, faster still.** Add `--component` with its name for a page of that component and the ones it nests. Its audit is not run first, as it is for a full build.
-- **`--styleguide --watch` builds again on each save.** It follows your project, the style guide's template and the engine, and builds a moment after you save. Several files saved together make one build. Ctrl+C stops it.
+- **`--styleguide --watch` builds again on each save.** It follows your project, the control center's template and the engine, and builds a moment after you save. Several files saved together make one build. Ctrl+C stops it.
 - **Built again after each commit and each pull.** Once you have built the page here, your git builds it again quickly after a commit, a merge or a pull, and a rebase. Your copy stays as your git is, with no command of yours.
   - **Git never waits.** The build runs on its own and ends with the page. A commit goes ahead at once.
   - **Never unasked.** Nothing is built where no page was built yet, nothing on CI, and nothing with `"hooks": false`.
@@ -231,7 +231,7 @@ Also on each component.
 
 ### Templates
 
-A template is a page frame in Figma made of your system's components, such as a settings page or a list with a side panel. List yours under `templates` in `ds-config.json` and the style guide gets a Templates page. List none and the page is not there at all, nor in the menu: it is the one page a reader cannot start from the guide, so an empty one would ask for work nobody can do from there.
+A template is a page frame in Figma made of your system's components, such as a settings page or a list with a side panel. List yours under `templates` in `ds-config.json` and the control center gets a Templates page. List none and the page is not there at all, nor in the menu: it is the one page a reader cannot start from the guide, so an empty one would ask for work nobody can do from there.
 
 - **What it is made of.** The components Figma places in it, in Figma's order. Each one with a page of its own is linked.
 - **Whether the code uses each one.** Each component says In the code, Not in the code, Kept out on purpose or In progress. It is the same answer the template check gives (Gate [17]).
@@ -243,10 +243,10 @@ A template is a page frame in Figma made of your system's components, such as a 
 
 Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project, or pages kept in Notion or Confluence. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
 
-When the layer changes, the style guide follows.
+When the layer changes, the control center follows.
 
-- **A change the engine makes is published at once.** A fix copied from the style guide and run in Claude Code (an answer to a proposal, drafts approved, changed or dropped, a part named, lines drafted), or one the engine makes on its own (`intentLayer.autoFix`), is committed to the layer. The same command then:
-  - builds the style guide again from the layer as it is now;
+- **A change the engine makes is published at once.** A fix copied from the control center and run in Claude Code (an answer to a proposal, drafts approved, changed or dropped, a part named, lines drafted), or one the engine makes on its own (`intentLayer.autoFix`), is committed to the layer. The same command then:
+  - builds the control center again from the layer as it is now;
   - checks the new page: built from that commit, with the pages the change was about;
   - publishes it where your team's guide lives: its store (set in `ds-config.json` or your company's profile), else your publish job on GitHub or GitLab, started with your token (`GITHUB_TOKEN`, or `GITLAB_WRITE_TOKEN`). Without one, it gives the link to start the job by hand.
 - **A change made in the layer by hand** builds the page again on its own too. See It updates on its own, above.
@@ -351,7 +351,7 @@ The template is only the layout. Every colour and weight on the page is one of y
 
 ### The page is checked too
 
-The style guide is held to what a page owes the people who read it, as a product's page is.
+The control center is held to what a page owes the people who read it, as a product's page is.
 
 - **Every file it links to is there.** A script, a style sheet or a picture the page names that is missing fails the check, so a page with a hole is never published.
 - **Its size is shown.** Every build says how much the page and its files weigh, with the largest files. Past 25 MB it warns, since the page is slow to open on a phone.
@@ -377,7 +377,7 @@ Every build writes the page's twin in text beside it, from the same object the p
 - **What the index holds.** A line per component: what it is, its props, what to avoid, its parts, what it composes with, and whether its design and code differ. Then the token families, how many variables the code uses, and how many WCAG criteria are checked. A part is listed under its root, never as a component to choose.
 - **What a component's file holds.** How to write it (its import line, its tag, its syntax), its props with their types, defaults and values, its events and slots, what it is for, when to use it and when not to, its rules, the mistakes made with it, what it cannot do, its parts, what it is used in, the tokens it uses, its accessibility, where its design and code differ, and where it came from.
 - **Nothing is invented.** A fact the data does not hold is a line that is not written, and a heading with nothing under it is left out.
-- **Published with the page.** The job that publishes the style guide publishes the twin with it, so one address serves both readers. A component the system no longer holds leaves with its file.
+- **Published with the page.** The job that publishes the control center publishes the twin with it, so one address serves both readers. A component the system no longer holds leaves with its file.
 - **Not the same as the local index.** For an agent working in your repository the engine also writes `contracts/llms.txt` and `contracts/catalog.json`, with the catalog for checking generated UI. Those stay beside the contracts, where only somebody who can run the engine reaches them. This twin is the published page's.
 
 ### The Status table
@@ -409,8 +409,8 @@ One row for each component, with one word per state. The cards above the table a
 
 Early development. Each component's page opens on its Playground: the component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch.
 
-- **Live from your Storybook.** With a Storybook built to files, the Playground draws each component as its story does, its own script running: a disclosure opens, a menu drops down, a switch switches. The controls set the story's args through Storybook itself, so the story is never reloaded and nothing flickers. The Storybook is published beside the style guide, in its `storybook/` folder.
-- **Or from where you host it.** With no build beside the code, `storybook.url` in `ds-config.json` names the address your Storybook is published at. The Playground draws each story from there, its controls still setting the story's args through Storybook's own channel. Inspect reads the style guide's own copy of the component there, since a page at another address cannot be read.
+- **Live from your Storybook.** With a Storybook built to files, the Playground draws each component as its story does, its own script running: a disclosure opens, a menu drops down, a switch switches. The controls set the story's args through Storybook itself, so the story is never reloaded and nothing flickers. The Storybook is published beside the control center, in its `storybook/` folder.
+- **Or from where you host it.** With no build beside the code, `storybook.url` in `ds-config.json` names the address your Storybook is published at. The Playground draws each story from there, its controls still setting the story's args through Storybook's own channel. Inspect reads the control center's own copy of the component there, since a page at another address cannot be read.
 - **Inspect.** Outlines each part, padding and gap. Click one to see what it is and its value (`chip padding left · --padding-s · 8px`), and click inside to go one level deeper. A live story is inspected where it is drawn, with the styles only its own page has.
 - **Figma beside the code.** Off unless `styleguide.figmaCompare` is `true` in `ds-config.json`. Then a Figma button shows Figma's image of the variant you set, beside the component or over it with a slider. The images come from `.design-system-engine-refs/` or, with `FIGMA_TOKEN` in `.env`, straight from Figma.
 - **Width.** Shows the component at each breakpoint your Figma file gives (Phone 350, Desktop 1680), else at 375, 768 and 1280 pixels, with your media queries applied.

@@ -107,11 +107,11 @@ rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's desi
 rms-design-system-engine --capture-script vars <n|sums>  # write the read-only script for chunk n of Figma's variables, text styles and effect styles (sums: the checksums alone), to run unchanged with use_figma; save its answer as it came. Each answer is compact (a short record per variable, colours in hex, numbers in their shortest exact form) and near 19,000 bytes, so about 1,900 variables take about ten
 rms-design-system-engine --capture-script components <sums|sums new|next>  # the same for the components, kept by component id: sums gives each component's checksum, a page at a time (the next page when one is left, 'sums new' starts over), next reads as many of the components no answer holds yet as fit in one answer, compressed (one read at a time; a number reads the same as next); each runs the recipes' Step 1c functions, state walk and raw-value sweep in Figma, and none switches Figma's page
 rms-design-system-engine --capture-import [vars|components]  # check every saved answer against the checksum Figma computed, name the chunks to read again (answers saved in the form before still read, or are named to read again), and once all are there write the vars snapshot, or the structure and props snapshots with component-values.snapshot.json, component-state-tokens.json and component-state-bindings.json (keeping what a chunk did not read, naming the components no longer in Figma)
-rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
+rms-design-system-engine --styleguide                    # the control center of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
 rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
-rms-design-system-engine --guide-status                  # is the style guide the team opens (its store) behind what it is built from, and is its pipeline running
-rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
+rms-design-system-engine --guide-status                  # is the control center the team opens (its store) behind what it is built from, and is its pipeline running
+rms-design-system-engine --publish-styleguide            # write the CI job that publishes the control center on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
@@ -124,7 +124,7 @@ rms-design-system-engine --prop-pair <component> "<Figma property>" yes|no  # th
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
 rms-design-system-engine --writes                       # what this project lets the engine change, one answer per place; --writes <figma|code|generated|engine> <yes|ask|no> records one
-rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
+rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the control center fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
 rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Documentation page (Fix, Add, Move), with its key and what it rests on
 rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json; what the answer changes in the intent layer is made and committed at once (a no to a Move merges the part into its parent's page, a no to a Fix writes the sentence again as a draft, a page to write is started from its code), and a Fix not answered yet is left as it is
 rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
@@ -136,7 +136,7 @@ rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts fro
 rms-design-system-engine --decision <what it is about> "<what was decided>" [--ruled-out "<option>"]... [--why "<reason>"]  # one line under the Decisions heading of that page in the intent layer (a component, pattern, template, flow, foundation or the system), with who and when; written locally to read first, --commit or --merge-request sends it, only when the person asks
 rms-design-system-engine --decisions                     # every decision recorded, newest first, wherever it was made
 rms-design-system-engine --part <part> <root|none>         # the team's answer to a part question: placed only inside <root> (written on the root's page in the intent layer, under Parts as ### <part>, and as a decision), or none, a component of its own; written locally to read first, --commit or --merge-request sends it, only when the person asks
-rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions, themes) and what this person may do there, as GitLab answers
+rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, control center, decisions, themes) and what this person may do there, as GitLab answers
 rms-design-system-engine --store <part>=<link|folder|nowhere> [--store <part>.path=<folder in it>] [--store <part>.branch=<branch>]   # name where a part lives (ds-config.json → stores); who may change it is GitLab's answer, never asked
 rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
 rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives, one question a part (a terminal; else --store), then write this setup as the company's profile
@@ -144,7 +144,7 @@ rms-design-system-engine --profile-export [file] [--name <company>]  # write thi
 rms-design-system-engine --make-command <client> --profile <link> [--dir <folder>]   # write the command the team installs, /rms-design-system-engine-<client>: the engine with that profile
 rms-design-system-engine --readmes                       # the README of each repository the setup names (the profile's, each store's) brought up to date now, where GitLab lets this person, and what happened to each (every run does it quietly)
 rms-design-system-engine --refresh-snapshots             # send the snapshots this folder holds to the snapshots store, when GitLab lets this person write it
-rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the style guide to the team's themes store, for everyone's Theme choice
+rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the control center to the team's themes store, for everyone's Theme choice
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--owner <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -152,18 +152,18 @@ rms-design-system-engine --keep                          # list the kept differe
 rms-design-system-engine --unkeep --match <words> [--component <name>]   # take kept differences back: open again on the next audit
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
-rms-design-system-engine --checked badge 1.3.3 --by "QA"  # the person checked a criterion only a person can judge: Done in the style guide, by them and when, until the component changes (commit design-system-engine-checked.json)
+rms-design-system-engine --checked badge 1.3.3 --by "QA"  # the person checked a criterion only a person can judge: Done in the control center, by them and when, until the component changes (commit design-system-engine-checked.json)
 rms-design-system-engine --unchecked badge 1.3.3          # take it back: to check again
 rms-design-system-engine --rename-sweep                  # a token renamed in Figma, renamed everywhere in one change: one patch for the system and one per product, every rule, script and doc, the old name kept in the theme pointing at the new one (nothing applied)
 rms-design-system-engine --rename-sweep --since v2.3.0   # the renames since that git ref, not since the last committed read of Figma; --no-keep-old drops the old names
 rms-design-system-engine --figma-motion                  # write the read-only script that reads, on every page, Figma's prototype transitions between variants, each component's Motion keyframes and animation styles, and the overlays its prototype opens, to run with use_figma
 rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve), and each component's loop, opening and closing that differ (motion-components.mjs)
-rms-design-system-engine --figma-examples                # read the examples the design team placed in Figma (each component's instances on its pages, outside the component itself: its words, its icons, the instances it holds), through figma-cli in parts when it answers, else write the script for the session's Figma tool (--from N for each part); the style guide's Playground opens each component as its best example
+rms-design-system-engine --figma-examples                # read the examples the design team placed in Figma (each component's instances on its pages, outside the component itself: its words, its icons, the instances it holds), through figma-cli in parts when it answers, else write the script for the session's Figma tool (--from N for each part); the control center's Playground opens each component as its best example
 rms-design-system-engine --figma-examples <answers.json…> # keep the saved answers as the examples snapshot (paths.snapshotExamples, figma-examples.snapshot.json beside the variables snapshot)
 rms-design-system-engine --figma-brands                  # read the system's brands: Figma's extended collections (each a skin over the system's own collections, its colours and its sizes) and the variables each overrides in each mode, from the file that holds them (the FigCli plugin open on it), through figma-cli a collection at a time when it answers, else the read-only script for the Figma tool (--collection "<name>" --from N)
-rms-design-system-engine --figma-brands <answers.json…>   # keep the saved answers as the brands snapshot (paths.snapshotBrands, figma-brands.snapshot.json beside the variables snapshot); the style guide's Brand switch puts each brand on every preview and the Showroom, never on the page around them
+rms-design-system-engine --figma-brands <answers.json…>   # keep the saved answers as the brands snapshot (paths.snapshotBrands, figma-brands.snapshot.json beside the variables snapshot); the control center's Brand switch puts each brand on every preview and the Showroom, never on the page around them
 rms-design-system-engine --brands-css <a.css b.css | addresses…>  # the same brands snapshot from the brands' own stylesheets (one file a brand, named by the file; /* extends: <brand> */ puts it under another; each block's variables in the mode its selector names, a block with none in the base mode), or the files ds-config.json lists in brands.css: the brands can live in the code's repository instead of Figma
-# the style guide's Showroom: each showroom/<Screen>.vue (a screen from Figma written with the system's own components; what the code lacks a stand-in in showroom/stand-ins/) drawn by the project's build, at Figma's size and breakpoint, in the brand and mode chosen, each in a frame of its own as wide as the screen, so its @media rules, its vw and its fixed parts read the screen's width, never the style guide's window. The Showroom page lists the screens as a grid of cards (each its screen in small); a card opens the screen's own page (#showroom/<Screen>), the screen alone until Differences is pressed: then each note of its <Screen>.json (missing, and differs: fixedHere or not) is numbered, pinned over its part of the screen (the note's at, a selector, else the part named data-figma or data-stand-in) and listed beside it in a line (its say; the whole of it, what, under it), filtered by kind; a pin clicked shows its note on the screen. A screen is liquid: laid out to its breakpoint's width (Auto, the room there is, Desktop from 1440px; Desktop, 1440px; Laptop, Figma's own), and Full browser shows it alone over the whole browser window. The screens are drawn and measured at Laptop, Figma's size. Corrections several screens share can sit in one stylesheet (showroom/shared/), each still listed in every screen's own list
+# the control center's Showroom: each showroom/<Screen>.vue (a screen from Figma written with the system's own components; what the code lacks a stand-in in showroom/stand-ins/) drawn by the project's build, at Figma's size and breakpoint, in the brand and mode chosen, each in a frame of its own as wide as the screen, so its @media rules, its vw and its fixed parts read the screen's width, never the control center's window. The Showroom page lists the screens as a grid of cards (each its screen in small); a card opens the screen's own page (#showroom/<Screen>), the screen alone until Differences is pressed: then each note of its <Screen>.json (missing, and differs: fixedHere or not) is numbered, pinned over its part of the screen (the note's at, a selector, else the part named data-figma or data-stand-in) and listed beside it in a line (its say; the whole of it, what, under it), filtered by kind; a pin clicked shows its note on the screen. A screen is liquid: laid out to its breakpoint's width (Auto, the room there is, Desktop from 1440px; Desktop, 1440px; Laptop, Figma's own), and Full browser shows it alone over the whole browser window. The screens are drawn and measured at Laptop, Figma's size. Corrections several screens share can sit in one stylesheet (showroom/shared/), each still listed in every screen's own list
 rms-design-system-engine --showroom-compare [--refresh] [--tolerance=N]  # each Showroom screen measured against the Figma screen it was written from (its link in <Screen>.json): Figma's box for every text and component (showroom/<Screen>.figma-layout.json, read through figma-cli when missing, else the script for the Figma tool), the built page measured in Chrome, every text matched by its words and every part named with data-figma, each one more than N px (2) off listed, furthest first. Every --styleguide build runs it too, says it in its summary and shows it beside each screen
 rms-design-system-engine --figma-effects                 # write the read-only script that reads each component's shadows and blurs, gradient and image fills, Clip content, blend mode and opacity, on it and its layers two levels deep, to run with use_figma
 rms-design-system-engine --figma-effects <answer.json>   # keep its answer as the effects snapshot (paths.snapshotEffects) and say each one the code draws otherwise (effects-parity.mjs)
@@ -172,10 +172,10 @@ rms-design-system-engine --figma-screens <answer.json>   # keep its answer as th
 rms-design-system-engine --figma-a11y                    # write the read-only script that reads the same screens for accessibility: each text and lone icon with what is drawn behind it, inside instances, and each control under 24 by 24, to run with use_figma
 rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
-rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's hooks (done by --init): pre-commit and pre-push check the change; post-commit, post-merge and post-rewrite build the local style guide again, quickly, where one was built (--git-rebuild); --remove-hooks takes them out
+rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's hooks (done by --init): pre-commit and pre-push check the change; post-commit, post-merge and post-rewrite build the local control center again, quickly, where one was built (--git-rebuild); --remove-hooks takes them out
 rms-design-system-engine --install-hooks --tool cursor,codex  # the same guard in Cursor's and Codex's own hooks (.cursor/hooks.json, .codex/hooks.json); a project with a .cursor or .codex folder gets them with every --install-hooks
 rms-design-system-engine --git-check commit|push         # what git's hooks run: only for what the change uses; commit warns and exits 0, push exits 1 while a finding is left
-rms-design-system-engine --git-rebuild commit|merge|rewrite  # what git's post-commit, post-merge and post-rewrite run: the local style guide built again quickly, in a process of its own, where a page was built; never on CI or with "hooks": false; always exits 0
+rms-design-system-engine --git-rebuild commit|merge|rewrite  # what git's post-commit, post-merge and post-rewrite run: the local control center built again quickly, in a process of its own, where a page was built; never on CI or with "hooks": false; always exits 0
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
 rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
 rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
@@ -268,7 +268,7 @@ reads the same one:
 |---|---|
 | `figma` | the design file: what Figma shows (a role, a name, an annotation, a component) |
 | `code` | the product's code: the files people wrote |
-| `generated` | the code the engine generated: the tokens, the contracts, the style guide |
+| `generated` | the code the engine generated: the tokens, the contracts, the control center |
 | `engine` | the engine's own files: the authored contract, the structure contract's notes, the kept differences |
 
 Each is `yes` (write it, and say what changed; the product's code only through a branch and a pull request), `ask`
@@ -339,7 +339,7 @@ these files and Figma's description and annotations) for what an agent needs: a 
 what it is, when to use it, when not to, its role, an example, and no name the system does not have (its properties
 are not asked for: the contract carries them from Figma and the code). Each component is ready, partial or thin;
 the document gets the same class from how many are ready. It prints what to add, writes
-`.design-system-engine-out/guidance-rating.json`, and the style guide shows what no other row of each component's
+`.design-system-engine-out/guidance-rating.json`, and the control center shows what no other row of each component's
 Documentation area says: its Example row, and Names that do not exist when it gives one. `--extract` also runs the extraction test, which spends the
 person's model tokens: a question for each property with options, answered by a model that sees only the guidance
 through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
@@ -377,7 +377,7 @@ component's `guidelines` in `design-intent.json`, the rest in the global block, 
 source is an adapter (`intent-layer.mjs` → `SOURCES`) that reads its own format, read-only, into a snapshot in one
 shape: pages, each with what it is for, when to use it, when not to, common mistakes, limitations, rules, its other
 sections and what was left out. Everything that reads it (the design intent, the contracts, `llms.txt`, the
-prototypes, the style guide and its Documentation page) takes only that shape and names each line by its source, so
+prototypes, the control center and its Documentation page) takes only that shape and names each line by its source, so
 another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
 document one component, the first configured one is its page. The first source is the intent layer below.
 
@@ -426,7 +426,7 @@ Where it is used: each component's `intentLayer` in `design-intent.json` (with i
 `intent` block and its description (the page's purpose, unless one is authored; `descriptionFrom` says where it came from), each rule with its status (checked, checkable or judgment), a `for:` line in `llms.txt` and its first `avoid:` line (the
 authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
 to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
-style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
+control center each component's Documentation merges it with Figma, the code and the contract, each line under its
 source with a link to its page, plus an Intent layer row: its page and how many lines were read (or, with no page,
 one to write). Every row of a component's tables opens in a side panel with all of it, nothing cut short; for the
 Intent layer row that is every line the engine took from the page, kind by kind, its other sections, its status and
@@ -504,7 +504,7 @@ kept in place is no longer asked to move). A no leaves the decision on the page.
 said, never answering for them.
 
 **Reviewing drafts: `--review-drafts`.** The words, everywhere: a line is a **draft** (its `**Draft:**` marker), what
-a person does with it is **review** it (the page's decision, the style guide's Drafts to review card). Each draft is
+a person does with it is **review** it (the page's decision, the control center's Drafts to review card). Each draft is
 approved (its marker comes off), changed (its new text, checked against the system as a drafted line is, and the marker
 off) or dropped (the line deleted), in the page's spec and its DSDS page alike. With no file the command lists every
 draft; with a file of the person's decisions it makes them, writes `CHANGES.md`, and `--commit` or `--merge-request`
@@ -517,7 +517,7 @@ each marked `**Draft (<task>, <day>):**`, so no agent gets them and the decision
 component's, a pattern's, a template's, a foundation's, or **the System page** (the system's own entry in the layer's
 index, whose drafts are held as any page's). Written locally to read first; `--commit` or `--merge-request` sends them.
 
-**Decisions copied from the style guide.** Each Copy decision is the system's own command, the page by its kind and
+**Decisions copied from the control center.** Each Copy decision is the system's own command, the page by its kind and
 name, and the decision in words, never a file or a flag: `/rms-design-system-engine-<client> on Component Button,
 Approve all 3 drafts from the task "What to do when no component fits" (28 Oct)`. The router turns it into the command
 (`--review-drafts --approve 'Button' --task '…' --expect 3 --said '…'`, `--intent-decide '<the proposal>' yes`,
@@ -738,7 +738,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **An address for each area**: a component's area is in the address after a slash (`#c-chip/accessibility`, `/documentation`, `/parity`, `/variants`, `/built-with`, `/used-in`, `/changelog`; the Playground has none), kept as the areas are switched and opened directly from a shared link, before the props of the variant (`#c-chip/accessibility?Size=L`).
 - **The page's width**: the content takes the whole width the screen gives beside the menu, with no cap, so a wide screen shows wider tables and stages.
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
-  screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+  screen the menu is always there), and the control center check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **The stage's bars**: above the component, a bar in the tables' head colour with the sizing mode (Desktop, Phone) at
   its left and Inspect at its right; below it, a bar with the colour mode (Light, Dark) at its right and, while
@@ -803,7 +803,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   **Affects:** the components whose code it changed, as pills, then where else it changed the system, as quieter pills
   read from its own diff: Figma (the components and tokens its snapshots changed), Documentation, Examples (demo
   pages, stories), Tokens, Code (sub-components and helpers), Tests, Agent files (`.claude/`, AGENTS.md), Version (the
-  version it set), Style guide, Pipeline, Setup (`ds-config.json`), else its folders. A part is named for the
+  version it set), Control center, Pipeline, Setup (`ds-config.json`), else its folders. A part is named for the
   component it belongs to when it sits under the same `folder/File` as the component's code
   (`docs/components/chip/Chip.md` for `chip/Chip.vue`), else by the components its changed lines
   name. Each pill links to where the change is seen: the component's page when it names one, the Documentation or
@@ -863,7 +863,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   description answers it too. A part is not listed as a component (the menu, the overview, Status fold it into its
   root), its page says whose part it is, its Documentation is its root's Parts section, and the Documentation page asks
   no page of its own for it (a page it has is to move into the root's Parts). Contracts and `llms.txt` list it under
-  its root, from `.design-system-engine-out/parts.json`, which the style guide's build writes.
+  its root, from `.design-system-engine-out/parts.json`, which the control center's build writes.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
   `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
   opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
@@ -901,7 +901,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what passed and where).
   Above the table All, then Who acts, then a chip a status. Status (✕ To fix, ! To
   check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
-  finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
+  finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the control center in the
   browser, the last audit or the audit's code capture, a person). A criterion only a person can judge (1.3.3, 1.4.5,
   2.4.6, 3.1.2, 3.3.3, 3.3.7 and the media ones) says how to mark it (Checked it? Tell Claude badge 1.3.3 is checked); once
   the person has, `--checked` records who and when with the component's signature (its CSS rules, its contract entry, its
@@ -946,7 +946,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 A project's own template is filled through markers:
 
 - `{{AGREED}}` ← the agreed view above, as JSON.
-- `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`), or built from a folder of SVG files, one icon each (`styleguide.iconSource` naming a folder, else the folder named `icon` or `icons` the code keeps five or more in, the one under `src/` first: `icon-folder.mjs`). Each icon is named by its path in the folder (`m/alert-m.svg` → `m-alert-m`), and the ids inside each file are kept apart from the other files'. An icon of that sheet that paints itself white is listed by the style guide check, never a failure of the page.
+- `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`), or built from a folder of SVG files, one icon each (`styleguide.iconSource` naming a folder, else the folder named `icon` or `icons` the code keeps five or more in, the one under `src/` first: `icon-folder.mjs`). Each icon is named by its path in the folder (`m/alert-m.svg` → `m-alert-m`), and the ids inside each file are kept apart from the other files'. An icon of that sheet that paints itself white is listed by the control center check, never a failure of the page.
 - `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
@@ -1004,17 +1004,17 @@ the page shows the differences), builds the page again, checks it (a page that f
 `public/`. A job already there is never overwritten, and nothing is committed. A GitHub Pages site is public even from
 a private repository (only GitHub Enterprise Cloud keeps it private); GitLab Pages can be kept to project members.
 
-**Is the published page behind?** With a style guide store (`stores.styleguide`), each publish writes beside the page
+**Is the published page behind?** With a control center store (`stores.styleguide`), each publish writes beside the page
 what it was built from (`built-from.json`: the engine's commit and each source's latest commit, as `--ci-changed` reads
 them: the code, each store read from GitLab, the profile, the Figma file). A run compares it with the sources now, at
 most every six hours, and says in one line what moved since and when the page was published; where the token may read
-the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A style guide
+the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A control center
 build always asks, and says how to publish when the page is behind; with `"styleguide": { "publish": "auto" }` it
 publishes itself, where GitLab lets the person write the store, so a pipeline that cannot run never leaves the team on
 an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now, and says what
 this folder's last round did. The page records what it was built from (the code's commit, Figma's version, the engine's commit) in its head, never on the page itself.
 
-Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the style guide store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
+Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the control center store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
 (docs-truth) checks on the output.
 
@@ -1147,24 +1147,24 @@ it as the props type) and `tsc` shows prop drift in the editor and in CI. `contr
 #### Where each part lives: stores and a company's profile (`--store`, `--profile`)
 
 A team keeps each part of the engine's own files where it chose: the Figma and code snapshots, the intent layer, the
-contracts, the style guide, the differences kept on purpose (`kept`: a design rule agents follow, so a team keeps them
+contracts, the control center, the differences kept on purpose (`kept`: a design rule agents follow, so a team keeps them
 with its intent layer; with the decisions when the setup names no place for them) and the other decisions (answers to
 proposals, accepted debt, checks made by hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
 names the place of each; the configuration reference has the format. Each run reads the snapshots, the kept
 differences and the decisions from their stores when the store's commit moved. A file changed on this computer since it
-was last read is replaced only by a copy built from newer inputs (its stamp); otherwise it is kept, and said. The contracts (`--contracts-out` with no folder), the style guide
+was last read is replaced only by a copy built from newer inputs (its stamp); otherwise it is kept, and said. The contracts (`--contracts-out` with no folder), the control center
 (`--publish-styleguide`), the kept differences (after `--keep`), the decisions (after `--intent-decide`, `--checked`),
 the snapshots
 (`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on
 each run) are written to theirs. A store brings into the project only its own kind of file (a snapshots store only
 `*.snapshot.json`), never a `.env` or a hook.
 
-**The team's themes** (`stores.themes`, often a `themes` folder in the style guide's own repository): the themes a
-style guide module lets people make: one system's themes, flat (`<name>.theme.json` in the folder its `path` names; a
+**The team's themes** (`stores.themes`, often a `themes` folder in the control center's own repository): the themes a
+control center module lets people make: one system's themes, flat (`<name>.theme.json` in the folder its `path` names; a
 store several systems share points `path` at the system's own folder). Each run reads them into the
-engine's own folder (`.design-system-engine-out/themes`), never the project's, and the style guide shows them in its
+engine's own folder (`.design-system-engine-out/themes`), never the project's, and the control center shows them in its
 Theme choice, with the themes in the person's own module data folder beside them (the store's when both have one).
-Each style guide build sends the themes this person keeps (their module data folder, or saved beside the page) that the store lacks, or holds an older version of, when GitLab lets them write it: a theme made reaches everyone with no step of its own, and a newer one a colleague sent is never replaced. `--share-theme <file>` sends one by hand.
+Each control center build sends the themes this person keeps (their module data folder, or saved beside the page) that the store lacks, or holds an older version of, when GitLab lets them write it: a theme made reaches everyone with no step of its own, and a newer one a colleague sent is never replaced. `--share-theme <file>` sends one by hand.
 
 **Who may write is GitLab's answer, never the setup's.** Before the first write to a place in a run the engine asks
 GitLab, with the token that would write: the token's role in the project (Developer or more writes), whether it may
@@ -1220,7 +1220,7 @@ repository holds; and the command each person installs (`<command>/SKILL.md`). I
 `client`, else the command folder the repository holds. Every other repository a store names gets a section of the
 engine's in its README, between two markers (`<!-- rms-design-system-engine:start … -->` and `…:end -->`): what the
 engine keeps there and who writes it, the snapshots it holds, its pipeline (the variables `.gitlab-ci.yml` lists in its
-comments, and its schedules) or, with none, that whoever runs the engine publishes the style guide, who can do what, and the related projects. What the team wrote around the markers stays;
+comments, and its schedules) or, with none, that whoever runs the engine publishes the control center, who can do what, and the related projects. What the team wrote around the markers stays;
 a README without them gets the section under its title. Each run generates them, compares them with what is there and
 writes only what differs, where GitLab lets the person running it write (a commit, or one merge request the engine keeps
 open); a run without that access changes nothing and says nothing. A repository is asked again only when its branch
@@ -1261,7 +1261,7 @@ unpaired), and
 file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
 
-Once published, the shared contracts are what the style guide links to. The intent-layer sync reads them with the
+Once published, the shared contracts are what the control center links to. The intent-layer sync reads them with the
 pages (`shared-contracts.mjs`): each component's **Contract** button opens its file on GitLab, and its Documentation
 **Properties** row is done while the shared contract still lists what the code and Figma have, and a task to publish
 again when it does not (a prop, event, slot or Figma property added or gone, or a contract in another format). With
@@ -1551,7 +1551,7 @@ inside it), and whether a yes/no variant changes how the component looks: one wh
 shown or hidden (the same fill, stroke, text, padding, gap and corners) is a boolean property in all but name. Each is a
 line with the same statuses.
 
-The style guide has a **Rules** page, in its menu: how the system is built, in Figma and in the code, in one table.
+The control center has a **Rules** page, in its menu: how the system is built, in Figma and in the code, in one table.
 A row is a rule, with its side (Figma or Code), how many follow it, who owns it (Design, Engineering, or both) and its
 status (Fix, Decide, or Done). A rule nothing breaks says so ("Nothing breaks it"), never that nothing was found.
 Every column head sorts by it, and the same head again sorts the other way round; above the table a chip a status, with
@@ -1820,7 +1820,7 @@ person says yes.
 
 **--change-report.** `--change-report <component>`, once Figma is read again: the read before beside the read after,
 section by section, and each place where it is not what the change said (warned when Figma was last read before the
-change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The style guide reads them
+change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The control center reads them
 in **History**, with every other change: a row a change (what was asked, waiting, made as said or not as said, and the
 component it changes), under its own chip and with Figma as its source, each opening its before and after in the side
 panel (what the change said it does, what Figma shows once read again, where it is used, what it breaks and adds, who
@@ -1834,7 +1834,7 @@ reads the latest commit of the code (its GitLab mirror), of each store read from
 layer and of the profile's file, Figma's version of the file (with `FIGMA_TOKEN`) and the engine's own commit, with the
 tokens every run reads (the environment, else `.env`). Exit 0 names what moved (or that no build is recorded yet); exit 3
 says nothing did. `--ci-changed --record`, after a build that succeeded, keeps them in
-`.design-system-engine-out/ci-last-build.json`. A store the build only writes (the published style guide) is never read,
+`.design-system-engine-out/ci-last-build.json`. A store the build only writes (the published control center) is never read,
 so its own commit starts nothing; a folder with no commit yet is a state of its own; a source that cannot be read counts
 as moved.
 
@@ -2093,7 +2093,7 @@ The rules are `--check-ui`'s, plus:
   control) is drawn as that part, inside its parent, which keeps its own pieces (the pill) and takes the children in
   place of its own. A copy of a component the system's CSS styles keeps the classes the system's own CSS knows and those
   its options point at; the product's own (its panel's width) stay in the product, and so does the name the page gave
-  it (`aria-label`). Each copy keeps its ids to itself. An option is set as the style guide sets it: on its part (a
+  it (`aria-label`). Each copy keeps its ids to itself. An option is set as the control center sets it: on its part (a
   switch's checkbox), on and off, with the state a part is heard in (`heardOn`). A field's value option sets its value;
   words for a part the copy lacks go nowhere, and Figma's default words never go through a guessed part. Figma's
   default that leaves a component inert or alarming (a field `Disabled=True`, a `State` of Error), drawn because the
@@ -2111,7 +2111,7 @@ The rules are `--check-ui`'s, plus:
 - **It works as in the product.** The system's own scripts (`systemScripts`) run on the page, a click moves a
   selection (tabs, a segmented control, a list), a field takes typing, and a link stays on the page. A part that opens
   another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
-  the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
+  the system's overlay when its CSS has one (container, layers, open and closing classes, as the control center plays it),
   else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
   `opens` that names no part, the page or itself is an error. A part it opens drawn with the engine's layout pieces
   (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. A
@@ -2416,11 +2416,11 @@ design, another kept difference's words, or a short one that names nothing the d
 user) and when, who answers for it (`--owner`, else whoever kept it), `--truth figma|code` when one side
 is right, and `--review` (a date, or `90d`, `6m`, `1y`) when to look at it again. On every run a kept difference never
 fails its gate (a gate whose failing lines are all kept passes), its line is shown as `✋ kept on purpose` with the
-reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the style guide's
+reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the control center's
 Parity area shows it with the status Kept on purpose. What is kept is that difference with those values, matched by its
 check and its words (a file's line number and the severity icon aside): when a value changes on either side, it is open
 again and the decision is listed as no longer found, to drop with `--unkeep --match <words>` or to keep again. A kept
-difference whose review date has come is To check in the style guide. Agents get each one as a rule: its component's
+difference whose review date has come is To check in the control center. Agents get each one as a rule: its component's
 contract lists it under `kept` (what differs, the side that is right, why; never who), and the prototype context says
 it beside the component, so an agent follows the side the team chose. `--keep` alone lists the decisions. Only the
 person keeps a difference: the project's hooks ask before `--keep` or an edit of the file unless their latest message
@@ -2521,7 +2521,7 @@ whatever surface the project serves, in this order:
    **Each product's own page** comes after the guide (a run on the whole guide, no `--component`): the built page
    of each product in `paths.plugins` (`ui.html` beside the `pluginCSS` source, else `<product>/ui.html`), opened
    whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
-   product (`product` in `a11y.json`) and the style guide lists them on the Status page under Products, one row per
+   product (`product` in `a11y.json`) and the control center lists them on the Status page under Products, one row per
    product. `a11y.products: false` leaves them out.
    The page criteria (1.3.4, 2.4.1, 2.4.2, 2.4.5, 3.1.1, 3.2.3, 3.2.4, 3.2.6, 3.3.4, 3.3.7) are tried on each such page whole and
    across the pages of one product (never two products'), each flow in `a11y.flows` read page by page in its order (`--reference config`).
@@ -2561,16 +2561,16 @@ whatever surface the project serves, in this order:
    the base page. The routes are read from the usual router file and every file under `src/router` or
    `src/routes` (route modules included), as `/#/…` addresses when the router uses hash history. Scoped to a
    component, it opens only the pages whose view uses it, the component's own page first. A project whose
-   packages are not installed is told so, and a generated style guide that draws no component is not used.
+   packages are not installed is told so, and a generated control center that draws no component is not used.
    A component whose class no element in the code has is said at once, with the classes that hold its name
    (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
    modes (`a11y.timeoutSec` sets it, and the audit waits for it past its other gates' limit), each page drawing
-   several components given time for each (a style guide part, and the page the system's own build draws, `pageShare`).
+   several components given time for each (a control center part, and the page the system's own build draws, `pageShare`).
    The build's page is checked in a copy of its own beside the copies that share the parts (`--built`), the build
    started once by the run. The copies that check
    parts at once and the run after them each stop inside that one time, so the audit never has to. A check stopped by it
    keeps what the pages it finished found, and says the page it was on and the ones it never reached not checked
-   (a style guide's part by its components), never clean, and the stop names the page it was on and how many of its
+   (a control center's part by its components), never clean, and the stop names the page it was on and how many of its
    checks were done (`stoppedOn`). The copies that share the parts each have the run's whole time, and a part they did not finish waits
    for the next run, never started by the run with what little time is left. The Firefox and WebKit pass runs in
    the run's remaining time: it tries each component in every browser before the next, never-tried and oldest
@@ -2661,12 +2661,12 @@ there, never a failure.
   caught before the element's own handler, so the check never navigates or submits.
 - **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
 - **The keys of each pattern (ARIA Authoring Practices)** — where the component's own script runs (an app page, or a
-  style guide that inlines `systemScripts`): a tab list, menu or list box that moves with the arrows but not with Home
+  control center that inlines `systemScripts`): a tab list, menu or list box that moves with the arrows but not with Home
   and End (`homeend`, 2.1.1); a combobox whose list does not open on Down or close on Escape with the focus kept in it
-  (`comboboxkeys`, 2.1.1). On a style guide the same run also presses Escape on a menu button and Tab in a modal, as
+  (`comboboxkeys`, 2.1.1). On a control center the same run also presses Escape on a menu button and Tab in a modal, as
   the audit does with real keys. Drawn as markup alone, nothing answers a key, so nothing is pressed.
 - **What a screen reader says** — each control's name, role and state, as NVDA and VoiceOver say them ("Bold,
-  button, pressed"), shown under 4.1.2 in the style guide. A name nobody sees (an `aria-label`, a title, alt text) that
+  button, pressed"), shown under 4.1.2 in the control center. A name nobody sees (an `aria-label`, a title, alt text) that
   says little fails 2.4.6 (`weakname`): a placeholder word or a role ("icon", "button"), a file or an icon's name
   ("chevron-down"), the role said twice ("Close button, button"). A visible label is the design's own words and is left
   alone. Two links with the same words going to different places fail 2.4.4 (`samename`).
@@ -2675,7 +2675,7 @@ there, never a failure.
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
   and a form does not submit while it runs. A dialog already open as the page loads is judged when it lies over
   the page (in the top layer, or fixed); one drawn in the page's flow with nothing that opened it (a specimen on a
-  style guide) is listed as not judged (`notJudged` in `--json`), never failed.
+  control center) is listed as not judged (`notJudged` in `--json`), never failed.
 - **A modal keeps the focus** — each modal dialog that opens (one shown with `showModal()`, or one with
   `aria-modal="true"` lying over the page) is walked with Tab past its last control and Shift+Tab past its first: the focus must stay inside it
   (`modalescape`, 2.4.3). A non-modal dialog may let the focus go.
@@ -2702,13 +2702,13 @@ there, never a failure.
   checkbox; a click flips a disclosure's `aria-expanded` and shows or hides its panel; a click selects a tab and no
   other; typing writes into a text box. A Figma note adds one: `Escape closes`, `arrow keys move`, `Enter and Space
   activate`. A behaviour needs the component's own script, so it runs on a page that has it (`a11y.urls`, `--url`,
-  Storybook, the app); on the engine's style guide, which draws markup only, it is listed as not checked. An
+  Storybook, the app); on the engine's control center, which draws markup only, it is listed as not checked. An
   exception is the person's: `contract.authored.json → components[name].behaviourExceptions` `{ "<behaviour id>":
   "<why, with a link to the ADR or pull request>" }` (ids: `keys-toggle`, `click-toggle`, `click-expand`,
   `click-select`, `types`, `escape-closes`, `arrows-move`, `keys-activate`). Without a link it is still checked, and
-  that is reported. The build sheet lists each role's behaviours. On the style guide they run when the project lists
+  that is reported. The build sheet lists each role's behaviours. On the control center they run when the project lists
   its scripts in `systemScripts`.
-- **States follow their props** — on the style guide, an option that shows a state (Selected, Pressed, Checked,
+- **States follow their props** — on the control center, an option that shows a state (Selected, Pressed, Checked,
   Expanded, Error, Disabled) and changes only a class is reported: a screen reader still hears the component as it
   was. The attribute its role names goes with it (`aria-pressed` for a toggle button, `aria-selected` for a tab,
   `aria-checked` for a switch or checkbox, `aria-expanded`, `aria-invalid`, `disabled`). A computed ARIA attribute in
@@ -2762,7 +2762,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   Tab reaches, where the focus shows, reflow, zoom, text spacing, what an input does, dragging, target size); `chrome`,
   what a screen reader hears (4.1.2), read from Chrome's accessibility tree, which no other engine exposes. Fifteen
   `each` criteria (1.4.4, 1.4.10, 1.4.12, 1.4.13, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11, 2.5.2, 2.5.7, 2.5.8, 3.2.1, 3.2.2,
-  3.3.8) are tried again in Firefox and WebKit on each component the style guide draws (`a11y-browsers.mjs`, through
+  3.3.8) are tried again in Firefox and WebKit on each component the control center draws (`a11y-browsers.mjs`, through
   `page-driver.mjs`: plain scripts in the page and real Tab presses, Option+Tab in Safari; what a component does when
   used by the in-page checks of `wcag-page.js`, each said only where it had something to try), Chrome measured by the
   same code in the same pass. Whether hover content also shows on a tap stays Chrome's (it needs touch emulation). Only what differs from Chrome is
@@ -2777,7 +2777,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   reason. Advisory and asked for only (`a11yJudgement.cmd`): no criterion passes or fails on it, and the answer is
   kept by the words, so the same wording is never paid for twice.
 - **What a screen reader actually says** (`--hear [--reader voiceover|nvda] [--component a,b]`) — VoiceOver (a Mac) or
-  NVDA (Windows), through Guidepup, moved through each control of each component the style guide draws, and what it
+  NVDA (Windows), through Guidepup, moved through each control of each component the control center draws, and what it
   said held against the browser's name, role and states in that reader's words (`screen-reader.mjs`). It speaks aloud
   and opens a browser window. Advisory and asked for only: shown on the 4.1.2 row with the reader and the day, to hear
   again once the component changes. A reader that cannot be driven is said with what to turn on, never turned on.
@@ -2828,7 +2828,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **Reflow at 320px (1.4.10)** — each component on a 320px screen, in every run that checks components: one
   that cannot be narrower than the screen (its min-content, as nothing around it asks for more) is named with
   the width it needs. Content that needs two dimensions (a data table, a picture, code) is left out, as WCAG
-  does. The whole page at 320px stays opt-in with `a11y.reflow: true`; the engine's style guide fits 320
+  does. The whole page at 320px stays opt-in with `a11y.reflow: true`; the engine's control center fits 320
   pixels (its Parity filter and a control with many options scroll sideways).
 - **WCAG 2.2, the rest a component can be checked for** (`wcag-page.js`, run on up to 24 instances of each
   component, so a grid of chips is judged on its chips, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
@@ -2890,7 +2890,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   points at a local copy), and is scoped to the checked components.
 
 A component's text contrast is measured in each mode the system declares and in each pair of them that can be on at
-once (dark with high contrast); the style guide measures every combination of its colour switches, reading a sibling
+once (dark with high contrast); the control center measures every combination of its colour switches, reading a sibling
 laid under the text and a `::before` or `::after` that covers a box. The system's text and background pairs are also
 checked in every combination of two switches (the `🎛` check, `modeCombinations` in config.md). The Figma side
 is read by `--figma-a11y` (contrast and target size on Figma's own screens) and its findings are pinned there by
