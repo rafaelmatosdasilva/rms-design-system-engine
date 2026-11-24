@@ -537,7 +537,9 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 
 #### Lit, Angular, Svelte and Web Components
 
-A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
+A component written as a class is read the way a Vue or React one is, into the same props, slots and events. This is
+the engine's one reading of a component, not the lint's own: what it finds here is what parity, the accessibility
+check, the style guide, the playground, Code Connect drafts, contracts and stories all work from.
 
 - **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
 - **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`. An Angular app's root component (`app.ts`, `app.component.ts`) is the app, never one of its system's components.
