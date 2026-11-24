@@ -24,13 +24,17 @@ test('the badge is written from main only, after the suite, and says what the ru
   assert.equal(wf.slice(0, wf.indexOf('  badge:')).includes('contents: write'), false, 'the test job stays read-only');
 });
 
-// The passing value is a lighter green beside the README's dark green label, as its other live badges are two-toned; a
-// failing run stays red, and the README leaves the value's colour to the run, so a red run shows red (the owner's,
-// 17 November 2026).
-test('the badge reads as one phrase, "Tests passed 2,807", and a red run never shows a count as failures', () => {
-  assert.match(wf, /label="Tests passed"; message="\$pretty"; color=3D841D/);
-  assert.match(wf, /label="Tests"; message="failing"; color=red/);
-  assert.match(wf, /"label":"%s","message":"%s"/);
+// The badge is this repository's own SVG now, drawn by lib/badge-svg.mjs and written by lib/badges.mjs, because
+// GitHub proxies every README image it serves and that proxy was breaking the two live badges. What the badge says
+// and what colour it says it in is held to in test/badge-svg.test.mjs; what this workflow owes is the count, the
+// outcome, and a checkout to draw from.
+test('the run that counts the tests is the run that draws its badge', () => {
+  const badge = wf.slice(wf.indexOf('  badge:'));
+  assert.match(badge, /node lib\/badges\.mjs tests "\$pretty"/, 'a passing run shows what it counted');
+  assert.match(badge, /node lib\/badges\.mjs tests --failing/, 'a failing run never shows a count as failures');
+  assert.match(badge, /uses: actions\/checkout@[0-9a-f]{40} #/, 'drawing the badge needs the repository, pinned by digest');
+  assert.match(badge, /uses: actions\/setup-node@[0-9a-f]{40} #/);
+  assert.doesNotMatch(badge, /img\.shields\.io/, 'nothing outside draws it any more');
 });
 
 // The suite runs in quarters on four machines at once, and `test` (the check main's ruleset requires) is their sum:

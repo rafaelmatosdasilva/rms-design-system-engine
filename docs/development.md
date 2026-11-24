@@ -76,7 +76,18 @@ A row recorded before this has none of it, and is left out of the summary rather
 
 Main takes no direct push. A pull request merges when the privacy check, the test suite and CodeQL pass.
 
-The tests badge in the README is not written by hand: the Tests workflow puts what the run counted into `tests.json` on the `badges` branch, and the badge reads that file. So the number on the README is the number the last run on `main` really reported.
+### The README's two live badges
+
+Every image in the README is an SVG this project hosts itself, and that is on purpose. GitHub serves no README image from its own origin: each one is fetched through a proxy of its own, and an image the proxy cannot reach in about four seconds shows as a broken icon for everybody, cached that way for a while. The tests and Scorecard badges used to be drawn by an outside renderer, which made them the only two images GitHub proxied, and so the only two that broke.
+
+Both are now drawn by `lib/badge-svg.mjs` and written to the `badges` branch, an orphan branch holding nothing else:
+
+- **Tests.** The run that counts the tests writes the badge as it finishes (`tests.yml`), so the number is what the last run on `main` really reported. A failing run says only that it failed, never a count that would read as that many failures.
+- **Scorecard.** `badges.yml` reads the score from the public OpenSSF API that this repository's own `scorecard.yml` publishes to, when that workflow finishes and again daily.
+
+Neither fetches anything when the README is read, so there is nothing left to time out. A badge is rewritten only when it would actually change, so the branch takes no commit a push.
+
+Drawing them here moves one risk, and it is worth naming. An outside renderer that fails shows a broken image, which anybody can see; a writer that fails leaves the last badge sitting there, still a badge, quietly out of date. So `badges.yml` also asks the state the way `release-due.yml` does — does the Scorecard badge still say what the API says, and has the suite's badge been written lately? — and opens one issue when it does not. `node lib/badges.mjs report` asks the same from a terminal and writes nothing.
 
 Actions are pinned by commit, so they are updated on purpose rather than by drift. Dependabot watches them and opens one grouped pull request a week when any has moved (`.github/dependabot.yml`); it arrives labelled `release: patch` and goes through the same gate as any other change.
 
