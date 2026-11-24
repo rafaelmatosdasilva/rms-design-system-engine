@@ -135,3 +135,22 @@ test('with the contracts: the button as WordPress\'s button, every other button 
   const lines = (await import('../lib/wordpress-theme.mjs')).auditLines(r, cfg).join('\n');
   assert.match(lines, /^ℹ️ {2}WordPress view → contracts\/wordpress\/theme\.json: the tokens as its presets, \d+ components? as its styles/, 'one line when no theme is named');
 });
+
+test('a system built from Figma alone: its contracts carry what each variant paints with, and WordPress\'s button takes it', async () => {
+  const dir = tempDir('wp-figma-only-');
+  cpSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  // What the capture writes beside the snapshots: each variant's own bindings, as Figma has them.
+  const paint = (bg, text) => [{ token: bg, bindingField: 'fills', isText: false, depth: 0 }, { token: text, bindingField: 'fills', isText: true, depth: 1 }];
+  writeFileSync(join(dir, 'component-state-bindings.json'), JSON.stringify({ button: {
+    'State=Default, Disabled=False': { props: { state: 'default', disabled: 'false' }, bindings: paint('button/background/color', 'button/text/color') },
+    'State=Hover, Disabled=False': { props: { state: 'hover', disabled: 'false' }, bindings: paint('button/background/hover/color', 'button/text/color') },
+  } }));
+  const { generateContracts } = await import('../lib/contract-gen.mjs');
+  const r = await generateContracts(dir, cfg, {});
+  const contract = json(join(dir, 'contracts', 'button.contract.json'));
+  assert.deepEqual(contract.tokens.byVariant[0].paints, [{ token: 'button/background/color', field: 'fills' }, { token: 'button/text/color', field: 'fills', text: true }], 'no code, and still Figma\'s colours');
+  const button = r.wordpress.theme.styles.elements.button;
+  assert.deepEqual(button.color, { background: 'var:preset|color|button-background-color', text: 'var:preset|color|button-text-color' });
+  assert.deepEqual(button[':hover'], { color: { background: 'var:preset|color|button-background-hover-color' } });
+});
