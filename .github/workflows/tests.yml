@@ -182,8 +182,11 @@ jobs:
           echo "Through Playwright: $PLAYWRIGHT."
           [ "$RESULT" = success ] && [ "$PLAYWRIGHT" = success ]
 
-  # The README's tests badge reads one file on the `badges` branch (an orphan branch holding nothing else). Only main
-  # writes it, and only when the number or the outcome actually changed, so the branch does not take a commit per push.
+  # The README's tests badge is this repository's own SVG on the `badges` branch (an orphan branch holding nothing but
+  # the badges), which the README fetches straight from raw.githubusercontent.com. GitHub proxies every other README
+  # image through camo, and that proxy is what used to break this one; lib/badge-svg.mjs says the whole of it. The run
+  # that counts the tests is the run that draws the badge, so it is live without anything being fetched when the README
+  # is read. Only main writes it, and only when the badge would actually change, so the branch takes no commit a push.
   badge:
     needs: test
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -191,10 +194,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
       - name: Say what the suite counted
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           COUNT: ${{ needs.test.outputs.count }}
           RESULT: ${{ needs.test.result }}
         run: |
@@ -202,24 +211,10 @@ jobs:
           # Thousands separators without depending on the runner's locale.
           pretty=$(echo "${COUNT:-0}" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')
           # Read as one phrase, "Tests passed 2,807": the count is of tests that passed. A red run says only that it
-          # failed, never a count that reads as that many failures.
-          # The value's colour is the result: a lighter green beside the README's dark green label (4.5:1 with white
-          # text), red when the suite fails.
+          # failed, never a count that reads as that many failures. Which words and colours each outcome takes is in
+          # lib/badge-svg.mjs, with the rest of how the badge is drawn.
           if [ "$RESULT" = success ]; then
-            label="Tests passed"; message="$pretty"; color=3D841D
+            node lib/badges.mjs tests "$pretty"
           else
-            label="Tests"; message="failing"; color=red
+            node lib/badges.mjs tests --failing
           fi
-          json=$(printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}' "$label" "$message" "$color")
-          sha=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .sha 2>/dev/null || true)
-          now=$(gh api "repos/$REPO/contents/tests.json?ref=badges" --jq .content 2>/dev/null | base64 -d 2>/dev/null || true)
-          if [ "$(echo "$now" | tr -d '[:space:]')" = "$(echo "$json" | tr -d '[:space:]')" ]; then
-            echo "Badge already says: $message"
-            exit 0
-          fi
-          gh api -X PUT "repos/$REPO/contents/tests.json" \
-            -f message="tests: $message" \
-            -f branch=badges \
-            -f content="$(printf '%s\n' "$json" | base64 -w0)" \
-            ${sha:+-f sha="$sha"} > /dev/null
-          echo "Badge now says: $message"
