@@ -643,7 +643,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`motionTodos`). Each that differs is a row of the component's Motion tab and of the Status page's Motion: one Figma
   animates and the code does not, Claude's; one the code animates and Figma does not, You in Figma.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its source renders: a React component's return, a Vue component as the project's own build
+  own pages, else what its source renders: a React component as the project's own React renders it (built by its Vite
+  or its webpack; `react-harness.mjs`), else its return read as text, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
   `<style>` blocks compile to, SCSS and scoped ones included; `vue-harness.mjs`), else its template read with its props'
   default words, else the element its Figma role asks for) with its own CSS. A Vue component is rendered in each of its
@@ -1082,9 +1083,11 @@ accountable; totals each run, full list with `--exemption-debt`); **code→desig
 the code has and Figma does not, surfaced as a "sync back to the design" advisory so code-ahead-of-design
 is visible; the engine only surfaces it, the designer decides; totals each run, full list with
 `--code-drift`; each component's line names its props); **component code** (`component-faults.mjs`: what a screen
-runs into in a Vue component's own file, read without running it, each with its line: an element no rule styles, a
-modifier class with no rule, one click firing an event twice, a slot repeated by a `v-for` with nothing passed, a prop
-read only when mounted, a longer text prop whose line breaks are lost, a prop that takes HTML in one component of a
+runs into in a Vue or a React component's own file (`.vue`, `.jsx`, `.tsx`), read without running it, each with its
+line and its fix in its framework's terms: an element no rule styles, a
+modifier class with no rule, one click firing an event twice (React: a callback called by a child and by the
+`onClick` around it), a slot repeated by a `v-for` with nothing passed (React: `children` inside a `.map()`), a prop
+read only when mounted (React: copied into `useState` or `useRef`, or read only in an effect that runs once), a longer text prop whose line breaks are lost, a prop that takes HTML in one component of a
 folder and text in another, an on/off that hides more than Figma's (the parts another Figma on/off shows, read from the
 structure snapshot's toggles), and a slot Figma stretches its content in that sits in a column of the code drawing it at
 its own width; a part it imports to draw itself, such as a base picked at run time, is read as its own; the
@@ -2554,6 +2557,12 @@ whatever surface the project serves, in this order:
    back what it reports, as the page using it would: an `update:<prop>` event sets that prop, a toggle's click flips
    the state it was told; Figma's values are written as the code's own options write them. A project whose packages
    are not installed, or that has none of these builds, is told so, never rendered with tools of the engine's.
+   **A React system's components, the same way** (`react-harness.mjs`): every `.jsx` and `.tsx` component in each of
+   its variants on one page, drawn by the project's own React, checked beside the other targets on every run. Its
+   build is read in the same order: Vite (`vite.config`), webpack (`webpack.config` with a rule whose loader compiles
+   JSX: Babel's, TypeScript's, SWC's or esbuild's, built from the project's folder as its own build runs), else Vite
+   with React's plugin installed. A project with React and no such build is told so; with none of its own React, the
+   stand-in draws its components only where there is no other page to check.
    **Every variant, every run.** The components rendered from their code are tried in Figma's variants when Figma has
    the component (the default, each other value of each variant prop, each on/off prop flipped), else in the code's
    own props' (each value of each option, booleans on and off, each text emptied or set, each icon emptied), up to
