@@ -1468,8 +1468,14 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.match(tpl, /var bkCss = function \(t, unit\) \{[^\n]*var nm = t\.var \|\| [^\n]*'var\(' \+ nm/, 'a value drawn through its variable, Figma\'s value behind it');
   assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
   assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');
-  assert.match(tpl, /sysButton\('button', 'Download all tokens'/);
-  assert.match(tpl, /saveFile\('tokens\.json'/);
+  // The tokens in the formats people's tools read, made at the build (token-exports.mjs) and only saved by the page:
+  // DTCG, Tokens Studio and a WordPress theme.json, never a file of the engine's own that no tool opens.
+  assert.match(tpl, /var TF = DATA\.tokenFiles;/);
+  assert.match(tpl, /\['dtcg', 'DTCG', [^\n]*'\.tokens\.json', TF\.dtcg\]/);
+  assert.match(tpl, /\['studio', 'Tokens Studio', [^\n]*'\.tokens-studio\.json', TF\.tokensStudio\]/);
+  assert.match(tpl, /\['wordpress', 'WordPress', [^\n]*'theme\.json', TF\.wordpress\]/);
+  assert.match(tpl, /saveFile\(f\[3\], 'application\/json', JSON\.stringify\(f\[4\]/);
+  assert.doesNotMatch(tpl, /Download all tokens|collections: TK_COLLS\.map/, 'the engine\'s own token file is gone');
 });
 
 test('a foundation shows every mode at once: a column per mode, no switch, the columns lined up from table to table', () => {

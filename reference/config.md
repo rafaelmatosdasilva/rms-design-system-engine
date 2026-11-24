@@ -132,9 +132,11 @@ Once `ds-config.json` exists, extract:
   - `dropSegments` - array of path segments to strip from the end of a token path before deriving the var name. Default: `["color", "default"]`. Set to `[]` to preserve all segments (e.g. when CSS vars end in `-color`).
 - `contracts.styleDictionaryOut` - writes the same tokens in Style Dictionary's own JSON (`value`, `type`, `comment`),
   beside `tokens.json` when set to `true`, or at a path you give. For a pipeline built on Style Dictionary.
-- `contracts.tokensStudioOut` - the same for Tokens Studio: one set, each token with the type Tokens Studio uses for
-  it (a dimension is `spacing`, `borderRadius` or `sizing` by the group it sits in, never all three as one).
-  Neither format carries a second mode, so a token with one keeps it in `tokens.json`, and the run says how many.
+- `contracts.tokensStudioOut` - the same for Tokens Studio: a set, each token with the type Tokens Studio uses for
+  it (a dimension is `spacing`, `borderRadius` or `sizing` by the group it sits in, never all three as one). A token
+  with a second mode puts it in a set of that mode's name, and a theme per mode turns them on. Style Dictionary's file
+  has no place for a second mode, so a token with one keeps it in `tokens.json`, and the run says how many.
+  The style guide's Tokens page saves the same formats (DTCG, Tokens Studio, a WordPress `theme.json`) with no setting.
   - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
   - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is; setup sets it when the theme CSS does.
   - `aliases` - per-segment renames (`{ figmaSegment: cssSegment }`). `iconTextAlias` is shorthand for `{ iconText: "text" }`; use `aliases` for any other rename the DS needs.

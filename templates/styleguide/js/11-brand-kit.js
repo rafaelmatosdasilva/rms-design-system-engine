@@ -1989,16 +1989,29 @@
       draw();
     });
     tkRun();
-    // Every token in every mode in one file, by collection: its Figma name, the code's name, what it styles, its value in each mode.
-    var tkActs = document.createElement('div'); tkActs.className = 'sg-section-actions'; tkActs.innerHTML = sysButton('button', 'Download all tokens', null, null, null, DOWNLOAD_SVG);
-    (tk.querySelector(':scope > h2') || tk).appendChild(tkActs);
-    tkActs.querySelector('button').addEventListener('click', function () {
-      var out = { name: (DATA.title || 'Design system') + ' tokens', exported: new Date().toISOString(), collections: TK_COLLS.map(function (c) {
-        var rows = tkRows.filter(function (r) { return r.coll === c; });
-        return { name: c, modes: tkModesOf(rows), tokens: rows.map(function (r) { var values = {}; r.labels.forEach(function (m, i) { values[m] = r.values[i]; }); return { name: r.t.figma, code: r.t.var || null, type: r.t.type, values: values }; }) };
-      }) };
-      saveFile('tokens.json', 'application/json', JSON.stringify(out, null, 2));
-    });
+    // Every token in the formats people's own tools read, made at the build from Figma's variables (token-exports.mjs):
+    // DTCG, the standard every other is made from, Tokens Studio with each mode a set and a theme, and a WordPress
+    // theme.json, which has no modes (the first mode of each token). The page saves the files, it never makes them.
+    var TF = DATA.tokenFiles;
+    if (TF) {
+      var tkSlug = String(DATA.title || 'design-system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'design-system';
+      var TK_FILES = [
+        ['dtcg', 'DTCG', 'Download the tokens as W3C DTCG', tkSlug + '.tokens.json', TF.dtcg],
+        ['studio', 'Tokens Studio', 'Download the tokens for Tokens Studio, each mode a set and a theme', tkSlug + '.tokens-studio.json', TF.tokensStudio],
+        ['wordpress', 'WordPress', 'Download a WordPress theme.json' + (TF.modes ? ', the first mode of each token' : ''), 'theme.json', TF.wordpress],
+      ].filter(function (f) { return f[4]; });
+      // Two tokens at one name cannot both be in a file: the ones left out are said on each button, never lost in silence.
+      var tkLeft = (TF.dropped || []).length ? '. ' + TF.dropped.length + ' left out, another token having the same name: ' + TF.dropped.join(' · ') : '';
+      TK_FILES.forEach(function (f) { f[2] += tkLeft; });
+      var tkActs = document.createElement('div'); tkActs.className = 'sg-section-actions';
+      tkActs.innerHTML = TK_FILES.map(function (f) { return sysButton('button', f[1], ' data-tk-file="' + f[0] + '" aria-label="' + esc(f[2]) + '" title="' + esc(f[2]) + '"', null, null, DOWNLOAD_SVG); }).join('');
+      (tk.querySelector(':scope > h2') || tk).appendChild(tkActs);
+      tkActs.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-tk-file]'); if (!b) return;
+        var f = TK_FILES.filter(function (x) { return x[0] === b.getAttribute('data-tk-file'); })[0];
+        if (f) saveFile(f[3], 'application/json', JSON.stringify(f[4], null, 2) + '\n');
+      });
+    }
   }
   if (!document.getElementById('tokens')) emptyPage('tokens', 'tokens', 'Foundations', 'Tokens', 'No tokens yet', 'Every variable of the system, in every mode, shows here once Figma is read.', askHTML(ENGINE + ' refresh the Figma data', 'Copy the request').replace('…</code>', '</code>'), true);
 
