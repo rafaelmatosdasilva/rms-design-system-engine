@@ -298,6 +298,8 @@ It reads the files of your system and of each product listed beside it (`pluginD
 
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 
+**A loop goes to you.** When the AI edits the same file three times in a row and the check answers the same way each time, its fix and the check do not agree. The third time the hook stops saying "fix it": the AI hands the finding to you instead, with each finding, what it tried in each round and what the check answered, and never changes the code only to make the check pass. A round whose findings changed is progress, and starts the count again.
+
 **What each generated change cost.** Each request that makes a UI edit is kept, on this computer only (`.design-system-engine-out/generations.jsonl`):
 
 - the rounds it took (each UI edit checked is one) and the time from the request to the end of the turn;
