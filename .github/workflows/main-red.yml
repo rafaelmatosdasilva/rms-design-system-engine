@@ -1,0 +1,47 @@
+# release-due.yml watches releases, merge-stalled.yml watches pull requests that cannot land, badges.yml watches the
+# README's badges. None of them watches main, and on 24 November 2026 main's own suite was red for forty minutes
+# before anybody knew - found by somebody running the suite on their own machine for an unrelated reason
+# (lib/main-red.mjs says how it happened, and why it is nobody's mistake).
+#
+# So this asks the state, as those do: how many runs in a row has main's suite failed? It never speaks for one red
+# run, because one red run here is usually a browser losing its context; it speaks once failing has carried on, and
+# it closes its own issue when a run on main goes green.
+#
+# It runs after the suite finishes on main, so the answer is current the moment there is a new one, and daily, since
+# a red main is a reason to stop merging and the runs would otherwise stop coming exactly when it matters.
+name: main red
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    branches: [main]
+    types: [completed]
+  schedule:
+    # Off the hour, for the reason the other schedules here carry: a run on the hour waits longest and is dropped most.
+    - cron: '41 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-red
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Has main been failing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node lib/main-red.mjs check

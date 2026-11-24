@@ -89,6 +89,24 @@ Neither fetches anything when the README is read, so there is nothing left to ti
 
 Drawing them here moves one risk, and it is worth naming. An outside renderer that fails shows a broken image, which anybody can see; a writer that fails leaves the last badge sitting there, still a badge, quietly out of date. So `badges.yml` also asks the state the way `release-due.yml` does — does the Scorecard badge still say what the API says, and has the suite's badge been written lately? — and opens one issue when it does not. `node lib/badges.mjs report` asks the same from a terminal and writes nothing.
 
+### When main itself goes red
+
+Main's ruleset does not make a branch catch up before it merges (`strict` is off). That is deliberate: with a quarter-hour suite and seven pull requests in a day, making every open branch rebase and run again after each merge would serialize all of them.
+
+Its cost is a pair of changes that are each right alone and wrong together. On 24 November 2026, #701's run started against main as it then stood; #699 merged ninety seconds later, adding a badge to the README; #701's quarters finished green having never seen it, and auto-merge landed #701 against a list that did not know about the badge. Main was red from that moment and stayed red through two more merges, found only because somebody ran the suite locally for an unrelated reason.
+
+`.github/workflows/main-red.yml` and `lib/main-red.mjs` watch for that, in the same way everything else here watches: by asking the state rather than listening for an event. The question is **how many runs in a row has main's suite failed**.
+
+It deliberately does not speak for a single red run. Of main's last 25 runs, four failed on their own and were green again on the very next one — the browser checks on Windows lose their browsing context now and then, and a quarter of the suite has flaked too. A watcher that spoke for each of those would be noise, and a noisy watcher gets turned off.
+
+What tells a breakage apart is not which job failed — the genuinely broken quarter and one of the flakes were the same job — but that it does not stop:
+
+- **Three runs in a row** (`RED_RUNS`) opens one issue. No flake in those 25 runs ever reached three; the one real breakage passed it on its third.
+- **Two that have stood for `RED_HOURS`** opens it as well, because a red main is a reason to stop merging, and the streak would otherwise stop growing exactly when it matters.
+- **One red run never speaks**, however long it stands.
+
+The issue names each failing job with the number of the streak's runs it appeared in, rather than a verdict on which is flaking — a streak that opens with a flake would otherwise show the real cause as the intermittent one. It closes itself when a run on main goes green. `node lib/main-red.mjs report` asks the same from a terminal and writes nothing.
+
 Actions are pinned by commit, so they are updated on purpose rather than by drift. Dependabot watches them and opens one grouped pull request a week when any has moved (`.github/dependabot.yml`); it arrives labelled `release: patch` and goes through the same gate as any other change.
 
 The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
