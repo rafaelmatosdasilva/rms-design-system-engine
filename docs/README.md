@@ -10,7 +10,7 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [Audit](audit.md): how the engine checks your Figma library, lints your code and compares Figma with the code.
 - [Accessibility](test-accessibility.md): how the engine tests the accessibility of every component, and of your products' pages, in a real browser.
 - [Documentation](documentation.md): how the engine writes each component's contract and gathers the intent layer.
-- [Collaboration](collaboration.md): how the engine publishes the living style guide and the playground.
+- [Collaboration](collaboration.md): how the engine publishes the living control center and the playground.
 - [Creation](creation.md): how the engine builds prototypes with your real components.
 - [Security](security.md): what the engine reads, sends and may change, and why it can be trusted with a team's code.
 - [Working on the engine](development.md): for whoever changes the engine itself.
@@ -25,21 +25,21 @@ flowchart LR
   R --> I["Intent<br/>why it exists,<br/>when to use it"]
   K --> V["Checks<br/>measured in a real browser"]
   I --> V
-  V --> S[Style guide]
+  V --> S[Control center]
   V --> A[AI agents]
   V --> P["Patches and tasks<br/>for people"]
 ```
 
 Facts, contracts and checks are measured, never guessed by a model. AI drafts the intent layer and builds with the system, and the checks judge what it builds. When something cannot be read or run, the result says so instead of passing.
 
-**One request, start to finish.** You ask Claude Code to check the button. The engine reads the button from Figma and the code, takes the components inside it along, and measures it in every state and colour mode. Each difference names its rule, the file and line, the value to write there and who fixes it. Code people wrote comes back as a patch to apply, never changed, and a change to Figma waits for a yes. The button's page in the style guide shows the same result.
+**One request, start to finish.** You ask Claude Code to check the button. The engine reads the button from Figma and the code, takes the components inside it along, and measures it in every state and colour mode. Each difference names its rule, the file and line, the value to write there and who fixes it. Code people wrote comes back as a patch to apply, never changed, and a change to Figma waits for a yes. The button's page in the control center shows the same result.
 
 - **It reads Figma precisely.** What your design system really defines, the tokens and each component's parts, states and options. It is not a "does this look like Figma?" screenshot comparison.
 - **It reads your code the same way.** Once per run it opens your pages in a browser and records what the code really produces, every token in every mode, each component's sizes, states, props, icons and markup, and which components sit inside which.
-- **One read of each component, whatever wrote it.** Vue, React, Svelte, Lit, Angular and Web Components are read once into the same props, slots and events: a Custom Elements Manifest where a system ships one, else the class itself, down to a plain `customElements.define` with no library at all. Every part then works from that one reading, not from a reader of its own: parity, the accessibility check, the style guide, the playground, Code Connect drafts, contracts and stories. What each framework says in its own syntax is in [Lint your codebase rules](audit.md#lit-angular-svelte-and-web-components).
+- **One read of each component, whatever wrote it.** Vue, React, Svelte, Lit, Angular and Web Components are read once into the same props, slots and events: a Custom Elements Manifest where a system ships one, else the class itself, down to a plain `customElements.define` with no library at all. Every part then works from that one reading, not from a reader of its own: parity, the accessibility check, the control center, the playground, Code Connect drafts, contracts and stories. What each framework says in its own syntax is in [Lint your codebase rules](audit.md#lit-angular-svelte-and-web-components).
 - **Every fact has a source.** Each one says where it came from and how sure the reading is. When something cannot be read reliably, the engine says so instead of blaming the design.
 - **It writes the facts out for AI tools.** A catalog of your real components, their options and which go inside which, so AI tools build with the real system instead of guessing. `--check-ui` checks what they generate against it, every time, without changing it.
-- **It pairs each Figma component with its code file.** One shared pairing (`component-pairing.mjs`) answers for every check, the style guide and the router, so they all agree. Details below.
+- **It pairs each Figma component with its code file.** One shared pairing (`component-pairing.mjs`) answers for every check, the control center and the router, so they all agree. Details below.
 
 The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
 
@@ -61,7 +61,7 @@ Each sign the code gives counts. A strong sign pairs on its own. A weak one need
 | Props | Backs another sign | its props hold two thirds of Figma's properties |
 
 - **Paired.** A strong sign, or two that agree.
-- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it on the Status page, under Parity, to confirm or pin.
+- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the control center lists it on the Status page, under Parity, to confirm or pin.
 - **Only in Figma.** No sign at all. The files nearest its name are named, among those no other component has.
 - **Never taken twice on a weak sign.** A file a name gives to one component is not offered to another on its tokens alone, unless the two differ only by a state word.
 - **One file, two styles.** When Figma has bannerTopPrimary and bannerTopSecondary and the code has `banners/Top.vue` with a prop that chooses the style (`useSecondaryStyle`), both are paired with it.

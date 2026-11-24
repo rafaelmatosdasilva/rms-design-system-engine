@@ -1,6 +1,6 @@
 # A brand's personality, read from its tokens
 
-Part of the rms-design-system-engine reference (`rms-design-system-engine --reference personality`). The style guide's Identity page reads it for the brand or theme in view, from what its tokens draw, and draws it as one chart.
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference personality`). The control center's Identity page reads it for the brand or theme in view, from what its tokens draw, and draws it as one chart.
 
 ---
 

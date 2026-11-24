@@ -15,7 +15,7 @@ const partOptions = (text) => {
 test('the parts are the features page\'s own, in its order', () => {
   const parts = featureParts();
   assert.equal(parts[0], 'Check your Figma library rules');
-  assert.ok(parts.includes('Publish a living style guide'));
+  assert.ok(parts.includes('Publish a living control center'));
   assert.ok(parts.length >= 10);
   assert.equal(new Set(parts).size, parts.length);
 });

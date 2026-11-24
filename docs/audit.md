@@ -28,7 +28,7 @@ Code can only match what Figma states, so the summary says first when the file i
 
 ### How your system builds a component in Figma
 
-Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it, or a text layer Figma names after its words), auto layout everywhere (a variant's own frame, and each row of words or controls inside it placed by hand, such as a divider and its label set side by side; a chart, a map or an image's overlay is drawn freely on purpose and left out), whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The style guide's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library-rules)).
+Every run reads your components and writes down how they are built: how components, properties and variant options are named, whether layers have names of their own (every layer of every variant, `Frame 12` or a `Union` left as Figma named it, or a text layer Figma names after its words), auto layout everywhere (a variant's own frame, and each row of words or controls inside it placed by hand, such as a divider and its label set side by side; a chart, a map or an image's overlay is drawn freely on purpose and left out), whether a component binds its own variables or the shared ones, a description on each. Nothing is a rule until every component follows it: each line is a rule, to fix (most follow it, or your team decided it) or to decide. It reads how each component is built inside too: every variant's layers, auto layout, what each property drives, styles, nesting and slots, and the shape each family (the buttons, the cards) is built in. The control center's Rules page lists them; each fix copies into Claude Code, and renames are made in Figma for you ([how to ask](features.md#check-your-figma-library-rules)).
 
 Two more things it reads of every layer, which make a rule about *which* token possible rather than only about whether there is one:
 
@@ -95,7 +95,7 @@ More readings of the library:
 - **Annotated like its family.** A tab with no Accessibility annotation when almost every other tab has one.
 - **Nested properties within reach.** A badge inside a card whose own properties don't show in the card's properties panel, when most nested components show theirs. An agent can only set what the panel shows.
 - **A property says what it drives.** The properties panel is all an agent sees of a component, so `showExtra` driving a layer called Dot is flagged.
-- **Components no product uses.** One your code builds that no product's code uses, read from the contracts' catalog. Your style guide's own pages don't count as a product.
+- **Components no product uses.** One your code builds that no product's code uses, read from the contracts' catalog. Your control center's own pages don't count as a product.
 - **Components nothing uses.** One that isn't placed on any page of your file and that no other component holds. It's for someone to check, never removed.
 - **A component that repeats an option.** `buttonLarge` beside a `button` whose Size already takes `large`.
 - **Two components that do one job.** Built the same and given the same properties, like `badgeInfo` and `badgeNote`. It's a pair to look at; the engine never merges them.
@@ -125,7 +125,7 @@ Each is a decision for your team in Figma, and keeping it as it is, as a known e
 
 ### One Rules page for Figma and the code
 
-How your system is built, on both sides, is one page in the style guide's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
+How your system is built, on both sides, is one page in the control center's menu, called Rules. It is the clean base an AI builds on: what is broken there gets copied into everything built next.
 
 - **How far along each side is.** Above the filters, a card for Figma and one for the code, the Status page's own cards:
   - A ring of every rule in the colour of its state: done, to decide, to fix. In its middle, the share done.
@@ -162,7 +162,7 @@ The full list of options is in the reference (`--reference usage`, *--figma-edit
 
 Two kinds of finding, one for each part of your code: the system's own tokens and themes, and the apps that use them.
 
-What it finds is shown as rules too. Each check's findings become rows on the style guide's Rules page, beside Figma's, so both sides of how your system is built read as one list.
+What it finds is shown as rules too. Each check's findings become rows on the control center's Rules page, beside Figma's, so both sides of how your system is built read as one list.
 
 ### How your system builds a component in the code
 
@@ -232,7 +232,7 @@ The checks above read what your styles *do* with the system's values, so they se
 - **A class your markup puts on an element that no stylesheet styles.** Usually a style that was deleted and left the class behind. It is the oldest thing in a product and the cheapest to delete.
 - **A class a stylesheet defines that no markup ever puts on.** A rule nothing can reach.
 
-Both appear on the style guide's Rules page under Code, each with its file and line. The engine deletes nothing: each one is handed back for a person to decide.
+Both appear on the control center's Rules page under Code, each with its file and line. The engine deletes nothing: each one is handed back for a person to decide.
 
 Nothing is guessed:
 
@@ -409,7 +409,7 @@ A system with colour scales (blue 100 to 900, red 100 to 900) numbers its steps 
 - **A step that splits is listed.** On the system's own page surface, in each mode, a step that reaches 4.5:1 in some colours and falls under it in others, with how light each one looks (OKLCH lightness).
 - **So is a swap that would break.** A text colour or a surface that points at a step today and passes, and would fall under its ratio at the same step of another colour, with the colours that break it.
 - **Both are to decide, never to fix.** Even out the steps, or say in the intent layer which colours may not stand in for each other.
-- **Where a colour is picked.** The style guide's colour page shows each step the scales share, every colour's token at it with its contrast on the page in each mode, and each step's card says whether it reads in every colour, in none, or splits, with the colours that fall short.
+- **Where a colour is picked.** The control center's colour page shows each step the scales share, every colour's token at it with its contrast on the page in each mode, and each step's card says whether it reads in every colour, in none, or splits, with the colours that fall short.
 - **In the health report.** "Can one colour stand in for another at the same step?" is answered from the same lists.
 - A system with a single scale (a neutral grey) has nothing to compare, so the Rules page, the colour page and the health report show none of it.
 
@@ -420,7 +420,7 @@ The gates check each mode on its own. When you have two collections that switch 
 - Each token is compared with Figma's value in that combination.
 - Each text and background pair the system uses is measured for contrast.
 
-Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Status page, under The system.
+Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the control center's Status page, under The system.
 
 The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Status page under The system.
 
@@ -475,7 +475,7 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 
 Where you see it:
 
-- **The style guide's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
+- **The control center's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
   - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
 - **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
 - **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
@@ -532,14 +532,14 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 - **Its variants are its props.** A component that takes `VariantProps<typeof buttonVariants>` has a prop for each axis of that `cva` call, with its options and the default `cva` gives it. `tailwind-variants`' `tv` is read the same way. Figma's variants are then compared with these props like any other.
 - **`asChild` is composition.** A component that hands its element to its child (Radix's `Slot`) takes `asChild`, said as a yes/no prop and never drawn on its own, since it needs a child to draw.
 - **Radix's states are drawn too.** A component that renders a Radix primitive's `Root`, passes its props on (`{...props}`) and styles a Radix state (`data-[state=checked]:bg-primary`) takes the prop Radix sets that state from: `checked`, `pressed` (`data-state="on"`), `open`, and `disabled` for `data-[disabled]`. Each is drawn as a case of its own, so its look is compared with Figma's Checked or Pressed variant. In the default case it is left to Radix, so a switch still switches.
-- **On its style guide page too.** The page carries the Tailwind your build compiles, so each component looks as it ships there. Tailwind's reset (its preflight and your own base rules) applies only where components are drawn, never to the guide around them. A component is known by its `data-slot` (`data-slot="switch"`), since its classes are Tailwind's. Any Tailwind system whose theme file is Tailwind's entry (`@import "tailwindcss"`) gets the same.
+- **On its control center page too.** The page carries the Tailwind your build compiles, so each component looks as it ships there. Tailwind's reset (its preflight and your own base rules) applies only where components are drawn, never to the guide around them. A component is known by its `data-slot` (`data-slot="switch"`), since its classes are Tailwind's. Any Tailwind system whose theme file is Tailwind's entry (`@import "tailwindcss"`) gets the same.
 - **Drawn as it ships.** With React and Vite installed, the components are drawn by your own Vite config, so its alias and its Tailwind plugin compile the classes and Radix runs: a switch switches, and its `data-[state=checked]` classes follow.
 
 #### Lit, Angular, Svelte and Web Components
 
 A component written as a class is read the way a Vue or React one is, into the same props, slots and events. This is
 the engine's one reading of a component, not the lint's own: what it finds here is what parity, the accessibility
-check, the style guide, the playground, Code Connect drafts, contracts and stories all work from.
+check, the control center, the playground, Code Connect drafts, contracts and stories all work from.
 
 - **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
 - **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`. An Angular app's root component (`app.ts`, `app.component.ts`) is the app, never one of its system's components.
@@ -556,15 +556,15 @@ check, the style guide, the playground, Code Connect drafts, contracts and stori
 - **Proven on real code.** A public Lit library of 58 components and a public Angular library of 77 were read this way: 42 and 67 of them with their class (the rest draw no element of their own), with their options, defaults, descriptions, events and slots.
 - **The codebase rules proven too.** On the same Lit library, 54 of its 58 components are read with their parts and states (42 before, with none of their states), and on Angular Material's buttons, chips, checkbox and slide toggle, 8 of 11 have their states (none before). On a public set of seven plain Web Components, written without a library, 6 have their root and states (`:host([checked])`, `:host([disabled])`, none before), and the seventh is said to have no styles of its own.
 - **Lit drawn as it ships.** With Lit and Vite installed, each Lit component is drawn by your own Vite in a real browser, in each of its cases, each value set as a property as Lit reads it. Its tag is the one it defines, or the one a file beside it registers. The accessibility check and the browser measurements read through its shadow root.
-- **On the style guide too.** Each case is kept as a declarative shadow root, with the styles Lit adopted inside it, so the page shows it as Lit drew it without running Lit. `styleguide.renderLit: false` leaves them undrawn.
+- **On the control center too.** Each case is kept as a declarative shadow root, with the styles Lit adopted inside it, so the page shows it as Lit drew it without running Lit. `styleguide.renderLit: false` leaves them undrawn.
 - **Your own build only.** A Lit library built without Vite (with Rollup or the web dev server alone) is said so, and its components get the checks that read code.
 - **Angular compiled by your own compiler.** With Angular installed, its compiler (`@angular/compiler-cli`, the one `ng build` runs) compiles each Angular component ahead of time, with your own tsconfig, its template and its stylesheets inside it. A stylesheet in Sass is compiled by your own Sass, as your builder does. What the compiler refuses (a template naming what the component lacks) is said with its own error.
 - **Angular drawn as it ships.** Your own Vite (yours, or the one `@angular/build` installs) serves the compiled components, and your own Angular draws each in each of its cases, on the element its selector names. Each value is set as an input by the name a template uses (an alias among them), what a person puts in it is projected into its `<ng-content>`, and a library that ships partly compiled (Angular Material) is finished by your own `@angular/compiler`. No zone.js is needed from Angular 18 on, and before that your own zone.js runs. The accessibility check and the browser measurements read it drawn.
-- **On the style guide too.** Each case is kept as Angular drew it, with the styles Angular scoped to it and a library's own styles beside it. `styleguide.renderAngular: false` leaves them undrawn.
+- **On the control center too.** Each case is kept as Angular drew it, with the styles Angular scoped to it and a library's own styles beside it. `styleguide.renderAngular: false` leaves them undrawn.
 - **Proven on a real app.** An app the Angular CLI made (Angular 22, SCSS, no zone.js) with Angular Material had all three of its components drawn in all ten of their cases: Material's buttons and slide toggle among them, its theme and its styles kept.
 - **Svelte drawn as it ships.** With Svelte, its plugin for Vite (`@sveltejs/vite-plugin-svelte`) and Vite installed, each Svelte component is built by your own Svelte and drawn in a real browser, in each of its cases. Svelte 5 mounts it and Svelte 3 and 4 make it, as each of them does, and what a person puts in it goes in as its content. Your `svelte.config.js` is read by your own plugin, as it always is. A SvelteKit app's own Vite config starts its router, so it is left out, and `$lib` points at `src/lib`. The accessibility check and the browser measurements read it drawn.
 - **Svelte 5's props.** What `$props()` is taken apart into is its props, with their defaults (`let { size = 'm' } = $props()`), and the content it renders (`{@render children()}`, a named snippet) is what it holds. Svelte 3 and 4's `export let` are read as before. A Svelte file's props are read from its script only, so a selector in its styles (`[aria-pressed='true']`) is never a default.
-- **On the style guide too.** Each case is kept as Svelte drew it, with the styles Svelte scoped to it. `styleguide.renderSvelte: false` leaves them undrawn.
+- **On the control center too.** Each case is kept as Svelte drew it, with the styles Svelte scoped to it. `styleguide.renderSvelte: false` leaves them undrawn.
 - **Every case can draw.** A prop a component requires (`input.required()`) is given in every case, never only in its own, since without it the component refuses to draw. This holds for every framework.
 
 #### Values written by hand
@@ -578,7 +578,7 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 
 #### A commit warns, a push refuses
 
-`--install-hooks` (and `--init`) also adds git hooks to the project. Two check what your change uses: `pre-commit` and `pre-push`. Three build your local style guide again after a change: `post-commit`, `post-merge` and `post-rewrite` ([Built again after each commit](collaboration.md#see-a-change-in-seconds)).
+`--install-hooks` (and `--init`) also adds git hooks to the project. Two check what your change uses: `pre-commit` and `pre-push`. Three build your local control center again after a change: `post-commit`, `post-merge` and `post-rewrite` ([Built again after each commit](collaboration.md#see-a-change-in-seconds)).
 
 - **A commit warns.** It lists what the commit adds that has a finding, and always goes ahead.
 - **A push refuses.** While one of those findings is left, the push stops with the list. Fix them and push again.
@@ -696,7 +696,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 
 ### Components
 
-- **What Figma does not publish is no component of yours, but its construction is checked.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the style guide. How it is built is still checked: its layers Figma named (`Frame 3`) and the values typed by hand in it are listed with the others, under its own name.
+- **What Figma does not publish is no component of yours, but its construction is checked.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the control center. How it is built is still checked: its layers Figma named (`Frame 3`) and the values typed by hand in it are listed with the others, under its own name.
 - **No hand-built DS components.** A screen uses the real component, not a hand-styled copy.
   - A product's own version of a system component is listed too, as advice. It is found by what it draws (a class that loops the same animation as a component's part, `.spinner` beside the loader's `.loader-spinner`) or by its name (a class of its own that starts with a component's name and says nothing more, `loading-state`).
   - A class beside a system class on the same element dresses the component and is left alone.
@@ -739,7 +739,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 ### In the browser
 
 - **Renders correctly in a browser.** Checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup, the rule's `probe`.
-- **On your own stories.** With a Storybook built to files (`storybook build`), each story is a page the values are measured on, after your style guide and your apps: a component drawn nowhere else is measured on its story, with its real content and its own script, rather than as a bare element of its class. A state a story draws is found there as drawn. The capture reads one story of each component before a second of any, up to 40 (`codeReading.storyPages`).
+- **On your own stories.** With a Storybook built to files (`storybook build`), each story is a page the values are measured on, after your control center and your apps: a component drawn nowhere else is measured on its story, with its real content and its own script, rather than as a bare element of its class. A state a story draws is found there as drawn. The capture reads one story of each component before a second of any, up to 40 (`codeReading.storyPages`).
   - **Each story against its own variant.** A story's args say which Figma variant it shows (`size: 'Large'` is `size=Large`). The component's base values are measured on a story that shows Figma's default variant, and every other story is measured as drawn and held to the variant it shows: *`button` → `height (size=Large, story Large)`: Figma `44`, the code `36px`*.
   - **A story Figma has nothing for is named,** never compared: an option Figma does not list, or a state it never draws.
   - **Never read as your code.** The built Storybook is Storybook's own bundle: the lint and every other reader of your code pass over it, as they do `dist`.
@@ -775,7 +775,7 @@ A full audit writes `.design-system-engine-out/differences.md` and `differences.
 
 Under its verdict, the summary of a full audit counts the components that pass, drift (an open difference) and were not checked, with the names when there are few. Beside them, `findings.json` holds every finding of every check as one record, with its rule in plain words, its evidence and its verdict.
 
-It is written whether or not you have a style guide, and the summary of every check says where it is.
+It is written whether or not you have a control center, and the summary of every check says where it is.
 
 ### The same findings where you already review code
 

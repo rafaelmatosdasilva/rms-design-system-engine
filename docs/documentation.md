@@ -50,7 +50,7 @@ A team with Storybook has already written much of a spec there. With a Storybook
 
 A prop none of those sources describes is listed, with where its description goes.
 
-- **Where it is listed.** On the component's Documentation area in the style guide (What each prop is for), and in the audit's contract completeness line. `--contract-completeness` lists each one.
+- **Where it is listed.** On the component's Documentation area in the control center (What each prop is for), and in the audit's contract completeness line. `--contract-completeness` lists each one.
 - **Where it goes.** The comment above the prop in its code file, with the file and line. A Figma property no code prop is goes in `contract.authored.json` (`propDescriptions`).
 - **A draft for each code prop.** One plain sentence from what the engine knows for sure: its type and values, its default, the Figma property it pairs with, the Figma properties that set it, and how often its uses set it. Nothing more: "Size of the chip: s, m or l. Default m."
 - **As a patch.** The drafts are written to `.design-system-engine-out/handback/prop-descriptions.diff`. Each one goes above its prop in the file's own style: a doc comment in a Vue props object, a `defineProps` type or a TypeScript interface, or a line in the component's own comment when that is where its props are described (`@size {String} …`).
@@ -94,7 +94,7 @@ Each fact says where it came from, and none is guessed:
 
 | `from` | What it means |
 |---|---|
-| `measured` | The style guide's build tried every variant in a browser. |
+| `measured` | The control center's build tried every variant in a browser. |
 | `code` | Read from the component's own markup, with no browser. |
 | `figma` | Its role annotation in Figma. |
 | `authored` | Written in `contract.authored.json`. |
@@ -126,7 +126,7 @@ The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C De
 - **A value no format of 2025.10 holds is kept as written.** A colour CSS spells another way (`color-mix()`), and a size in `%` or `em`, are left as the design file gives them.
 - **A reference stays a reference** (`{color.blue}`).
 - **What you read is unchanged.** Whatever the engine shows you or an agent says the value as CSS writes it: `#0a84ff`, `24px`. The Style Dictionary and Tokens Studio files carry the same text their formats always held.
-- **The same tokens from the style guide.** The Tokens page saves them in three formats, made from one dictionary when the page is built:
+- **The same tokens from the control center.** The Tokens page saves them in three formats, made from one dictionary when the page is built:
 
 | Download | What it holds |
 |---|---|
@@ -334,7 +334,7 @@ They are written beside the components' contracts, in `patterns/` and `flows/`, 
 
 ### Contract changes in History
 
-Each build of the style guide compares the contracts with the ones the last build read, and the History page lists what changed under its own filter, Contracts:
+Each build of the control center compares the contracts with the ones the last build read, and the History page lists what changed under its own filter, Contracts:
 
 - **A component's contract:** a property, option, state, slot, event or token added or removed, a default changed. A change that breaks a product says so.
 - **A pattern's or a flow's:** a rule added or removed at its level, a component it uses added or removed.
@@ -445,7 +445,7 @@ rms-design-system-engine --decision-records
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](features.md#maintain-usage-guidelines) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Contracts, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
+The control center shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (the day and time on one line, the release under them), Source (Code, Figma, Intent layer, Contracts, Decisions), What, Affects and Done by. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A commit no release held yet is asked about again once a day, so a release tagged later shows. A chip for each source shows only that source, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 
 - **An intent layer change** is a row of its own: what it added apart from what it changed, each on one line, the commit that made it, and the components those pages document. Pages are counted by kind (component pages, other pages named while they are few, token pages), every name a click away (Show all). The engine keeps the last 50 changes it read, in the layer's snapshot.
 - **What kind of row it is** (a Decision, a Lesson, a Comment) is the first line of What.
@@ -579,16 +579,16 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 
 A DSDS page says who each section is written for: everyone, people or agents (`for`).
 
-- **For agents alone.** Agents get it: in the contracts, the design intent and the checks. The style guide's pages leave it out, since it is written for a machine.
-- **For people alone.** It shows on the style guide's pages, and agents get it too. DSDS says an agent reads everything.
+- **For agents alone.** Agents get it: in the contracts, the design intent and the checks. The control center's pages leave it out, since it is written for a machine.
+- **For people alone.** It shows on the control center's pages, and agents get it too. DSDS says an agent reads everything.
 - **For everyone.** Both, as any page without the mark.
 
 ### Links inside your pages
 
 A DSDS page can link to another entry inside its text: `[focus visible](dsds:shared-a11y#focus-visible)`, or `<dsds:button>`.
 
-- **Written as words.** Agents and the style guide read the link's own words, or the name of what it points at for `<dsds:…>`. Nothing reaches them as a link that leads nowhere outside the layer.
-- **Checked like any other reference.** A link to an entry the layer no longer has, or to a part it no longer has (an item, a trait or one of its values), is a finding with its page and where it is: Links to nothing. A rename never leaves your guidance pointing at nothing without anyone noticing. `--check-intent` lists it, and the style guide shows it on the page.
+- **Written as words.** Agents and the control center read the link's own words, or the name of what it points at for `<dsds:…>`. Nothing reaches them as a link that leads nowhere outside the layer.
+- **Checked like any other reference.** A link to an entry the layer no longer has, or to a part it no longer has (an item, a trait or one of its values), is a finding with its page and where it is: Links to nothing. A rename never leaves your guidance pointing at nothing without anyone noticing. `--check-intent` lists it, and the control center shows it on the page.
 
 ### Where each page came from
 

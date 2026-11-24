@@ -93,12 +93,12 @@ reference it points to say, never from memory or from this table alone.
 | Figma brought in line with the code (a component's role, its accessibility spec), accessibility findings pinned on the screens, or the prototypes' gaps sent to Figma as a to do list, once the person says yes | `figma-edits` |
 | a component's props and values, where a component is used, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
-| the style guide published for the team, one link rebuilt on every push (GitHub Pages or GitLab Pages) | `publish-styleguide` |
+| the control center published for the team, one link rebuilt on every push (GitHub Pages or GitLab Pages) | `publish-styleguide` |
 | an idea, an article or a fix for the engine itself, not for a design system | `engine-ideas` |
 
 Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
-and the skill), `personality` (how the style guide reads a brand's personality from its tokens).
+and the skill), `personality` (how the control center reads a brand's personality from its tokens).
 
 **Writing a page of the intent layer.** Run `rms-design-system-engine --check-intent <the file>` first and fix what it
 prints; write the page only once it passes. Never name what the system does not have. Never remove a `**Draft:**`
@@ -160,13 +160,13 @@ Route by intent:
   system.
 - **The whole design system:** run `rms-design-system-engine` in the terminal (or `/rms-design-system-engine` in Claude Code),
   then follow the `full-audit` recipe.
-- **The style guide:** a request that names it gets it, accessibility named or not ("show the
-  accessibility of buttonPrimary in the style guide"): `--styleguide`, with `--component <name>` when
+- **The control center:** a request that names it gets it, accessibility named or not ("show the
+  accessibility of buttonPrimary in the control center"): `--styleguide`, with `--component <name>` when
   it names one. That page holds the component and the ones it nests only, written beside the whole
   system's page (`styleguide/<name>.html`), never in its place. Accessibility asked for alone stays
   in the chat (`--only accessibility`) and builds no page.
 - **Another design system than this folder's:** when the request names a system this folder is not
-  set up for ("the style guide for Northwind DS"), the router asks for that system's code (a folder or
+  set up for ("the control center for Northwind DS"), the router asks for that system's code (a folder or
   a link to its repository) and its Figma link at once, in one message, and the request runs there with
   `--project`. Never run this folder's system in its place. A cloud session cannot read a folder on
   the person's computer: ask for the repository link, and say that to work on a local folder they run

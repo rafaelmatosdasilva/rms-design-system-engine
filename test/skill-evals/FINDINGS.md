@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## A measurement is keyed to the guide, not to the commit, and a shared checkout loses it
+
+**Found** 24 November 2026, renaming the style guide to the control center across the guide set (103 mentions in `rms-design-system-engine.md`, `cookbook/`, `reference/`) and measuring it.
+
+**What happened.** The first run was started in the main checkout. It measured 75 of the 82 runs, then stopped: `has rows from guide 6b5a83b5efc3 / engine 8c8b4c28, not abe85009dafc / 8c5beb5e+dirty: move it away to start again`. Another session had switched that checkout to its own branch mid-run, so the engine identity changed under the measurement and the file could no longer be appended to. `RESULTS.md` was never written and the gate stayed red, with $3.64 spent.
+
+**The guess that was wrong.** That rebasing the branch would throw those 75 runs away, since the commit they named no longer existed, and that finishing would cost the whole $3.64 again. It did not: the second run, from a worktree on the rebased commit, printed `resuming: 75 runs already measured, 7 to go` and cost $0.36. The rows are keyed to the guide's own hash, which the rename did not change on a rebase, not to the engine commit printed beside it. A guide change can therefore be rebased freely between a stopped measurement and the one that finishes it.
+
+**What changed because of it.** Nothing in the engine: the evaluation refused correctly, and refusing is what kept two engines' rows out of one record. The lesson is where it runs. A measurement takes tens of minutes and spends real money, and the main checkout is shared with every other session on this computer, any of which may switch the branch without knowing a run is in flight. Run it from a worktree of its own, which nothing else will touch. A fresh worktree holds none of the tool installs or the pinned DSDS release, so fetch and install them there first, or the tasks fail for a reason that is not the guide's.
+
+**What the rename itself measured.** 82/82, 0 rule violations, 0.049 a run and 3.3 turns, each identical to the version before it, the two Portuguese runs included. Renaming the page the guide describes, everywhere the guide describes it, cost the agent nothing.
+
+---
+
 ## Every request paid for the whole guide and, for a full audit, for an 80 KB recipe
 
 **Found** 23 November 2026, reading what each guide task was handed before its first write (`procedure.mjs`) over 82 Haiku runs. Every run started at about 24.7k input tokens before its first call, and paid them again on every turn: runs averaged 90k input in 3.2 turns.
