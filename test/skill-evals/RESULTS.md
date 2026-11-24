@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The accessibility check finishes on a large system (continuous evaluation)
+
+What changed since the entry below (engine 8587d93): Templates stays out of the menu while a system lists none (#686); The tokens dictionary in DTCG's official version, 2025.10 (#688); What following the guide costs an agent: the route hands a recipe's steps, and the main guide keeps what every request needs (#685); Copies get the run's time, and what they did not finish waits for the next run; Give each badge line its own label and balance the dividers (#690); The whole library built from its written description, in Figma and in code (#687); What each generated change cost, beside whether it passed (#691); The browsers pass takes the run's remaining time, keeps earlier results and resumes; the stop line counts kept pages; Pages the copies checked are said checked in this run; The accessibility check finishes on a large system. The guide changed in `cookbook/audit-component.md`, `cookbook/engine-ideas.md`, `cookbook/first-setup.md`, `cookbook/fix-a-difference.md`, `cookbook/full-audit.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `3afdc21d4ee5` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md ef605eb2` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 923ab11d` `cookbook/first-setup.md ed605684` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md ebd8723a` `cookbook/refresh-figma.md 25764bdc` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 1475b197` `reference/gates.md a8e75b2a` `reference/maintainers.md 764adfe8` `reference/personality.md 7f1584bf` `reference/usage.md 4a50c8ab` `rms-design-system-engine.md abe85009`
+
+| Haiku, engine dce96008 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.056 | 0.050 |
+| Input a run | 86k | 89k |
+| Turns a run | 3.0 | 3.6 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 89k a run against 86k, in 3.6 turns against 3.0. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-accessibility-check-finishes-on-a-large-system`.
+
 ## 2026-11: The whole library built from its written description, in Figma and in code (continuous evaluation)
 
 What changed since the entry below (engine 4b18b974): The whole library built from its written description, in Figma and in code. The guide changed in `reference/usage.md`.
