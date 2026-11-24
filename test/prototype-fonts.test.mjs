@@ -45,16 +45,20 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
   // Each answer is held until the test lets it go: a page that waited for its font could not draw before then, so
   // drawing while the request is still unanswered is what proves the page did not wait, on a machine at any load. A
   // clock could not say it: a busy machine takes as long to open the page as the wait itself.
-  const held = new Map();   // path -> the request still unanswered
-  const answer = (path) => { const res = held.get(path); held.delete(path); if (!res) return;
+  // The page asks for its font in the background, so on a slow machine (GitHub's Windows runners) it can draw before
+  // the request even reaches this server: what is held is the answer, never the asking. A path is answered once the
+  // test releases it, whenever its request comes; until then nothing answers, so a page that waited could not draw.
+  const held = new Map(), released = new Set();   // path -> the request still unanswered; the paths let go
+  const reply = (path, res) => {
     if (path === 'fail') { res.writeHead(400); return res.end(); }   // not one of Google's fonts
     res.writeHead(200, { 'content-type': 'text/css', 'access-control-allow-origin': '*' });
     res.end(`@font-face { font-family: "Pt Probe Sans"; src: local("${have}"); }`);
   };
+  const answer = (path) => { released.add(path); const res = held.get(path); held.delete(path); if (res) reply(path, res); };
   const server = createServer((req, res) => {
     const path = req.url.slice(1).split(/[/?]/)[0];
     if (path === 'hang') return;   // a network that never answers
-    if (path === 'probe') { held.set(path, res); return answer(path); }
+    if (path === 'probe' || released.has(path)) return reply(path, res);
     held.set(path, res);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -90,8 +94,8 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
     // Any other is asked of Google Fonts, and the page does not wait: served, refused, or never answered.
     for (const [path, end] of [['ok', 'google'], ['fail', 'missing'], ['hang', 'loading']]) {
       const { sessionId } = await open(page(path, 'Pt Probe Sans'));
-      // Drawn while its font is still unanswered: it did not wait. (hang is never answered at all.)
-      if (path !== 'hang') assert.ok(held.has(path), `${path}: the page drew before its font was answered`);
+      // Drawn while its font is still unanswered (asked for or not yet): it did not wait. (hang is never answered.)
+      assert.ok(!released.has(path), `${path}: the page drew before its font was answered`);
       assert.equal(await ev(sessionId, `getComputedStyle(document.querySelector('[data-pt-path="0"]')).fontFamily`), '"Pt Probe Sans", ui-sans-serif, sans-serif', 'the system\'s stack behind it meanwhile');
       answer(path);
       // The picture waits for the font 3s at most, measured on the page's own clock, which the test's opening and
