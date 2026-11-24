@@ -461,6 +461,61 @@ test('hostOf: a Notion or Confluence page is its tool\'s; a GitLab project that 
   assert.equal(hostOf('https://wiki.acme.test/pages/viewpage.action?pageId=100'), 'confluence');
   assert.equal(hostOf('https://git.acme.test/design/display/intent'), 'gitlab');
   assert.equal(intentLayerConfig({ intentLayer: { confluence: 'https://wiki.acme.test/pages/viewpage.action?pageId=100' } }).host, 'confluence');
+  // A Data Center site under its own path, in each link form it gives; a GitLab file path that looks like one stays GitLab.
+  assert.equal(hostOf('https://wiki.acme.test/confluence/spaces/DS/pages/100/Intent'), 'confluence');
+  assert.equal(hostOf('https://wiki.acme.test/confluence/display/DS/Intent+layer'), 'confluence');
+  assert.equal(hostOf('https://git.acme.test/design/docs/-/tree/main/spaces/DS/pages/100'), 'gitlab');
+});
+
+test('Confluence links: the site\'s own path is where its API is; a /display/ link names its page by space and title', async () => {
+  const { parseConfluence } = await import('../lib/doc-tools.mjs');
+  assert.deepEqual(parseConfluence('https://wiki.acme.test/confluence/spaces/DS/pages/100/Intent'), { origin: 'https://wiki.acme.test', base: 'https://wiki.acme.test/confluence', host: 'wiki.acme.test', id: '100', named: null });
+  assert.equal(parseConfluence('https://wiki.acme.test/confluence/pages/viewpage.action?pageId=100').base, 'https://wiki.acme.test/confluence');
+  assert.equal(parseConfluence('https://acme.atlassian.net/wiki/spaces/DS/pages/100/Intent').base, 'https://acme.atlassian.net/wiki');
+  assert.deepEqual(parseConfluence('https://wiki.acme.test/display/DS/Intent+layer').named, { space: 'DS', title: 'Intent layer' });
+  assert.equal(parseConfluence('https://wiki.acme.test/design/display/intent'), null);
+});
+
+test('Confluence, a real public site read with no sign-in: the page found by its title, sub-pages walked when the quick call fails', async () => {
+  // Recorded from a real Data Center site (test/fixtures/confluence-public): its descendant call answered 500 for
+  // every page, and a /display/ link names no id.
+  const rec = JSON.parse(readFileSync(new URL('./fixtures/confluence-public/answers.json', import.meta.url), 'utf8'));
+  const link = 'https://cwiki.apache.org/confluence/display/AIRAVATA/Style+Guide';
+  const calls = [];
+  const fetchImpl = async (url, o = {}) => {
+    calls.push({ url, headers: o.headers });
+    const u = new URL(url); const a = rec.answers.find((x) => x.get === `${u.pathname}${u.search}`);
+    return a ? json(a.json, a.status) : json({}, 404);
+  };
+  const dir = makeFixture({});
+  const r = await syncIntentLayer(dir, { intentLayer: link }, { fetchImpl, env: {} });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(calls.map((c) => new URL(c.url).pathname), ['/confluence/rest/api/content', '/confluence/rest/api/content/177048405/descendant/page', '/confluence/rest/api/content/177048405/child/page']);
+  assert.ok(calls.every((c) => !c.headers.Authorization), 'no token set, none sent');
+  const page = readIntentLayer(dir, { intentLayer: link }).entities[0];
+  assert.equal(page.url, 'https://cwiki.apache.org/confluence/spaces/AIRAVATA/pages/177048405/Style+Guide');
+});
+
+test('Confluence: a page that needs a sign-in says how to give one; sub-pages walked a level at a time, in folders; links keep their words', async () => {
+  const { storageToMarkdown } = await import('../lib/doc-tools.mjs');
+  assert.equal(storageToMarkdown('<p>See also <ac:link><ri:page ri:content-title="Spacing" /></ac:link> and <ac:link><ri:page ri:content-title="Type" /><ac:plain-text-link-body><![CDATA[the type scale]]></ac:plain-text-link-body></ac:link>.</p>'), 'See also Spacing and the type scale.');
+  const link = 'https://wiki.acme.test/confluence/spaces/DS/pages/100/Intent';
+  const closed = await syncIntentLayer(makeFixture({}), { intentLayer: link }, { fetchImpl: async () => json({}, 401), env: {} });
+  assert.match(closed.error, /did not let this run read the page without signing in \(401\): put CONFLUENCE_TOKEN in \.env by hand \(never in the chat\)/);
+  const kids = { 100: [{ id: '101', title: 'Components' }], 101: [{ id: '102', title: 'Button Main', body: { storage: { value: '<h2>When not to use</h2><ul><li>For navigation.</li></ul>' } } }], 102: [] };
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    if (/\/content\/100$/.test(u.pathname)) return json({ id: '100', title: 'Intent layer', version: { number: 1 }, body: { storage: { value: '<p>Read first.</p>' } } });
+    if (/descendant/.test(u.pathname)) return json({}, 500);
+    const at = /content\/(\d+)\/child/.exec(u.pathname)?.[1];
+    return json({ results: (kids[at] ?? []).map((x) => ({ version: { number: 1 }, body: { storage: { value: '<p>x</p>' } }, ...x })) });
+  };
+  const dir = makeFixture({ '.env': 'CONFLUENCE_TOKEN=pat0\n' });
+  const r = await syncIntentLayer(dir, { intentLayer: link }, { fetchImpl });
+  assert.equal(r.ok, true, r.error);
+  const b = readIntentLayer(dir, { intentLayer: link }).entities.find((e) => e.name === 'Button Main');
+  assert.equal(b.layer, 'components');
+  assert.deepEqual(b.whenNotToUse, ['For navigation.']);
 });
 
 test('GitHub Enterprise: a host named in GITHUB_HOST, read through its own API, files through its contents; the token only to it', async () => {
