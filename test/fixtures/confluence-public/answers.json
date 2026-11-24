@@ -1,0 +1,52 @@
+{
+  "_about": "Real answers from a public Confluence Data Center site (the Apache Software Foundation wiki, cwiki.apache.org), read with no sign-in on 23 November 2026, for the link https://cwiki.apache.org/confluence/display/AIRAVATA/Style+Guide. Trimmed to the fields the reader uses: who edited each version, and the error reference, are taken out. The project's name in the page text is put generically (\"the project\"); the page is an Apache Software Foundation project's, under the Apache License 2.0.",
+  "answers": [
+    {
+      "get": "/confluence/rest/api/content?spaceKey=AIRAVATA&title=Style%20Guide&type=page&expand=version,body.storage",
+      "status": 200,
+      "json": {
+        "results": [
+          {
+            "id": "177048405",
+            "type": "page",
+            "title": "Style Guide",
+            "version": {
+              "when": "2021-03-26T13:06:00.000Z",
+              "number": 1
+            },
+            "body": {
+              "storage": {
+                "value": "<p>To keep the code uniform across all of the project's codebases, it is important to follow style guides and code organizations.  This page is a list of all style guides as applicable to the project. </p><h2>Language-specific style guides</h2><ol><li>Protocol Buffers Interface definitions - <a style=\"\" href=\"https://developers.google.com/protocol-buffers/docs/style\">https://developers.google.com/protocol-buffers/docs/style</a> </li><li>Java - <a href=\"https://google.github.io/styleguide/javaguide.html\">https://google.github.io/styleguide/javaguide.html</a> </li><li>Python - <a href=\"https://google.github.io/styleguide/pyguide.html\">https://google.github.io/styleguide/pyguide.html</a> </li><li>Ansible - <a href=\"https://docs.ansible.com/ansible/latest/dev_guide/style_guide/index.html\">https://docs.ansible.com/ansible/latest/dev_guide/style_guide/index.html</a> </li><li>Vue.js - <a href=\"https://vuejs.org/v2/style-guide/\">https://vuejs.org/v2/style-guide/</a></li><li>HTML, CSS - <a href=\"https://google.github.io/styleguide/htmlcssguide.html\">https://google.github.io/styleguide/htmlcssguide.html</a></li></ol><p><br /></p><ac:structured-macro ac:name=\"info\" ac:schema-version=\"1\" ac:macro-id=\"2f7d483c-d709-4239-9a9a-a2f7bc4f82b2\"><ac:rich-text-body>Developers: If you rather prefer to follow a different convention, please suggest alternatives. </ac:rich-text-body></ac:structured-macro><p class=\"auto-cursor-target\"><br /></p>",
+                "representation": "storage"
+              }
+            },
+            "_links": {
+              "webui": "/spaces/AIRAVATA/pages/177048405/Style+Guide"
+            }
+          }
+        ],
+        "start": 0,
+        "limit": 25,
+        "size": 1
+      }
+    },
+    {
+      "get": "/confluence/rest/api/content/177048405/descendant/page?limit=50&start=0&expand=version,ancestors,body.storage",
+      "status": 500,
+      "json": {
+        "statusCode": 500,
+        "reason": "Internal Server Error"
+      }
+    },
+    {
+      "get": "/confluence/rest/api/content/177048405/child/page?limit=50&start=0&expand=version,body.storage",
+      "status": 200,
+      "json": {
+        "results": [],
+        "start": 0,
+        "limit": 50,
+        "size": 0
+      }
+    }
+  ]
+}

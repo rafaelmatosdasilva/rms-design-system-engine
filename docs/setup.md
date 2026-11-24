@@ -548,7 +548,7 @@ A refusal used to say only that something failed, and one status code has severa
 | GitHub | Read access to the repository (Contents: Read) | github.com → Settings → Developer settings → Personal access tokens |
 | GitLab | The `read_api` scope | your GitLab → Preferences → Access tokens |
 | Notion | Read content, **and the page shared with the integration** | notion.so/profile/integrations → your integration → Capabilities |
-| Confluence | Read permission for the space | id.atlassian.com → Security → API tokens |
+| Confluence | Read permission for the space. None for a site anyone can read: the page is asked for with no sign-in first | id.atlassian.com → Security → API tokens (Atlassian's cloud, with your email); your Confluence → Profile → Personal access tokens (a site you host) |
 
 Three things look alike and are not, so each is said apart:
 
