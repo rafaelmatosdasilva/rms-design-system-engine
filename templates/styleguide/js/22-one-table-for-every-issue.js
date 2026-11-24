@@ -93,7 +93,7 @@
   // was checked, what to do and what was found read in full in its panel (the owner's choice, 11 November 2026);
   // Documentation's table is its task, kind, status and when it was checked, what is written and what to do read in
   // its panel.
-  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['todo', 'figma', 'code'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
+  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['todo', 'figma', 'code'], Documentation: ['written', 'todo'], Motion: ['code', 'figma'] };   // Motion: five columns, as most tables have, the timings in the panel (the owner's, 24 November 2026)   // the rest: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row

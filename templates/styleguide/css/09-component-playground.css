@@ -230,7 +230,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept, so nothing m
    what the others leave. With nothing left over, every share grows by the same factor, so the table stays balanced. */
 .sg-issues .sg-col-no { width: 7%; }
 .sg-issues .sg-col-kind { width: 18%; }
-.sg-issues--motion .sg-col-kind { width: 26%; }   /* what happens: when it plays, what moves and on which part */
+.sg-issues--motion .sg-col-kind { width: 30%; }   /* what happens: when it plays, what moves and on which part, as wide as what to do */
 .sg-issues :is(.sg-col-figma, .sg-col-code) { width: 20%; }
 .sg-issues .sg-col-whoCell { width: 20%; }
 .sg-issues .sg-col-source { width: 16%; }

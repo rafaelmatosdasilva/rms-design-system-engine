@@ -325,6 +325,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-23-guide-cost-on-six-more-criteria` | The 25 guide tasks on Haiku (engine 071bcc9d) | "The route hands a recipe's steps, measured with six more criteria and prototypes in every browser" |
 | `2026-11-24-accessibility-check-finishes-on-a-large-system` | The 25 guide tasks on Haiku (engine dce96008) | "The accessibility check finishes on a large system" |
 | `2026-11-24-the-tokens-page-saves-dtcg` | The 25 guide tasks on Haiku (engine 857c85d) | "Token downloads: DTCG, Tokens Studio modes, WordPress" |
-| `2026-11-24-the-changes-made-in-figma` | The 25 guide tasks on Haiku (engine b2ac5380) | "The changes made in Figma are read in History, not on a page of their own" |
+| `2026-11-24-what-a-motion-token-is-for` | The 25 guide tasks on Haiku (engine 1c5f8027) | "What a motion token is for, checked against each component's size, and a five-column Motion table" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

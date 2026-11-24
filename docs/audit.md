@@ -537,7 +537,9 @@ A shadcn/ui system is read as its own kind of React, from its `components.json`:
 
 #### Lit, Angular, Svelte and Web Components
 
-A component written as a class is read the way a Vue or React one is, into the same props, slots and events.
+A component written as a class is read the way a Vue or React one is, into the same props, slots and events. This is
+the engine's one reading of a component, not the lint's own: what it finds here is what parity, the accessibility
+check, the style guide, the playground, Code Connect drafts, contracts and stories all work from.
 
 - **Known by its imports.** A class that extends `LitElement`, or carries `@Component` from `@angular/core`, is a component, whatever its file is called. A spec or a story file is never one. An Angular service is not either.
 - **Named by its file.** `acme-button.ts` is `acme-button`, and `badge.component.ts` is `badge`. An Angular app's root component (`app.ts`, `app.component.ts`) is the app, never one of its system's components.
@@ -728,6 +730,11 @@ A collection whose values change with a mode (a sizing collection per breakpoint
   - **Named by the component, the motion and the part.** For example `modal/open/backdrop/duration` and `modal/open/card/delay`, with `motion/` or any other prefix before them. The motion is `open` or `close`.
   - **Its reduced form.** The same names under `reduced` (`modal/open/reduced/card/duration`). A part the reduced form leaves out, or gives `0ms`, must stop under `prefers-reduced-motion`, and one it still moves must not.
   - **Matched to the code by name.** A part is the component's class with the part's name (`.modal-card`). The part that starts first is the component's own element, when no class names it.
+- **What a motion token is for.** A duration or a curve can say which size of change it is for, and a component that moves with one meant for another size is named.
+  - **Written where the token comes from.** A token from Figma says it in its own description (`@for small`, `@for medium` or `@for large`). A token only the code has says it on the intent layer's motion page, beside its name (`--duration-fast` … `@for small`).
+  - **A component's size is its box in Figma.** Up to 100 by 100 is small, up to 200 by 200 medium, anything larger large.
+  - **Where it shows.** On the motion page, under For the system, and as a task for the code in the component's Motion area: "button is large (320 by 130 in Figma) and moves with `--motion-quick`, which is for small changes."
+  - **Nothing written, nothing said.** A token with no `@for`, or a component with no box in Figma, is never checked.
 
 ### In the browser
 

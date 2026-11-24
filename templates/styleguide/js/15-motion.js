@@ -28,8 +28,13 @@
     var varRows = (DATA.systemTodo || []).filter(function (t) { return t.component === c.name && t.kind === 'Motion variables'; }).map(function (t) {
       return { key: c.name + '\u0000motion:variables', area: 'Motion', kind: 'Variables', kindHTML: esc('Motion variables'), code: '<code>' + esc((t.vars || []).join(', ')) + '</code>', figma: '<span class="pg-par-none">None</span>', todo: esc(t.todo), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 };
     });
+    // A token it moves with that is for another size than its own (the token's @for, beside its box in Figma): one task,
+    // for the code.
+    var purposeRows = (DATA.systemTodo || []).filter(function (t) { return t.component === c.name && t.kind === 'Motion purpose'; }).map(function (t) {
+      return { key: c.name + '\u0000motion:purpose', area: 'Motion', kind: 'Purpose', kindHTML: esc('Token for another size'), code: esc(t.say), figma: '<span class="pg-par-none">' + esc('Its size, from its box') + '</span>', todo: esc(t.todo), who: WHO.code, st: 'todo', rel: PAR_REL.differs, at: DATA.builtAt || null };
+    });
     var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
-    return varRows.concat((c.moves || []).map(function (r) {
+    return varRows.concat(purposeRows).concat((c.moves || []).map(function (r) {
       var anim = /^(Repeats|Opens|Closes)$/.test(r.when) ? 'an animation' : 'a transition';
       var todo = r.status === 'differs' || r.status === 'code-none' ? motionTodo(r.status, { ms: r.figma.ms, easing: r.figma.easing, from: r.figma.from, anim: anim })
         : r.status === 'figma-none' ? motionTodo('figma-none', { what: r.what, ms: r.code.ms, easing: r.code.easing }) : '';
@@ -73,6 +78,10 @@
       var out = r.alsoTimed.map(function (a) { return capital(PURPOSE_WORD[a.purpose] || a.purpose.toLowerCase()) + ' has ' + a.timings + ' timings: choose one for every component.'; });
       if (r.shared > 1) out.push('Shared by ' + r.shared + ' components' + (r.values ? ': make it one token.' : '.'));
       else if (r.values) out.push('Written as values: make it a token.');
+      // A token used by a component of another size than it is for (its @for): one line a token, with those components.
+      var off = {};
+      (r.outside || []).forEach(function (o) { (off[o.var] = off[o.var] || { size: o.size, comps: [] }).comps.push(o.component + ' (' + o.is + ')'); });
+      Object.keys(off).forEach(function (v) { out.push(v + ' is for ' + off[v].size + ' changes, and ' + off[v].comps.join(', ') + (off[v].comps.length === 1 ? ' moves' : ' move') + ' with it: use the token for ' + (off[v].comps.length === 1 ? 'its' : 'their') + ' size.'); });
       return out.join(' ');
     };
     var moTokens = function () { if (tkFoundation) tkFoundation(mo, 'motion'); };
