@@ -306,6 +306,16 @@ test('what a run already found is printed again with --summary, never a new run 
   assert.deepEqual(r('build the chip like last time').run, ['rms-design-system-engine --component chip']);
 });
 
+test('the tokens as a WordPress theme\'s files, with the theme\'s folder when the request names one; a question about it, or a saved theme, is not that', () => {
+  for (const q of ['export the tokens to WordPress', 'sync our theme.json with Figma', 'give me a WordPress theme.json from Figma', 'exporta os tokens para o WordPress']) {
+    assert.deepEqual([r(q).recipe, r(q).run], ['ask-the-system', ['rms-design-system-engine --wordpress']], q);
+  }
+  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run, ['rms-design-system-engine --wordpress ../acme-theme']);
+  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run, ['rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"'], 'quoted, and the engine reads the ~ as the home');
+  assert.notDeepEqual(r('how does the WordPress export work?').run, ['rms-design-system-engine --wordpress']);
+  assert.notDeepEqual(r('save dark.theme.json to the themes store').run?.[0], 'rms-design-system-engine --wordpress');
+});
+
 test('Code Connect files drafted from the contracts, for the components that have none; a check of the ones there, or how to write one, is not that', () => {
   for (const q of ['draft the Code Connect files', 'write Code Connect files for the components that have none', 'cria os rascunhos de code connect']) {
     assert.deepEqual([r(q).recipe, r(q).run], ['ask-the-system', ['rms-design-system-engine --code-connect-draft']], q);

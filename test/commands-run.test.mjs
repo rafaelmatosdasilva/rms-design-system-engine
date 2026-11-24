@@ -52,7 +52,7 @@ const COMMANDS = [
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
   '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots', '--lessons',
-  '--outputs',
+  '--outputs', '--wordpress',
 ];
 
 // A home of their own: --update links the /rms-design-system-engine command in ~/.claude/commands, and run with the
