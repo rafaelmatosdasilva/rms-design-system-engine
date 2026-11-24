@@ -72,15 +72,18 @@ test('a badge may fall behind for a few days before it is worth an issue, not we
 });
 
 test('the README reads both badges from the branch, and nothing in it is drawn by an outside renderer', () => {
-  assert.equal(readme.includes('img.shields.io'), false, 'an outside renderer is the one thing GitHub proxies');
   for (const file of [TESTS, SCORECARD]) {
     assert.ok(readme.includes(`/rms-design-system-engine/${BRANCH}/${file}`), `the README shows ${file}`);
   }
   // raw.githubusercontent.com is served as it is; every other host is fetched through GitHub's proxy, which is what
-  // broke the badges in the first place.
+  // broke the badges in the first place. The host is read from the parsed address rather than looked for inside the
+  // string: a host only has meaning where the URL says it is, and naming the one host allowed covers every outside
+  // renderer at once, not whichever one happened to break.
   const images = [...readme.matchAll(/<img[^>]+src="([^"]+)"/g)].map((m) => m[1]);
-  assert.ok(images.length > 0);
+  assert.ok(images.length > 0, 'the README\'s images are read');
   for (const src of images) {
-    assert.match(src, /^https:\/\/raw\.githubusercontent\.com\//, `${src} would be fetched through the proxy`);
+    // A relative address resolves against github.com and fails here, as it should: it would be proxied too.
+    assert.equal(new URL(src, 'https://github.com/').host, 'raw.githubusercontent.com',
+      `${src} would be fetched through the proxy`);
   }
 });
