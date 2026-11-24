@@ -44,6 +44,11 @@ test('every recipe follows the template', () => {
   }
 });
 
+test('every recipe\'s own part stays small: the route hands it with every request of its kind', async () => {
+  const { recipeHead, MAX_RECIPE } = await import('../lib/route.mjs');
+  for (const f of RECIPES) { const { head } = recipeHead(read(f)); assert.ok(head.length <= MAX_RECIPE, `${f}: its steps are ${head.length} characters, over ${MAX_RECIPE}: move reference after its recipe-check`); }
+});
+
 test('the main file stays small: it is loaded on every run', () => {
   assert.ok(Buffer.byteLength(main) <= 30 * 1024, `${MAIN} is ${Buffer.byteLength(main)} bytes, over 30 KB: move task steps to a recipe`);
 });

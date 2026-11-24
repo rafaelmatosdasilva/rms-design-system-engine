@@ -320,5 +320,8 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-23-tasks-routed-by-cause-and-sequences` | The 25 guide tasks on Haiku (engine ca14b005) | "Tasks routed by each difference's cause, motion sequences, and three more criteria in every browser" |
 | `2026-11-23-six-more-criteria-and-prototypes-in-every-browser` | The 25 guide tasks on Haiku (engine 4b18b974) | "Six more criteria and the drawn prototypes in Firefox and WebKit" |
 | `2026-11-23-the-whole-library-built-from` | The 25 guide tasks on Haiku (engine 8587d93) | "The whole library built from its written description, in Figma and in code" |
+| `2026-11-23-route-hands-recipe-steps` | The 25 guide tasks on Haiku (engine 5288ebe7) | "The route hands a recipe's own steps, and the main guide keeps what every request needs" |
+| `2026-11-23-engine-idea-search-follows-links` | The 25 guide tasks on Haiku (engine 559b7cb8) | "An idea for the engine is searched for with grep, which follows a linked install" |
+| `2026-11-23-guide-cost-on-six-more-criteria` | The 25 guide tasks on Haiku (engine 071bcc9d) | "The route hands a recipe's steps, measured with six more criteria and prototypes in every browser" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
