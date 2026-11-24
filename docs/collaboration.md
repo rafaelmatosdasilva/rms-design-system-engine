@@ -129,7 +129,7 @@ What every page shares:
 - **Every panel in one order.** What to do comes first, with See in Figma or See in code when it has one. Then what it changes or where (the components, the places), then its Status, then the rest: who acts, why, where it was read and when it was last checked. A panel says each date once.
 - **What to do is the action only.** It says what to do, each name or value in it a pill. What was found is in Why, or is the value inside the action.
 - **Every panel has its own link.** A rule's, a task's, a documentation row's, a change in Figma's and a token's: copy the address and it opens again.
-- **Changes in Figma say what to do.** A change waiting to be made, or made but not as said, opens on what to do in Figma, with See in Figma.
+- **Changes in Figma say what to do.** In History, a change waiting to be made, or made but not as said, opens on what to do in Figma, with See in Figma.
 - **A token's naming rule says the new name.** A token whose parts are out of the system's order (its state, its size, its kind's word) is listed with the whole name it takes, beside the name it has. The rule's title is one short sentence. Its panel says, under What to do, where most names put each part, with one of your own names that does.
 
 ### Status
@@ -210,7 +210,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
 | Requests | The Requests page's own table, filtered to what teams ask for that names this component, with the same chips, each row opening the same panel. Shown only when a request names it |
-| History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it, its changes in Figma and code not committed yet |
+| History | The History page's own table, filtered to the changes that affect this component: each code commit (its issues and release), each Figma change and comment, each intent layer commit, each contract change and each decision, with who did it and when. The same columns, chips and sorting. Under it, when Figma was last read for it and code not committed yet |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 
