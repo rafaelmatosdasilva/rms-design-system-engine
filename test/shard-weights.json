@@ -271,6 +271,7 @@
   "no-semicolons.test.mjs": 0,
   "no-testbed-names.test.mjs": 118.3,
   "not-a-composition.test.mjs": 60.1,
+  "not-run.test.mjs": 0.1,
   "notion-fetch.test.mjs": 0,
   "one-implementation.test.mjs": 0.1,
   "only.test.mjs": 9.5,

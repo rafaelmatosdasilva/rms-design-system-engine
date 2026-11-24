@@ -57,6 +57,18 @@ test('--prototype <page>: the page checked against the system, and never a stack
   assert.match(out, /^(✅|✓|❌)/m, 'it says where the page stands');
 });
 
+// The sections the browser measures used to leave the report altogether when the browser did not run, and a report
+// with no 📱 section reads as a page that fits at every width. Measured once already, where a copy with no
+// `node_modules` skipped every width check silently and the run read as clean.
+test('--prototype <page> --no-browser: every section the browser measures says it did not run, and why', { timeout: budget(300000) }, () => {
+  const dir = project();
+  const out = (() => { const r = run(dir, '--prototype', 'prototypes/SignIn.jsx', '--no-browser'); return `${r.stdout}${r.stderr}`; })();
+  assert.match(out, /⏭ {2}📱 EVERY SIZE {2}Not run: the browser was not asked for \(--no-browser\)/, out.slice(-1500));
+  assert.match(out, /⏭ {2}🖱 {2}HOW IT WORKS {2}Not run: the browser was not asked for \(--no-browser\)/, out.slice(-1500));
+  // The mistake this stops: the reassuring line of a check that never ran.
+  assert.doesNotMatch(out, /nothing runs past the screen/, 'a width check that did not run never says the page fits');
+});
+
 test('--prototype <page> --comment: what a person said is kept with the page, and read back on the next run', { timeout: budget(300000) }, () => {
   const dir = project();
   // The flag whose command line was the one not in scope: it took the whole command down before anything was read.
