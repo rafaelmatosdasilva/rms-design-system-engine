@@ -308,12 +308,14 @@ test('what a run already found is printed again with --summary, never a new run 
 
 test('the tokens as a WordPress theme\'s files, with the theme\'s folder when the request names one; a question about it, or a saved theme, is not that', () => {
   for (const q of ['export the tokens to WordPress', 'sync our theme.json with Figma', 'give me a WordPress theme.json from Figma', 'exporta os tokens para o WordPress']) {
-    assert.deepEqual([r(q).recipe, r(q).run], ['ask-the-system', ['rms-design-system-engine --wordpress']], q);
+    assert.deepEqual([r(q).recipe, r(q).run], ['refresh-figma', ['rms-design-system-engine --refresh-figma', 'rms-design-system-engine --wordpress']], q);
   }
-  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run, ['rms-design-system-engine --wordpress ../acme-theme']);
-  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run, ['rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"'], 'quoted, and the engine reads the ~ as the home');
-  assert.notDeepEqual(r('how does the WordPress export work?').run, ['rms-design-system-engine --wordpress']);
-  assert.notDeepEqual(r('save dark.theme.json to the themes store').run?.[0], 'rms-design-system-engine --wordpress');
+  assert.match(r('export the tokens to WordPress').notes.join(' '), /only its variables/, 'Figma read again first, its variables alone');
+  assert.match(r('export the tokens to WordPress').say.join(' '), /The WordPress theme uses the committed snapshots/, 'with no Figma tool here, the person hears the theme comes from the last capture');
+  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run.at(-1), 'rms-design-system-engine --wordpress ../acme-theme');
+  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run.at(-1), 'rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"', 'quoted, and the engine reads the ~ as the home');
+  assert.ok(!r('how does the WordPress export work?').run.some((c) => c.includes('--wordpress')));
+  assert.ok(!(r('save dark.theme.json to the themes store').run ?? []).some((c) => c.includes('--wordpress')));
 });
 
 test('Code Connect files drafted from the contracts, for the components that have none; a check of the ones there, or how to write one, is not that', () => {
