@@ -268,7 +268,8 @@ node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet
   its problem.
 
 Any change to the guide files needs a fresh evaluation run before it is merged. `test/guide-structure.test.mjs`
-keeps the split whole (index, recipe template, a 30 KB cap on the main file, no paragraph in two files, every
+keeps the split whole (index, recipe template, the main file kept to 18,000 characters, under the 19,899 a Claude
+Code compaction keeps of it, so every rule in it survives a long session, no paragraph in two files, every
 pointer resolves, every recipe-check command runs on the demo).
 
 ### Rendered assertions per mode

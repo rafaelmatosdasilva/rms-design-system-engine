@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The main guide is held inside what a compaction keeps (continuous evaluation)
+
+What changed since the entry below (engine b570a62f): The contracts as a WordPress theme: the button, link and headings styled by the system, only what theme.json can say (#717); The main guide is held inside what a compaction keeps, measured at 19,899 characters. The guide changed in `reference/maintainers.md`.
+
+Guide set measured: `1eca9ce8c6f1` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 23f08edc` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 79f6bf29` `reference/gates.md a8e75b2a` `reference/maintainers.md 79fed046` `reference/personality.md 851bd4e2` `reference/usage.md 7aaee936` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine f59f9c73 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.049 | 0.048 |
+| Input a run | 78k | 77k |
+| Turns a run | 3.1 | 3.1 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 77k a run against 78k, in 3.1 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-24-guide-inside-compaction`.
+
 ## 2026-11: The contracts as a WordPress theme: the button, link and headings styled by the system, only what theme.json can say (continuous evaluation)
 
 What changed since the entry below (engine 599fbbaf): The WordPress theme says when Figma was read; Asking for the tokens in WordPress reads Figma first; A Firefox page is waited for by asking it, and a step that meets a process move runs again on the same tab (#714); A WordPress theme asked for with no Figma asks for the Figma link first; A suite run red only because a job never got a machine is run again, once (#715); A token or a theme key named __proto__ reaches no prototype; The custom merge's guard said the way the code scanner reads one; The contracts as a WordPress theme: the button, link and headings styled by the system, only what theme.json can say; The tokens as a WordPress theme from Figma, every mode carried, and a patch for the theme (#713); The reports say the WordPress view, as they say the DSDS and specs views. The guide changed in `reference/config.md`, `reference/usage.md`.
