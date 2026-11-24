@@ -252,7 +252,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-11-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine db66ce8) | "A component's examples are read, with main merged in" |
 | `2026-11-11-the-code-grammar-s-test` | The 24 guide tasks on Haiku (engine 8f8f3b6) | "The code grammar's test makes its folder through tempDir" |
 | `2026-11-11-the-theme-editor-in-every-style-guide` | The 20 guide tasks on Haiku (engine 46ed658) | "The theme editor in every style guide: new themes of the system, made over a live screen" |
-| `2026-11-11-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 047ba3c) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into styleguide/source-cards-one-row" |
+| `2026-11-11-merge-branch-main-of-https-2` | The 24 guide tasks on Haiku (engine 047ba3c) | "The changes made in Figma are read in History, not on a page of their own" |
 | `2026-11-11-merge-origin-main-into-figma` | The 24 guide tasks on Haiku (engine 106e4e9) | "Each Figma part read in the code, and four checks of a component's words" |
 | `2026-11-11-merge-origin-main-into-figma-2` | The 24 guide tasks on Haiku (engine bd8cd70) | "Each Figma part read in the code, and four checks of a component's words, on the code's construction rules" |
 | `2026-11-12-figma-s-anatomy-against-the` | The 24 guide tasks on Haiku (engine 922ee07) | "Figma's anatomy held against the code's" |
@@ -261,7 +261,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-12-two-severities-for-the-construction` | The 24 guide tasks on Haiku (engine fd52a2f) | "Two severities for the construction check, and the same as data" |
 | `2026-11-12-merge-main-the-batch-is` | The 24 guide tasks on Haiku (engine df790fa) | "Pages and flows: orientation, more than one way, a flow walked; media fixtures; forced colours apart from AA" |
 | `2026-11-12-merge-origin-main-into-parity` | The 24 guide tasks on Haiku (engine 0029a14) | "Figma's anatomy held against the code's, on the latest main" |
-| `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "Merge branch 'main' of https://github.com/rafaelmatosdasilva/rms-design-system-engine into code/content-and-ci" |
+| `2026-11-12-merge-branch-main-of-https` | The 24 guide tasks on Haiku (engine 0ebb6b5) | "The changes made in Figma are read in History, not on a page of their own" |
 | `2026-11-12-code-into-figma` | The 24 guide tasks on Haiku (engine 84f012d) | "Code into Figma, templates as frames and code from a spec" |
 | `2026-11-12-layout-faults` | The 24 guide tasks on Haiku (engine 3f231b9) | "Layout faults, construction check annotations and the skill file" |
 | `2026-11-12-code-into-figma-on-main` | The 24 guide tasks on Haiku (engine 44b2c48) | "Code into Figma, on main with the layout faults" |
@@ -326,5 +326,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-24-accessibility-check-finishes-on-a-large-system` | The 25 guide tasks on Haiku (engine dce96008) | "The accessibility check finishes on a large system" |
 | `2026-11-24-the-tokens-page-saves-dtcg` | The 25 guide tasks on Haiku (engine 857c85d) | "Token downloads: DTCG, Tokens Studio modes, WordPress" |
 | `2026-11-24-what-a-motion-token-is-for` | The 25 guide tasks on Haiku (engine 1c5f8027) | "What a motion token is for, checked against each component's size, and a five-column Motion table" |
+| `2026-11-24-the-changes-made-in-figma` | The 25 guide tasks on Haiku (engine ca33340d) | "The changes made in Figma are read in History, not on a page of their own" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
