@@ -42,11 +42,20 @@ test('where each family comes from: the machine, the system\'s @font-face, else 
 
 test('a prototype draws at once wherever its fonts are: installed, served, failing or never answering', { skip: CHROME ? false : 'no Chrome available', timeout: budget(90000) }, async () => {
   let have = 'DejaVu Sans';   // a font the machine has, found below
-  const server = createServer((req, res) => {
-    if (req.url.startsWith('/hang')) return;   // a network that never answers
-    if (req.url.startsWith('/fail')) { res.writeHead(400); return res.end(); }   // not one of Google's fonts
+  // Each answer is held until the test lets it go: a page that waited for its font could not draw before then, so
+  // drawing while the request is still unanswered is what proves the page did not wait, on a machine at any load. A
+  // clock could not say it: a busy machine takes as long to open the page as the wait itself.
+  const held = new Map();   // path -> the request still unanswered
+  const answer = (path) => { const res = held.get(path); held.delete(path); if (!res) return;
+    if (path === 'fail') { res.writeHead(400); return res.end(); }   // not one of Google's fonts
     res.writeHead(200, { 'content-type': 'text/css', 'access-control-allow-origin': '*' });
     res.end(`@font-face { font-family: "Pt Probe Sans"; src: local("${have}"); }`);
+  };
+  const server = createServer((req, res) => {
+    const path = req.url.slice(1).split(/[/?]/)[0];
+    if (path === 'hang') return;   // a network that never answers
+    if (path === 'probe') { held.set(path, res); return answer(path); }
+    held.set(path, res);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -63,10 +72,9 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
   try {
     const ev = async (sessionId, e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
     const open = async (url) => {
-      const started = Date.now();
       const { sessionId } = await openPage(send, url);
       assert.ok(await waitForTrue(send, sessionId, `${FILE_PAGE_LOADED} && !!document.querySelector('[data-pt-path="0"]')`, { attempts: 200 }), 'the page draws');
-      return { sessionId, drewIn: Date.now() - started };
+      return { sessionId };
     };
     // A font installed on the machine: never asked of the network. Whichever of these this machine has.
     const probe = await open(page('probe', 'Pt Probe Sans'));
@@ -81,15 +89,16 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
     assert.deepEqual(await ev(shipped.sessionId, FONTS_IN), { 'Pt Probe Sans': 'system' });
     // Any other is asked of Google Fonts, and the page does not wait: served, refused, or never answered.
     for (const [path, end] of [['ok', 'google'], ['fail', 'missing'], ['hang', 'loading']]) {
-      const { sessionId, drewIn } = await open(page(path, 'Pt Probe Sans'));
-      // Under the engine's own font wait (FONTS_IN races a 3s timer), because that is what the assertion is about:
-      // a page that waited for the font cannot have drawn in less than the wait. A plain number was 2000, which is
-      // how long a page takes to open on a machine running the rest of the suite, not how long waiting takes.
-      assert.ok(drewIn < 3000, `${path}: drawn in ${drewIn}ms, which is the font wait or longer: it waited`);
+      const { sessionId } = await open(page(path, 'Pt Probe Sans'));
+      // Drawn while its font is still unanswered: it did not wait. (hang is never answered at all.)
+      if (path !== 'hang') assert.ok(held.has(path), `${path}: the page drew before its font was answered`);
       assert.equal(await ev(sessionId, `getComputedStyle(document.querySelector('[data-pt-path="0"]')).fontFamily`), '"Pt Probe Sans", ui-sans-serif, sans-serif', 'the system\'s stack behind it meanwhile');
-      const waited = Date.now();
-      assert.deepEqual(await ev(sessionId, FONTS_IN), { 'Pt Probe Sans': end });
-      assert.ok(Date.now() - waited < 4000, `${path}: the picture waits 3s at most`);
+      answer(path);
+      // The picture waits for the font 3s at most, measured on the page's own clock, which the test's opening and
+      // the machine's other work do not add to.
+      const [fonts, waited] = await ev(sessionId, `(async () => { const t = performance.now(); const v = await ${FONTS_IN}; return [v, performance.now() - t]; })()`);
+      assert.deepEqual(fonts, { 'Pt Probe Sans': end });
+      assert.ok(waited < 4000, `${path}: the picture waited ${Math.round(waited)}ms, 3s at most`);
       assert.equal(await ev(sessionId, `(() => { const n = document.getElementById('pt-font-note'); return n.hidden ? '' : n.textContent; })()`), path === 'fail' ? 'Pt Probe Sans is not installed here and could not be loaded: set in the system\'s fallback fonts' : '');
     }
   } finally { close(); chrome.kill(); server.close(); }
