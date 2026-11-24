@@ -113,6 +113,17 @@ The test tools under `test/` are watched the same way, with one grouped pull req
 
 The privacy check reads Dependabot's release notes like any other text. A package quoted at its version (`pinia@4.1.0`) is not an address there, since a domain ends in letters and a version in a number. An address beside one is still found.
 
+### When a job never got a machine
+
+A run can go red with every test passing: a job waits for a GitHub machine that never comes and is cancelled before
+its first step, and the job that adds up the results counts that as a failure. On 24 November 2026 that took main,
+and the README's tests badge, red for the macOS Playwright job alone.
+
+- `.github/workflows/rerun-unstarted.yml` reads each failed run of the suite (`lib/unstarted.mjs`).
+- When every job that ran passed, and the only red is a job with no step run, the failed jobs run again, once.
+- A job that ran and failed is a result, and is never run again here. A run that still gets no machine on its second
+  attempt stays red, and the main-red watcher above counts it.
+
 ## Coding standards
 
 The engine's code follows ESLint's recommended rules for JavaScript, and `test/lint.test.mjs` runs ESLint over `lib/`, the root entries and the git hooks on every test run, so a change that breaks them fails the suite. ESLint is a test tool in `test/.lint-tools`, as TypeScript is in `test/.ci-tools`: the engine itself still has no dependency.
