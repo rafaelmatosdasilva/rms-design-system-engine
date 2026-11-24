@@ -225,6 +225,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Publishes the contracts to a shared repository.
 - Writes the whole system in the DSDS format for teams that document their system that way: components, tokens and themes, the patterns and foundations of your pages, and the rules they share, in the DSDS version your pages use.
 - Writes the contracts in the open component specs format too: each component's parts, props, slots and the tokens each part uses.
+- Writes your tokens as a WordPress theme: a `theme.json` whose presets the editor offers, a style variation for each other look, and a patch that brings your theme in line.
 - Records each breaking change as a release of the system, so products know what moved.
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
@@ -236,6 +237,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
 | `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
+| `/rms-design-system-engine export the tokens to our WordPress theme` | Figma's variables read again, then a `theme.json` and a style variation per mode, with no control center built, and a patch for your theme's own files when you name its folder |
 
 ## Maintain usage guidelines
 

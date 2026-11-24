@@ -132,10 +132,39 @@ The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C De
 |---|---|
 | DTCG | Every token of Figma's variables, at its Figma name's path. An alias is the reference to its token. Every mode of its collection, its collection, what it styles and its name in the code are under `$extensions` (`com.rms.design-system-engine`). A word or a yes or no, which DTCG has no type for, keeps its value with no `$type`. |
 | Tokens Studio | A set per collection. A collection with modes has its first mode in its own set, a set per other mode with only what differs in it (`Theme/Dark`), and a theme per mode that turns them on. |
-| WordPress | A `theme.json` (version 3): colours in the palette, font sizes, font families and spacing as presets, each named by the code's variable when there is one. A radius, a border, a duration and every other token go under `settings.custom`. `theme.json` has no modes, so each token's first mode is written. |
+| WordPress | A `theme.json` (version 3): colours, font sizes, font families, spacing, radii and shadows as presets, each named by the code's variable when there is one. A border, a duration and every other token go under `settings.custom`. A font size with a value per screen width is fluid. The other looks (Dark) are style variations, which the [WordPress command](#the-tokens-in-a-wordpress-theme) writes beside it. |
 
 - **Two tokens at one name.** A token where another one's group already is (or the same name in two collections) cannot be in one file. It is left out of the downloads, and each button's hint names it.
 - **Watched like the other standards.** Its version is pinned in `lib/dtcg.mjs`. A newer one moves the writer through a pull request.
+
+### The tokens in a WordPress theme
+
+`rms-design-system-engine --wordpress` writes your tokens as a WordPress theme's files, straight from the Figma snapshot. No control center has to be built. It uses the same dictionary as the Tokens page's downloads, so both give the same answer.
+
+- **Asked in Claude Code, Figma is read first.** "Export the tokens to WordPress" reads Figma's variables again (only those), then makes the theme. When Figma cannot be read in that session, you are told, and the theme comes from the last capture.
+- **Figma is needed.** The theme is made from Figma's variables. In a project not set up yet, setup asks for the Figma link as needed, not optional, and makes the theme right after. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
+- **The command alone reads the capture.** `--wordpress` uses the Figma variables the engine last captured, and the run says their date. After a change in Figma, read it again first (`--refresh-figma`), or run a full audit, which does both when `wordpress.theme` is set.
+
+What it writes, in `.design-system-engine-out/wordpress/`:
+
+| File | What it holds |
+|---|---|
+| `theme.json` | Each token's first mode. Colours, font sizes, font families, spacing, radii and shadows are presets the block editor offers by name. Everything else goes under `settings.custom`, as `--wp--custom--…` variables. Each preset's slug is the code's own variable when there is one. |
+| `styles/<mode>.json` | A style variation for each other mode a site switches to: Dark, High contrast, a second brand. It holds only what differs in that mode. A list it holds (the palette) is whole, because a variation's list replaces the theme's. The Site Editor offers each one under Styles. |
+
+How modes are carried:
+
+- **A look is a style variation.** Light and Dark, or two brands, are modes a site switches between, so each other mode gets a file of its own.
+- **A screen width is fluid.** Modes named for screens (Phone, Tablet, Desktop, or a number of pixels) are one value growing with the screen. A font size gets `fluid` from its narrowest screen's value to its widest's, so WordPress scales it between them. Every other font size says `fluid: false`, since turning fluid on would scale them all.
+- **What no file carries is counted.** A spacing with a value per screen has no fluid form in `theme.json`, so the first screen's value is written and the run says how many there are.
+- **Radii need WordPress 6.9.** That is the version that added radius presets (`settings.border.radiusSizes`).
+
+Your theme is never changed. Give the command the theme's folder, or set `wordpress.theme` in `ds-config.json` (see [the configuration](../reference/config.md)), and it compares the theme's own `theme.json` and `styles/` with these files:
+
+- **A patch to apply.** `.design-system-engine-out/wordpress/theme.diff` brings the theme in line. Apply it in the theme's folder with `git apply`.
+- **Everything else is kept.** Styles, templates, layout, a font's files and the names the theme gave its presets stay as they are. The theme's own indent and line ends are kept too, so the patch holds only what changed.
+- **What only the theme has stays.** A preset Figma does not have is kept and named in the run's lines, for a person to add to Figma or remove.
+- **Every audit checks it.** With `wordpress.theme` set, every audit writes the files and the patch again. A theme in line with Figma gets no patch.
 
 ### The whole system in DSDS too
 

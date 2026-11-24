@@ -306,6 +306,32 @@ test('what a run already found is printed again with --summary, never a new run 
   assert.deepEqual(r('build the chip like last time').run, ['rms-design-system-engine --component chip']);
 });
 
+test('the tokens as a WordPress theme\'s files, with the theme\'s folder when the request names one; a question about it, or a saved theme, is not that', () => {
+  for (const q of ['export the tokens to WordPress', 'sync our theme.json with Figma', 'give me a WordPress theme.json from Figma', 'exporta os tokens para o WordPress']) {
+    assert.deepEqual([r(q).recipe, r(q).run], ['refresh-figma', ['rms-design-system-engine --refresh-figma', 'rms-design-system-engine --wordpress']], q);
+  }
+  assert.match(r('export the tokens to WordPress').notes.join(' '), /only its variables/, 'Figma read again first, its variables alone');
+  assert.match(r('export the tokens to WordPress').say.join(' '), /The WordPress theme uses the committed snapshots/, 'with no Figma tool here, the person hears the theme comes from the last capture');
+  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run.at(-1), 'rms-design-system-engine --wordpress ../acme-theme');
+  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run.at(-1), 'rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"', 'quoted, and the engine reads the ~ as the home');
+  assert.ok(!r('how does the WordPress export work?').run.some((c) => c.includes('--wordpress')));
+  // Nothing set up yet: setup first, the Figma link asked as needed (the theme is made from Figma's variables), the request after.
+  const fresh = r('export the tokens to WordPress', { ...P, hasConfig: false });
+  assert.equal(fresh.recipe, 'first-setup');
+  assert.match(fresh.ask, /Figma file \(needed here: the WordPress theme is made from Figma's variables/);
+  assert.doesNotMatch(fresh.ask, /optional: without it only the code is checked/);
+  assert.match(fresh.run[0], /--then='export the tokens to WordPress'/);
+  assert.match(r('check the button', { ...P, hasConfig: false }).ask, /optional: without it only the code is checked/, 'any other request keeps Figma optional');
+  // Set up from its code alone: the link is asked before anything runs, and only the Figma file changes.
+  const codeOnly = r('export the tokens to WordPress', { ...P, noFigma: true });
+  assert.deepEqual(codeOnly.run, ["rms-design-system-engine --init --figma-url='<the Figma link>'", 'rms-design-system-engine --refresh-figma', 'rms-design-system-engine --wordpress']);
+  assert.match(codeOnly.ask, /needed: the WordPress theme is made from Figma's variables, and this project was set up without one/);
+  const given = r('export the tokens to WordPress from https://www.figma.com/design/AbC123/Acme', { ...P, noFigma: true });
+  assert.equal(given.run[0], "rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Acme'");
+  assert.equal(given.ask, undefined, 'the link given is not asked again');
+  assert.ok(!(r('save dark.theme.json to the themes store').run ?? []).some((c) => c.includes('--wordpress')));
+});
+
 test('Code Connect files drafted from the contracts, for the components that have none; a check of the ones there, or how to write one, is not that', () => {
   for (const q of ['draft the Code Connect files', 'write Code Connect files for the components that have none', 'cria os rascunhos de code connect']) {
     assert.deepEqual([r(q).recipe, r(q).run], ['ask-the-system', ['rms-design-system-engine --code-connect-draft']], q);

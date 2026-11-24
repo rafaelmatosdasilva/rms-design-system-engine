@@ -3,7 +3,7 @@
 // below is invented.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { styleDictionary, tokensStudio, studioType, leaves, withOtherModes, exportLines, fromVariables, wordpressTheme, resolveValue, modesOf, NS } from '../lib/token-exports.mjs';
+import { styleDictionary, tokensStudio, studioType, leaves, withOtherModes, exportLines, fromVariables, wordpressTheme, wordpressFiles, mergeTheme, screenModes, resolveValue, modesOf, NS } from '../lib/token-exports.mjs';
 
 const DICT = {
   $description: 'Design-system tokens (W3C DTCG). Auto-generated — do not edit by hand.',
@@ -140,7 +140,7 @@ test('Tokens Studio from Figma\'s variables: a set per collection, a theme per m
 // WordPress's presets are closed lists: what has no home in them goes under settings.custom, never dropped.
 test('WordPress theme.json: the presets it has, the rest under custom, the code\'s names as slugs, values resolved', () => {
   const { tokens } = fromVariables(VARS);
-  const { theme, modes } = wordpressTheme(tokens, { name: 'Acme DS' });
+  const { theme, modes, fluid } = wordpressTheme(tokens, { name: 'Acme DS' });
   assert.equal(theme.$schema, 'https://schemas.wp.org/trunk/theme.json');
   assert.equal(theme.version, 3);
   assert.equal(theme.title, 'Acme DS');
@@ -148,11 +148,87 @@ test('WordPress theme.json: the presets it has, the rest under custom, the code\
   assert.deepEqual(palette.find((p) => p.slug === 'brand-fill'), { slug: 'brand-fill', color: '#2b5cff', name: 'brand fill' }, 'its reference read to the colour, the code\'s name its slug');
   assert.ok(palette.some((p) => p.slug === 'surface-base' && p.color === '#ffffff'), 'no code name: its path');
   assert.deepEqual(theme.settings.spacing.spacingSizes, [{ slug: 'spacing-gap-s', size: '4px', name: 'spacing gap s' }]);
-  assert.deepEqual(theme.settings.typography.fontSizes, [{ slug: 'type-body-size', size: '14px', name: 'type body size' }], 'the first mode');
+  assert.deepEqual(theme.settings.border.radiusSizes, [{ slug: 'corner-radius-m', size: '8px', name: 'corner radius m' }], 'a radius is a preset the editor offers (WordPress 6.9)');
   assert.deepEqual(theme.settings.typography.fontFamilies, [{ slug: 'type-family-sans', fontFamily: 'Acme Sans', name: 'type family sans' }]);
-  assert.equal(theme.settings.custom.corner.radius.m, '8px', 'a radius has no preset: custom');
+  assert.equal(theme.settings.custom.corner, undefined, 'a radius is no longer under custom');
   assert.equal(theme.settings.custom.motion.fast.duration, '200ms');
   assert.equal(theme.settings.custom.type.body.weight, 600);
-  assert.equal(modes, 3, 'theme.json has no modes: how many tokens had another is said');
+  assert.equal(fluid, 1);
+  assert.equal(modes, 2, 'what this one file does not carry is said: the two tokens with a Dark value');
   assert.equal(theme.settings.color.defaultPalette, undefined, 'nothing the system does not say, such as turning WordPress\'s own palette off');
+});
+
+test('WordPress: a font size whose modes are screen widths is fluid, from the narrowest to the widest, and the rest say they are not', () => {
+  const { tokens } = fromVariables([...VARS, { figma: 'type/caption/size', var: null, type: 'typography', collection: 'Size', modes: ['Value'], values: ['12px'] }]);
+  const { theme } = wordpressTheme(tokens);
+  assert.equal(theme.settings.typography.fluid, true);
+  assert.deepEqual(theme.settings.typography.fontSizes, [
+    { slug: 'type-body-size', size: '16px', name: 'type body size', fluid: { min: '14px', max: '16px' } },
+    { slug: 'type-caption-size', size: '12px', name: 'type caption size', fluid: false },
+  ], 'fluid on scales every size that does not say otherwise');
+  assert.deepEqual(screenModes(tokens.type.body.size), ['Phone', 'Desktop']);
+  assert.deepEqual(screenModes({ $value: 1, $extensions: { [NS]: { modes: { '1440': 2, '375': 1 } } } }), ['375', '1440'], 'pixels, narrowest first');
+  assert.equal(screenModes(tokens.brand.fill), null, 'Light and Dark are looks, not screens');
+});
+
+test('WordPress: each other mode a site switches to is a style variation, holding what differs in it, whole lists', () => {
+  const { tokens } = fromVariables([...VARS, { figma: 'brand/line', var: null, type: 'colour', collection: 'Brand', modes: ['Acme', 'Bolt'], values: ['#000000', '#ff0000'] }]);
+  const { theme, variations, fluid, left } = wordpressFiles(tokens, { name: 'Acme DS' });
+  assert.equal(theme.title, 'Acme DS');
+  assert.deepEqual(variations.map((v) => [v.file, v.mode, v.theme.title]), [['styles/dark.json', 'Dark', 'Dark'], ['styles/bolt.json', 'Bolt', 'Bolt']], 'a variation per other mode, of every collection; screens are none');
+  const dark = variations[0].theme;
+  assert.equal(dark.version, 3);
+  const palette = dark.settings.color.palette;
+  assert.equal(palette.length, theme.settings.color.palette.length, 'the whole palette, since a variation\'s list replaces the theme\'s');
+  assert.equal(palette.find((p) => p.slug === 'brand-fill').color, '#88a9ff', 'its reference read in that mode');
+  assert.equal(palette.find((p) => p.slug === 'blue-500').color, '#2b5cff', 'a token with one value keeps it');
+  assert.equal(dark.settings.spacing, undefined, 'what does not differ is not there');
+  assert.deepEqual(dark.settings.custom, { card: { shadow: { display: false } } }, 'custom holds only what differs, since it is merged key by key');
+  assert.equal(variations[1].theme.settings.color.palette.find((p) => p.slug === 'brand-line').color, '#ff0000');
+  assert.deepEqual([fluid, left], [1, 0]);
+});
+
+test('WordPress: a theme\'s own theme.json takes the system\'s presets and keeps everything else it has', () => {
+  const { theme: ours } = wordpressTheme(fromVariables(VARS).tokens);
+  const theirs = {
+    $schema: 'https://schemas.wp.org/trunk/theme.json', version: 3, title: 'Their theme',
+    settings: { appearanceTools: true, layout: { contentSize: '720px' },
+      color: { palette: [{ slug: 'brand-fill', color: '#000000', name: 'Brand' }, { slug: 'only-ours', color: '#ff00ff', name: 'Only the theme' }] },
+      typography: { fontFamilies: [{ slug: 'type-family-sans', fontFamily: 'Old Sans', name: 'Sans', fontFace: [{ fontFamily: 'Acme Sans', src: ['file:./fonts/acme.woff2'] }] }], fontSizes: [{ slug: 'huge', size: '48px', name: 'Huge' }] },
+      custom: { theirs: 'kept', motion: { fast: { duration: '100ms' } } } },
+    styles: { color: { background: 'var(--wp--preset--color--only-ours)' } },
+  };
+  const before = structuredClone(theirs);
+  const m = mergeTheme(theirs, ours);
+  assert.deepEqual(theirs, before, 'nothing is changed in place');
+  const t = m.theme;
+  assert.equal(t.title, 'Their theme');
+  assert.deepEqual([t.settings.appearanceTools, t.settings.layout, t.styles], [true, { contentSize: '720px' }, theirs.styles], 'what the system does not own is left as it is');
+  assert.deepEqual(t.settings.color.palette[0], { slug: 'brand-fill', color: '#2b5cff', name: 'Brand' }, 'the value is the system\'s, the name the theme gave it stays');
+  assert.equal(t.settings.color.palette[1].slug, 'only-ours', 'a preset only the theme has stays where it was');
+  assert.deepEqual(t.settings.typography.fontFamilies[0].fontFace, theirs.settings.typography.fontFamilies[0].fontFace, 'a font\'s files are kept');
+  assert.equal(t.settings.typography.fontFamilies[0].fontFamily, 'Acme Sans');
+  assert.deepEqual(t.settings.typography.fontSizes.find((f) => f.slug === 'huge'), { slug: 'huge', size: '48px', name: 'Huge', fluid: false }, 'with fluid turned on, the theme\'s own size keeps its size');
+  assert.equal(t.settings.typography.fluid, true);
+  assert.deepEqual([t.settings.custom.theirs, t.settings.custom.motion.fast.duration], ['kept', '200ms']);
+  assert.ok(m.changed.includes('palette brand-fill') && m.changed.includes('custom motion.fast.duration'));
+  assert.ok(m.added.includes('radiusSizes corner-radius-m'));
+  assert.deepEqual(m.onlyTheirs, ['palette only-ours', 'fontSizes huge']);
+  const fresh = mergeTheme(null, { ...ours, title: 'Acme DS' });
+  assert.deepEqual([fresh.theme.$schema, fresh.theme.version, fresh.theme.title], ['https://schemas.wp.org/trunk/theme.json', 3, 'Acme DS'], 'no theme.json yet: the system\'s whole');
+});
+
+test('WordPress: a key that would reach a prototype, from Figma or from the theme, is never written', () => {
+  const ours = { settings: { custom: JSON.parse('{"__proto__": {"polluted": "yes"}, "constructor": {"prototype": {"x": 1}}, "ok": {"toString": "1px"}}') } };
+  const theirs = JSON.parse('{"settings": {"custom": {"__proto__": {"polluted": "theirs"}}}}');
+  const m = mergeTheme(theirs, ours);
+  assert.equal(({}).polluted, undefined, 'Object.prototype is untouched');
+  assert.equal(Object.getPrototypeOf(m.theme.settings.custom), Object.prototype, 'the custom object keeps its own prototype');
+  assert.deepEqual(m.theme.settings.custom.ok, { toString: '1px' }, 'a key the prototype has is still a key of its own');
+  assert.ok(m.added.includes('custom ok.toString'));
+  const made = fromVariables([{ figma: '__proto__/polluted', var: null, type: 'number', collection: 'X', modes: ['Value'], values: ['1'] }, { figma: 'toString', var: null, type: 'number', collection: 'X', modes: ['Value'], values: ['2'] }]);
+  assert.equal(({}).polluted, undefined, 'a Figma variable named __proto__/x reaches no prototype');
+  assert.deepEqual(made.dropped, ['__proto__/polluted'], 'it is named, as every token that cannot be written is');
+  assert.equal(made.tokens.toString.$value, 2, 'a name the prototype has is a token like any other');
+  assert.equal(wordpressTheme(made.tokens).theme.settings.custom.toString, 2);
 });
