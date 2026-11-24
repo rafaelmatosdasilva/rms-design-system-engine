@@ -65,3 +65,42 @@ test('the hooks keep it: a prompt, a UI edit checked, the end of the turn', () =
   const r = spawnSync(process.execPath, [join(HERE, '..', 'audit.mjs'), '--generations'], { cwd: root, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
   assert.match(r.stdout, /1 request · /);
 });
+
+test('three rounds on one file answered the same way hand the finding to the person, with what each round tried', async () => {
+  const { stuckOn, handOffText, STUCK } = await import('../lib/generation-cost.mjs');
+  const root = tempDir('gen-stuck-');
+  startRequest(root, { session: 's', prompt: 'a chip with a custom colour' });
+  const f = (t) => [{ text: t }];
+  let h = noteRound(root, { session: 's', found: f('#2d8659 is not a colour the system has'), file: 'src/Chip.vue', added: ['color: #2d8659;'] });
+  assert.equal(stuckOn(h), null);
+  h = noteRound(root, { session: 's', found: f('#2d8659 is not a colour the system has'), file: 'src/Chip.vue', added: ['color: #2d8658;'] });
+  assert.equal(stuckOn(h), null, 'two rounds is still a fix in progress');
+  // Another file's round is that file's own.
+  assert.equal(stuckOn(noteRound(root, { session: 's', found: f('x'), file: 'src/Other.vue' })), null);
+  h = noteRound(root, { session: 's', found: f('#2d8659 is not a colour the system has'), file: 'src/Chip.vue', added: ['--chip-bg: #2d8659;'] });
+  const st = stuckOn(h);
+  assert.equal(STUCK, 3);
+  assert.deepEqual(st.findings, ['#2d8659 is not a colour the system has']);
+  assert.equal(st.attempts.length, 3);
+  const text = handOffText('src/Chip.vue', st);
+  assert.match(text, /checked src\/Chip\.vue 3 times in a row, and each time it found the same/);
+  assert.match(text, /round 3: --chip-bg: #2d8659;/);
+  assert.match(text, /Hand it to the person: say each finding, what you tried in each round and what the check answered/);
+  assert.match(text, /Never change the code only to make the check pass/);
+  // A round whose findings changed is progress, and starts the count again; a passing round is no loop.
+  assert.equal(stuckOn(noteRound(root, { session: 's', found: f('something else'), file: 'src/Chip.vue' })), null);
+  assert.equal(stuckOn([{ said: [] }, { said: [] }, { said: [] }]), null);
+});
+
+test('the hook says the hand-off, not "fix it", on the third round the check answers the same way', () => {
+  const root = makeFixture({ 'ds-config.json': {}, 'src/theme.css': ':root{--brand:#0a84ff}' });
+  const guard = (event) => spawnSync(process.execPath, [join(HERE, '..', 'lib', 'guard.mjs')], { input: JSON.stringify({ cwd: root, session_id: 'sy', ...event }), encoding: 'utf8' });
+  guard({ hook_event_name: 'UserPromptSubmit', prompt: 'a chip' });
+  const file = join(root, 'src', 'Chip.css');
+  const edit = (css) => { writeFileSync(file, css); return guard({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: file, content: css } }).stdout; };
+  assert.match(edit('.chip{color:#2d8659}'), /checked this edit/);
+  edit('.chip{color:#2d8659 }');
+  const third = edit('.chip{ color:#2d8659}');
+  assert.match(third, /3 times in a row/, third);
+  assert.doesNotMatch(third, /Fix them in this file now|Fix it in this file now/);
+});
