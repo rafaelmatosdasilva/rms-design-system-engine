@@ -274,14 +274,18 @@ test('a step still running past its limit is stopped with all it started, and th
 
 test('the accessibility check stops a browser copy that runs past its limit, says what it was on, and leaves its parts', () => {
   const src = readFileSync(join(ENGINE, 'lib', 'a11y-check.mjs'), 'utf8');
-  // Its limit: its share, inside what is left of the run's own time less a margin (at most two minutes, never more
-  // than a quarter of the limit), given to it so it stops itself and keeps what it checked; stopped from outside only
-  // two minutes past it.
+  // Its limit: what is left of the run's own time less a margin (at most two minutes, never more than a quarter of the
+  // limit): the copies run side by side, so each has the run's whole time, given to it so it stops itself and keeps
+  // what it checked; stopped from outside only two minutes past it. A share alone stopped every copy a part short.
   assert.match(src, /const MARGIN_COPIES = Math\.min\(120, Math\.floor\(RUN_LIMIT_SEC \/ 4\)\)/, 'a margin that never spends a short limit');
-  assert.match(src, /const own = Math\.min\(RUN_LIMIT_SEC - \(Date\.now\(\) - RUN_BEGAN\) \/ 1000 - MARGIN_COPIES, Number\(cfg\.a11y\?\.timeoutSec\) \|\| Math\.min\(LIMIT_CAP_SEC, Math\.max\(150, Math\.ceil\(open\.reduce\(\(s, t\) => s \+ share\(t\), 0\) \/ n\)\)\)\);/, 'its limit: its share, inside the run\'s');
-  assert.match(src, /const wait = copyLimit \+ 120;/, 'two minutes past it');
-  assert.match(src, /'--time-limit', String\(copyLimit\)/, 'given to the copy as its own');
+  assert.match(src, /const left = \(\) => RUN_LIMIT_SEC - \(Date\.now\(\) - RUN_BEGAN\) \/ 1000 - MARGIN_COPIES;/, 'inside the run\'s');
+  assert.match(src, /const own = Math\.min\(left\(\), Number\(cfg\.a11y\?\.timeoutSec\) \|\| LIMIT_CAP_SEC\);/, 'the run\'s whole time');
+  assert.match(src, /wait = limit \+ 120;/, 'two minutes past it');
+  assert.match(src, /'--time-limit', String\(limit\)/, 'given to the copy as its own');
   assert.match(src, /stdio: \['ignore', fd, fd\], detached: true \}\);/, 'what it prints kept, its browsers in its own group');
-  assert.match(src, /setTimeout\(\(\) => \{ stopped\.push\(\{ i, said \}\); try \{ process\.kill\(-child\.pid, 'SIGKILL'\); \}/);
-  assert.match(src, /was still checking after \$\{wait\}s: stopped, with every browser it started\. It was on: \$\{lastSaid\(x\.said\)\}\. Its parts are left for the page's own check\./);
+  assert.match(src, /setTimeout\(\(\) => \{ stopped\.push\(\{ name, said, wait \}\); try \{ process\.kill\(-child\.pid, 'SIGKILL'\); \}/);
+  assert.match(src, /was still checking after \$\{x\.wait\}s: stopped, with every browser it started\. It was on: \$\{lastSaid\(x\.said\)\}\./);
+  // What a copy did not finish waits for the next run, and the page the system's build draws has a copy of its own.
+  assert.match(src, /if \(!t\.kept && t\.sig\) t\.later = true;/);
+  assert.match(src, /'--built', JSON\.stringify\(built\)/);
 });

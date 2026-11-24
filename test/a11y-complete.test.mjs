@@ -263,10 +263,13 @@ test('out of time: what the pages it finished found is kept, the page it was on 
     // reserve it keeps back, and never goes below a floor of its own. So the number it reports is read from what it
     // says rather than assumed here: asserting the number asked for made this test fail whenever the two differed,
     // which is every budget below the reserve.
-    writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ a11y: { timeoutSec: 30 * TIME_SCALE } }, null, 2));
+    // One browser (a11y.parallel 1): this is the run's own stop. Pages shared out among copies are each stopped by their
+    // copy, and what one did not finish waits for the next run (auto-build.test.mjs).
+    writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ a11y: { timeoutSec: 30 * TIME_SCALE, parallel: 1 } }, null, 2));
 
     const out = await check([...['first.html', ...slow].flatMap((f) => ['--url', url(f)]), '--json-out', join(dir, 'a11y.json')]);
-    const done = out.match(new RegExp(`stopped after (\\d+)s, with (\\d+) of ${pageCount} page\\(s\\) checked: what they found is kept`));
+    // The stop names the page it was on, and how far into it: read past it, since which page depends on the computer.
+    const done = out.match(new RegExp(`stopped after (\\d+)s, with (\\d+) of ${pageCount} page\\(s\\) checked(?:, on .*?(?: with \\d+ of its checks done|, before its checks began))?: what they found is kept`));
     assert.ok(done, out);
     const secs = Number(done[1]);
     const d = JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8'));
