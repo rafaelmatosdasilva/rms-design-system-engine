@@ -452,6 +452,7 @@ look at, **how to look at it**, and keeps the answer only while it is still true
 - **A run stays inside its time.** The browsers that share the parts, and then the run itself, each stop on their own before `a11y.timeoutSec` runs out. What they checked is kept, so the next run goes on from there.
 - **Each page gets time for each component it draws.** That holds for a part of the style guide, and for the page your own build draws with every component in each variant. On a large system that page used to get one page's time, so it was stopped halfway on every run, even a run of one component.
 - **Your build's page is checked beside the parts.** It gets a browser of its own and its own time, while the parts are shared out. Your build is started once, never once per browser.
+- **Firefox and WebKit take the time that is left.** Their pass reloads the page for each component in each browser, so on a large guide it may not reach every component in one run. It starts none past the run's time, keeps what an earlier run found for the rest, and the next run tries those first.
 - **A stopped run says where it was.** It names the page it was on and how many of that page's checks were done, so a slow system is told apart from a stuck check.
 - **A check of a few components opens only their parts.** `--component` no longer goes through the whole guide to reach them.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
