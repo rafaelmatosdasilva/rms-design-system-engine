@@ -232,3 +232,14 @@ test('WordPress: a key that would reach a prototype, from Figma or from the them
   assert.equal(made.tokens.toString.$value, 2, 'a name the prototype has is a token like any other');
   assert.equal(wordpressTheme(made.tokens).theme.settings.custom.toString, 2);
 });
+
+test('WordPress: a theme\'s own styles keep what the system does not write, and take what it does', () => {
+  const theirs = { version: 3, styles: { color: { background: '#fff' }, elements: { button: { color: { background: '#000' }, shadow: 'none', ':hover': { color: { background: '#111' } } }, link: { typography: { textDecoration: 'none' } } } } };
+  const ours = { styles: { elements: { button: { color: { background: 'var:preset|color|button-bg' }, border: { radius: 'var:preset|border-radius|radii-button' } } } } };
+  const m = mergeTheme(theirs, ours);
+  assert.deepEqual(m.theme.styles.elements.button, { color: { background: 'var:preset|color|button-bg' }, shadow: 'none', ':hover': { color: { background: '#111' } }, border: { radius: 'var:preset|border-radius|radii-button' } });
+  assert.deepEqual([m.theme.styles.color, m.theme.styles.elements.link], [{ background: '#fff' }, { typography: { textDecoration: 'none' } }]);
+  assert.deepEqual([m.changed, m.added], [['styles elements.button.color'], ['styles elements.button.border']]);
+  const fresh = mergeTheme(null, { $schema: 'x', version: 3, title: 'Outline', slug: 'button-outline', blockTypes: ['core/button'], styles: { color: { text: 'red' } } });
+  assert.deepEqual([fresh.theme.slug, fresh.theme.blockTypes, fresh.theme.styles], ['button-outline', ['core/button'], { color: { text: 'red' } }], 'a new block style keeps what makes it one');
+});

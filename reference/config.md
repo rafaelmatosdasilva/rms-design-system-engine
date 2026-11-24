@@ -137,11 +137,12 @@ Once `ds-config.json` exists, extract:
   with a second mode puts it in a set of that mode's name, and a theme per mode turns them on. Style Dictionary's file
   has no place for a second mode, so a token with one keeps it in `tokens.json`, and the run says how many.
   The control center's Tokens page saves the same formats (DTCG, Tokens Studio, a WordPress `theme.json`) with no setting.
-- `wordpress.theme` *(optional)* - a WordPress theme's folder (or its `theme.json`). Every audit then writes the tokens as
-  that theme's files in `.design-system-engine-out/wordpress/` (`theme.json`, and `styles/<mode>.json` for each other mode)
-  and `theme.diff`, the patch that brings the theme's own files in line, for a person to `git apply` in that folder. The
-  theme is never changed. `--wordpress [<folder>]` does the same on its own (docs/documentation.md, The tokens in a
-  WordPress theme).
+- `wordpress.theme` *(optional)* - a WordPress theme's folder (or its `theme.json`). The contracts' WordPress view
+  (`contracts/wordpress/`: `theme.json` with the tokens as presets and the components as styles, `styles/<mode>.json` for
+  each other mode, `styles/blocks/<name>.json` for each other look of a button) is written on every run; with this set,
+  every audit also writes `theme.diff`, the patch that brings the theme's own files in line, for a person to `git apply`
+  in that folder. The theme is never changed. `--wordpress [<folder>]` does the same on its own (docs/documentation.md,
+  The whole system in a WordPress theme).
   - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
   - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is; setup sets it when the theme CSS does.
   - `aliases` - per-segment renames (`{ figmaSegment: cssSegment }`). `iconTextAlias` is shorthand for `{ iconText: "text" }`; use `aliases` for any other rename the DS needs.

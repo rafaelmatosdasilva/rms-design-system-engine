@@ -14,11 +14,11 @@ const DEMO = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'demo-ds'
 const project = () => { const dir = tempDir('wp-theme-'); cpSync(DEMO, dir, { recursive: true }); return { dir, cfg: JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')) }; };
 const json = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
-test('from the Figma snapshot alone: theme.json and a style variation per other mode, in the engine\'s own folder', async () => {
+test('from the Figma snapshot alone: theme.json and a style variation per other mode, in the contracts\' folder', async () => {
   const { dir, cfg } = project();
   const r = await writeWordpress(dir, cfg);
   assert.equal(r.error, undefined);
-  const out = join(dir, '.design-system-engine-out', 'wordpress');
+  const out = join(dir, 'contracts', 'wordpress');
   const theme = json(join(out, 'theme.json'));
   assert.equal(theme.version, 3);
   assert.ok(theme.settings.color.palette.length > 0);
@@ -30,7 +30,7 @@ test('from the Figma snapshot alone: theme.json and a style variation per other 
   assert.match(readFileSync(join(out, 'theme.json'), 'utf8'), /^\{\n\t"\$schema"/, 'tabs, as WordPress writes its own');
   assert.equal(r.patch, null, 'no theme named: no patch');
   const lines = wordpressLines(r).join('\n');
-  assert.match(lines, /🧩 WordPress theme → \.design-system-engine-out\/wordpress\/theme\.json: \d+ colours · \d+ spacings · \d+ radii/);
+  assert.match(lines, /🧩 WordPress theme → contracts\/wordpress\/theme\.json: \d+ colours · \d+ spacings · \d+ radii/);
   assert.match(lines, /1 style variation for the other modes: Dark \(styles\/dark\.json\)/);
   const captured = json(join(dir, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'))._updated;
   assert.match(lines, new RegExp(`From Figma as captured ${captured ? `on ${captured.slice(0, 10)}` : 'last'}`), 'the theme is made from the capture, and the run says when it was read');
@@ -54,7 +54,7 @@ test('with the theme\'s folder: a patch git applies there, the theme untouched, 
   const r = await writeWordpress(dir, { ...cfg, wordpress: { theme: 'wp-theme' } });
   assert.equal(readFileSync(join(folder, 'theme.json'), 'utf8'), text, 'nothing in the theme is changed');
   assert.equal(existsSync(join(folder, 'styles')), false);
-  assert.equal(r.patch, `.design-system-engine-out/wordpress/${PATCH_FILE}`);
+  assert.equal(r.patch, `contracts/wordpress/${PATCH_FILE}`);
   const tj = r.files.find((f) => f.file === 'theme.json');
   assert.ok(tj.changed.includes(`palette ${first.slug}`));
   assert.deepEqual(tj.onlyTheirs, ['palette theirs-only']);
@@ -85,7 +85,6 @@ test('nothing to make it from, and a theme folder that is not there, are said', 
   assert.match(codeOnly.error, /set up from its code alone, with no Figma file.*--init --figma-url/, 'a project with no Figma file is told what the theme needs');
   const gone = await writeWordpress(dir, cfg, { theme: 'no-such-theme' });
   assert.match(gone.error, /is not there/);
-  rmSync(join(dir, '.design-system-engine-out'), { recursive: true, force: true });
 });
 
 test('the theme\'s folder from the command or the config, and JSON written in the file\'s own way', () => {
@@ -117,4 +116,22 @@ test('a Figma variable named __proto__/x reaches no prototype in the contracts\'
   const r = await generateContracts(dir, cfg, {});
   assert.equal(({}).polluted, undefined);
   assert.ok(r.droppedTokens.includes('__proto__/polluted'), 'named among the tokens that could not be written');
+});
+
+test('with the contracts: the button as WordPress\'s button, every other button a style of the Button block, what has no place said', async () => {
+  const { dir, cfg } = project();
+  const { generateContracts } = await import('../lib/contract-gen.mjs');
+  const r = (await generateContracts(dir, cfg, {})).wordpress;
+  const theme = json(join(dir, 'contracts', 'wordpress', 'theme.json'));
+  const button = theme.styles.elements.button;
+  assert.match(button.spacing.padding.top, /^var:preset\|spacing\|/, 'its padding is the theme\'s own spacing preset');
+  assert.match(button.border.radius, /^var:preset\|border-radius\|/);
+  assert.ok(r.components.mapped.some((m) => m.component === 'button' && /button element/.test(m.as)));
+  for (const v of r.blocks) {
+    const file = json(join(dir, 'contracts', 'wordpress', v.file));
+    assert.deepEqual([file.version, file.blockTypes], [3, ['core/button']], 'a block style variation, as WordPress 6.6 reads one');
+  }
+  assert.ok(r.components.left.some((x) => x.component === 'field' && /no core block or element/.test(x.why)), 'a field has no place in theme.json, and it is said');
+  const lines = (await import('../lib/wordpress-theme.mjs')).auditLines(r, cfg).join('\n');
+  assert.match(lines, /^ℹ️ {2}WordPress view → contracts\/wordpress\/theme\.json: the tokens as its presets, \d+ components? as its styles/, 'one line when no theme is named');
 });
