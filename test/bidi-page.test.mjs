@@ -91,3 +91,20 @@ test('a page that never finishes loading is said, not waited on for ever', async
   await assert.rejects(bidiPage(ff.send, 'file:///page.html', { wait: { waitMs: 50, everyMs: 1 } }), /did not finish loading in Firefox/);
   assert.ok(ff.calls.some(([m]) => m === 'browsingContext.close'), 'its tab is closed');
 });
+
+// GitHub's Windows runners, 24 November 2026: a Firefox in which every new tab lost its context as it loaded.
+test('a Firefox that loses every tab is started again, and one that can hold none stops after its restarts', async () => {
+  const { firefoxPages } = await import('../lib/page-driver.mjs');
+  const LOST_FF = () => ({ send: async (m) => { if (m === 'browsingContext.create') return { context: 't' }; if (m === 'browsingContext.getTree') throw new Error(LOST); if (m === 'browsingContext.navigate') throw new Error(LOST); return {}; } });
+  const GOOD_FF = () => fakeFirefox().send;
+  let starts = 0, killed = 0;
+  const start = (bad) => async () => { starts++; return { b: { kill: () => { killed++; } }, bidi: { close: async () => {}, send: (bad(starts) ? LOST_FF() : { send: GOOD_FF() }).send } }; };
+  const ff = await firefoxPages(start((n) => n === 1), { restarts: 2 });
+  const page = await ff.page('file:///page.html', fast);
+  assert.equal(await page.evaluate('1'), 'on tab1', 'drawn in the second Firefox');
+  assert.equal(starts, 2); assert.equal(killed, 1, 'the lost Firefox is closed');
+  starts = 0;
+  const never = await firefoxPages(start(() => true), { restarts: 2 });
+  await assert.rejects(never.page('file:///page.html', fast), /DiscardedBrowsingContext/);
+  assert.equal(starts, 3, 'the first and two restarts, then it says so');
+});
