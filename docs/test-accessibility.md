@@ -50,6 +50,10 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **Your React, not an imitation of it.** React components are drawn with the React and the Vite your project has
   installed, so a component that keeps state, reads a context or renders through a portal behaves here as it does in
   your product. Without React installed, a smaller stand-in draws what it can and the run says what it left out.
+- **Your Lit, Angular or plain Web Component, too.** A component written as a class is drawn by your own Vite and
+  read where it really lives, through its shadow root. Each case is set the way its framework reads it: a property
+  for Lit, an input for Angular, and for a custom element written with no library, each watched attribute under its
+  own name, its class found by the tag it defines where it exports none.
 - **A part inside its parent.** A part written for its parent's context (an autocomplete's option, a list's item)
   throws or draws nothing on its own. When it does, it is drawn again inside the component its name says it belongs
   to (`ActionListItem` inside `ActionList`).
