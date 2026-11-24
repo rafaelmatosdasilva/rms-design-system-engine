@@ -31,6 +31,45 @@ test('Firefox and WebKit by default where they are here, the ones named, or none
   assert.deepEqual(prototypeBrowserList(found, { prototype: { browsers: [] } }), []);
 });
 
+// A browser whose tab the engine lost: openBrowser's own page throws what Firefox says when it drops a browsing
+// context. Each browser is given its go, and the count says how many of them lose the tab before one draws.
+const LOST = 'no such frame: DiscardedBrowsingContextError: BrowsingContext does no longer exist';
+function losingOpen(lose = {}) {
+  const tries = {};
+  return async (name) => {
+    tries[name] = (tries[name] ?? 0) + 1;
+    const lost = tries[name] <= (lose[name] ?? 0);
+    return {
+      label: name[0].toUpperCase() + name.slice(1),
+      page: async () => {
+        if (lost) throw new Error(LOST);
+        return {
+          evaluate: async (e) => (/__ptStates/.test(e) ? ['default'] : /data-pt-path/.test(e) ? true : []),
+          setViewport: async () => {},
+          close: async () => {},
+        };
+      },
+      close: async () => {},
+    };
+  };
+}
+const TWO = [{ name: 'chrome', path: '/c' }, { name: 'firefox', path: '/f' }];
+const WIDTHS = [{ name: 'tablet', px: 768 }];
+
+test('a browser that loses its tab is opened once more, and what the lost go wrote is not counted twice', async () => {
+  const run = await prototypeBrowsers({ url: 'file:///p.html', widths: WIDTHS, browsers: TWO, open: losingOpen({ firefox: 1 }) });
+  assert.deepEqual(run.refused, []);
+  assert.deepEqual(run.browsers.map((b) => b.label), ['Chrome', 'Firefox']);
+  assert.deepEqual(Object.keys(run.runs), ['Chrome', 'Firefox']);
+});
+
+test('a second loss is said, and that browser is left out rather than guessed at', async () => {
+  const run = await prototypeBrowsers({ url: 'file:///p.html', widths: WIDTHS, browsers: TWO, open: losingOpen({ firefox: 2 }) });
+  assert.deepEqual(run.refused, [`Firefox: ${LOST}`]);
+  assert.deepEqual(run.browsers.map((b) => b.label), ['Chrome']);
+  assert.deepEqual(Object.keys(run.runs), ['Chrome']);
+});
+
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><style>
   body { margin: 0; font: 16px/1.4 sans-serif; } .btn { display: inline-block; padding: 4px 8px; }
   @supports (-moz-appearance: none) { .ff { width: 40px; } }

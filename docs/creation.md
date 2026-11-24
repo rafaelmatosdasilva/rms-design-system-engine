@@ -271,6 +271,7 @@ The same widths, states and longer words are tried in Firefox, and in WebKit whe
 - **Only what differs is said.** A problem Chrome has is said once, above. One only another browser has gets a line of its own, with the browsers it happens in.
 - **A picture of each width.** Each browser keeps its own, in a folder named for it, so the style guide's pictures stay Chrome's.
 - **Which browsers.** `prototype.browsers` in `ds-config.json` names them, and `false` turns it off ([config](../reference/config.md)).
+- **A browser that loses its tab is given another go.** Firefox drops a tab now and then on a loaded machine. The browser is opened once more and the page drawn again, and only a second loss is said, with that browser left out rather than guessed at.
 
 ```
 📱 EVERY SIZE  Phone (375px), Tablet (768px), Desktop (1280px) · the words as written and 40% longer, all fit
