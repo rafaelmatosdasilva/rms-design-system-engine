@@ -223,7 +223,9 @@ test('--build-library on a system the engine wrote down: the Figma script, the c
   const { fixtureProject } = await import('./helpers.mjs');
   const ENGINE = join(import.meta.dirname, '..');
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'build-library-');
-  const cli = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  // Run as a person runs it: on CI the engine never writes the Figma script, since nobody is there to say yes.
+  const person = { ...process.env, NO_COLOR: '1' }; delete person.CI;
+  const cli = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: person });
   let r = cli('--build-library');
   assert.match(r.stdout, /Nothing to build from: no DSDS view/, 'none before the system is written down');
   cli('--contracts');
@@ -248,6 +250,9 @@ test('--build-library on a system the engine wrote down: the Figma script, the c
   assert.deepEqual(Object.keys(first.nodes).sort(), ['button', 'chip', 'field', 'tag']);
   const again = await run(script, figma);
   assert.deepEqual([again.made, again.changed], [[], []]);
+  // On CI, no script: nobody is watching the run to say yes.
+  const onCi = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--build-library'], { cwd: dir, encoding: 'utf8', env: { ...person, CI: '1' } });
+  assert.match(onCi.stdout, /does not let the engine write the design file \(on CI/);
   // Run again, the engine gives the same script and the same patch.
   cli('--build-library');
   assert.equal(readFileSync(join(dir, '.design-system-engine-out', 'handback', 'build-library.js'), 'utf8'), script);
