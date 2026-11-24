@@ -5,15 +5,15 @@ import { bidiPage } from '../lib/bidi.mjs';
 
 const LOST = 'no such frame: DiscardedBrowsingContextError: BrowsingContext does no longer exist';
 
-// A Firefox that drops the tab the first `drops` times a script runs, as Windows runners do now and then, and the
-// first `loadDrops` times a page is loaded into it.
-function fakeFirefox(drops, loadDrops = 0) {
+// A Firefox that drops the tab the first `drops` times a script runs, as Windows runners do now and then, and on the
+// loads named in `lostLoads` (1 is the first page load of all, 2 the next, and so on).
+function fakeFirefox(drops, lostLoads = []) {
   const calls = [];
-  let n = 0;
+  let n = 0, loads = 0;
   const send = async (method, params) => {
     calls.push([method, params]);
     if (method === 'browsingContext.create') return { context: `tab${++n}` };
-    if (method === 'browsingContext.navigate' && loadDrops-- > 0) throw new Error(LOST);
+    if (method === 'browsingContext.navigate' && lostLoads.includes(++loads)) throw new Error(LOST);
     if (method === 'script.evaluate') {
       if (drops-- > 0) throw new Error(LOST);
       return { type: 'success', result: { type: 'string', value: `on ${params.target.context}` } };
@@ -44,10 +44,20 @@ test('a second loss in one step is said, never tried a third time', async () => 
 // The go is each step's own. Counted once per page, the loss while the page loaded spent it and the step that met the
 // next loss had none, which failed checks on the Windows runners for a tab the engine could have opened again.
 test('a tab lost while the page loads costs the steps nothing: one that meets a loss later still gets its own go', async () => {
-  const ff = fakeFirefox(1, 1);
+  const ff = fakeFirefox(1, [1]);
   const page = await bidiPage(ff.send, 'file:///page.html');
   assert.equal(await page.evaluate('1'), 'on tab3', 'the step opened a tab of its own and ran again');
   assert.equal(ff.calls.filter(([m]) => m === 'browsingContext.create').length, 3, 'one at the open, one for the open it lost, one for the step');
+});
+
+// The reopen is an opening like any other, so it has the opening's own go. Without it the step's go went on a tab that
+// never finished loading and the loss was said anyway, which is how a third check met this on the Windows runners
+// after the go was made each step's own (engine #700).
+test('a reopen that loses its new tab while it loads opens another, and the step still comes through', async () => {
+  const ff = fakeFirefox(1, [2]);
+  const page = await bidiPage(ff.send, 'file:///page.html');
+  assert.equal(await page.evaluate('1'), 'on tab3', 'the reopen tried again rather than giving up the step');
+  assert.equal(ff.calls.filter(([m]) => m === 'browsingContext.create').length, 3, 'the open, the reopen it lost, and the reopen that held');
 });
 
 test('every step gets a go, not only the first: three steps each meeting one loss all come through', async () => {
