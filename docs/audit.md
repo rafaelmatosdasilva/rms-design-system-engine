@@ -801,7 +801,13 @@ What blocks a merge stays your own CI rule.
 ### The run's result in your team's chat
 
 A scheduled run finishes at night and only the person who looks finds out. Add `--notify` and it posts one line —
-what failed, what is open, where to read the whole of it, and a link to the job.
+what failed, what changed since the run before, what is open, where to read the whole of it, and a link to the job.
+
+- **What changed since the last run** comes first after the count: the checks that fail now and passed before
+  ("worse since the last run"), then the ones fixed, read from the project's parity history. An old failure is said
+  as old ("no check changed since the last run"), so a new one stands out.
+- **A style guide build** with `--notify` (`--styleguide --notify`) says when it ends: built or not, what the page
+  holds, whether its own check found a problem, and whether it went to the page your team opens.
 
 - Put the address in your CI's secrets as `DSE_CHAT_WEBHOOK`. It must be `https`.
 - It is read from there and nowhere else. Never `ds-config.json`, never a file, never printed, so a public repository

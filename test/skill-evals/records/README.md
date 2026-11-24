@@ -331,5 +331,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-24-the-style-guide-is-the` | The 25 guide tasks on Haiku (engine 4a0f6c2c) | "The style guide is the control center the page already called itself" |
 | `2026-11-24-the-rename-measured-82-82` | The 25 guide tasks on Haiku (engine 61b1c370) | "The rename measured: 82/82, and where a measurement has to run" |
 | `2026-11-24-the-rename-measured-82-82-2` | The 25 guide tasks on Haiku (engine 00f30f19) | "The rename measured: 82/82, and where a measurement has to run" |
+| `2026-11-24-chat-says-what-got-worse` | The 25 guide tasks on Haiku (engine d4fc6de1) | "The team's chat hears what got worse since the run before, and a spec says nothing is in Figma yet" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
