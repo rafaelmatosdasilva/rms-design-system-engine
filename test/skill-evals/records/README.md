@@ -332,5 +332,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-24-the-rename-measured-82-82` | The 25 guide tasks on Haiku (engine 61b1c370) | "The rename measured: 82/82, and where a measurement has to run" |
 | `2026-11-24-the-rename-measured-82-82-2` | The 25 guide tasks on Haiku (engine 00f30f19) | "The rename measured: 82/82, and where a measurement has to run" |
 | `2026-11-24-chat-says-what-got-worse` | The 25 guide tasks on Haiku (engine d4fc6de1) | "The team's chat hears what got worse since the run before, and a spec says nothing is in Figma yet" |
+| `2026-11-24-the-tokens-as-a-wordpress` | The 25 guide tasks on Haiku (engine 599fbbaf) | "The tokens as a WordPress theme from Figma, every mode carried, and a patch for the theme" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
