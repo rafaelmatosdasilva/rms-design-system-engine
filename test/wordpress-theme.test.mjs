@@ -31,6 +31,8 @@ test('from the Figma snapshot alone: theme.json and a style variation per other 
   const lines = wordpressLines(r).join('\n');
   assert.match(lines, /🧩 WordPress theme → \.design-system-engine-out\/wordpress\/theme\.json: \d+ colours · \d+ spacings · \d+ radii/);
   assert.match(lines, /1 style variation for the other modes: Dark \(styles\/dark\.json\)/);
+  const captured = json(join(dir, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'))._updated;
+  assert.match(lines, new RegExp(`From Figma as captured ${captured ? `on ${captured.slice(0, 10)}` : 'last'}`), 'the theme is made from the capture, and the run says when it was read');
   // A mode Figma no longer has loses its file on the next run.
   writeFileSync(join(out, 'styles', 'gone.json'), '{}');
   await writeWordpress(dir, cfg);

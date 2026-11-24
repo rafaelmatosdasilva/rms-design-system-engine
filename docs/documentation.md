@@ -141,6 +141,8 @@ The contracts' tokens are one dictionary, `contracts/tokens.json`, in the W3C De
 
 `rms-design-system-engine --wordpress` writes your tokens as a WordPress theme's files, straight from the Figma snapshot. No control center has to be built. It uses the same dictionary as the Tokens page's downloads, so both give the same answer.
 
+- **It reads the capture, not Figma.** The tokens come from the Figma variables the engine last captured, and the run says the date. After a change in Figma, read it again first (`--refresh-figma`), or run a full audit, which does both when `wordpress.theme` is set.
+
 What it writes, in `.design-system-engine-out/wordpress/`:
 
 | File | What it holds |
