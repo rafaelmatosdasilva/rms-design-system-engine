@@ -8,6 +8,24 @@ Newest first.
 
 ---
 
+## After a compaction, an agent had only the first two-thirds of the guide
+
+**Found** 24 November 2026, in a long working session of its own. That a compaction keeps only part of a loaded skill was a published source's claim, not checked here.
+
+**Evidence.**
+- *The session's own transcript:* Claude Code compacted the session three times, and each time showed the engine's guide again cut short, with a note that the rest was truncated for compaction. All three kept exactly the guide's first 19,899 characters and cut mid-sentence ("whenever Phase 1 CAN run.** An unscoped").
+- *The guide as it stood:* 30.6 KB, so the hooks' answers, "change only what the person asked for" and the audit rules sat past the cut. An agent late in a long session could break them with nothing in front of it saying not to.
+- *The guide on main now:* 16,354 characters since the route started handing each request its recipe's steps and the main guide kept only what every request needs. All of it is inside the line, so today every rule survives a compaction.
+
+**Guesses ruled out.**
+- That the cut falls on a heading or keeps whole sections: it fell mid-sentence, so it is a length, not a structure.
+
+**What changed.**
+- `test/guide-structure.test.mjs` holds the main guide to 18,000 characters, under the measured 19,899 with room for the line to move, and checks the rules that must hold on every request sit inside it. It held 30 KB before, which let the guide grow back past the cut with nothing failing.
+- One session's measurement: when Claude Code changes how much it keeps, the number here is measured again.
+
+---
+
 ## A measurement is keyed to the guide, not to the commit, and a shared checkout loses it
 
 **Found** 24 November 2026, renaming the style guide to the control center across the guide set (103 mentions in `rms-design-system-engine.md`, `cookbook/`, `reference/`) and measuring it.

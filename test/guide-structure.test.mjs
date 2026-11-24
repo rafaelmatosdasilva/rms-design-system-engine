@@ -49,8 +49,20 @@ test('every recipe\'s own part stays small: the route hands it with every reques
   for (const f of RECIPES) { const { head } = recipeHead(read(f)); assert.ok(head.length <= MAX_RECIPE, `${f}: its steps are ${head.length} characters, over ${MAX_RECIPE}: move reference after its recipe-check`); }
 });
 
-test('the main file stays small: it is loaded on every run', () => {
-  assert.ok(Buffer.byteLength(main) <= 30 * 1024, `${MAIN} is ${Buffer.byteLength(main)} bytes, over 30 KB: move task steps to a recipe`);
+// What an agent still has of the main file after Claude Code compacts a long session: its start, as far as
+// COMPACTION_KEEPS characters, then a note that the rest was cut. Measured on 24 November 2026 from a session's own
+// three compactions, each of which kept exactly the guide's first 19,899 characters and cut mid-sentence. The guide was
+// 30.6 KB then, so everything after its two-thirds point (the hooks' answers, change only what was asked, the audit
+// rules) was gone late in a long session. A rule past this line is one the agent can stop following without knowing.
+const COMPACTION_KEEPS = 19899;
+// The cap, with room under the measured line: one measurement, and the line may move with Claude Code.
+const MAIN_CAP = 18000;
+test('the main file stays inside what a compaction keeps: every rule in it is one an agent still has late in a long session', () => {
+  assert.ok(MAIN_CAP < COMPACTION_KEEPS);
+  assert.ok(main.length <= MAIN_CAP, `${MAIN} is ${main.length} characters, over ${MAIN_CAP}: a compaction keeps its first ${COMPACTION_KEEPS}, so move task steps to a recipe`);
+  // The rules that must hold on every request, said where they are, so a reordering that pushed one out would show.
+  for (const rule of ['INVARIANT', 'An audit request is a request to report', '**The project\'s hooks.**', 'When a hook refuses or asks, that is', 'Change only what the person asked for'])
+    assert.ok(main.indexOf(rule) >= 0 && main.indexOf(rule) < MAIN_CAP, `${MAIN}: "${rule}" is where a compaction keeps it`);
 });
 
 test('no paragraph of 120 characters or more lives in two places', () => {
