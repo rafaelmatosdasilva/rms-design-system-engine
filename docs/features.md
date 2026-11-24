@@ -237,7 +237,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
 | `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
-| `/rms-design-system-engine export the tokens to our WordPress theme` | Figma's variables read again, then a `theme.json` and a style variation per mode, with no control center built, and a patch for your theme's own files when you name its folder |
+| `/rms-design-system-engine export the Figma tokens to WordPress` | Figma's variables and components read again, then a `theme.json` with your components as its styles and a style variation per mode, with no control center built. In a folder with nothing set up, only the Figma link is asked |
+| `/rms-design-system-engine export the Figma tokens to our WordPress theme in <folder>` | The same, and a patch that brings your theme's own files in line, for you to apply |
 
 ## Maintain usage guidelines
 

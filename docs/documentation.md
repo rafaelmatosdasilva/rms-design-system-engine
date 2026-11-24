@@ -169,8 +169,9 @@ How modes are carried:
 
 Making it on request:
 
-- **Asked in Claude Code, Figma is read first.** "Export the tokens to WordPress" reads Figma's variables again (only those), then makes the view. When Figma cannot be read in that session, you are told, and the view comes from the last capture.
-- **Figma is needed.** The view is made from Figma's variables. In a project not set up yet, setup asks for the Figma link as needed, not optional, and makes the view right after. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
+- **Asked in Claude Code, Figma is read first.** "Export the Figma tokens to WordPress" reads Figma's variables and components again, then makes the view. When Figma cannot be read in that session, you are told, and the view comes from the last capture.
+- **Only Figma is needed.** The view is made from Figma alone, so a folder with nothing set up needs one answer: the Figma link, never asked when the request gives it. Setup then runs in that folder (built from Figma when it holds no code) and the view is made right after. A folder named in the request is the theme's, for the patch. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
+- **A system built from Figma alone keeps its colours.** With no code to read, each component's colours per variant come from the Figma capture itself, so its button still gets its fill, its text and its hover.
 - **The command alone reads the capture.** `rms-design-system-engine --wordpress` makes the contracts and the view again from the Figma variables the engine last captured, and the run says their date. After a change in Figma, read it again first (`--refresh-figma`).
 
 Your theme is never changed. Give the command the theme's folder, or set `wordpress.theme` in `ds-config.json` (see [the configuration](../reference/config.md)), and it compares the theme's own `theme.json` and `styles/` with these files:
