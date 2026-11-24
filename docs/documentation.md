@@ -165,6 +165,7 @@ How modes are carried:
 - **A screen width is fluid.** Modes named for screens (Phone, Tablet, Desktop, or a number of pixels) are one value growing with the screen. A font size gets `fluid` from its narrowest screen's value to its widest's, so WordPress scales it between them. Every other font size says `fluid: false`, since turning fluid on would scale them all.
 - **What no file carries is counted.** A spacing with a value per screen has no fluid form in `theme.json`, so the first screen's value is written and the run says how many there are.
 - **Radii need WordPress 6.9.** That is the version that added radius presets (`settings.border.radiusSizes`).
+- **Proven in a real WordPress.** The suite loads the view into WordPress itself (WordPress Playground, the pinned version in `test/wordpress-real.test.mjs`) and reads back what it resolved: the presets, the style variations, the Button block's styles, and the CSS it writes for the button, its hover, a fluid size and an Outline look.
 
 Making it on request:
 

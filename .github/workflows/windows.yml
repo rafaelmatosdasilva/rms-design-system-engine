@@ -71,6 +71,11 @@ jobs:
       # real Storybook, never a stand-in, so a story is read as Storybook itself draws it.
       - name: Install the Storybook a team builds its stories with
         run: npm ci --prefix test/.storybook-tools --no-audit --no-fund
+      # WordPress Playground, the real WordPress the contracts' WordPress view is loaded into (test/wordpress-real.test.mjs):
+      # its presets, style variations and Button block styles read back as WordPress resolves them. It downloads the
+      # pinned WordPress the first time it runs.
+      - name: Install the WordPress the WordPress view is loaded into
+        run: npm ci --prefix test/.wordpress-tools --no-audit --no-fund
       # DSDS's published schema, suite and examples for the pinned version, and for each older one the engine writes its
       # view in, which the DSDS tests check against. Fetched, never committed (lib/dsds-release.mjs says why); the
       # runner's Ruby turns DSDS's YAML examples into JSON.
