@@ -1,0 +1,68 @@
+# The README's two live badges are drawn by this repository and served from the `badges` branch, because GitHub
+# fetches every other README image through its own proxy and those two were the only ones it proxied - so the only
+# two that ever showed broken. lib/badge-svg.mjs says the whole of why.
+#
+# The suite writes its own badge as it finishes (tests.yml). This writes the other one: the OpenSSF Scorecard, read
+# from the public API that this repository's own scorecard.yml publishes to. It runs when that workflow finishes, so
+# a new score reaches the badge as soon as there is one, and daily, because the publishing is not instant and a run
+# that went red would otherwise be the end of it.
+#
+# Then it asks the state, the way release-due.yml does. Drawing a badge here moves one risk worth naming: a renderer
+# that fails shows a broken image, which anybody can see, while a writer that fails leaves the last badge sitting
+# there, quietly out of date, and nobody would notice. So it asks whether each badge still says what it is drawn
+# from, and writes one issue when it does not.
+name: badges
+
+on:
+  workflow_run:
+    workflows: [Scorecard]
+    types: [completed]
+  schedule:
+    # Off the hour, for the reason the other schedules here carry: a run on the hour waits longest and is dropped most.
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: badges
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Draw the Scorecard badge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node lib/badges.mjs scorecard
+
+  fresh:
+    needs: scorecard
+    # Asked even when the badge above could not be written, because that is exactly the case worth hearing about.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Is either badge out of date
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node lib/badges.mjs check
