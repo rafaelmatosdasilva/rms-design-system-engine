@@ -122,6 +122,12 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   const say = routeText(r('change the chip radius in Figma to 12px'), '');
   assert.match(say, /\nSAY: I can't change this in Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your final reply, word for word\./);
   assert.match(routeText(r('how do I turn on the visual comparison?'), 'x'.repeat(50), 'c', { maxRecipe: 10 }), /--- recipe visual-diff: read it with c --recipe visual-diff before you follow a step it has ---$/);
+  // A recipe's own part is handed, and what goes on past its check is one command away.
+  const long = '# Full\n\n**Use when.** x\n\n## Steps\n\n1. Run it.\n\n```recipe-check\nrms-design-system-engine\n```\n\n---\n\n## Phase 2\n\nlong reference';
+  const handed = routeText(r('run the full parity audit'), long, 'c');
+  assert.match(handed, /--- recipe [a-z-]+ \(c --recipe [a-z-]+\) ---\n# Full\n[\s\S]*```recipe-check\nrms-design-system-engine\n```\n\n--- the recipe goes on past its steps, with the reference they point into: c --recipe [a-z-]+ prints it whole, for a step that needs it ---$/);
+  assert.doesNotMatch(handed, /Phase 2/);
+  assert.doesNotMatch(routeText(r('run the full parity audit'), long.split('\n\n---')[0], 'c'), /goes on past its steps/, 'nothing past the check: no pointer');
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);
 });
