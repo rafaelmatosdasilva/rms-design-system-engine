@@ -162,3 +162,23 @@ test('in each browser here: what a component does when used, said only where it 
     assert.equal(plain['2.5.7'], undefined, 'nothing to drag, so 2.5.7 was not tried');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// On a large style guide the pass reloads the page for each component in each browser, more than a run's time holds:
+// it starts no component past its time, keeps what an earlier run found for those, and tries them first next time.
+test('a pass out of time keeps the earlier results for what it did not reach, and reaches those first next time', async () => {
+  const seen = [];
+  const fake = (name) => ({ label: { chrome: 'Chrome', firefox: 'Firefox' }[name], close: async () => {}, page: async (u) => { seen.push(`${name} ${u}`); return { evaluate: async () => null, setViewport: async () => {}, press: async () => {}, close: async () => {} }; } });
+  const open = async (name) => fake(name);
+  const browsers = [{ name: 'chrome' }, { name: 'firefox' }];
+  const previous = { at: '2026-01-01T00:00:00.000Z', components: { old: { Chrome: [], Firefox: [{ kind: 'focus', desc: 'button' }] } }, ran: {}, tried: { old: '2026-01-01T00:00:00.000Z' } };
+  const late = await a11yBrowsers({ url: (n) => n, components: ['old', 'fresh'], browsers, open, rootOf: (n) => `#${n}`, until: Date.now() - 1, previous });
+  assert.deepEqual(late.notReached.sort(), ['fresh', 'old']);
+  assert.deepEqual(late.components.old, previous.components.old, 'kept from the earlier run');
+  assert.equal(late.components.fresh, undefined);
+  assert.deepEqual(seen, []);
+  // With time, the one never tried goes first, then the oldest; each is tried in every browser before the next.
+  const run = await a11yBrowsers({ url: (n) => n, components: ['old', 'fresh'], browsers, open, rootOf: (n) => `#${n}`, previous });
+  assert.deepEqual(seen, ['chrome fresh', 'firefox fresh', 'chrome old', 'firefox old']);
+  assert.deepEqual(run.notReached, []);
+  assert.ok(run.tried.fresh && run.tried.old);
+});

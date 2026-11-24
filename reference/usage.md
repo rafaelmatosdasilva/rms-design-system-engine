@@ -2558,10 +2558,17 @@ whatever surface the project serves, in this order:
    packages are not installed is told so, and a generated style guide that draws no component is not used.
    A component whose class no element in the code has is said at once, with the classes that hold its name
    (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
-   modes (`a11y.timeoutSec` sets it, and the audit waits for it past its other gates' limit). The copies that check
+   modes (`a11y.timeoutSec` sets it, and the audit waits for it past its other gates' limit), each page drawing
+   several components given time for each (a style guide part, and the page the system's own build draws, `pageShare`).
+   The build's page is checked in a copy of its own beside the copies that share the parts (`--built`), the build
+   started once by the run. The copies that check
    parts at once and the run after them each stop inside that one time, so the audit never has to. A check stopped by it
    keeps what the pages it finished found, and says the page it was on and the ones it never reached not checked
-   (a style guide's part by its components), never clean.
+   (a style guide's part by its components), never clean, and the stop names the page it was on and how many of its
+   checks were done (`stoppedOn`). The copies that share the parts each have the run's whole time, and a part they did not finish waits
+   for the next run, never started by the run with what little time is left. The Firefox and WebKit pass runs in
+   the run's remaining time: it tries each component in every browser before the next, never-tried and oldest
+   first, starts none past its time (`until`), and keeps an earlier run's results for those (`notReached`).
    **A component shown only after an action** (a modal behind its "Show modal" button, a menu kept hidden until
    its trigger is pressed, a popover, a toast): when the scoped component is not seen on a page after two seconds,
    the controls that may open it are pressed in turn, up to 8: those whose words name it first, then those that say

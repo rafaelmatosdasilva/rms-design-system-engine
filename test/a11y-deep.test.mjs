@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, runGate, budget, standIn } from './helpers.mjs';
-import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../lib/a11y-check.mjs';
+import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression, pageShare, stoppedOn, PER_COMPONENT_SEC } from '../lib/a11y-check.mjs';
 import { stateContrastFindings, tokenContrastFindings, tintedVars } from '../lib/contrast-check.mjs';
 import { deriveContrastPairs } from '../lib/pair-derive.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -664,4 +664,29 @@ test('style guide: the checks that act (arrow keys, Enter, an opener) act only o
     assert.equal((await run('composites', null)).length, 2);
     close();
   } finally { c.kill(); }
+});
+
+// A page that draws many components is given time for each: the page a system's own build draws (every component in
+// each variant) was given one page's share, so a check of a large system, and even of one component, stopped halfway.
+test('a page is given time for each component it draws, the build\'s page as a style guide part is', () => {
+  const one = pageShare({ url: 'x' }, { modes: 2 });
+  assert.equal(pageShare({ styleguide: true, components: 1 }, { modes: 2 }), one);
+  assert.equal(pageShare({ harness: true, components: 1 }, { modes: 2 }), one);
+  assert.equal(pageShare({ harness: true, components: 40 }, { modes: 2 }), one + 39 * 2 * PER_COMPONENT_SEC);
+  assert.equal(pageShare({ harness: true, components: 40 }, { modes: 2 }), pageShare({ styleguide: true, components: 40 }, { modes: 2 }));
+  assert.equal(pageShare({ harness: true, components: 40, kept: {} }), 0);
+  // A product page is checked whole: one page's share, whatever it shows.
+  assert.equal(pageShare({ url: 'x', components: 40 }, { modes: 2 }), one);
+});
+
+test('a stopped run says the page it was on and how far into its checks it got', () => {
+  const step = [];
+  const run = makeStep([], [], 'demo', (no) => step.push(no));
+  return (async () => {
+    await run(async () => {}); await run(async () => {});
+    assert.deepEqual(step, [1, 2]);
+    assert.equal(stoppedOn({ where: 'the Vue components', check: 3 }), ', on the Vue components with 2 of its checks done');
+    assert.equal(stoppedOn({ where: 'part 4 (cardTile)', check: 0 }), ', on part 4 (cardTile), before its checks began');
+    assert.equal(stoppedOn(null), '');
+  })();
 });
