@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { writeFileSync, rmSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { PASS, compare, browserRows, browserLine, onlyLine, differByBrowser, a11yBrowsers } from '../lib/a11y-browsers.mjs';
+import { PASS, compare, browserRows, browserLine, onlyLine, differByBrowser, a11yBrowsers, shortVersion, browserName } from '../lib/a11y-browsers.mjs';
 import { keyActions, openBrowser } from '../lib/page-driver.mjs';
 import { browsersHere, triedIn, BROWSER_RUN_LINE } from '../lib/browsers.mjs';
 import { WCAG22, WCAG_KIND } from '../lib/wcag21.mjs';
@@ -48,6 +48,24 @@ test('only what differs from Chrome is said, with the browsers it fails in, and 
   assert.deepEqual(browserRows(run, 'other'), {});
 });
 
+test('each browser is named with the version it was, and a run saved without versions names it alone', () => {
+  assert.equal(shortVersion('131.0.6778.85'), '131');
+  assert.equal(shortVersion('133.0'), '133');
+  assert.equal(shortVersion('18.2'), '18.2');
+  assert.equal(shortVersion('17.4.1'), '17.4');
+  assert.equal(shortVersion(undefined), '');
+  assert.equal(browserName({ label: 'WebKit', version: '18.2' }), 'WebKit 18.2');
+  assert.equal(browserName({ label: 'Firefox' }), 'Firefox');
+  const f = (kind, desc) => ({ kind, sc: WCAG_KIND[kind], desc });
+  const run = { browsers: [{ label: 'Chrome', version: '131.0.6778.85' }, { label: 'Firefox', version: '133.0' }, { label: 'WebKit', version: '18.2', altTab: true }], components: {
+    menu: { Chrome: [], Firefox: [], WebKit: [f('focus', 'button.ring')] },
+  } };
+  const rows = browserRows(run, 'menu');
+  assert.equal(browserLine(rows['2.4.7']), 'Chrome 131 ✓ · Firefox 133 ✓ · WebKit 18.2 ✕');
+  assert.equal(onlyLine('2.4.7', rows['2.4.7'].only[0], rows['2.4.7']), 'Fails in WebKit 18.2 only: no visible focus when Tab reaches it, button.ring');
+  assert.equal(onlyLine('2.4.7', rows['2.4.7'].only[0]), 'Fails in WebKit only: no visible focus when Tab reaches it, button.ring', 'without its row, the browser alone');
+});
+
 test('what a row and a run say when no other browser tried it', () => {
   assert.match(triedIn({ browser: 'each', pass: true }), /^Tried in Chrome\. This is one a browser decides: Firefox and WebKit try it/);
   assert.match(triedIn({ browser: 'each' }), /^Tried in Chrome alone\. .* the pass in them does not try it yet\.$/);
@@ -77,6 +95,8 @@ test('in Chrome and Firefox: real Tab presses, and a focus ring Firefox alone ta
   try {
     const run = await a11yBrowsers({ url: () => pathToFileURL(page).href, components: ['demo'], browsers: [{ name: 'chrome', path: HERE.chrome }, { name: 'firefox', path: HERE.firefox }], open: openBrowser, rootOf: (n) => `#c-${n} .pg-preview` });
     assert.deepEqual(run.refused, []);
+    // Each browser says the version it was, so a row names it with it.
+    for (const b of run.browsers) assert.match(b.version ?? '', /^\d+(\.\d+)*/, `${b.label} gave its version`);
     const kinds = (l) => run.components.demo[l].map((f) => `${f.kind} ${f.desc}`).sort();
     // The same in both: a ring removed everywhere, the targets too small. Every control reached by Tab, though the
     // page's own sixty links come first: the walk starts at the components.
@@ -89,7 +109,7 @@ test('in Chrome and Firefox: real Tab presses, and a focus ring Firefox alone ta
     assert.ok(!kinds('Chrome').includes('focus button.ff'), kinds('Chrome'));
     assert.ok(kinds('Firefox').includes('focus button.ff'), kinds('Firefox'));
     const rows = browserRows(run, 'demo');
-    assert.equal(browserLine(rows['2.4.7']), 'Chrome ✕ · Firefox ✕');
+    assert.match(browserLine(rows['2.4.7']), /^Chrome \d+(\.\d+)? ✕ · Firefox \d+(\.\d+)? ✕$/);
     assert.deepEqual(rows['2.4.7'].only, [{ desc: 'button.ff', browsers: ['Firefox'] }]);
     assert.deepEqual(differByBrowser(run), []);
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -124,7 +144,7 @@ test('in Chrome and Firefox: a focus held, a positive tabindex and a control hid
       assert.ok(of('order').includes('obscured'), `${l} order: ${of('order')}`);
       assert.ok(!of('order').includes('tabtrap'), `${l}: nothing holds the focus there`);
     }
-    assert.equal(browserLine(browserRows(run, 'trap')['2.1.2']), 'Chrome ✕ · Firefox ✕');
+    assert.match(browserLine(browserRows(run, 'trap')['2.1.2']), /^Chrome \d+(\.\d+)? ✕ · Firefox \d+(\.\d+)? ✕$/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -153,7 +173,7 @@ test('in each browser here: what a component does when used, said only where it 
       assert.ok(run.components.drag[b.label].some((f) => f.kind === 'dragging'), `${b.label}: ${run.components.drag[b.label].map((f) => f.kind)}`);
       assert.ok(run.ran.used[b.label].includes('auth'), `${b.label}: ${run.ran.used[b.label]}`);
     }
-    const labels = run.browsers.map((b) => b.label);
+    const labels = run.browsers.map((b) => browserName(b));
     const used = browserRows(run, 'used'), drag = browserRows(run, 'drag'), plain = browserRows(run, 'plain');
     const fails = labels.map((l) => `${l} ✕`).join(' · ');
     for (const sc of ['2.5.2', '3.3.8']) assert.equal(browserLine(used[sc]), fails, sc);

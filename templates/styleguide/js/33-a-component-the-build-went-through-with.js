@@ -128,7 +128,7 @@
       // What fails in another browser only (a11y-browsers.mjs): a finding of its own, so the row keeps the worst status
       // across browsers, with what to change and the browser it fails in.
       var bb = WCAG && WCAG.byBrowser && WCAG.byBrowser.components[c.name] ? WCAG.byBrowser.components[c.name][k.sc] : null;
-      if (bb && bb.only.length) its = its.concat(bb.only.map(function (line) { var b = /^Fails in (.+?) only/.exec(line); return { st: 'todo', html: esc(line), todo: 'Change the code so it holds in ' + (b ? b[1] : 'that browser') + ' as it does in Chrome.', from: 'Tested in ' + (b ? b[1] : 'another browser') }; }));
+      if (bb && bb.only.length) its = its.concat(bb.only.map(function (line) { var b = /^Fails in (.+?) only/.exec(line); return { st: 'todo', html: esc(line), todo: 'Change the code so it holds in ' + (b ? b[1].replace(/ [\d.]+(?= and |$)/g, '') : 'that browser') + ' as it does in Chrome.', from: 'Tested in ' + (b ? b[1] : 'another browser') }; }));
       var fig = (a.notes || []).filter(function (n) { return n.sc.indexOf(k.sc) >= 0; }).map(function (n) { return n.text; });
       var how = (WCAG_HOW[k.how] || '') + (fig.length ? ', with the Figma annotation' + (fig.length > 1 ? 's ' : ' ') + fig.join(', ') : '');
       var texts = /^(1\.3\.3|1\.4\.5|3\.1\.2|1\.4\.12|2\.4\.6)$/.test(k.sc) && (c.__textParts || []).length ? ', its ' + c.__textParts.join(', ') : '';
@@ -278,6 +278,13 @@
       // Its date, its own check's: tried now on this page, the last audit's day, else when the page was built (what the
       // code and Figma said then).
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
+      // What the last audit tried in a browser says which, with the version it was, never "a browser": each browser
+      // the browsers pass tried this criterion in on this component, else Chrome, where the audit itself runs.
+      var bbNames = bbRow ? bbRow.line.split(' · ').map(function (x) { return x.replace(/ [✓✕]$/, ''); }) : WCAG && WCAG.byBrowser && WCAG.byBrowser.chrome ? [WCAG.byBrowser.chrome] : [];
+      if (bbNames.length) {
+        var bbSaid = 'Tested in ' + (bbNames.length > 1 ? bbNames.slice(0, -1).join(', ') + ' and ' + bbNames[bbNames.length - 1] : bbNames[0]);
+        src = src.map(function (x) { return /^Tested (on .+|at the last audit)$/.test(x) ? bbSaid : x; }).filter(function (x, i, all) { return all.indexOf(x) === i; });
+      }
       var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML((r.k.beyond ? '' : 'WCAG ') + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
         who: r.st === 'todo' || r.st === 'check' ? (own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, said: !!r.said, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,

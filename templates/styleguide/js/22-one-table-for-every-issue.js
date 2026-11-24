@@ -38,7 +38,17 @@
 
   // How a row was checked, in words, never its date: the date is said once, in Last checked (the owner's, 16 November
   // 2026). The table's status line and the panel's Where it was read say it alike.
-  function howChecked(x, st) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, st === 'done' ? 'Checked by a person' : 'To check by a person'); }
+  // What was tried on this page now was tried in the reader's own browser: named, with its version, as each browser of
+  // the last audit is ("Tested in Chrome 131, Firefox 133 and WebKit 18.2"). Only a source that named none says "a browser".
+  var VIEWER = (function () {
+    var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '', m, short = function (v) { var p = v.split('.'); return p[1] && !/^0+$/.test(p[1]) ? p[0] + '.' + p[1] : p[0]; };
+    if ((m = /Edg\/([\d.]+)/.exec(ua))) return 'Edge ' + short(m[1]);
+    if ((m = /Firefox\/([\d.]+)/.exec(ua))) return 'Firefox ' + short(m[1]);
+    if ((m = /Chrome\/([\d.]+)/.exec(ua))) return 'Chrome ' + short(m[1]);
+    if ((m = /Version\/([\d.]+).*Safari/.exec(ua))) return 'Safari ' + short(m[1]);
+    return '';
+  })();
+  function howChecked(x, st) { return String(x || '').replace(/^Tested now$/, VIEWER ? 'Tested in this browser (' + VIEWER + ')' : 'Tested in this browser').replace(/^Tested (on .+|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, st === 'done' ? 'Checked by a person' : 'To check by a person'); }
   function statusLine(r) {
     var how = function (x) { return howChecked(x, r.st); };
     if (r.st === 'pending') return '';   // nothing is known yet of how it is checked
