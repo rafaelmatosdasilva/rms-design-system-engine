@@ -148,16 +148,25 @@ What it writes:
 
 | File | What it holds |
 |---|---|
-| `theme.json` | Each token's first mode. Colours, font sizes, font families, spacing, radii and shadows are presets the block editor offers by name. Everything else goes under `settings.custom`, as `--wp--custom--…` variables. Each preset's slug is the code's own variable when there is one. Your button, link and headings are WordPress's own elements, styled with those presets (`styles.elements`). |
+| `theme.json` | Each token's first mode. Colours, font sizes, font families, spacing, radii and shadows are presets the block editor offers by name. Everything else goes under `settings.custom`, as `--wp--custom--…` variables. Each preset's slug is the code's own variable when there is one. Your button, link, headings, caption and citation are WordPress's own elements (`styles.elements`), and your divider, quote, table and disclosure its own blocks (`styles.blocks`), each styled with those presets. |
 | `styles/<mode>.json` | A style variation for each other mode a site switches to: Dark, High contrast, a second brand. It holds only what differs in that mode. A list it holds (the palette) is whole, because a variation's list replaces the theme's. The Site Editor offers each one under Styles. |
-| `styles/blocks/<name>.json` | A style of the Button block (WordPress 6.6) for each other look of a button (Outline, Secondary), and for each button component after the first. The editor offers each one by name. |
+| `styles/blocks/<name>.json` | A style of a block (WordPress 6.6) for each other look of a button, a divider, a quote, a table or a disclosure (Outline, Secondary), and for each such component after the first. The editor offers each one by name. |
 
 How a component becomes a style:
 
-- **Where it goes.** A component whose element is a button styles WordPress's button, one whose element is a link styles its link, and a heading (`h1` to `h6`) its heading. Without an element in the contract, its name says it (`buttonPrimary`).
+- **Where it goes.** Each component goes where WordPress keeps that thing, read from the element its contract says:
+
+  | Element | WordPress's place |
+  |---|---|
+  | `button`, `a`, `h1` to `h6` | its button, link and heading elements |
+  | `figcaption` or `caption`, `cite` | its caption and cite elements |
+  | `hr` (or a `separator` role), `blockquote`, `table`, `details` | its Separator, Quote, Table and Details blocks |
+
+  A button and a link with no element in the contract are known by their name (`buttonPrimary`). Every other place is read from the element alone, so a `quoteCard` that is a `div` is never taken for a quote.
 - **What it holds.** Its padding, corner radius and type style from its anatomy, and its fill, text and border colours from what its default variant paints with. Each token is the theme's own preset (`var:preset|color|brand-fill`), else its `--wp--custom--…` variable, else its value. So a change in Figma reaches every style through its token.
-- **Its states.** Hover, focus and pressed become `:hover`, `:focus` and `:active`, holding only what changes. A link's visited state becomes `:visited`.
+- **Its states.** Hover, focus and pressed become `:hover`, `:focus` and `:active`, holding only what changes. A link's visited state becomes `:visited`. `theme.json` takes a state on the button and the link only, so a state of any other place is said rather than written where WordPress would not read it.
 - **What has no place is said.** A chip, a tab or a field has no core block or element in WordPress, a disabled state has no place in `theme.json`, and neither does a height. The run lists each one with why, and nothing is dropped in silence.
+- **One place among several is not none.** A `pre` is WordPress's Code block or its Preformatted one, and an `img` its Image block or its Avatar. The element does not say which, so the run says WordPress has both and the choice is the team's, and never that there is no place for it.
 
 How modes are carried:
 
