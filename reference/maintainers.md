@@ -65,7 +65,9 @@ Five layers refuse anything private, each catching what the one before may miss:
   [-- gh arguments]` lists every pair of capitalised words the branch adds, its title and description included, unless
   both are plain words (a word counts as plain only where the dictionary has it in lower case) or one is a product the
   engine works with. Nothing opens until they were read: say a person or a company generically, or run it again with
-  `--names-read` once none is one. It is how a name no list knows is caught.
+  `--names-read` once none is one. It is how a name no list knows is caught. It opens the pull request with
+  `gh pr create`, and where that is refused (a session in the cloud cannot reach GitHub's GraphQL), through GitHub's
+  REST route, its base, draft and labels kept. It then says how to merge it there, since auto-merge has no REST route.
 - `test/no-testbed-names.test.mjs` runs the check on the whole repository with the suite and plants one case of each
   kind (`node .githooks/private-check.mjs --records` also reads the evaluation records).
 - A private name the hashed list should know (a client's own name, the backlog's) goes in as a hash (the first 16 hex
