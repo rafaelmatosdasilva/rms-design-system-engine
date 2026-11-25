@@ -24,6 +24,8 @@ test('only what the code renders: its renderings, or markup read from its code, 
   assert.equal(codeRendered(comp('chip')), true);
   assert.equal(codeRendered({ name: 'chip', markup: '<div></div>', markupFrom: 'jsx' }), true);
   assert.equal(codeRendered({ name: 'chip', markup: '<div></div>', markupFrom: 'role' }), false);
+  // A component only the code has, drawn by whichever framework's own build: Vue's, React's, Lit's or Angular's alike.
+  for (const from of ['vue-build', 'react-build', 'lit-build', 'angular-build']) assert.equal(codeRendered({ name: 'chip', markup: '<div></div>', markupFrom: from }), true, from);
   assert.equal(codeRendered({ name: 'chip' }), false);
 });
 

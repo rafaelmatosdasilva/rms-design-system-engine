@@ -44,6 +44,8 @@ test('edits: a role Figma does not state is added; a role that differs is a deci
   assert.match(edits[0].why, /renders <button class="button">/);
   assert.equal(edits[1].decision, true);
   assert.deepEqual(figmaEdits(SNAP, [{ ...VIEW[0], markupFrom: 'role' }]), [], 'a markup drawn from a role is not the code');
+  // What a framework's own build drew is the code, whichever framework: the same edit for each.
+  for (const from of ['vue-build', 'react-build', 'lit-build', 'angular-build']) assert.deepEqual(figmaEdits(SNAP, [{ ...VIEW[0], markupFrom: from }]).map((e) => e.component), ['button'], from);
   const lines = editLines(edits, { fileKey: 'K' }).join('\n');
   assert.match(lines, /button: add the annotation "Role: button"/);
   assert.match(lines, /For a person to decide \(1\)/);
