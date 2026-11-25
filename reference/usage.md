@@ -2562,7 +2562,10 @@ whatever surface the project serves, in this order:
    build is read in the same order: Vite (`vite.config`), webpack (`webpack.config` with a rule whose loader compiles
    JSX: Babel's, TypeScript's, SWC's or esbuild's, built from the project's folder as its own build runs), the webpack
    config Next.js or Create React App makes for the app (`react-apps.mjs`: as `next dev` or `react-scripts start` would,
-   tried on Next.js 15 and react-scripts 5), else Vite with React's plugin installed. A project with React and no such build is told so; with none of its own React, the
+   tried on Next.js 15 and react-scripts 5), else Vite with React's plugin installed. Each case is drawn inside the
+   providers the project's own app wraps it in (`react-app-context.mjs`: read from its entry, its Next.js layout or
+   `_app`, and its Storybook preview's decorators; one whose props use a name not traced to an import or a plain value
+   is left out and said), with the lists and objects the project's own pages pass it, read as data and never run. A project with React and no such build is told so; with none of its own React, the
    stand-in draws its components only where there is no other page to check.
    **Every variant, every run.** The components rendered from their code are tried in Figma's variants when Figma has
    the component (the default, each other value of each variant prop, each on/off prop flipped), else in the code's
