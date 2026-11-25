@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: React drawn by Next.js and Create React App, inside its app's providers and with its pages' data (continuous evaluation)
+
+What changed since the entry below (engine f497927a): WordPress test tools on isomorphic-git 1.44 and qs 6.17, past seven advisories (#723); Firefox on Windows stops failing checks, and the prototype font test holds the answer rather than the request (#724); React components checked, drawn and read as Vue's are (#725); test-tools: bump fast-check in /test/.ci-tools in the ci-tools group (#727); A component with no page is Missing, never Review (#726); The pins the registry is asked about are tried and proposed as DSDS's are, each moved with its hash (#729); React systems built with Next.js or Create React App drawn by the webpack config their framework makes; Next.js and Create React App installed in CI, watched by Dependabot, and said in the docs; React components drawn inside the providers their app wraps them in, with the data their pages pass; The run says which build drew the React components, which providers wrap them, and which it left out. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `4eeeb704d27e` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md fb1c11e9` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 23f08edc` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 750698f8` `reference/gates.md a8e75b2a` `reference/maintainers.md 79fed046` `reference/personality.md 851bd4e2` `reference/usage.md 88cd1014` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine 9473b769 | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.048 | 0.046 |
+| Input a run | 76k | 69k |
+| Turns a run | 3.1 | 2.9 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 69k a run against 76k, in 2.9 turns against 3.1. no task changed state, and no run moved: the same result. Records: `records/2026-11-25-react-apps-and-their-context`.
+
 ## 2026-11: React components checked, drawn and read as Vue's are (continuous evaluation)
 
 What changed since the entry below (engine f59f9c73): The WordPress view proven in a real WordPress, and exporting it asks only for the Figma link (#718); actions: bump the actions group with 3 updates (#719); test-tools: bump @wp-playground/cli (#720); The real WordPress test mounts its folders as Windows reads them (#722); The main guide is held inside what a compaction keeps, measured at 19,899 characters (#716); Accessibility rows name each browser with its version (#721); React components checked, drawn and read as Vue's are; A project with no React of its own is not told its React components were not drawn. The guide changed in `reference/config.md`, `reference/usage.md`.
