@@ -454,3 +454,15 @@ test('the company a project is for is one of its names: said once here or read f
     for (const d of [home, proj]) rmSync(d, { recursive: true, force: true });
   }
 });
+
+// An old glob's deprecation notice, as npm copies it into a lockfile, tells you to write to its author: the registry's
+// words, never this repository's. Its addresses and people are not read; anything else in it still is.
+test('a lockfile\'s deprecation notice is the registry\'s, not ours: its addresses are not read, elsewhere they are', async () => {
+  const { registryNotice } = await import('../.githooks/private-check.mjs');
+  const notice = '      "deprecated": "Old versions are not supported. Support may be purchased by contacting someone@example.org",';
+  assert.equal(registryNotice('test/.cra-tools/package-lock.json', notice), true);
+  assert.equal(registryNotice('package-lock.json', notice), true);
+  assert.equal(registryNotice('test/.cra-tools/package.json', notice), false, 'only a lockfile');
+  assert.equal(registryNotice('test/.cra-tools/package-lock.json', '      "license": "ISC",'), false, 'only its deprecated line');
+  assert.equal(registryNotice('docs/setup.md', notice), false);
+});

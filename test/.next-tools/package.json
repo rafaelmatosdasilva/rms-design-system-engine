@@ -1,0 +1,1 @@
+{ "private": true, "description": "The Next.js a React system built as a Next.js app has, for test/react-apps.test.mjs: its components drawn by the webpack config Next makes for it.", "dependencies": { "next": "15", "react": "19", "react-dom": "19" } }
