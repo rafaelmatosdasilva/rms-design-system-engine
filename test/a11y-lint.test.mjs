@@ -1,8 +1,10 @@
-// The accessibility lint a team runs in its editor (eslint-plugin-jsx-a11y, eslint-plugin-vuejs-accessibility),
+// The accessibility lint a team runs in its editor (eslint-plugin-jsx-a11y, eslint-plugin-vuejs-accessibility,
+// angular-eslint's template rules, eslint-plugin-lit-a11y),
 // counted beside the engine's own checks, and proposed, never installed, where a team has neither.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { a11yLintSetup, a11yLintFindings, a11yLintLines, frameworkOf } from '../lib/a11y-lint.mjs';
 import { tempDir } from './helpers.mjs';
@@ -62,4 +64,72 @@ test('a plugin named but not installed, or no ESLint to run it, is said so and n
   assert.match(a11yLintFindings(named, ['src/A.jsx'], undefined, { run }).why, /not installed/);
   const noBin = project({ 'package.json': REACT_PKG, 'eslint.config.mjs': "import jsxA11y from 'eslint-plugin-jsx-a11y';", 'node_modules/eslint-plugin-jsx-a11y/package.json': '{}' });
   assert.match(a11yLintFindings(noBin, ['src/A.jsx'], undefined, { run }).why, /no ESLint installed/);
+});
+
+test('Angular and Lit have their own accessibility lint found and proposed; plain custom elements are told the browser checks answer', () => {
+  const ang = project({ 'package.json': JSON.stringify({ dependencies: { '@angular/core': '20' } }), 'eslint.config.js': "const angular = require('angular-eslint');\nmodule.exports = [{ files: ['**/*.html'], extends: [angular.configs.templateAccessibility] }];\n",
+    'node_modules/@angular-eslint/eslint-plugin-template/package.json': '{}' });
+  assert.deepEqual(a11yLintSetup(ang).plugins.map((p) => [p.id, p.installed]), [['@angular-eslint/eslint-plugin-template', true]]);
+  assert.deepEqual(a11yLintSetup(project({ 'package.json': JSON.stringify({ dependencies: { '@angular/core': '20' } }) })).propose, { id: '@angular-eslint/eslint-plugin-template', framework: 'angular' });
+  const lit = project({ 'package.json': JSON.stringify({ dependencies: { lit: '3' } }), 'eslint.config.mjs': 'export default [];' });
+  const s = a11yLintSetup(lit);
+  assert.deepEqual(s.propose, { id: 'eslint-plugin-lit-a11y', framework: 'lit' });
+  assert.match(a11yLintLines({}, s).join('\n'), /eslint-plugin-lit-a11y \(ISC\)/, 'its own licence is named');
+  assert.deepEqual(a11yLintSetup(project({ 'package.json': JSON.stringify({ dependencies: { lit: '3' } }), '.eslintrc.json': JSON.stringify({ rules: { 'lit-a11y/alt-text': 'error' } }) })).plugins.map((p) => p.id), ['eslint-plugin-lit-a11y']);
+  const plain = project({ 'package.json': JSON.stringify({ name: 'acme-elements', customElements: 'custom-elements.json' }) });
+  const ps = a11yLintSetup(plain);
+  assert.equal(ps.framework, 'web-components');
+  assert.equal(ps.propose, null, 'no lint reads plain custom elements, so none is proposed');
+  assert.match(a11yLintLines({}, ps).join('\n'), /plain custom elements .* the engine's checks in the browser are the whole answer/);
+});
+
+test("Angular's templates are linted, and only its plugin's accessibility rules count", () => {
+  const dir = project({ 'package.json': JSON.stringify({ dependencies: { '@angular/core': '20' } }), 'eslint.config.js': 'angular.configs.templateAccessibility',
+    'node_modules/@angular-eslint/eslint-plugin-template/package.json': '{}', 'node_modules/.bin/eslint': '' });
+  const report = [{ filePath: join(dir, 'src/button/button.component.html'), messages: [
+    { ruleId: '@angular-eslint/template/alt-text', line: 2, severity: 2, message: '<img/> element must have a text alternative.' },
+    { ruleId: '@angular-eslint/template/eqeqeq', line: 4, severity: 2, message: 'Expected `===`' },
+    { ruleId: '@angular-eslint/template/no-positive-tabindex', line: 5, severity: 2, message: 'The tabindex attribute should not be positive' }] }];
+  let asked = null;
+  const run = (bin, args) => { asked = args; const e = new Error('exit 1'); e.stdout = JSON.stringify(report); throw e; };
+  const r = a11yLintFindings(dir, ['src/button/button.component.ts', 'src/button/button.component.html', 'src/button/button.component.scss'], undefined, { run });
+  assert.deepEqual(asked, ['--format', 'json', 'src/button/button.component.ts', 'src/button/button.component.html'], "the component's template is linted, its stylesheet is not");
+  assert.deepEqual(r.findings.map((f) => f.rule), ['@angular-eslint/template/alt-text', '@angular-eslint/template/no-positive-tabindex'], 'eqeqeq is not an accessibility rule');
+  // The engine's file list holds code only: the template is found from the component's templateUrl.
+  writeFileSync(join(dir, 'card.component.ts'), "@Component({ selector: 'acme-card', templateUrl: './card.component.html' })\nexport class Card {}\n");
+  writeFileSync(join(dir, 'card.component.html'), '<img src="a.png">');
+  a11yLintFindings(dir, ['card.component.ts'], undefined, { run });
+  assert.deepEqual(asked, ['--format', 'json', 'card.component.ts', 'card.component.html'], 'the template its component names is linted with it');
+});
+
+// The real thing: the team's own ESLint 10 with the Vue, Angular and Lit plugins (test/.lint-tools), run on a component
+// of each, the Angular one's template found from its templateUrl.
+const TOOLS = join(dirname(fileURLToPath(import.meta.url)), '.lint-tools', 'node_modules');
+const realReady = existsSync(join(TOOLS, 'eslint-plugin-lit-a11y', 'package.json')) && existsSync(join(TOOLS, '@angular-eslint', 'eslint-plugin-template', 'package.json'))
+  ? false : 'the accessibility plugins are not installed (npm ci --prefix test/.lint-tools)';
+test("the real ESLint reports each framework's accessibility problem, with its file and line", { skip: realReady }, () => {
+  const dir = project({
+    'package.json': JSON.stringify({ name: 'acme-ui', type: 'module', dependencies: { '@angular/core': '22', lit: '3', vue: '3' } }),
+    'eslint.config.mjs': [
+      "import vueA11y from 'eslint-plugin-vuejs-accessibility';", "import vueParser from 'vue-eslint-parser';",
+      "import tpl from '@angular-eslint/eslint-plugin-template';", "import tplParser from '@angular-eslint/template-parser';",
+      "import litA11y from 'eslint-plugin-lit-a11y';",
+      'export default [',
+      "  { files: ['**/*.vue'], languageOptions: { parser: vueParser }, plugins: { 'vuejs-accessibility': vueA11y }, rules: { 'vuejs-accessibility/alt-text': 'error' } },",
+      "  { files: ['**/*.html'], languageOptions: { parser: tplParser }, plugins: { '@angular-eslint/template': tpl }, rules: { '@angular-eslint/template/alt-text': 'error', '@angular-eslint/template/eqeqeq': 'error' } },",
+      "  { files: ['**/*.js'], plugins: { 'lit-a11y': litA11y }, rules: { 'lit-a11y/alt-text': 'error' } },",
+      '];'].join('\n'),
+    'src/Avatar.vue': '<template>\n  <img src="a.png">\n</template>\n',
+    'src/card/card.component.ts': "@Component({ selector: 'acme-card', templateUrl: './card.component.html' })\nexport class Card {}\n",
+    'src/card/card.component.html': '<div>\n  <img src="a.png">\n  <span *ngIf="a == b">x</span>\n</div>\n',
+    'src/acme-badge.js': "import { html } from 'lit';\nexport const badge = () => html`\n  <img src=\"a.png\">`;\n",
+  });
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'junction');
+  const s = a11yLintSetup(dir);
+  assert.deepEqual(s.plugins.map((p) => [p.id, p.installed]).sort(), [['@angular-eslint/eslint-plugin-template', true], ['eslint-plugin-lit-a11y', true], ['eslint-plugin-vuejs-accessibility', true]]);
+  const r = a11yLintFindings(dir, ['src/Avatar.vue', 'src/card/card.component.ts', 'src/acme-badge.js'], s);
+  assert.equal(r.ran, true, r.why);
+  assert.deepEqual(r.findings.map((f) => `${f.file}:${f.line} ${f.rule}`).sort(), [
+    'src/acme-badge.js:3 lit-a11y/alt-text', 'src/card/card.component.html:2 @angular-eslint/template/alt-text', 'src/Avatar.vue:2 vuejs-accessibility/alt-text'].sort(),
+  "each framework's own rule, and Angular's eqeqeq is not counted");
 });

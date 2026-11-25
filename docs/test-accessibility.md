@@ -76,12 +76,17 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 
 ### Your team's own accessibility lint
 
-- **Counted beside the engine's checks.** When your ESLint uses eslint-plugin-jsx-a11y (React) or
-  eslint-plugin-vuejs-accessibility (Vue), the check runs your own ESLint on the design system's component files and
-  lists what those rules report, with the file and line.
+- **Counted beside the engine's checks.** When your ESLint uses eslint-plugin-jsx-a11y (React),
+  eslint-plugin-vuejs-accessibility (Vue), angular-eslint's template rules (Angular) or eslint-plugin-lit-a11y (Lit),
+  the check runs your own ESLint on the design system's component files and lists what those rules report, with the
+  file and line.
+- **Angular's templates too.** A component's `.html` template, named by its `templateUrl`, is linted with it. Only
+  the plugin's accessibility rules count, never its other template rules.
+- **Plain custom elements.** Their markup is written in strings no lint reads, so the engine's checks in the browser
+  are the whole answer for them, and the check says so.
 - **Your ESLint, as installed.** It runs from your project's `node_modules`, never fetched. A plugin your config names
   but nobody installed is said to be, and nothing runs.
-- **Proposed, never installed.** A team with neither is told the one that fits its framework. Nothing is added to
+- **Proposed, never installed.** A team with none is told the one that fits its framework. Nothing is added to
   your project or your config.
 
 ### What it tries

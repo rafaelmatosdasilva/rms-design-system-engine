@@ -157,6 +157,10 @@ test('never two rounds at once: a lock held by a running process; one whose proc
   assert.equal(d.ok, true, 'older than six hours');
   d.release();
   assert.ok(!existsSync(file));
+  // One caught as it is written (made, its words not in yet) is another's, taken a moment ago: never taken over.
+  writeFileSync(file, '');
+  assert.equal(takeLock(file, { pid: 555, alive: () => true }).ok, false, 'half written a moment ago');
+  assert.equal(takeLock(file, { pid: 666, alive: () => true, now: Date.now() + 60000 }).ok, true, 'left half written long ago: taken over');
 });
 
 test('the page compared without when or from which commit it was built', () => {
