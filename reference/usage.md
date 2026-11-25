@@ -643,8 +643,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`motionTodos`). Each that differs is a row of the component's Motion tab and of the Status page's Motion: one Figma
   animates and the code does not, Claude's; one the code animates and Figma does not, You in Figma.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its source renders: a React component as the project's own React renders it (built by its Vite
-  or its webpack; `react-harness.mjs`), else its return read as text, a Vue component as the project's own build
+  own pages, else what its source renders: a React component as the project's own React renders it (built by its Vite,
+  its webpack, or the webpack config Next.js or Create React App makes for it; `react-harness.mjs`), else its return read as text, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
   `<style>` blocks compile to, SCSS and scoped ones included; `vue-harness.mjs`), else its template read with its props'
   default words, else the element its Figma role asks for) with its own CSS. A Vue component is rendered in each of its
@@ -2560,8 +2560,12 @@ whatever surface the project serves, in this order:
    **A React system's components, the same way** (`react-harness.mjs`): every `.jsx` and `.tsx` component in each of
    its variants on one page, drawn by the project's own React, checked beside the other targets on every run. Its
    build is read in the same order: Vite (`vite.config`), webpack (`webpack.config` with a rule whose loader compiles
-   JSX: Babel's, TypeScript's, SWC's or esbuild's, built from the project's folder as its own build runs), else Vite
-   with React's plugin installed. A project with React and no such build is told so; with none of its own React, the
+   JSX: Babel's, TypeScript's, SWC's or esbuild's, built from the project's folder as its own build runs), the webpack
+   config Next.js or Create React App makes for the app (`react-apps.mjs`: as `next dev` or `react-scripts start` would,
+   tried on Next.js 15 and react-scripts 5), else Vite with React's plugin installed. Each case is drawn inside the
+   providers the project's own app wraps it in (`react-app-context.mjs`: read from its entry, its Next.js layout or
+   `_app`, and its Storybook preview's decorators; one whose props use a name not traced to an import or a plain value
+   is left out and said), with the lists and objects the project's own pages pass it, read as data and never run. A project with React and no such build is told so; with none of its own React, the
    stand-in draws its components only where there is no other page to check.
    **Every variant, every run.** The components rendered from their code are tried in Figma's variants when Figma has
    the component (the default, each other value of each variant prop, each on/off prop flipped), else in the code's

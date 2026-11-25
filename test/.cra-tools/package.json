@@ -1,0 +1,1 @@
+{ "private": true, "description": "The react-scripts a React system built as a Create React App app has, for test/react-apps.test.mjs: its components drawn by the webpack config react-scripts makes for it.", "dependencies": { "react": "18", "react-dom": "18", "react-scripts": "5.0.1" } }

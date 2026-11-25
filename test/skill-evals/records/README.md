@@ -336,5 +336,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-24-the-contracts-as-a-wordpress` | The 25 guide tasks on Haiku (engine b570a62f) | "The contracts as a WordPress theme: the button, link and headings styled by the system, only what theme.json can say" |
 | `2026-11-24-guide-inside-compaction` | The 25 guide tasks on Haiku (engine f59f9c73) | "The main guide is held inside what a compaction keeps" |
 | `2026-11-24-a-project-with-no-react` | The 25 guide tasks on Haiku (engine f497927a) | "React components checked, drawn and read as Vue's are" |
+| `2026-11-25-react-apps-and-their-context` | The 25 guide tasks on Haiku (engine 9473b769) | "React drawn by Next.js and Create React App, inside its app's providers and with its pages' data" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

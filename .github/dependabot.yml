@@ -155,6 +155,38 @@ updates:
     commit-message:
       prefix: test-tools
   - package-ecosystem: npm
+    directory: /test/.next-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      next-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.cra-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      cra-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
     directory: /test/.storybook-tools
     schedule:
       interval: daily

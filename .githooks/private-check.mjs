@@ -2667,6 +2667,14 @@ const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', m
 const RECORD = /^test\/skill-evals\/records\//;
 const TEXT_FILE = (f) => /\.(mjs|cjs|js|jsx|tsx?|vue|svelte|md|json|jsonl|ya?ml|sh|html|css|txt)$/.test(f) || !/\./.test(f.split('/').pop());
 
+// A lockfile's "deprecated" line is the registry's notice, written by the package's own maintainer when it was
+// deprecated and copied in by npm: an old glob's says to write to its author. Like the names a lockfile carries (read
+// by --pr apart from it), it is never this repository's words, so its people and addresses are not read; a project's
+// name, a secret or a path in it still are.
+export const registryNotice = (file, line) => /(^|\/)package-lock\.json$/.test(file) && /^\s*"deprecated": "/.test(line);
+const THEIRS = new Set(['email address', 'a person\'s name', 'a person\'s first name', 'a person credited']);
+const asRepo = (file, line, found) => (registryNotice(file, line) ? found.filter((x) => !THEIRS.has(x.kind)) : found);
+
 export function repoFindings({ records = false } = {}) {
   const files = [...new Set([...git(['ls-files']).split('\n'), ...git(['ls-files', '--others', '--exclude-standard']).split('\n')])]
     .filter(Boolean).filter(TEXT_FILE);
@@ -2677,7 +2685,7 @@ export function repoFindings({ records = false } = {}) {
     if (RECORD.test(f)) { if (forbiddenHits(text)) out.push({ file: f, line: 0, kind: 'private name', what: '' }); continue; }
     // Names first over the whole file (a name split over two lines is still one name), then line by line.
     const named = forbiddenHits(text) > 0 || termHits(text) > 0;
-    text.split('\n').forEach((l, i) => { for (const x of privateFindings(l, { names: named })) out.push({ file: f, line: i + 1, ...x }); });
+    text.split('\n').forEach((l, i) => { for (const x of asRepo(f, l, privateFindings(l, { names: named }))) out.push({ file: f, line: i + 1, ...x }); });
     if (named && !out.some((x) => x.file === f && x.kind === 'private name')) out.push({ file: f, line: 0, kind: 'private name', what: '' });
   }
   return out;
@@ -2695,7 +2703,7 @@ function diffFindings(diff, at = '') {
       const text = l.slice(1);
       const found = RECORD.test(file)
         ? [...(forbiddenHits(text) ? [{ kind: 'private name', what: '' }] : []), ...secrets(text).map((w) => ({ kind: 'a secret', what: w })), ...localPaths(text).map((w) => ({ kind: 'a path on someone\'s computer', what: w }))]
-        : privateFindings(text);
+        : asRepo(file, text, privateFindings(text));
       for (const x of found) out.push({ file: at + file, line, ...x });
       line++;
     }
