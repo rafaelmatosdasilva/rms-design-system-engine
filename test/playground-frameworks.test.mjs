@@ -52,6 +52,22 @@ test('a Lit, a plain custom element and an Angular component are written by thei
   assert.equal(importOf({ tag: 'acme-tabs', syntax: 'angular', exportName: 'AcmeTabsComponent', file: 'src/components/acme-tabs.component.ts' }).line, "import { AcmeTabsComponent } from '@/components/acme-tabs.component';");
 });
 
+// A class component never falls through to the JSX reading. A custom element is often a class in one file and a
+// `customElements.define` in a barrel beside it, and its own file then declares no tag: it used to come back as its
+// class name in JSX, so a contract told an agent to write `<AcmeSwitch>` in a Lit system, which runs nothing. A tag
+// nobody declared is left unsaid instead, because a wrong tag is worse than none.
+test('a class component with no tag of its own is never given its class name as a JSX tag', () => {
+  const lit = "import { LitElement, html } from 'lit';\nexport default class AcmeSwitch extends LitElement { render() { return html`<button role=\"switch\"></button>`; } }\n";
+  assert.deepEqual(callName('acme switch', '/x/acme-switch.component.ts', lit), { syntax: 'html', framework: 'lit' });
+  const anon = "customElements.define('acme-badge', class extends HTMLElement { connectedCallback() { this.innerHTML = '<span></span>'; } });\n";
+  assert.deepEqual(callName('acme badge', '/x/acme-badge.ts', anon), { tag: 'acme-badge', syntax: 'html' }, 'a class written straight into the define has no name to export, and its tag is still its own');
+  const ng = "import { Component } from '@angular/core';\n@Component({ template: '<div></div>' })\nexport class AcmeOddComponent {}\n";
+  assert.deepEqual(callName('acme odd', '/x/acme-odd.component.ts', ng), { syntax: 'angular', exportName: 'AcmeOddComponent' }, 'an Angular component with no selector is still Angular');
+  // What a JSX file does is untouched.
+  const jsx = "export function AcmeCard() { return <div className=\"card\" />; }\n";
+  assert.deepEqual(callName('acme card', '/x/AcmeCard.jsx', jsx), { tag: 'AcmeCard', syntax: 'jsx' });
+});
+
 // ── The real thing: each system's style guide built with its own build, and its Playground opened in Chrome ──
 const TABS_LIT = `import { LitElement, html, css } from 'lit';
 
