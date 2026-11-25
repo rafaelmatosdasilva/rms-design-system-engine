@@ -40,7 +40,7 @@
       }
     });
     (api.props || []).forEach(function (q) {
-      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^[:.?[]/, '').split(/[=\s\]]/)[0]) === low(q.name); })) attrs.push(syn === 'html' ? q.name + '="…"' : bind(q.name, '…'));
+      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^[:.?[]/, '').split(/[=\s\]]/)[0]) === low(q.name); })) attrs.push(syn === 'html' || syn === 'vue' ? q.name + '="…"' : bind(q.name, '…'));
     });
     // Each list it was drawn with (a bar's tabs), written as the code takes it.
     Object.keys(c.codeLists || {}).forEach(function (k) {
