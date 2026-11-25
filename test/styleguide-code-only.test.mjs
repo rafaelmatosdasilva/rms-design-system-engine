@@ -224,3 +224,35 @@ test('with no Figma data and no component in the code, the style guide says ther
   assert.match(r.stdout, /No Figma data yet, and no component found in the code: nothing to compare\./, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /Figma and the code agree on everything/);
 });
+
+// A Lit, an Angular or a plain Web Component is drawn by the project's own build. When that build cannot run, the
+// pages used to show nothing at all for it, where a Vue or a React component falls back to the markup its own source
+// holds. The code's grammar had read a class component's template all along (templateOf, templateUrl included) and the
+// style guide never asked it for one. Plain Web Components had no test at the control center either, only at the reader.
+test('a Web Component whose build cannot run still shows the markup its own source holds, without its shadow styles', { timeout: budget(300000) }, () => {
+  const dir = tempDir('sg-wc-');
+  mkdirSync(join(dir, 'src', 'components'), { recursive: true });
+  mkdirSync(join(dir, 'src', 'styles'), { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme-wc', private: true, type: 'module' }));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'src/styles/tokens.css', plugins: [], pluginCSS: [] } }, null, 2));
+  writeFileSync(join(dir, 'src', 'styles', 'tokens.css'), ':root { --acme-accent: #2563eb; }\n.acmeTag { padding: 4px 8px; border-radius: 4px; }\n');
+  // No node_modules, so the project has no build to draw it with: the case this is about.
+  writeFileSync(join(dir, 'src', 'components', 'acme-tag.js'), `/** A small label for a status. */
+class AcmeTag extends HTMLElement {
+  static get observedAttributes() { return ['tone']; }
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  connectedCallback() { this.render(); }
+  render() { this.shadowRoot.innerHTML = \`<style>:host { display: inline-block } .acmeTag { outline: 2px solid red }</style><span class="acmeTag" data-tone="\${this.getAttribute('tone') ?? 'quiet'}"><slot></slot></span>\`; }
+}
+customElements.define('acme-tag', AcmeTag);`);
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  // The build says it could not draw them, which is the case the fallback is for.
+  assert.match(r.stdout, /not drawn: the project has no Vite/, r.stdout);
+  const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
+  assert.match(page, /acme-tag/, 'the component is on the page');
+  const markup = /"markup":"((?:[^"\\]|\\.)*)"/.exec(page)?.[1] ?? '';
+  assert.match(markup, /span class=/, `its own markup is shown: ${markup.slice(0, 160)}`);
+  assert.doesNotMatch(markup, /style>/, 'the styles of its shadow root are the component\'s, never the page\'s');
+  assert.doesNotMatch(markup, /outline: 2px solid red/, 'a rule of the component never reaches the page as markup');
+});
