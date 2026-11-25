@@ -1989,7 +1989,8 @@
       draw();
     });
     tkRun();
-    // Every token in the formats people's own tools read, made at the build from Figma's variables (token-exports.mjs):
+    // Every token in the formats people's own tools read, made at the build from Figma's variables, else from the code's
+    // own token files for a system with no Figma (token-exports.mjs):
     // DTCG, the standard every other is made from, Tokens Studio with each mode a set and a theme, and a WordPress
     // theme.json, which has no modes (the first mode of each token). The page saves the files, it never makes them.
     var TF = DATA.tokenFiles;
