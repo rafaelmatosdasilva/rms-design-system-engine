@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The guide names every place the WordPress view styles (continuous evaluation)
+
+What changed since the entry below (engine 95069e43): The guide names every place the WordPress view styles. The guide changed in `reference/usage.md`.
+
+Guide set measured: `d8524665e563` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 7b2e89ae` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 23f08edc` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md e0e203c0` `reference/gates.md a8e75b2a` `reference/maintainers.md 79fed046` `reference/personality.md 851bd4e2` `reference/usage.md def88c74` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine 2d7e185a | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.046 | 0.052 |
+| Input a run | 73k | 91k |
+| Turns a run | 3.0 | 3.4 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 91k a run against 73k, in 3.4 turns against 3.0. no task changed state, and no run moved: the same result. Records: `records/wordpress-places-guide`.
+
 ## 2026-11: The scaffold and the component writers name Angular, Lit and plain Web Components (continuous evaluation)
 
 What changed since the entry below (engine 1cd3d883): Lit, Web Components and Angular checked for accessibility in every variant on every run, as Vue and React are (#739); A WordPress theme's folder is read however it is said, and the person chooses a patch or the theme changed (#742); Components written as Angular, Lit and plain Web Components, from a spec, from the docs and from Figma's build sheet, as Vue and React are. The guide changed in `cookbook/build-from-figma.md`, `reference/config.md`, `reference/usage.md`.
