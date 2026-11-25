@@ -225,7 +225,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Publishes the contracts to a shared repository.
 - Writes the whole system in the DSDS format for teams that document their system that way: components, tokens and themes, the patterns and foundations of your pages, and the rules they share, in the DSDS version your pages use.
 - Writes the contracts in the open component specs format too: each component's parts, props, slots and the tokens each part uses.
-- Writes your system as a WordPress theme, only what `theme.json` can say: your tokens as presets the editor offers, your button, link and headings as its styles, a style variation for each other look, and a patch that brings your theme in line.
+- Writes your system as a WordPress theme, only what `theme.json` can say: your tokens as presets the editor offers, your button, link and headings as its styles, a style variation for each other look, and a patch that brings your theme in line, or applied to it when you choose.
 - Records each breaking change as a release of the system, so products know what moved.
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
@@ -238,7 +238,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
 | `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
 | `/rms-design-system-engine export the Figma tokens to WordPress` | Figma's variables and components read again, then a `theme.json` with your components as its styles and a style variation per mode, with no control center built. In a folder with nothing set up, only the Figma link is asked |
-| `/rms-design-system-engine export the Figma tokens to our WordPress theme in <folder>` | The same, and a patch that brings your theme's own files in line, for you to apply |
+| `/rms-design-system-engine export the Figma tokens to our WordPress theme in <folder>` | The same, after you are asked whether to change the theme itself or only get a patch that brings its own files in line, for you to apply |
 
 ## Maintain usage guidelines
 

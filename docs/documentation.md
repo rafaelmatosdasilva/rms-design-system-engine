@@ -170,16 +170,18 @@ How modes are carried:
 Making it on request:
 
 - **Asked in Claude Code, Figma is read first.** "Export the Figma tokens to WordPress" reads Figma's variables and components again, then makes the view. When Figma cannot be read in that session, you are told, and the view comes from the last capture.
-- **Only Figma is needed.** The view is made from Figma alone, so a folder with nothing set up needs one answer: the Figma link, never asked when the request gives it. Setup then runs in that folder (built from Figma when it holds no code) and the view is made right after. A folder named in the request is the theme's, for the patch. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
+- **Only Figma is needed.** The view is made from Figma alone, so a folder with nothing set up needs one answer: the Figma link, never asked when the request gives it. Setup then runs in that folder (built from Figma when it holds no code) and the view is made right after. A folder named in the request is the theme's, for the patch. Say it as you like: in quotes, with a space (`~/Local Sites/acme/…`), from `wp-content/`, or as its `theme.json`. In a project set up from its code alone, you are asked for the link before anything runs, and only the Figma file the engine reads changes.
 - **A system built from Figma alone keeps its colours.** With no code to read, each component's colours per variant come from the Figma capture itself, so its button still gets its fill, its text and its hover.
 - **The command alone reads the capture.** `rms-design-system-engine --wordpress` makes the contracts and the view again from the Figma variables the engine last captured, and the run says their date. After a change in Figma, read it again first (`--refresh-figma`).
 
-Your theme is never changed. Give the command the theme's folder, or set `wordpress.theme` in `ds-config.json` (see [the configuration](../reference/config.md)), and it compares the theme's own `theme.json` and `styles/` with these files:
+Your theme is changed only when you choose it. Give the command the theme's folder, or set `wordpress.theme` in `ds-config.json` (see [the configuration](../reference/config.md)), and it compares the theme's own `theme.json` and `styles/` with these files:
 
+- **You are asked which you want.** Asked in Claude Code with a theme's folder, you are asked every time whether to change the theme itself or only get the patch, whatever words the request used.
 - **A patch to apply.** `contracts/wordpress/theme.diff` brings the theme in line. Apply it in the theme's folder with `git apply`.
+- **Or applied for you.** With `--apply`, the theme's files get what the patch says, and the patch stays as the record: `git apply -R` with it, in the theme's folder, puts the theme back as it was.
 - **Everything else is kept.** Templates, layout, a font's files, the names the theme gave its presets and every style the system does not write stay as they are. The theme's own indent and line ends are kept too, so the patch holds only what changed.
 - **What only the theme has stays.** A preset Figma does not have is kept and named in the run's lines, for a person to add to Figma or remove.
-- **Every audit checks it.** With `wordpress.theme` set, every audit writes the view and the patch again. A theme in line with Figma gets no patch.
+- **Every audit checks it.** With `wordpress.theme` set, every audit writes the view and the patch again, and never applies it. A theme in line with Figma gets no patch.
 
 ### The whole system in DSDS too
 
