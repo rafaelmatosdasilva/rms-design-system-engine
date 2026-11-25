@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pairsOf, sharedWith, surety, matchNote, needsNothingMeets, needLines, THIN } from '../lib/request-phrases.mjs';
-import { wordsOf } from '../lib/prototype-context.mjs';
+import { wordsOf, stemOf, STOP_WRITTEN } from '../lib/prototype-context.mjs';
 
 const OTP = 'sign in with an email, then a one-time code, then a success page';
 
@@ -59,6 +59,24 @@ test('singular and plural are one word', () => {
   for (const [a, b] of [['files', 'file'], ['tables', 'table'], ['boxes', 'box'], ['classes', 'class']]) {
     assert.deepEqual(wordsOf(a), wordsOf(b), `${a} and ${b} have to be one word`);
   }
+});
+
+// The list is written in whole words and read after the word is cut, so an entry whose stem differs from itself
+// stopped nothing. Measured on a real system: "wireframe", the recipe's own trigger word, went into the search as
+// "wirefram" and scored components on it, and two of those matches were reported as needs the system has nothing for.
+test('no word the list stops escapes it by being cut first', () => {
+  for (const w of STOP_WRITTEN) {
+    assert.deepEqual(wordsOf(w), [], `"${w}" is on the list and still reached the search as "${stemOf(w)}"`);
+  }
+});
+
+test('the words a request is read on are its own, not its grammar', () => {
+  // The four the stemmer used to let through, each written as a person writes it.
+  assert.deepEqual(wordsOf('a wireframe of this page, there, before the others'), []);
+  // And the function words that were never on the list at all.
+  assert.deepEqual(wordsOf('where you show it, and who it is for, and how'), []);
+  // What is left of a real request is what it is about.
+  assert.deepEqual(wordsOf('a wireframe for a settings page with a filter list'), ['sett', 'filter', 'list']);
 });
 
 test('what a person reads about a need', () => {
