@@ -215,9 +215,20 @@ It exits 1 when one is behind. `.github/workflows/pinned-standards.yml` runs it 
 current while anything is behind, closing it when nothing is. A new issue each week for the same standard is how a
 watch gets muted.
 
-**It proposes nothing.** Moving a pin changes what the engine writes or checks — a newer accessibility rule set finds
-different things — so a person decides it and it goes through a pull request that says what passed. DSDS keeps its own
-watch, which does propose, because it has a conformance suite to prove the move against.
+**The issue proposes nothing; a pull request does.** Moving a pin changes what the engine writes or checks — a newer
+accessibility rule set finds different things — so a person decides it, through a pull request that says what passed.
+DSDS's own watch opens one, proved against its conformance suite. The pins the npm registry is asked about (axe-core,
+IBM's checker, web-features, Playwright) get the same from `.github/workflows/pin-move.yml`, every Monday after the ask:
+
+- Each is pinned twice: its version, and the hash of the file the engine fetches for it, which the engine checks before
+  it runs any of it. `lib/pin-move.mjs` moves the two together, the hash worked out from the registry's own package.
+- A job that can write nothing moves the pin in its own copy and runs the tests that use that tool. The new version's
+  code runs only there.
+- A second job runs none of it: it moves the pin, commits, opens one pull request a pin (a draft when the tests
+  failed) with the report, and starts the whole suite on its branch.
+
+`node lib/pin-move.mjs behind` lists the ones behind, and `node lib/pin-move.mjs hash <pin> <version>` prints the hash
+a move would write.
 
 Three kinds of pin, because they go stale in different ways:
 
