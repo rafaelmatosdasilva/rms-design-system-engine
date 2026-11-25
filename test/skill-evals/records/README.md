@@ -340,5 +340,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-25-a-wordpress-theme-s-folder` | The 25 guide tasks on Haiku (engine 1cd3d883) | "A WordPress theme's folder is read however it is said, and the person chooses a patch or the theme changed" |
 | `class-writers` | The 25 guide tasks on Haiku (engine 95069e43) | "The scaffold and the component writers name Angular, Lit and plain Web Components" |
 | `wordpress-places-guide` | The 25 guide tasks on Haiku (engine 2d7e185a) | "The guide names every place the WordPress view styles" |
+| `webhook-listener` | The 25 guide tasks on Haiku (engine d7200251) | "The Figma webhook listener takes only what it should" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

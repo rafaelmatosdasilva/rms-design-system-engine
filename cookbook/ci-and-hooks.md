@@ -36,7 +36,7 @@ node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --list
 node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --delete <id>
 ```
 
-Configure `webhook.port` and `webhook.secret` in `ds-config.json`.
+Configure `webhook.port` and `webhook.secret` in `ds-config.json`. The passcode is required: the server will not start, and setup will not register, without one, and setup offers a fresh one to paste. The server listens on this computer only (`127.0.0.1`), so Figma reaches it through a tunnel or a proxy in front of it; set `webhook.host` (`"0.0.0.0"`) only where it is meant to be reached directly. Events closer together than a run takes are one run (`webhook.minIntervalSec`, 60 by default).
 
 ---
 

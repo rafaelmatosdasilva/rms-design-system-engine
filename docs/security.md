@@ -44,6 +44,16 @@ For whoever approves tools for a team: each line links to its detail below.
 
 Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTEM_ENGINE_USAGE_LOG=1`) stay on your computer. A Figma webhook exists only if you deploy `webhook-server.mjs` yourself.
 
+### The Figma webhook listener
+
+What reaches it can start checks on your computer, so it takes only what it should:
+
+- **This computer only.** It listens on `127.0.0.1` unless `webhook.host` in `ds-config.json` says otherwise. Figma reaches it through a tunnel or a proxy you put in front of it.
+- **Never without a passcode.** It will not start, and `setup-webhook.mjs` will not register it with Figma, with no `webhook.secret` (or `FIGMA_WEBHOOK_SECRET`). There is no default passcode, and setup offers a fresh one to use.
+- **The passcode compared in constant time.** A wrong one is refused in the same time however close it is.
+- **Nothing larger than an event.** A body past 64 KB is refused before it is read to its end.
+- **One run at a time.** Events closer together than a run takes are one run after it (`webhook.minIntervalSec`, 60 by default), never a queue.
+
 ### Tokens
 
 - Each token lives in a `.env` in the folder you run the engine from, kept out of git, per person. The installer asks for it hidden and writes a `.env` only you can read.
