@@ -1,7 +1,7 @@
 // route.mjs: the request routed to a recipe and the exact command by the engine, the same on any model.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { route, routeText, namedComponents, otherSystem } from '../lib/route.mjs';
+import { route, routeText, namedComponents, otherSystem, themeFolderSaid } from '../lib/route.mjs';
 
 const P = { hasConfig: true, components: ['button', 'chip', 'field', 'statusBar'] };
 const r = (text, p = P) => route(text, p);
@@ -312,8 +312,9 @@ test('the tokens as a WordPress theme\'s files, with the theme\'s folder when th
   }
   assert.match(r('export the tokens to WordPress').notes.join(' '), /its variables and its components/, 'Figma read again first: the theme takes its tokens and its components');
   assert.match(r('export the tokens to WordPress').say.join(' '), /The WordPress theme uses the committed snapshots/, 'with no Figma tool here, the person hears the theme comes from the last capture');
-  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run.at(-1), 'rms-design-system-engine --wordpress ../acme-theme');
-  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run.at(-1), 'rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme"', 'quoted, and the engine reads the ~ as the home');
+  assert.deepEqual(r('exporta os tokens para o tema WordPress em ../acme-theme').run.at(-1), 'rms-design-system-engine --wordpress ../acme-theme [--apply]');
+  assert.deepEqual(r('update the WordPress theme at ~/sites/acme/wp-content/themes/acme.').run.at(-1), 'rms-design-system-engine --wordpress "~/sites/acme/wp-content/themes/acme" [--apply]', 'quoted, and the engine reads the ~ as the home');
+  assert.equal(r('export the tokens to WordPress').ask, undefined, 'no theme named: nothing to ask');
   assert.ok(!r('how does the WordPress export work?').run.some((c) => c.includes('--wordpress')));
   // Nothing set up yet: setup here, from Figma alone, the Figma link the only question, and the export right after.
   const fresh = r('export the Figma tokens to WordPress', { ...P, hasConfig: false, noCode: true });
@@ -335,6 +336,33 @@ test('the tokens as a WordPress theme\'s files, with the theme\'s folder when th
   assert.equal(given.run[0], "rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Acme'");
   assert.equal(given.ask, undefined, 'the link given is not asked again');
   assert.ok(!(r('save dark.theme.json to the themes store').run ?? []).some((c) => c.includes('--wordpress')));
+});
+
+test('the theme\'s folder however it is said, and the person always asked whether the theme itself is changed', () => {
+  const folderOf = (q) => r(q).run.at(-1).replace(/^rms-design-system-engine --wordpress /, '').replace(/ \[--apply\]$/, '');
+  const said = [
+    ['exporta os tokens para o theme.json em ~/Local Sites/acme/app/public/wp-content/themes/acme/theme.json', '"~/Local Sites/acme/app/public/wp-content/themes/acme/theme.json"', 'a space in a local site\'s folder'],
+    ['export the tokens to WordPress in "/Users/someone/Local Sites/acme/wp-content/themes/acme"', '"/Users/someone/Local Sites/acme/wp-content/themes/acme"', 'in quotes'],
+    ['exporta os tokens para o theme.json em `~/sites/acme/theme.json`', '"~/sites/acme/theme.json"', 'in backticks'],
+    ['exporta para o WordPress no tema wp-content/themes/acme', 'wp-content/themes/acme', 'no leading dot'],
+    ['export the tokens to WordPress into C:\\sites\\acme\\theme.json', '"C:\\\\sites\\\\acme\\\\theme.json"', 'a Windows path, its backslashes kept from the shell'],
+    ['exporta os tokens para /srv/acme/theme.json, por favor', '/srv/acme/theme.json', 'the punctuation after it is not the path\'s'],
+  ];
+  for (const [q, folder, why] of said) assert.equal(folderOf(q), folder, why);
+  assert.equal(themeFolderSaid('export the Figma tokens to WordPress from https://www.figma.com/design/AbC123/Acme'), null, 'a link is never the folder');
+  assert.equal(themeFolderSaid('escreve os tokens no theme.json do tema acme-theme'), null, 'a theme\'s name alone is not a folder');
+  assert.equal(themeFolderSaid('exporta e/ou sincroniza o theme.json'), null);
+  // Asked every time, whatever the words: "write it to our theme" reads either way, and a wrong guess changes their code.
+  for (const q of ['escreve os tokens no theme.json em ../acme', 'apply the Figma tokens to our WordPress theme in ../acme', 'exporta os tokens para o tema WordPress em ../acme']) {
+    const x = r(q);
+    assert.equal(x.recipe, 'refresh-figma', q);
+    assert.equal(x.run.at(-1), 'rms-design-system-engine --wordpress ../acme [--apply]', q);
+    assert.match(x.ask, /^whether to change the theme in \.\.\/acme itself \(its files written, a patch kept that undoes it\) or only make the patch/, q);
+    assert.match(x.askHow, /--apply when they want the theme changed, left out for the patch only/);
+  }
+  const both = r('export the tokens to WordPress in ../acme', { ...P, noFigma: true });
+  assert.match(both.ask, /Figma file .*, and whether to change the theme in \.\.\/acme/, 'one message with both questions');
+  assert.match(both.askHow, /the link in --figma-url, and --apply/);
 });
 
 test('Code Connect files drafted from the contracts, for the components that have none; a check of the ones there, or how to write one, is not that', () => {

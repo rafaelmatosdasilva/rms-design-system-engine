@@ -141,7 +141,8 @@ Once `ds-config.json` exists, extract:
   (`contracts/wordpress/`: `theme.json` with the tokens as presets and the components as styles, `styles/<mode>.json` for
   each other mode, `styles/blocks/<name>.json` for each other look of a button) is written on every run; with this set,
   every audit also writes `theme.diff`, the patch that brings the theme's own files in line, for a person to `git apply`
-  in that folder. The theme is never changed. `--wordpress [<folder>]` does the same on its own (docs/documentation.md,
+  in that folder. An audit never changes the theme, and no setting does: only `--wordpress [<folder>] --apply`, when the
+  person chose it, writes the patch into it. `--wordpress [<folder>]` does the same on its own (docs/documentation.md,
   The whole system in a WordPress theme).
   - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
   - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is; setup sets it when the theme CSS does.

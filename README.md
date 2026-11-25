@@ -73,7 +73,7 @@ Then ask in plain words, such as `/rms-design-system-engine check the button`. [
 # Security and enterprise
 
 - **Runs on your machines.** No server, no account and no telemetry. It talks only to the services you already use, listed host by host for your firewall.
-- **Your data stays yours.** Tokens stay in each person's own `.env`, and code people wrote is never changed: findings come back as patches.
+- **Your data stays yours.** Tokens stay in each person's own `.env`, and code people wrote is never changed unless you choose it: findings come back as patches.
 - **Nothing extra to trust.** No npm dependencies. Every release is signed and comes with a software bill of materials.
 - **Compliance answered.** GDPR, SOC 2, ISO 27001, HIPAA and the AI model's terms, each in one line.
 

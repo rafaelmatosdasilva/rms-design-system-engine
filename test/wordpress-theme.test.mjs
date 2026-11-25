@@ -76,6 +76,40 @@ test('with the theme\'s folder: a patch git applies there, the theme untouched, 
   assert.match(wordpressLines(again).join('\n'), /The theme is in line with Figma: no patch\./);
 });
 
+test('with --apply, chosen by the person: the theme gets what the patch says, the patch kept, and it undoes it', async () => {
+  const { dir, cfg } = project();
+  const folder = join(dir, 'Local Sites', 'acme');
+  mkdirSync(folder, { recursive: true });
+  const ours = await writeWordpress(dir, cfg);
+  const first = ours.theme.settings.color.palette[0];
+  const theirs = { version: 3, title: 'Their theme', settings: { layout: { contentSize: '720px' }, color: { palette: [{ ...first, color: '#123456' }, { slug: 'theirs-only', color: '#ff00ff', name: 'Theirs' }] } } };
+  const text = JSON.stringify(theirs, null, 2) + '\n';
+  writeFileSync(join(folder, 'theme.json'), text);
+  // Not asked for: the theme stays as it was, whatever the folder.
+  const patchOnly = await writeWordpress(dir, cfg, { theme: 'Local Sites/acme' });
+  assert.equal(readFileSync(join(folder, 'theme.json'), 'utf8'), text);
+  assert.equal(patchOnly.applied, undefined);
+  assert.match(wordpressLines(patchOnly).join('\n'), /or ask for it applied \(--apply\)\. Nothing in the theme was changed\./);
+  const r = await writeWordpress(dir, cfg, { theme: 'Local Sites/acme/theme.json', apply: true });
+  assert.equal(r.applied, 2, 'theme.json and the Dark variation');
+  const after = json(join(folder, 'theme.json'));
+  assert.deepEqual([after.title, after.settings.layout], ['Their theme', { contentSize: '720px' }], 'what the system does not own is kept');
+  assert.equal(after.settings.color.palette[0].color, first.color, 'Figma\'s value');
+  assert.ok(after.settings.color.palette.some((c) => c.slug === 'theirs-only'), 'a preset only the theme has stays');
+  assert.match(readFileSync(join(folder, 'theme.json'), 'utf8'), /^\{\n {2}"version"/, 'the theme\'s own indent');
+  assert.ok(existsSync(join(folder, 'styles', 'dark.json')));
+  assert.ok(existsSync(join(dir, r.patch)), 'the patch is kept as the record');
+  assert.match(wordpressLines(r).join('\n'), /Applied to the theme in .*Local Sites\/acme: 2 files written\. The patch is kept as the record → contracts\/wordpress\/theme\.diff \(git apply -R "?\/.*contracts\/wordpress\/theme\.diff"? in that folder/);
+  // The record undoes it, back to the theme as it was.
+  execFileSync('git', ['apply', '-R', join(dir, r.patch)], { cwd: folder });
+  assert.equal(readFileSync(join(folder, 'theme.json'), 'utf8'), text);
+  assert.equal(existsSync(join(folder, 'styles', 'dark.json')), false);
+  // Applied again, the theme is in line: nothing to write, no patch.
+  await writeWordpress(dir, cfg, { theme: 'Local Sites/acme', apply: true });
+  const again = await writeWordpress(dir, cfg, { theme: 'Local Sites/acme', apply: true });
+  assert.deepEqual([again.patch, again.applied], [null, undefined]);
+});
+
 test('nothing to make it from, and a theme folder that is not there, are said', async () => {
   const { dir, cfg } = project();
   const missing = await writeWordpress(dir, { ...cfg, paths: { ...cfg.paths, snapshotVars: 'nowhere.json' } });
