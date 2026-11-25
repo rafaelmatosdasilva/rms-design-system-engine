@@ -1,0 +1,28 @@
+{
+  "_note": "Acme with Figma's side, for test/class-parity.test.mjs. Every name is invented.",
+  "name": "Acme",
+  "figma": {
+    "modes": [
+      {
+        "name": "Light",
+        "snapshotKey": "light",
+        "cssSelector": "root"
+      }
+    ],
+    "namingConvention": {
+      "prefix": "--acme-"
+    }
+  },
+  "paths": {
+    "themeCSS": "src/styles/tokens.css",
+    "snapshotVars": "figma/vars.snapshot.json",
+    "snapshotStructure": "figma/structure.snapshot.json",
+    "compPropsSnapshot": "figma/props.snapshot.json"
+  },
+  "componentFiles": {
+    "acme-button": "src/components/acme-button/acme-button.component.ts"
+  },
+  "componentSelectors": {
+    "acme-button": ".acmeButton"
+  }
+}

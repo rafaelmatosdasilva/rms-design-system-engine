@@ -1,0 +1,8 @@
+{
+  "_updated": "2026-11-25T00:00:00.000Z",
+  "_note": "Invented Figma component structure for Acme.",
+  "components": {
+    "acme-button": { "h": 36, "innerRadiusVar": "radius-l", "colors": { "fill": { "token": "accent" }, "text": { "token": "on-accent" } }, "defaultVariant": "", "variants": {} },
+    "acme-badge": { "innerRadiusVar": "radius", "colors": { "fill": { "token": "accent" }, "text": { "token": "on-accent" } }, "defaultVariant": "", "variants": {} }
+  }
+}
