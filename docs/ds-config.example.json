@@ -46,10 +46,12 @@
   "_visual_note": "Directory for stored reference screenshots. Commit this dir to track visual history.",
   "visualRefs": ".design-system-engine-refs",
 
-  "_webhook_note": "Config for webhook-server.mjs. Run setup-webhook.mjs to register with Figma.",
+  "_webhook_note": "Config for webhook-server.mjs. Run setup-webhook.mjs to register with Figma. secret is required. host is 127.0.0.1 (this computer only) unless set. minIntervalSec: the least time between two runs.",
   "webhook": {
     "port": 3456,
-    "secret": "YOUR_WEBHOOK_SECRET"
+    "host": "127.0.0.1",
+    "secret": "YOUR_WEBHOOK_SECRET",
+    "minIntervalSec": 60
   },
 
   "_guidelines_note": "Optional. Written guidelines for the design intent. sources = committed md/json files. source.notion = one page link (NOTION_TOKEN in .env). source.gitlab = wiki page or Markdown file links, gitlab.com or your own GitLab (GITLAB_TOKEN with read_api in .env for private projects, GITLAB_HOST for a company server).",
