@@ -147,3 +147,35 @@ customElements.define('acme-tag', AcmeTag);`);
     assert.equal(await inPage(`document.querySelector('acme-tag').shadowRoot.querySelector('.tag') ? 'drawn' : 'empty'`), 'drawn');
   } finally { browser.kill(); await h.close(); }
 });
+
+// A page for one component draws it and what it nests, followed in turn. The scope was worked out for Vue and React
+// alone, and a class component's build read the name asked for by itself: a page for a component that holds another
+// drew the one named and left the other to its source. Measured on a real build before the fix: 1 of 1 drawn, where
+// the same page now draws 2 of 2.
+test('a page for one Web Component draws what it nests too, as a Vue or a React page does', { skip: READY, timeout: budget(600000) }, async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const dir = tempDir('wc-scope-');
+  mkdirSync(join(dir, 'src', 'components'), { recursive: true });
+  mkdirSync(join(dir, 'src', 'styles'), { recursive: true });
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme-wc', private: true, type: 'module' }));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'src/styles/tokens.css', plugins: [], pluginCSS: [] } }, null, 2));
+  writeFileSync(join(dir, 'src', 'styles', 'tokens.css'), ':root { --acme-accent: #2563eb; }\n.acmeTag { padding: 4px; }\n.acmeIcon { width: 16px; }\n');
+  writeFileSync(join(dir, 'src', 'components', 'acme-icon.js'), `/** A small icon. */
+class AcmeIcon extends HTMLElement {
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  connectedCallback() { this.shadowRoot.innerHTML = \`<span class="acmeIcon"></span>\`; }
+}
+customElements.define('acme-icon', AcmeIcon);`);
+  writeFileSync(join(dir, 'src', 'components', 'acme-tag.js'), `/** A small label for a status. */
+class AcmeTag extends HTMLElement {
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  connectedCallback() { this.shadowRoot.innerHTML = \`<span class="acmeTag"><acme-icon></acme-icon><slot></slot></span>\`; }
+}
+customElements.define('acme-tag', AcmeTag);`);
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake', '--component', 'acme-tag'],
+    { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(540000) });
+  const out = `${r.stdout}${r.stderr}`;
+  assert.match(out, /2 of 2 Lit components drawn with the project's own Lit/, `the page draws the component and what it nests: ${out.slice(-700)}`);
+});

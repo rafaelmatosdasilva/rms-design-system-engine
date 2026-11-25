@@ -319,6 +319,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 
 - Draws each component from your own markup and CSS, with Figma's props as its controls.
 - A Vue, React, Lit, Angular, Svelte or Web Component is drawn by your project's own build, every variant as it renders: its hooks, context, portals and shadow roots run, a custom element written with no library is drawn as Lit's are and needs no Lit, and an Angular one is compiled by your own Angular compiler first (`styleguide.renderVue`, `styleguide.renderReact`, `styleguide.renderLit`, `styleguide.renderAngular` or `styleguide.renderSvelte: false` reads the source instead).
+- A component whose build cannot run is still shown, from the markup its own source holds: a Vue template, a React return, or a Lit, Angular or plain custom element's own template. The run says which components it could not draw and why.
 - Every state, every theme and every breakpoint your Figma file gives.
 - Inspect outlines each part, its padding and gap, with the token behind each value.
 - It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.

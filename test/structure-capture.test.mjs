@@ -8,7 +8,7 @@ import { makeFixture, typescriptRoot } from './helpers.mjs';
 import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../lib/component-source.mjs';
 import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../lib/component-api.mjs';
 import { symbolsIn, iconRefs, iconUsage } from '../lib/icon-source.mjs';
-import { fingerprint, markupClassSet, stripScripts } from '../lib/markup-source.mjs';
+import { fingerprint, markupClassSet, stripScripts, stripStyles } from '../lib/markup-source.mjs';
 import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../lib/structure-capture.mjs';
 import { captureCode } from '../lib/code-capture.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -231,6 +231,23 @@ test('markup: fingerprint ids, DS classes, icon context and button content (scri
   assert.equal(stripScripts('<p>a</p><script>var s = "<div id=\'g\'>";'), '<p>a</p>', 'an unterminated script takes the rest of the file with it');
   assert.equal(stripScripts('<p>a</p><script>one</script><p>b</p><script>two'), '<p>a</p><p>b</p>', 'a closed one, then one left open');
   assert.equal(stripScripts('<p>a</p><p>b</p>'), '<p>a</p><p>b</p>', 'nothing to strip');
+});
+
+// A component's own template carries the styles of its shadow root, and the control center shows that template as
+// markup when the build cannot draw it. One pass over it is not enough: a tag written inside another, or one a pass
+// cuts in two, leaves a `<style` behind that the page would then draw, which is a system's rules landing in the
+// page's own. So the strip runs until the text stops changing, and the property to hold is that nothing opens a
+// style any more - not that the leftovers read prettily.
+test('markup: a style block is stripped until none opens one, however it is written', () => {
+  assert.equal(stripStyles('<style>a{}</style><span>x</span>'), '<span>x</span>');
+  assert.equal(stripStyles('<STYLE >a{}</STYLE ><b>y</b>'), '<b>y</b>', 'its case and its spaces are no escape');
+  assert.equal(stripStyles('<style>unclosed'), '', 'an unclosed one runs to the end, as a browser reads it');
+  assert.equal(stripStyles('<span>x</span>'), '<span>x</span>', 'nothing to strip');
+  // The two a single pass lets through. Over-removal is the safe side of this and is accepted.
+  for (const nasty of ['<style><style>a{}</style></style><span>x</span>', '<sty<style>a{}</style>le>x', '<style a="</style>">b{}</style>']) {
+    assert.doesNotMatch(stripStyles(nasty), /<style/i, `nothing opens a style any more: ${nasty}`);
+  }
+  assert.equal(stripScripts('<script>x</script><p>k</p>'), '<p>k</p>', 'the scripts strip is the same one and still holds');
 });
 
 test('markup: DS classes come from config, else from the saved snapshot, else none', () => {
