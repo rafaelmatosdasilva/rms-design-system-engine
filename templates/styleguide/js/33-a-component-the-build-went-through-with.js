@@ -1789,6 +1789,28 @@
         else { el.style.visibility = ''; play(el, 'enter'); shown = true; trigger.textContent = 'Hide ' + c.name; }
       });
     })();
+    // An Angular component that enters and leaves with animate.enter and animate.leave: Hide and Show put its own leave
+    // and enter classes on that element, as Angular does, and take them off once its animation has played.
+    else if (c.enterLeave && !(mv && mv.entry)) (function () {
+      var el2 = c.enterLeave, shown = true;
+      var target = function () { var h = preview.firstElementChild; return h && ((el2.at && h.querySelector('.' + el2.at)) || (el2.at && h.classList.contains(el2.at) && h) || h.firstElementChild || h); };
+      var play = function (el, cls, done) { if (!cls) { if (done) done(); return; } el.classList.add.apply(el.classList, cls.split(/\s+/)); setTimeout(function () { el.classList.remove.apply(el.classList, cls.split(/\s+/)); if (done) done(); }, playTime(el) + 50); };
+      action('Hide ' + c.name, function (trigger) {
+        var el = target(); if (!el) return;
+        if (shown) { play(el, el2.leave, function () { el.style.visibility = 'hidden'; }); shown = false; trigger.textContent = 'Show ' + c.name; }
+        else { el.style.visibility = ''; play(el, el2.enter); shown = true; trigger.textContent = 'Hide ' + c.name; }
+      });
+    })();
+    // A Lit component or a plain custom element that animates its own host: its entry played by drawing it again, and
+    // each exit by putting that class or attribute on it, the drawing put back once it has played.
+    else if (c.hostMotion && !(mv && mv.entry)) {
+      if (c.hostMotion.entry) action('Play entry', function () { refresh(); });
+      (c.hostMotion.exits || []).forEach(function (x) { action('Play exit', function () {
+        var h = preview.firstElementChild; if (!h) return;
+        if (x.cls) h.classList.add(x.cls); else h.setAttribute(x.attr, '');
+        setTimeout(function () { setTimeout(refresh, 400); }, playTime(h));
+      }); });
+    }
     else if (mv && mv.entry) action('Play entry', function () { var src = preview.firstElementChild; if (src) src.replaceWith(src.cloneNode(true)); });
     if (mv && !mv.overlay) (mv.exits || []).forEach(function (x) { action('Play exit', function () {
       var src = preview.firstElementChild; if (!src) return; src.classList.add(x);

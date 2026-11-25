@@ -18,14 +18,20 @@
     return out + e(text.slice(at));
   }
   function callCode(c, props, state) {
-    var api = c.api, syn = api.syntax, attrs = [];
+    var api = c.api, syn = api.framework === 'lit' ? 'lit' : api.syntax, attrs = [];
+    // A value bound as each framework writes it: Vue's :name="…", Angular's [name]="…", Lit's .name=${…}, React's
+    // name={…}. Plain HTML takes text only, so a value that is not text is left out there.
+    var bind = function (name, v) {
+      return syn === 'vue' ? ':' + name + '="' + v.replace(/"/g, '&quot;') + '"' : syn === 'angular' ? '[' + name + ']="' + v.replace(/"/g, '&quot;') + '"'
+        : syn === 'lit' ? '.' + name + '=${' + v + '}' : syn === 'html' ? null : name + '={' + v + '}';
+    };
     var codeProp = function (n) { return (api.props || []).find(function (q) { return low(q.name) === low(n); }); };
     props.forEach(function (p) {
       if (p.showsPart) return;   // Figma's switch for a part: the code shows it by giving the part's props
       var name = p.prop || p.label, q = codeProp(name), v = state[p.label];
       // Every prop the Playground sets, at its value now, the defaults too: the code draws what the preview shows.
       if (p.type === 'BOOLEAN') {
-        attrs.push(v ? name : syn === 'vue' ? ':' + name + '="false"' : syn === 'html' ? null : name + '={false}');
+        attrs.push(v ? name : bind(name, 'false'));
       } else if (p.type === 'VARIANT') {
         var val = q && q.values ? (q.values.find(function (x) { return low(x) === low(v); }) || v) : v;
         if (val != null && val !== '') attrs.push(name + '="' + attrText(val) + '"');
@@ -34,7 +40,7 @@
       }
     });
     (api.props || []).forEach(function (q) {
-      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^:/, '').split(/[=\s]/)[0]) === low(q.name); })) attrs.push(q.name + (syn === 'vue' || syn === 'html' ? '="…"' : '={…}'));
+      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^[:.?[]/, '').split(/[=\s\]]/)[0]) === low(q.name); })) attrs.push(syn === 'html' ? q.name + '="…"' : bind(q.name, '…'));
     });
     // Each list it was drawn with (a bar's tabs), written as the code takes it.
     Object.keys(c.codeLists || {}).forEach(function (k) {
@@ -44,13 +50,13 @@
         if (v && typeof v === 'object') return '{ ' + Object.keys(v).map(function (f) { return f + ': ' + lit(v[f]); }).join(', ') + ' }';
         return typeof v === 'string' ? "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'" : String(v);
       };
-      var list = lit(c.codeLists[k]);
-      attrs.push(syn === 'vue' ? ':' + k + '="' + list.replace(/"/g, '&quot;') + '"' : syn === 'html' ? null : k + '={' + list + '}');
+      attrs.push(bind(k, lit(c.codeLists[k])));
     });
     attrs = attrs.filter(Boolean);
     var one = attrs.length ? ' ' + attrs.join(' ') : '';
     var open = '<' + api.tag + (one.length > 60 ? '\n  ' + attrs.join('\n  ') + '\n' : one);
-    return syn === 'html' ? open + '></' + api.tag + '>' : open + (one.length > 60 ? '/>' : ' />');
+    // A custom element is never self-closed (HTML, Lit and Angular templates alike): it is closed by its own end tag.
+    return /^(html|lit|angular)$/.test(syn) ? open + '></' + api.tag + '>' : open + (one.length > 60 ? '/>' : ' />');
   }
   // The HTML the preview draws, indented, without what the page itself set on it (its centring margin).
   var VOID_TAG = /^(area|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
