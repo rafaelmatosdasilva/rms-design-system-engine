@@ -56,7 +56,12 @@ jobs:
       # (test/react-harness.test.mjs). Without these its browser tests skip, and a skipped browser test checked
       # nothing - which is what the skip count below refuses to let pass quietly.
       - name: Install the React build tools the React tests use
-        run: npm ci --prefix test/.react-tools --no-audit --no-fund
+        # Next.js and Create React App too: a React system built by either is drawn by the webpack config its framework
+        # makes (test/react-apps.test.mjs).
+        run: |
+          npm ci --prefix test/.react-tools --no-audit --no-fund
+          npm ci --prefix test/.next-tools --no-audit --no-fund
+          npm ci --prefix test/.cra-tools --no-audit --no-fund
       # Lit and the Vite a Lit project builds with (test/lit-harness.test.mjs): without them its browser tests skip.
       - name: Install the Lit build tools the Lit tests use
         run: npm ci --prefix test/.lit-tools --no-audit --no-fund
