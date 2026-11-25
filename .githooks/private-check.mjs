@@ -2810,7 +2810,7 @@ export function openPullRequest({ title, bodyFile, rest = [], run = (c, a, o) =>
   try { head = value('--head') ?? value('-H') ?? String(run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ROOT })).trim(); } catch { /* no branch */ }
   if (!repo || !head || head === 'HEAD') { log('Nothing was opened: the repository on GitHub or the branch could not be read for the REST route.'); return { ok: false, route: 'rest' }; }
   const base = value('--base') ?? value('-B') ?? 'main';
-  let url = null, number = null;
+  let url, number;
   try {
     const made = JSON.parse(String(run('gh', ['api', '-X', 'POST', `repos/${repo}/pulls`, '-f', `title=${title}`, '-f', `head=${head}`, '-f', `base=${base}`, '-F', `body=@${bodyFile}`,
       ...(rest.includes('--draft') || rest.includes('-d') ? ['-F', 'draft=true'] : []), '--jq', '{url: .html_url, number: .number}'], {})));
