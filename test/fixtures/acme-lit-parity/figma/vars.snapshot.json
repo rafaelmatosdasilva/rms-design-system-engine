@@ -1,0 +1,7 @@
+{
+  "_updated": "2026-11-25T00:00:00.000Z",
+  "_note": "Invented Figma variables for Acme.",
+  "color": { "light": { "accent": "#1f5fd6", "on-accent": "#ffffff" } },
+  "sizing": { "radius": "6px", "radius-l": "8px", "height-m": "36px" },
+  "typography": {}, "aliases": {}, "breakpoints": {}, "strings": {}, "booleans": {}, "animation": {}, "primitives": {}
+}

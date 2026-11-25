@@ -1,0 +1,17 @@
+{
+  "_updated": "2026-11-25T00:00:00.000Z",
+  "_note": "Invented Figma component properties for Acme.",
+  "acme-button": {
+    "nodeId": "1:1",
+    "properties": {
+      "tone": {
+        "type": "VARIANT",
+        "defaultValue": "loud",
+        "variantOptions": [
+          "loud",
+          "quiet"
+        ]
+      }
+    }
+  }
+}
