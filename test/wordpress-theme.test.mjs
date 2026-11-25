@@ -99,7 +99,7 @@ test('with --apply, chosen by the person: the theme gets what the patch says, th
   assert.match(readFileSync(join(folder, 'theme.json'), 'utf8'), /^\{\n {2}"version"/, 'the theme\'s own indent');
   assert.ok(existsSync(join(folder, 'styles', 'dark.json')));
   assert.ok(existsSync(join(dir, r.patch)), 'the patch is kept as the record');
-  assert.match(wordpressLines(r).join('\n'), /Applied to the theme in .*Local Sites\/acme: 2 files written\. The patch is kept as the record → contracts\/wordpress\/theme\.diff \(git apply -R "?\/.*contracts\/wordpress\/theme\.diff"? in that folder/);
+  assert.match(wordpressLines(r).join('\n'), /Applied to the theme in .*Local Sites\/acme: 2 files written\. The patch is kept as the record → contracts\/wordpress\/theme\.diff \(git apply -R "?(?:[A-Za-z]:)?\/.*contracts\/wordpress\/theme\.diff"? in that folder/);
   // The record undoes it, back to the theme as it was.
   execFileSync('git', ['apply', '-R', join(dir, r.patch)], { cwd: folder });
   assert.equal(readFileSync(join(folder, 'theme.json'), 'utf8'), text);
