@@ -1,9 +1,14 @@
 {
   "private": true,
-  "description": "ESLint, for test/lint.test.mjs: the engine's own code held to its written coding standards (docs/development.md#coding-standards). A test tool only: the engine itself has no dependency.",
+  "description": "ESLint, for test/lint.test.mjs: the engine's own code held to its written coding standards (docs/development.md#coding-standards), and the accessibility plugins Vue, Angular and Lit teams run, for test/a11y-lint.test.mjs. A test tool only: the engine itself has no dependency.",
   "dependencies": {
+    "@angular-eslint/eslint-plugin-template": "22",
+    "@angular-eslint/template-parser": "22",
     "@eslint/js": "10",
     "eslint": "10",
-    "globals": "17"
+    "eslint-plugin-lit-a11y": "5",
+    "eslint-plugin-vuejs-accessibility": "2",
+    "globals": "17",
+    "vue-eslint-parser": "10"
   }
 }
