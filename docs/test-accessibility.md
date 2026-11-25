@@ -51,9 +51,13 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
   installed (its Vite, or its webpack), so a component that keeps state, reads a context or renders through a portal
   behaves here as it does in your product. Without React installed, a smaller stand-in draws what it can and the run
   says what it left out.
-- **Every variant, beside your pages.** Your Vue or React components are drawn in each of their variants on a page of
-  their own and checked beside your control center and your pages, on every run. A variant no page shows is still
-  tried. Before, a React system's components were drawn this way only when it had no control center.
+- **Every variant, beside your pages.** Your Vue, React, Lit, Angular or plain Web Components are drawn in each of
+  their variants on a page of their own and checked beside your control center and your pages, on every run. A
+  variant no page shows is still tried. Before, React, Lit, Angular and Web Components systems had their components
+  drawn this way only when there was no control center.
+- **Inside shadow roots, everywhere.** On any page that draws components inside open shadow roots (a Lit system's
+  control center, its own page of variants), every check reaches into them and finds their parts by the same
+  selectors.
 - **Your Lit, Angular or plain Web Component, too.** A component written as a class is drawn by your own Vite and
   read where it really lives, through its shadow root. Each case is set the way its framework reads it: a property
   for Lit, an input for Angular, and for a custom element written with no library, each watched attribute under its
