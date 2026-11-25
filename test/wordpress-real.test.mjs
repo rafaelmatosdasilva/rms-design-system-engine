@@ -34,6 +34,8 @@ require_once '/wordpress/wp-load.php';
 if (!empty($_GET['theme'])) { switch_theme(sanitize_key($_GET['theme'])); echo json_encode(['active' => get_stylesheet()]); exit; }
 $s = wp_get_global_settings();
 $styles = WP_Block_Styles_Registry::get_instance()->get_registered_styles_for_block('core/button');
+$separatorStyles = WP_Block_Styles_Registry::get_instance()->get_registered_styles_for_block('core/separator');
+$kept = WP_Theme_JSON_Resolver::get_merged_data()->get_raw_data()['styles']['blocks'] ?? [];
 $markup = '';
 foreach (array_keys($styles) as $slug) $markup .= '<!-- wp:button {"className":"is-style-' . $slug . '"} --><div class="wp-block-button is-style-' . $slug . '"><a class="wp-block-button__link wp-element-button">A</a></div><!-- /wp:button -->';
 $rendered = do_blocks($markup);
@@ -43,7 +45,7 @@ echo json_encode([
   'palette' => $s['color']['palette']['theme'] ?? [], 'radiusSizes' => $s['border']['radiusSizes']['theme'] ?? [],
   'spacingSizes' => $s['spacing']['spacingSizes']['theme'] ?? [], 'fontSizes' => $s['typography']['fontSizes']['theme'] ?? [],
   'variations' => array_values(array_map(function ($v) { return $v['title'] ?? null; }, WP_Theme_JSON_Resolver::get_style_variations())),
-  'buttonStyles' => array_keys($styles), 'rendered' => $rendered, 'variationCss' => is_array($after) ? implode("\\n", $after) : (string) $after,
+  'buttonStyles' => array_keys($styles), 'separatorStyles' => array_keys($separatorStyles), 'keptBlocks' => array_intersect_key($kept, array_flip(['core/separator', 'core/quote', 'core/table', 'core/details', 'core/tag'])), 'rendered' => $rendered, 'variationCss' => is_array($after) ? implode("\\n", $after) : (string) $after,
   'css' => wp_get_global_stylesheet(),
 ]);
 `;
@@ -89,8 +91,16 @@ before(async () => {
       { when: { Variant: 'Primary', State: 'Default' }, paints: [{ token: 'button/bg', field: 'fills' }, { token: 'button/text', field: 'fills', text: true }] },
       { when: { Variant: 'Primary', State: 'Hover' }, paints: [{ token: 'button/bg-hover', field: 'fills' }, { token: 'button/text', field: 'fills', text: true }] },
       { when: { Variant: 'Outline', State: 'Default' }, paints: [{ token: 'surface/base', field: 'fills' }, { token: 'button/bg', field: 'strokes' }, { token: 'button/bg', field: 'fills', text: true }] },
-    ] } }], { refOf: (t) => made.refs[String(t).replace(/^\{|\}$/g, '').split('/').join('.')] ?? null });
-  theme(join(root, 'acme-fluid'), 'Acme fluid', [['theme.json', { ...made.theme, styles: components.styles }], ...[...made.variations, ...components.variations].map((v) => [v.file, v.theme])]);
+    ] } },
+    // The places WordPress keeps beyond the button, each read from its element, written with the system's radius.
+    ...[['divider', 'hr'], ['quote', 'blockquote'], ['dataTable', 'table'], ['disclosure', 'details'], ['caption', 'figcaption'], ['source', 'cite']]
+      .map(([name, element]) => ({ name, semantics: { element }, anatomy: { root: { radiusToken: '{radii.button}' } } })),
+    // A second divider, as a style of the Separator block.
+    { name: 'rule', semantics: { element: 'div' }, accessibility: { role: { value: 'separator' } }, anatomy: { root: { radiusToken: '{radii.button}' } } },
+  ], { refOf: (t) => made.refs[String(t).replace(/^\{|\}$/g, '').split('/').join('.')] ?? null });
+  // With one block WordPress has not (core/tag), so what WordPress keeps is shown to be its own choice, not an echo.
+  const fluidStyles = { ...components.styles, blocks: { ...components.styles.blocks, 'core/tag': { border: { radius: '8px' } } } };
+  theme(join(root, 'acme-fluid'), 'Acme fluid', [['theme.json', { ...made.theme, styles: fluidStyles }], ...[...made.variations, ...components.variations].map((v) => [v.file, v.theme])]);
 
   mkdirSync(join(root, 'proof'));
   writeFileSync(join(root, 'proof', 'index.php'), PROOF);
@@ -141,4 +151,25 @@ test('in a real WordPress, a button\'s hover, its Outline look and a fluid font 
   assert.match(wp.rendered, /class="wp-block-button is-style-button-outline/, 'a Button block can take the Outline style');
   assert.match(wp.variationCss, /background-color: var\(--wp--preset--color--surface-base\);border-color: var\(--wp--preset--color--button-bg\);border-style: solid;color: var\(--wp--preset--color--button-bg\);/, 'and WordPress writes its colours from the system\'s tokens');
   assert.deepEqual(wp.variations, ['Dark']);
+});
+
+// WordPress has more places than the button, the link and the headings, and the view used to leave a divider, a quote,
+// a table, a disclosure, a caption and a citation out, saying WordPress had none. What WordPress itself writes into its
+// stylesheet is the answer, and it writes every one of them.
+test('in a real WordPress, a divider, a quote, a table, a disclosure, a caption and a citation are styled where WordPress keeps them', { skip: SKIP, timeout: budget(300000) }, async () => {
+  assert.equal((await read('?theme=acme-fluid')).active, 'acme-fluid');
+  const wp = await read();
+  const radius = 'var(--wp--preset--border-radius--radii-button)';
+  // Each block, kept in WordPress's own merged theme data with the system's radius: WordPress drops from that data any block
+  // or property it does not support, which the made-up block beside them shows.
+  for (const [what, block] of [['divider', 'core/separator'], ['quote', 'core/quote'], ['table', 'core/table'], ['disclosure', 'core/details']]) {
+    assert.equal(wp.keptBlocks[block]?.border?.radius, radius, `the ${what}: WordPress's ${block.replace('core/', '')} block keeps the system's radius`);
+  }
+  assert.ok(!('core/tag' in wp.keptBlocks), 'a block WordPress has not is dropped: what it keeps is its own answer');
+  // The caption and the citation are elements, written into WordPress's own stylesheet.
+  assert.match(wp.css, /wp-element-caption[^{]*\{[^}]*border-radius: var\(--wp--preset--border-radius--radii-button\)/, 'the caption: WordPress\'s caption element');
+  assert.match(wp.css, /(^|\})cite\{[^}]*border-radius: var\(--wp--preset--border-radius--radii-button\)/, 'the citation: WordPress\'s cite element');
+  // A second divider is a style of the Separator block, kept and offered by name.
+  assert.equal(wp.keptBlocks['core/separator']?.variations?.rule?.border?.radius, radius);
+  assert.deepEqual(wp.separatorStyles, ['rule'], 'offered by name in the editor');
 });

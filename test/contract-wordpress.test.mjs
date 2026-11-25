@@ -82,3 +82,47 @@ test('a token the theme has no name for is written as its value, and a component
   assert.ok(r.left.some((x) => x.component === 'h2Title' && /no padding, radius, type style or colour token/.test(x.why)));
   assert.equal(wordpressComponents([], opts).styles, null, 'no contracts: no styles');
 });
+
+// WordPress has more places than the button, the link and the headings, and the view knew only those three: every other
+// component was left out saying WordPress has no core block or element for it, which was untrue for a divider, a quote,
+// a table, a disclosure, a caption and a citation. A team told so does not try. Each place is read from the element
+// alone, never the name, and an element WordPress has several places for is left with that reason, never with none.
+test('a divider, a quote, a table, a disclosure, a caption and a citation go where WordPress keeps them', () => {
+  assert.equal(placeOf({ name: 'divider', semantics: { element: 'hr' } }), 'core/separator');
+  assert.equal(placeOf({ name: 'rule', semantics: { element: 'div' }, accessibility: { role: { value: 'separator' } } }), 'core/separator', 'a separator by its role');
+  assert.equal(placeOf({ name: 'quote', semantics: { element: 'blockquote' } }), 'core/quote');
+  assert.equal(placeOf({ name: 'dataTable', semantics: { element: 'table' } }), 'core/table');
+  assert.equal(placeOf({ name: 'disclosure', semantics: { element: 'details' } }), 'core/details');
+  assert.equal(placeOf({ name: 'caption', semantics: { element: 'figcaption' } }), 'caption');
+  assert.equal(placeOf({ name: 'source', semantics: { element: 'cite' } }), 'cite');
+  assert.equal(placeOf({ name: 'quoteCard', semantics: { element: 'div' } }), null, 'a name is never a place: a quote card is not a quote');
+
+  const c = (name, element, extra = {}) => ({ name, semantics: { element }, anatomy: { root: { radiusToken: '{radii.button}' } }, ...extra });
+  const r = wordpressComponents([c('divider', 'hr'), c('quote', 'blockquote'), c('dataTable', 'table'), c('disclosure', 'details'),
+    c('caption', 'figcaption'), c('source', 'cite'), c('rule', 'div', { accessibility: { role: { value: 'separator' } } })], opts);
+  assert.deepEqual(Object.keys(r.styles.blocks).sort(), ['core/details', 'core/quote', 'core/separator', 'core/table']);
+  assert.deepEqual(Object.keys(r.styles.elements).sort(), ['caption', 'cite']);
+  assert.deepEqual(r.styles.blocks['core/separator'], { border: { radius: 'var:preset|border-radius|radii-button' } }, 'written with the system\'s own token');
+  // A second of a block is a style of that block, as a second button is a style of the Button block.
+  const rule = r.variations.find((v) => v.component === 'rule');
+  assert.deepEqual(rule?.theme.blockTypes, ['core/separator']);
+  assert.ok(r.mapped.some((m) => m.component === 'rule' && /a style of the Separator block/.test(m.as)), JSON.stringify(r.mapped));
+});
+
+test('what has no place is said truly: one place among several is not none, and a state is only the button\'s and the link\'s', () => {
+  const c = (name, element) => ({ name, semantics: { element }, anatomy: { root: { radiusToken: '{radii.button}' } } });
+  const r = wordpressComponents([c('codeBlock', 'pre'), c('avatar', 'img'), c('field', 'input')], opts);
+  const why = Object.fromEntries(r.left.map((l) => [l.component, l.why]));
+  assert.match(why.codeBlock, /the Code block and the Preformatted block for a pre/);
+  assert.match(why.avatar, /the Image block and the Avatar block for an img/);
+  assert.match(why.field, /no core block or element/, 'a field really has none');
+  for (const w of [why.codeBlock, why.avatar]) assert.doesNotMatch(w, /no core block/, 'WordPress has a place for it, so it is never said to have none');
+
+  // A quote with a hover: theme.json takes a state on the button and the link only, and says so rather than drop it.
+  const quote = { name: 'quote', semantics: { element: 'blockquote' }, props: [variant('State', ['Default', 'Hover'], 'Default')],
+    anatomy: { root: { radiusToken: '{radii.button}' } },
+    tokens: { byVariant: [{ when: { State: 'Default' }, paints: [{ token: 'surface/base', field: 'fills' }] }, { when: { State: 'Hover' }, paints: [{ token: 'button/bg', field: 'fills' }] }] } };
+  const q = wordpressComponents([quote], opts);
+  assert.ok(q.left.some((l) => l.component === 'quote' && /a state only on the button and the link/.test(l.why)), JSON.stringify(q.left));
+  assert.ok(!(':hover' in (q.styles.blocks['core/quote'] ?? {})), 'no pseudo-class is written where WordPress would not read it');
+});

@@ -225,7 +225,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 - Publishes the contracts to a shared repository.
 - Writes the whole system in the DSDS format for teams that document their system that way: components, tokens and themes, the patterns and foundations of your pages, and the rules they share, in the DSDS version your pages use.
 - Writes the contracts in the open component specs format too: each component's parts, props, slots and the tokens each part uses.
-- Writes your system as a WordPress theme, only what `theme.json` can say: your tokens as presets the editor offers, your button, link and headings as its styles, a style variation for each other look, and a patch that brings your theme in line, or applied to it when you choose.
+- Writes your system as a WordPress theme, only what `theme.json` can say: your tokens as presets the editor offers, your button, link, headings, caption, citation, divider, quote, table and disclosure as its styles, a style variation for each other look, and a patch that brings your theme in line, or applied to it when you choose.
 - Records each breaking change as a release of the system, so products know what moved.
 - Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
