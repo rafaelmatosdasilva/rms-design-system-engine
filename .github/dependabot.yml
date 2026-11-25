@@ -164,6 +164,13 @@ updates:
       next-tools:
         patterns:
           - '*'
+    # These tools are the Next.js app the suite proves the engine against (Next 15 with React 19, held by
+    # test/react-apps.test.mjs). A new major is another app to prove, so it is a pull request of its own, never a bump:
+    # Next 16 failed that test on 25 November 2026.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
@@ -180,6 +187,13 @@ updates:
       cra-tools:
         patterns:
           - '*'
+    # These tools are the Create React App app the suite proves the engine against (react-scripts 5 with React 18, as
+    # it ships). A new React major is another app to prove, so it is a pull request of its own, never a bump: React 19
+    # came with a lock file npm ci refused on 25 November 2026.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
