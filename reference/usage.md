@@ -226,10 +226,11 @@ checks each piece once it exists, and hands back the starting files when asked (
 - **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
 - **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
-- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react|shadcn] [--folder <folder>]` writes each
+- **Starting files (`--scaffold`).** `--scaffold [component…] [--framework vue|react|shadcn|angular|lit|"web component"] [--folder <folder>]` writes each
   component still to build (all of them in build order, or the ones named) from what is exact in Figma, as one patch
   that adds the files: `.design-system-engine-out/handback/scaffold.patch`, for a person to apply with `git apply`.
-  Each is the component file and a stylesheet of its own beside it (`Button.vue` or `Button.jsx` with `button.css`):
+  Each is the component file and a stylesheet of its own beside it (`Button.vue` or `Button.jsx` with `button.css`), or, for
+  Angular, Lit or a plain custom element, one file holding its styles as its framework does (`acme-button.component.ts`):
   its element by its role (a `<button type="button">`), its props as the catalog names them (a variant of True and
   False a boolean), a modifier class for each value that has one and the element's `disabled` where a value is
   `:disabled`, its text props as text, the system's components it holds as their tags, and every rule of its build

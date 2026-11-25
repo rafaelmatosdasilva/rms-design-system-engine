@@ -908,6 +908,11 @@ A system that exists only in Figma, built in code piece by piece, each piece che
 - **Every rule of its build sheet.** Its sizes, spacing and colours as your variables, a class for each option that changes its look, and its own height where an option changes it.
 - **What is still yours.** What Figma does not say exactly, such as what a state is wired to or a focus ring the design does not draw, is listed at the top of the file, never made up.
 
+- **The Angular, Lit or plain Web Components way.** In a project with Angular or Lit installed, or one whose `ds-config.json` says `"framework": "web component"`, each component is written in that framework's own words, with its styles inside the file as that framework keeps them.
+  - **Angular:** a standalone component with its selector, an `@Input` for each prop, and its template bound with `[class]`, `[disabled]` and `{{ }}`.
+  - **Lit:** a `LitElement` with its properties and their defaults, and its `html` template bound with `${this.…}` and `?disabled`.
+  - **A plain custom element:** an element that draws into its own shadow root, each prop an attribute it watches, and everything it writes escaped.
+  - **Your names.** The file, the class and the tag are named as your own components are (`acme-chip.component.ts`, `AcmeChipComponent`, the `acme-` prefix your tags share). A tag with no dash, which a custom element cannot have, is listed as yours to name.
 - **The shadcn/ui way, in a shadcn/ui project.** Each component is a `.tsx` in the ui folder `components.json` names, its options a `cva` call, joined with `cn()` from your utils alias, its root named by `data-slot`, and `asChild` through Radix's `Slot` when your project has it. A state Figma draws on the element (Disabled) is Tailwind's prefix for it (`disabled:`), and each value is written as the utility that reads its variable (`px-(--space-m)`), never as a value in brackets.
 
 ### What it never does
@@ -1023,6 +1028,7 @@ The same spec Figma is built from, written as a component file the way your own 
 ### What it follows
 
 - **Your construction rules.** Your framework, the folder and file name, how parts and options are named, and how props are written, all read from your own code.
+- **Your framework, whichever it is.** Vue, React, Angular, Lit or plain Web Components, told from your own components, else from what your project installs, else from `framework` in `ds-config.json`. Build from your documentation writes with the same writer.
 - **Your tokens.** Each value is the custom property your naming convention gives the variable.
 - **Your text styles.** Each text is set the way your components set it, with your mixin or your class.
 - **Your components.** A part that is another of your components is written as its own tag.
