@@ -111,7 +111,7 @@ Actions are pinned by commit, so they are updated on purpose rather than by drif
 
 The test tools under `test/` are watched the same way, with one grouped pull request a day for each folder. A new TypeScript major is left out: TypeScript 7 has no JavaScript API, and the engine reads JSX and Props through that API, so moving to it is a person's call.
 
-The privacy check reads Dependabot's release notes like any other text. A package quoted at its version (`pinia@4.1.0`) is not an address there, since a domain ends in letters and a version in a number. An address beside one is still found.
+Dependabot's pull requests quote each package's release notes, changelog and commits, which name people, and a squash merge writes a description into the commit message. So the auto-merge workflow keeps only Dependabot's own lines (what it bumps, from which version to which) before turning auto-merge on (`lib/dependabot-body.mjs`), and the privacy check reads that. A package quoted at its version (`pinia@4.1.0`) is not an address to that check either, since a domain ends in letters and a version in a number. An address beside one is still found.
 
 ### When a job never got a machine
 

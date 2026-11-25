@@ -18,6 +18,21 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Dependabot quotes each package's release notes and commits, which name people, and a squash merge writes the
+      # description into the commit message, so the privacy check refused the bump (lib/dependabot-body.mjs says why).
+      # Its own lines, what it bumps and to which version, are kept; editing the description re-runs that check.
+      - name: Keep Dependabot's own words in the description
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr view "$PR" --repo "$REPO" --json body --jq .body > "$RUNNER_TEMP/body.md"
+          node lib/dependabot-body.mjs "$RUNNER_TEMP/body.md" > "$RUNNER_TEMP/own.md"
+          if ! cmp -s <(sed -e '$a\' "$RUNNER_TEMP/body.md") "$RUNNER_TEMP/own.md"; then gh pr edit "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/own.md"; fi
       - run: gh pr merge "$PR" --auto --squash --repo "$REPO"
         env:
           PR: ${{ github.event.pull_request.number }}
