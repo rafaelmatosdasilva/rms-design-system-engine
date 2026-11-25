@@ -100,6 +100,12 @@ updates:
       nuxt-tools:
         patterns:
           - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
@@ -116,6 +122,12 @@ updates:
       vue-tools:
         patterns:
           - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
@@ -132,6 +144,12 @@ updates:
       vue-cli-tools:
         patterns:
           - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
@@ -148,6 +166,12 @@ updates:
       react-tools:
         patterns:
           - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
     labels:
       - 'release: patch'
@@ -208,6 +232,110 @@ updates:
       timezone: Etc/UTC
     groups:
       storybook-tools:
+        patterns:
+          - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.angular-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      angular-tools:
+        patterns:
+          - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.lit-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      lit-tools:
+        patterns:
+          - '*'
+    # A framework's new major is another app to prove, beside the one before: a pull request of its own, found every
+    # week by lib/test-tool-majors.mjs, never a bump.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.svelte-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      svelte-tools:
+        patterns:
+          - '*'
+    # Svelte is parked (the owner's decision, 20 November 2026): its folder keeps its fixes, and nothing asks about
+    # its majors.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.reader-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      reader-tools:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'release: patch'
+      - 'after: nothing'
+    commit-message:
+      prefix: test-tools
+  - package-ecosystem: npm
+    directory: /test/.claude-cli-tools
+    schedule:
+      interval: daily
+      time: '07:00'
+      timezone: Etc/UTC
+    groups:
+      claude-cli-tools:
         patterns:
           - '*'
     open-pull-requests-limit: 5
