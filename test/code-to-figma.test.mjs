@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { opsFromCode, opsFromMarkup, markupTree, variablesByCss } from '../lib/code-to-figma.mjs';
 import { anatomyOf } from '../lib/code-grammar.mjs';
+import { templateOf } from '../lib/class-components.mjs';
 import { ground, predict, opsScript } from '../lib/figma-ops.mjs';
 
 const vue = `<template>
@@ -91,4 +92,41 @@ test('a template drawn as a frame: nested frames, the system\'s components as in
 test('a comment in the markup is taken out however it nests or is left open', () => {
   assert.deepEqual(markupTree('<div class="a"><!-<!-- x -->- y --><span>Hi</span></div><!-- open').kids.map((k) => k.tag), ['div']);
   assert.deepEqual(markupTree('<div class="a"><!-<!-- x -->- y --><span>Hi</span></div>').kids[0].kids.map((k) => k.tag), ['span']);
+});
+
+// The same component written as Lit, as Angular and as a plain custom element. What a prop drives was read from Vue's
+// and JSX's syntax only, so Lit's ${this.label} and ${this.showIcon ? html`…`} and Angular's {{ label }} with *ngIf
+// gave Figma no text property and no boolean: every part came out as a layer always there, with words of its own.
+const litSrc = `import { LitElement, html, css } from 'lit';
+export class AcmePill extends LitElement {
+  static styles = css\`.acme-pill { display: inline-flex; gap: var(--space-xs); padding: var(--space-s); background-color: var(--surface-muted); border-radius: var(--radius-m); }\`;
+  render() {
+    return html\`<div class="acme-pill">
+      \${this.showIcon ? html\`<acme-icon class="acme-pill__icon"></acme-icon>\` : ''}
+      <span class="acme-pill__label">\${this.label}</span>
+    </div>\`;
+  }
+}
+customElements.define('acme-pill', AcmePill);`;
+
+const ngSrc = `import { Component, Input } from '@angular/core';
+@Component({
+  selector: 'acme-pill',
+  template: \`<div class="acme-pill">
+    <acme-icon *ngIf="showIcon" class="acme-pill__icon"></acme-icon>
+    <span class="acme-pill__label">{{ label }}</span>
+  </div>\`,
+})
+export class AcmePillComponent { @Input() showIcon = true; @Input() label = 'Active'; }`;
+
+test('a Lit and an Angular component say what each prop drives, as a Vue one does', () => {
+  const styles = [{ file: 'src/acme-pill.css', text: '.acme-pill { display: inline-flex; gap: var(--space-xs); padding: var(--space-s); background-color: var(--surface-muted); border-radius: var(--radius-m); } .acme-pill__label { font-size: 13px; }' }];
+  for (const [what, file, text] of [['Lit', 'src/acme-pill.ts', litSrc], ['Angular', 'src/acme-pill.component.ts', ngSrc]]) {
+    // A class component's anatomy is built from its own template, as codeInputs builds it (code-grammar.mjs).
+    const a = anatomyOf({ file, text, template: templateOf(file, text), styles, root: 'acme-pill', props: ['showIcon', 'label'] });
+    const ops = opsFromCode({ name: 'acmePill', text, api, anatomy: a, varOf, componentOf });
+    const properties = ops.filter((o) => o.op === 'addProperty').map((o) => [o.name, o.kind]);
+    assert.ok(properties.some(([n, k]) => n === 'label' && k === 'text'), `${what}: its words are a prop, not words of its own (${JSON.stringify(properties)})`);
+    assert.ok(properties.some(([n, k]) => n === 'showIcon' && k === 'boolean'), `${what}: the part it shows is a boolean (${JSON.stringify(properties)})`);
+  }
 });

@@ -189,3 +189,34 @@ test('the facts file says whether the control read is the component itself; resu
   assert.ok(!('own' in c.oldX), 'not said, not guessed');
   assert.ok(!('own' in measuredFacts({ facts: [f(true)] })), 'the contract keeps the facts it always kept');
 });
+
+// A component written as a class keeps its markup in its own template, which neither the Vue reading nor the JSX one
+// finds: Lit's `return html`<button…`` has the tag behind a tag function, and an Angular `template:` has no return at
+// all. So every role, aria attribute and key such a component handles reached no contract, and an agent read that as a
+// component that gives a screen reader nothing. The file is what says it is a class component, so it is passed in.
+test('what a screen reader is given is read from a class component\'s own template too', () => {
+  const lit = `import { LitElement, html } from 'lit';
+export class AcmeSwitch extends LitElement {
+  render() { return html\`<button role="switch" aria-checked=\${String(this.checked)} aria-label="Notify me"></button>\`; }
+}`;
+  assert.deepEqual(markupFacts(lit, { props: ['checked'], file: '/x/acme-switch.ts' }),
+    { role: 'switch', name: 'aria-label', states: ['aria-checked'], focusable: true, keyboard: ['Enter', 'Space'] });
+  assert.equal(markupFacts(lit, { props: ['checked'] }), null, 'with no file it is not read as a class: nothing is guessed');
+
+  const ng = `import { Component } from '@angular/core';
+@Component({ selector: 'acme-switch', template: '<button role="switch" aria-pressed="false"></button>' })
+export class AcmeSwitchComponent {}`;
+  const read = markupFacts(ng, { props: [], file: '/x/acme-switch.component.ts' });
+  assert.equal(read?.role, 'switch', 'an Angular template has no return and is still read');
+  assert.equal(read?.focusable, true);
+
+  const plain = `class AcmeHint extends HTMLElement {
+  connectedCallback() { this.attachShadow({ mode: 'open' }).innerHTML = \`<p role="note">x</p>\`; }
+}
+customElements.define('acme-hint', AcmeHint);`;
+  assert.equal(markupFacts(plain, { props: [], file: '/x/acme-hint.js' })?.role, 'note', 'a plain custom element writes its own markup');
+
+  // A Vue file and a JSX one are read as they always were.
+  assert.equal(markupFacts('<template><button role="switch"></button></template>', { props: [] })?.role, 'switch');
+  assert.equal(markupFacts('export function X() { return (<button role="switch" />); }', { props: [] })?.role, 'switch');
+});
