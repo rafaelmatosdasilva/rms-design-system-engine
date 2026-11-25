@@ -229,10 +229,17 @@ test('a drafted example shows its code under its line', () => {
   assert.doesNotMatch(html.split('Limitations:')[0], /Source: none found/, 'an example says where its code is from itself');
 });
 
-test('the pages to write are ordered most used first, with a chip and each one\'s reach', () => {
-  // The Documentation page: the rows with no page sorted by their rank, a chip for them, their reach in the panel.
+test('the pages to write are the Missing rows, most used first, each with its reach', () => {
+  // The Documentation page: the rows with no page sorted by their rank, their reach in the panel.
   assert.match(tpl, /\.concat\(\(IL\.noPage \|\| \[\]\)\.slice\(\)\.sort\(function \(a, b\) \{ var r = IL\.pagesToWrite \|\| \{\}/);
-  assert.match(tpl, /\{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' \}/);
+  // A component with no page is Missing, never Review, and has no chip of its own beside the statuses.
+  const fn = (name) => new RegExp('var ' + name + ' = (function \\(p\\) \\{[^\\n]*\\});').exec(tpl)[1];
+  const docLeft = () => [{ st: 'check' }];
+  const needsReview = new Function('docLeft', `return (${fn('needsReview')})`)(docLeft);
+  const needsWrite = new Function('docLeft', `return (${fn('needsWrite')})`)(docLeft);
+  assert.equal(needsReview({ action: 'missing', missingFor: 'tileMedia' }), false, 'no page is not a review');
+  assert.equal(needsWrite({ action: 'missing', missingFor: 'tileMedia' }), true, 'no page is a page to write');
+  assert.doesNotMatch(tpl, /key: 'pagesToWrite'/);
   const src = /var ilReachOf = (function \(n\) \{[\s\S]*?'<\/span><\/p>'; \});/.exec(tpl)[1];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const namePills = (ns) => '<span class="sg-il-codes">' + ns.map((n) => '<code class="sg-name">' + esc(n) + '</code>').join('') + '</span>';

@@ -1479,7 +1479,7 @@
     // Where what is missing is written: "in Figma", "in the intent layer", or both.
     var docWhere = function (p, st) { var w = []; docLeft(p).filter(function (x) { return !st || x.st === st; }).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
     // Where what is missing is to be written, said under Missing: In Figma, In the intent layer, or both.
-    var docTopic = function (p) { if (p.tokens) return 'In Figma or the intent layer'; if (p.absent) return 'In the intent layer'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
+    var docTopic = function (p) { if (p.tokens) return 'In Figma or the intent layer'; if (p.absent || p.missingFor) return 'In the intent layer'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
     // Each thing still to write, as one block: what to write (or check). Where it goes (the spec file and its section, the
     // page's JSON being generated from it; Figma's description; the code's comment) is said only in the decision Claude
     // Code is given, which writes it.
@@ -1504,6 +1504,8 @@
       + (x.why ? '<span class="sg-il-label">Why</span><span class="sg-il-text">' + esc(x.why) + '</span>' : '') }; }); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
+    // A component with no page is Missing, whatever else it has to check: its page is what is to write, and the
+    // Missing rows are the pages to write, most used first (pages-to-write.mjs), with no chip of their own.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
     // keep it instead, and whether to remove it (once the For agents page).
     var notesOff = function (p) { var c = !p.tokens && docComp(p); return (c && c.notesLeft) || []; };
@@ -1519,8 +1521,8 @@
     };
     var needsRemove = function (p) { return notesOff(p).length > 0; };
     var removeTopic = function (p) { var n = notesOff(p).length; return n + (n === 1 ? ' note no agent reads' : ' notes no agent reads'); };
-    var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
-    var needsWrite = function (p) { if (p.absent) return !(p.drafts || []).length; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
+    var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && !p.missingFor && (p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
+    var needsWrite = function (p) { if (p.absent) return !(p.drafts || []).length; if (p.missingFor) return true; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
     // A page whose component changed since it was written: its review is that, whatever else it waits on.
     var isStale = function (p) { return (p.wrong || []).some(function (f) { return f.kind === 'stale'; }); };
@@ -1604,7 +1606,7 @@
     var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : [], p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ['pagesToWrite'] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '" data-f-area="' + esc(ilArea(p)) + '"' + (p.missingFor && (IL.pagesToWrite || {})[p.missingFor] ? ' data-f-pagesToWrite="1"' : '') + '><td>' + firstLine(c.forWhat) + '</td><td>' + esc(ilArea(p)) + '</td>' + (NO_LAYER ? '' : '<td>' + firstLine(c.file) + '</td>') + '<td>' + ilSources(p) + '</td><td>' + firstLine(c.decision) + (p._part ? '<span class="pg-par-val sg-il-part">' + esc(IL_PART_WORD[p._part]) + '</span>' : '') + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : []).join(' ') + '"') + ' data-f data-f-source="' + esc(ilSourceWords(p).join('|')) + '" data-f-status="' + esc(IL_WORD[statusOf(p)] || '') + '" data-f-waits="' + esc((statusOf(p) === 'review' && deciderOf(p)) || '') + '" data-f-area="' + esc(ilArea(p)) + '"' + '><td>' + firstLine(c.forWhat) + '</td><td>' + esc(ilArea(p)) + '</td>' + (NO_LAYER ? '' : '<td>' + firstLine(c.file) + '</td>') + '<td>' + ilSources(p) + '</td><td>' + firstLine(c.decision) + (p._part ? '<span class="pg-par-val sg-il-part">' + esc(IL_PART_WORD[p._part]) + '</span>' : '') + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i) + (p._part ? ':' + p._part : ''); };
@@ -1677,7 +1679,7 @@
       scope.addEventListener('click', function (e) { var tr = e.target.closest('table.sg-il tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
       scope.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('table.sg-il tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
       filterBar(scope, { links: links || [], total: list.length, said: 'pages',
-        chips: ilStatusChips.concat([{ key: 'pagesToWrite', label: 'Pages to write, most used first', dot: 'differs' }]),
+        chips: ilStatusChips,
         cols: [{ key: 'status' }, { key: 'source', label: 'Source', multi: true, order: SRC_ORDER }, { key: 'area', label: 'Area', order: IL_AREA_ORDER }, { key: 'waits', label: 'Waiting on' }] });
     };
     wire(ilSec, rows, sourceLinks(ilSrc.url, srcWords));
