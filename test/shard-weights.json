@@ -546,5 +546,6 @@
   "workspace.test.mjs": 0.2,
   "writes.test.mjs": 0.2,
   "writing-formats.test.mjs": 0,
-  "wrong.test.mjs": 5.3
+  "wrong.test.mjs": 5.3,
+  "framework-parts.test.mjs": 40.2
 }

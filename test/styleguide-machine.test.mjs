@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { machineFiles, machineIndex, componentPage, componentSlug, isMachineFile, MACHINE_INDEX } from '../lib/styleguide-machine.mjs';
+import { machineFiles, machineIndex, componentPage, componentSlug, isMachineFile, MACHINE_INDEX, callLine } from '../lib/styleguide-machine.mjs';
 import { writeMachine, copyPage } from '../lib/styleguide-files.mjs';
 import { readFileSync as read } from 'node:fs';
 import { tempDir } from './helpers.mjs';
@@ -26,7 +26,7 @@ const DATA = {
     {
       name: 'cardTile',
       description: 'One thing in a list.',
-      api: { tag: 'acme-card-tile', file: 'src/CardTile.vue', syntax: '<acme-card-tile size="m" />', props: [{ name: 'size', type: 'string' }, { name: 'flat', type: 'boolean' }, { name: 'rows', type: 'array' }], events: ['select'], slots: [] },
+      api: { tag: 'CardTile', file: 'src/CardTile.vue', syntax: 'vue', props: [{ name: 'size', type: 'string' }, { name: 'flat', type: 'boolean' }, { name: 'rows', type: 'array' }], events: ['select'], slots: [] },
       import: { line: "import { CardTile } from '@acme/ui';", from: '@acme/ui' },
       controls: [{ label: 'Size', prop: 'size', type: 'VARIANT', default: 'm', options: [{ label: 's' }, { label: 'm' }, { label: 'l' }] },
         { label: 'Flat', prop: 'flat', type: 'BOOLEAN', default: 'false', options: ['no', 'yes'] },
@@ -83,7 +83,7 @@ test('a component\'s file holds what its page holds: how to write it, what it ta
   // It says it is generated and where the page for people is, so nobody edits it and a reader can go there.
   assert.match(text, /Never edit this file/);
   assert.match(text, /\.\.\/index\.html#c-cardTile/);
-  assert.match(text, /## Write it like this[\s\S]*import \{ CardTile \} from '@acme\/ui';[\s\S]*<acme-card-tile size="m" \/>/);
+  assert.match(text, /## Write it like this\n\n```\nimport \{ CardTile \} from '@acme\/ui';\n<CardTile \/>\n```/);
   assert.match(text, /Its code is `src\/CardTile\.vue`\./);
   // Its props as a table, each with the default and the values the page offers.
   assert.match(text, /\| size \| string \| m \| s, m, l \|/);
@@ -182,4 +182,16 @@ test('the build writes the twin for the page it built, and never for the code ca
   assert.ok(gen.indexOf('writeStyleguide(outPath, html') < gen.indexOf('writeMachine(outPath, html)'));
   // And the run says how many files it wrote.
   assert.match(gen, /machine: machine\.files\.length/);
+});
+
+test("a component is written in its own framework's syntax, never with the framework's name in its place", () => {
+  assert.equal(callLine({ tag: 'acme-switch', syntax: 'html', framework: 'lit', props: [{ name: 'checked', type: 'boolean' }] }), '<acme-switch></acme-switch>');
+  assert.equal(callLine({ tag: 'acme-badge', syntax: 'html' }), '<acme-badge></acme-badge>', 'a plain custom element is closed by its end tag');
+  assert.equal(callLine({ tag: 'acme-chip', syntax: 'angular', props: [{ name: 'label', required: true }] }), '<acme-chip [label]="…"></acme-chip>');
+  assert.equal(callLine({ tag: 'MenuSheet', syntax: 'jsx', props: [{ name: 'items', required: true }] }), '<MenuSheet items={…} />');
+  assert.equal(callLine({ tag: 'CardTile', syntax: 'vue' }), '<CardTile />');
+  assert.equal(callLine({ syntax: 'html' }), '', 'no tag, nothing to write');
+  const lit = componentPage({ name: 'acme-switch', api: { tag: 'acme-switch', syntax: 'html', framework: 'lit' } }, { components: [] });
+  assert.match(lit, /## Write it like this\n\n```\n<acme-switch><\/acme-switch>\n```/);
+  assert.doesNotMatch(lit, /^html$/m);
 });
