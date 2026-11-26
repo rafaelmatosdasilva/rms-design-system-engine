@@ -2,7 +2,7 @@
   "private": true,
   "description": "WordPress Playground, the real WordPress (in PHP compiled to WebAssembly) the WordPress view is loaded into, for test/wordpress-real.test.mjs. Playground pins isomorphic-git and express exactly, so Dependabot cannot move them: the overrides give them their patched versions.",
   "dependencies": {
-    "@wp-playground/cli": "3.1.65"
+    "@wp-playground/cli": "3.1.66"
   },
   "overrides": {
     "isomorphic-git": "^1.38.6",
