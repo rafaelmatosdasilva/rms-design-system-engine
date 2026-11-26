@@ -413,7 +413,7 @@ Above the Documentation page's filters, a card for each source its pages come fr
 
 A project with no intent layer gets everything the Documentation page finds as a list and nothing else, and most of those lines are never carried into a file by hand. Some of them the engine is not guessing at:
 
-- **The element a component renders.** It read the code, in Vue, Svelte or JSX. A component whose root is a `div` is left alone — a box says nothing — and one your team already answered for keeps its answer.
+- **The element a component renders.** It read the code: a Vue template, JSX, a Lit template, an Angular template or what a plain custom element writes into itself. A component whose root is a `div` is left alone — a box says nothing — and one your team already answered for keeps its answer.
 - **A note that repeats the description.** An agent is shown both and reads the same thing twice, which is how a card that could have said something new says nothing.
 - **Your product's own first use of a component**, as an example. Certain that the code is real; a judgement that it is the one to show, so it is written as a draft for a person to approve.
 
@@ -435,7 +435,8 @@ What each list holds (a page's Data lines) is the engine's own, written from the
 Rules tell an agent what to do; an example shows it. A page with none gets one, drafted from how the products use the component.
 
 - **The call the products write most.** The engine reads the files the usage map names for it and finds every call. The form most of them take is the example.
-- **In the code's own syntax.** Vue, Svelte, JSX or a web component, as the component's contract says.
+- **In the code's own syntax.** Vue, Svelte, JSX, Angular's bindings, Lit's or a plain custom element's attributes, as the component's contract says.
+- **Wherever a product writes it.** A custom element's tag counts in a page, an Angular template or a Lit template alike.
 - **Only what the contract has.** Each prop, event and slot in it is one the contract names. A class, a directive or a prop the component does not take is left out.
 - **None of a product's own data.** A value the prop takes stays. A product's words become `…`, and an expression is named after its prop.
 - **Where it came from.** The line above it says how many of the uses take this form, and the file, line and product it was taken from.

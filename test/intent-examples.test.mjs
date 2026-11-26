@@ -74,6 +74,20 @@ test('the most common call, in the code\'s own syntax: only what the contract ha
   assert.equal(commonCall({ contract: { ...CONTRACT, source: { code: { file: 'x.vue' } } }, files: FILES }), null, 'no syntax named, no example');
 });
 
+test("the most common call in an Angular template and in a Lit one, in each one's own bindings", () => {
+  const ng = { ...CONTRACT, source: { code: { file: 'src/tile-media.component.ts', tag: 'acme-tile-media', syntax: 'angular' } } };
+  const tpl = '<acme-tile-media size="small" [items]="cart.lines" [title]="\'Your basket\'" (select)="pickLine($event)" *ngIf="cart" #tile [class.wide]="wide" [(dense)]="isDense"></acme-tile-media>';
+  const a = commonCall({ contract: ng, files: [{ file: 'src/app/cart.component.html', text: tpl }] });
+  assert.equal(a.code, '<acme-tile-media size="small" [items]="items" [title]="title" (select)="onSelect($event)" [(dense)]="dense"></acme-tile-media>');
+  assert.equal(a.lang, 'html', 'an Angular template is shown as HTML');
+  assert.ok(!/ngIf|#tile|class\.wide|cart|pickLine|basket/.test(a.code), 'its directives, references and own data left out');
+  const lit = { ...CONTRACT, source: { code: { file: 'src/acme-tile-media.ts', tag: 'acme-tile-media', syntax: 'html' } } };
+  const html = 'html`<acme-tile-media size="medium" .items=${this.rows} ?dense=${true} @select=${this.go}></acme-tile-media>`';
+  assert.equal(commonCall({ contract: lit, files: [{ file: 'src/app-shell.ts', text: html }] }).code, '<acme-tile-media size="medium" .items=${items} ?dense=${true} @select=${onSelect}></acme-tile-media>');
+  // A plain page writes attributes only, and keeps them.
+  assert.equal(commonCall({ contract: lit, files: [{ file: 'index.html', text: '<acme-tile-media size="small" dense onclick="x()"></acme-tile-media>' }] }).code, '<acme-tile-media size="small" dense></acme-tile-media>');
+});
+
 const call = commonCall({ contract: CONTRACT, files: FILES });
 const plannedItem = (entity) => ({ entity, page: { name: entity.name, file: entity.file, component: 'tileMedia' }, remove: [], rewrite: [], need: ['example'], example: call });
 const facts = factsFrom({ components: { tileMedia: { file: 'src/tiles/TileMedia.vue', props: { size: { options: ['small', 'medium'] } } } } });
