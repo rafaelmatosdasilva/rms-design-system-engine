@@ -341,5 +341,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `class-writers` | The 25 guide tasks on Haiku (engine 95069e43) | "The scaffold and the component writers name Angular, Lit and plain Web Components" |
 | `wordpress-places-guide` | The 25 guide tasks on Haiku (engine 2d7e185a) | "The guide names every place the WordPress view styles" |
 | `webhook-listener` | The 25 guide tasks on Haiku (engine d7200251) | "The Figma webhook listener takes only what it should" |
+| `2026-11-26-no-value-set-that-is` | The 25 guide tasks on Haiku (engine bb55b3cf) | "Pull requests open from a cloud session by GitHub's REST route" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

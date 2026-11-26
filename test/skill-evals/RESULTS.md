@@ -2,6 +2,24 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: Pull requests open from a cloud session by GitHub's REST route (continuous evaluation)
+
+What changed since the entry below (engine d7200251): The Figma webhook listener takes only what it should (#749); Each framework's badges say the parts a real run proves, and the four match (#750); A pull request opened through the privacy check opens from a cloud session too, by GitHub's REST route where its GraphQL is refused; No value set that is never read. The guide changed in `reference/maintainers.md`.
+
+Guide set measured: `68ea449c29d8` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 4f268aa7` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md e614b632` `cookbook/audit-component.md a43bfa5f` `cookbook/build-component-figma.md f3ba547e` `cookbook/build-from-figma.md 7b2e89ae` `cookbook/burndown.md 52fbb216` `cookbook/change-component-figma.md 25aba5fe` `cookbook/ci-and-hooks.md 9aaf250e` `cookbook/engine-ideas.md 0cafecf8` `cookbook/figma-edits.md 21abbd99` `cookbook/first-setup.md 66fc2449` `cookbook/fix-a-difference.md de3c90d8` `cookbook/full-audit.md b75be538` `cookbook/guidelines-links.md f2acd294` `cookbook/prototype.md 33b7e97a` `cookbook/publish-styleguide.md f0d77ac1` `cookbook/refresh-figma.md 662f4b75` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md e6166519` `reference/gates.md a8e75b2a` `reference/maintainers.md 8fc0b070` `reference/personality.md 851bd4e2` `reference/usage.md def88c74` `rms-design-system-engine.md 6b5a83b5`
+
+| Haiku, engine bb55b3cf | Entry below | This version |
+|---|---|---|
+| The 25 guide tasks (`new-ui-saved` at 10 runs) | 82/82 | 82/82 |
+| Mean cost a run | 0.047 | 0.049 |
+| Input a run | 71k | 81k |
+| Turns a run | 2.9 | 3.2 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 81k a run against 71k, in 3.2 turns against 2.9. no task changed state, and no run moved: the same result. Input moved but input a turn held (24k to 25k): the turns moved, 2.9 to 3.2, and nothing a run reads grew - most in `forbidden-green` 4.0 to 8.7, `new-ui-saved` 5.7 to 6.6, `engine-idea` 5.0 to 5.7. Records: `records/2026-11-26-no-value-set-that-is`.
+
 ## 2026-11: The Figma webhook listener takes only what it should (continuous evaluation)
 
 What changed since the entry below (engine 2d7e185a): A system with only code gets its Tokens page and the three token downloads, from its own token files (#747); The guide names every place the WordPress view styles (#748); The Figma webhook listener takes only what it should: this computer unless a host is set, a passcode always, compared in constant time, no body past an event's size, one run at a time. The guide changed in `cookbook/ci-and-hooks.md`, `reference/config.md`.

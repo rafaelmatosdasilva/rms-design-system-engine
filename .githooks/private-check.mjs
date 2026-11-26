@@ -2787,6 +2787,42 @@ export function prFindings(title, body) {
   ];
 }
 
+// The pull request opened once its words are read: by gh pr create first, which asks GitHub's GraphQL, and where that is
+// refused (a session in the cloud may not reach it), by GitHub's REST route, which answers in both places. The REST route
+// takes the base, a draft and the labels gh would have; what else gh was given is said, never dropped in silence. It
+// ends saying how to merge the same way, since auto-merge has no REST route.
+// run(cmd, args, opts) → stdout (execFileSync's shape) · log: where it speaks. → { ok, url?, route }
+export function openPullRequest({ title, bodyFile, rest = [], run = (c, a, o) => execFileSync(c, a, { encoding: 'utf8', ...o }), log = console.error } = {}) {
+  try {
+    const out = String(run('gh', ['pr', 'create', '--title', title, '--body-file', bodyFile, ...rest], { stdio: ['ignore', 'pipe', 'pipe'] }) ?? '');
+    if (out.trim()) console.log(out.trim());
+    return { ok: true, url: out.trim().split('\n').pop() || null, route: 'gh' };
+  } catch (e) {
+    const why = String(e?.stderr ?? e?.message ?? e).split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? 'refused';
+    log(`gh pr create could not open it (${why}): opening it through GitHub's REST route instead.`);
+  }
+  const value = (f) => (rest.includes(f) ? rest[rest.indexOf(f) + 1] : null);
+  const labels = rest.flatMap((x, i) => (x === '--label' || x === '-l' ? String(rest[i + 1] ?? '').split(',') : [])).map((x) => x.trim()).filter(Boolean);
+  const known = new Set(['--base', '-B', '--draft', '-d', '--label', '-l', '--head', '-H']);
+  const other = rest.filter((x, i) => x.startsWith('-') && !known.has(x) && !known.has(rest[i - 1]));
+  let repo = null, head = null;
+  try { repo = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(String(run('git', ['remote', 'get-url', 'origin'], { cwd: ROOT })).trim())?.[1] ?? null; } catch { /* no origin */ }
+  try { head = value('--head') ?? value('-H') ?? String(run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ROOT })).trim(); } catch { /* no branch */ }
+  if (!repo || !head || head === 'HEAD') { log('Nothing was opened: the repository on GitHub or the branch could not be read for the REST route.'); return { ok: false, route: 'rest' }; }
+  const base = value('--base') ?? value('-B') ?? 'main';
+  let url, number;
+  try {
+    const made = JSON.parse(String(run('gh', ['api', '-X', 'POST', `repos/${repo}/pulls`, '-f', `title=${title}`, '-f', `head=${head}`, '-f', `base=${base}`, '-F', `body=@${bodyFile}`,
+      ...(rest.includes('--draft') || rest.includes('-d') ? ['-F', 'draft=true'] : []), '--jq', '{url: .html_url, number: .number}'], {})));
+    url = made.url; number = made.number;
+  } catch (e) { log(`Nothing was opened: GitHub's REST route refused it too (${String(e?.stderr ?? e?.message ?? e).split('\n')[0]}).`); return { ok: false, route: 'rest' }; }
+  console.log(url);
+  if (labels.length) { try { run('gh', ['api', '-X', 'POST', `repos/${repo}/issues/${number}/labels`, ...labels.flatMap((l) => ['-f', `labels[]=${l}`])], {}); } catch { log(`The labels (${labels.join(', ')}) could not be put on it: add them by hand.`); } }
+  if (other.length) log(`Not carried over by the REST route: ${other.join(' ')}. Set them on the pull request by hand.`);
+  log(`Opened through the REST route. If gh pr merge ${number} --auto is refused the same way, auto-merge has no REST route: once its checks pass, merge it with gh api -X PUT repos/${repo}/pulls/${number}/merge -f merge_method=squash.`);
+  return { ok: true, url, route: 'rest', number };
+}
+
 if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])) {
   const args = process.argv.slice(2);
   const at = args.indexOf('--message');
@@ -2829,8 +2865,7 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
       process.exit(1);
     }
     const rest = args.includes('--') ? args.slice(args.indexOf('--') + 1) : [];
-    try { execFileSync('gh', ['pr', 'create', '--title', title, '--body-file', bodyFile, ...rest], { stdio: 'inherit' }); } catch { process.exit(1); }
-    process.exit(0);
+    process.exit(openPullRequest({ title, bodyFile, rest }).ok ? 0 : 1);
   }
   const found = at >= 0 ? messageFindings(readFileSync(args[at + 1], 'utf8')).map((x) => ({ file: 'the commit message', line: 0, ...x }))
     : args.includes('--staged') ? stagedFindings()
