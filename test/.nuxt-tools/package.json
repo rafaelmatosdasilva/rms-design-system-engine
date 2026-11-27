@@ -2,7 +2,7 @@
   "private": true,
   "description": "Nuxt, for test/vue-builds.test.mjs.",
   "dependencies": {
-    "nuxt": "^4.6.4",
+    "nuxt": "^4.7.0",
     "vue": "3"
   },
   "overrides": {
